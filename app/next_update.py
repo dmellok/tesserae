@@ -273,6 +273,7 @@ def reach_for_device(device: Any, *, now: float | None = None) -> Reach:
             entry = None
 
     sign_connected = False
+    view = None
     if visionect.is_visionect_device(device):
         svc = visionect.service()
         uuid = svc.device_uuid(device.id) if svc is not None else ""
@@ -286,11 +287,11 @@ def reach_for_device(device: Any, *, now: float | None = None) -> Reach:
         return Reach(MODE_CONNECTED)
     predicted = getattr(entry, "predicted_next_wake_at", None)
     if isinstance(predicted, (int, float)):
-        gap = getattr(entry, "last_sleep_interval_s", None)
+        gap = _checkin_gap_s(device, entry, stored, view)
         return Reach(
             MODE_SLEEPS,
             next_checkin_at=float(predicted),
-            gap_s=float(gap) if isinstance(gap, (int, float)) and gap > 0 else None,
+            gap_s=gap,
             step=_aligned_step(device, entry, stored),
             cadence_stable=getattr(entry, "prediction_source", None)
             in ("configured", "firmware", "server"),
@@ -298,6 +299,30 @@ def reach_for_device(device: Any, *, now: float | None = None) -> Reach:
     if visionect.is_visionect_device(device):
         return Reach(MODE_SLEEPS)
     return Reach(MODE_UNKNOWN)
+
+
+def _checkin_gap_s(device: Any, entry: Any, stored: Any, sign_view: Any = None) -> float | None:
+    """Seconds between a sleeper's ordinary check-ins, for stepping past the
+    next one. The last sleep can't answer this on its own: the sleep through
+    quiet hours is one long interval, and stepping by it puts the check-in
+    after a 9:01 AM wake at 6:31 PM. So the cadence the device is set to (or a
+    sign's measured one) comes first, and the last sleep only when neither is
+    known."""
+
+    def positive(value: Any) -> float | None:
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
+            return None
+        return float(value)
+
+    if isinstance(sign_view, dict) and (measured := positive(sign_view.get("checkin_gap_s"))):
+        return measured
+    if isinstance(stored, dict) and (configured := positive(stored.get("sleep_interval_s"))):
+        return configured
+    schema = getattr(device, "config_schema", None)
+    spec = schema.get("sleep_interval_s") if isinstance(schema, dict) else None
+    if isinstance(spec, dict) and (default := positive(spec.get("default"))):
+        return default
+    return positive(getattr(entry, "last_sleep_interval_s", None))
 
 
 def _aligned_step(device: Any, entry: Any, stored: Any) -> Callable[[float], float | None] | None:

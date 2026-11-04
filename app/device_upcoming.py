@@ -26,9 +26,11 @@ the same decisions the tick would make, in the same order:
 * Home Return lands one timeout after the last interaction, deferred to the
   end of quiet hours rather than dropped, because that is what repeatedly
   retrying every tick amounts to;
-* anything landing inside the display's quiet hours is left out entirely: it
-  is a fire that will not repaint this panel, which is the only thing being
-  described here.
+* a daily fire landing inside the display's quiet hours is left out entirely:
+  it will not repaint this panel, which is the only thing being described here;
+* a cycle step or interval fire landing inside them is delivered when they end
+  (the scheduler's catch-up), so it is projected there, once per window, if the
+  record is still running then.
 
 Everything that survives is then coalesced per tick: several records due at
 the same instant fire in one pass, and the panel shows the last frame to
@@ -345,6 +347,21 @@ def _project_cycle(record: CycleRecord, inputs: ProjectionInputs) -> list[_Candi
     prev_fire_ts = record.last_pushed_at
     base_ts = record.last_window_start
     out: list[_Candidate] = []
+
+    def candidate(at: datetime, page: str) -> _Candidate:
+        return _Candidate(
+            at=at,
+            rank=_RANK_CYCLE,
+            priority=rotation.priority,
+            record_id=rotation.id,
+            cause="cycle",
+            certainty=certainty,
+            lineup_id=rotation.id,
+            lineup_name=rotation.name,
+            page_id=None if unknown_dashboard else page,
+        )
+
+    caught_up: set[datetime] = set()
     for window_start, step_index in _cycle_windows(record, inputs):
         fire_at = max(window_start, inputs.now)
         if fire_at > inputs.through:
@@ -372,21 +389,20 @@ def _project_cycle(record: CycleRecord, inputs: ProjectionInputs) -> list[_Candi
         if record.device_pages is not None and step_page not in record.device_pages:
             continue
         if _is_quiet(inputs, fire_at):
+            # Skipped for this panel; the catch-up delivers whichever step is
+            # current when the window ends, if the record is still running.
+            resumed = _quiet_ends_after(inputs, fire_at)
+            if resumed is None or resumed > inputs.through or resumed in caught_up:
+                continue
+            state = _cycle_step_state(record, resumed, inputs.tz)
+            if state is None:
+                continue
+            page = rotation.steps[state[1]].page_id
+            if record.device_pages is None or page in record.device_pages:
+                caught_up.add(resumed)
+                out.append(candidate(resumed, page))
             continue
-        page_id = None if unknown_dashboard else step_page
-        out.append(
-            _Candidate(
-                at=fire_at,
-                rank=_RANK_CYCLE,
-                priority=rotation.priority,
-                record_id=rotation.id,
-                cause="cycle",
-                certainty=certainty,
-                lineup_id=rotation.id,
-                lineup_name=rotation.name,
-                page_id=page_id,
-            )
-        )
+        out.append(candidate(fire_at, step_page))
     return out
 
 
@@ -422,6 +438,7 @@ def _project_interval(record: TimedRecord, inputs: ProjectionInputs) -> list[_Ca
     if record.last_fired is not None:
         cursor = max(cursor, datetime.fromtimestamp(record.last_fired, UTC) + step)
     out: list[_Candidate] = []
+    caught_up: set[datetime] = set()
     walked = 0
     while cursor <= inputs.through and len(out) < _MAX_CANDIDATES_PER_RECORD:
         walked += 1
@@ -442,10 +459,28 @@ def _project_interval(record: TimedRecord, inputs: ProjectionInputs) -> list[_Ca
                 break
             cursor = nxt
             continue
-        if not _is_quiet(inputs, cursor):
+        at: datetime | None = cursor
+        if _is_quiet(inputs, cursor):
+            # Skipped for this panel; the catch-up delivers it when the window
+            # ends, if the record's own mask and window still allow it then.
+            at = _quiet_ends_after(inputs, cursor)
+            if at is not None:
+                resumed_local = _local(at, inputs.tz)
+                if (
+                    at > inputs.through
+                    or at in caught_up
+                    or resumed_local.weekday() not in schedule.days_of_week
+                    or not _window_contains(
+                        schedule.time_of_day_start, schedule.time_of_day_end, resumed_local.time()
+                    )
+                ):
+                    at = None
+                else:
+                    caught_up.add(at)
+        if at is not None:
             out.append(
                 _Candidate(
-                    at=cursor,
+                    at=at,
                     rank=_RANK_TIMED,
                     priority=schedule.priority,
                     record_id=schedule.id,

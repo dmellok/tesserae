@@ -1858,6 +1858,8 @@ class VisionectService:
             "connect_reason": sign.connect_reason,
             "status": status_summary(sign.status),
             "heartbeat_min": sign.params.get(PARAM_HEARTBEAT),
+            "checkin_gap_s": observed_status_gap_s(sign.status_times)
+            or (sign.known_interval_min * 60 if sign.known_interval_min else None),
             "sleep_disabled": sign.params.get(PARAM_SLEEP_DISABLE),
             "wifi": sign.params.get(PARAM_WIFI_SSID),
             "param_error": sign.param_error,

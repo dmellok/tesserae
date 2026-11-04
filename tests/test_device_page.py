@@ -5,6 +5,7 @@ that used to land on the card now redirect."""
 
 from __future__ import annotations
 
+import json
 import re
 import time
 from pathlib import Path
@@ -14,18 +15,26 @@ from flask import Flask
 
 from app.main import REPO_ROOT, create_app
 
+# The collapsible sections, in sub-nav order, for a device with every
+# feature. The summary rail (#overview) heads the page beside them.
 SECTIONS = (
-    "overview",
-    "identity",
     "display",
-    "timing",
+    "schedule",
     "controls",
-    "rendering",
     "power",
-    "lineups",
-    "connection",
+    "troubleshooting",
     "remove",
 )
+# Ids the older, finer sections had. They live on as groups inside the
+# sections above, so old links (#lineups, #logs, ...) still land.
+OLD_ANCHORS = {
+    "identity": "display",
+    "rendering": "display",
+    "timing": "schedule",
+    "lineups": "schedule",
+    "connection": "troubleshooting",
+    "logs": "troubleshooting",
+}
 
 
 @pytest.fixture
@@ -57,28 +66,249 @@ def _add(
     return device_id
 
 
-def test_device_page_renders_every_section_anchor(app: Flask) -> None:
+def _full_device(app: Flask) -> tuple[object, str]:
+    """A paired Pico (buttons, battery, REST token, log upload) that has
+    checked in: the device that shows every section."""
     client = app.test_client()
     _sign_in(client)
-    dev = _add(client)
+    code = app.config["PAIRING_STORE"].issue(note="test").code
+    resp = client.post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+        data=json.dumps(
+            {
+                "device_id": "kitchen",
+                "kind": "pico_bin_client",
+                "panel_w": 800,
+                "panel_h": 480,
+                "fw_version": "1.41.0",
+            }
+        ),
+    )
+    assert resp.status_code == 201, resp.get_data(as_text=True)
+    token = resp.get_json()["device_token"]
+    resp = client.post(
+        "/api/v1/device/kitchen/status",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        data=json.dumps({"battery_pct": 76, "logs": {"schema": 1, "ring_bytes": 3072}}),
+    )
+    assert resp.status_code == 200
+    return client, "kitchen"
+
+
+def _section_html(body: str, section_id: str) -> str:
+    """The markup of one top-level section, from its opening tag to the
+    next section."""
+    start = body.index(f'id="{section_id}"', body.index('<section class="dx-dsec'))
+    start = body.rindex("<section", 0, start)
+    end = body.find('<section class="dx-dsec', start + 1)
+    return body[start : end if end != -1 else len(body)]
+
+
+def _rail_html(body: str) -> str:
+    start = body.index('<aside class="dx-rail" id="overview"')
+    return body[start : body.index("</aside>", start)]
+
+
+def test_device_page_renders_every_section_anchor(app: Flask) -> None:
+    client, dev = _full_device(app)
     resp = client.get(f"/settings/devices/{dev}")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     for anchor in SECTIONS:
         assert f'id="{anchor}"' in body, anchor
         assert f'href="#{anchor}"' in body, anchor
-    # Breadcrumb + header.
+    # The rail is #overview (old links to the Overview section land on it).
+    assert body.count('id="overview"') == 1
+    # One layout wrapper: the page script wires each one it finds.
+    assert body.count("data-device-page") == 1
+    # Five sections and the danger zone, no more: the section strip is the list.
+    nav = body[body.index("data-subnav>") : body.index("</nav>", body.index("data-subnav>"))]
+    assert re.findall(r'data-subnav-link="([^"]+)"', nav) == list(SECTIONS)
+    # Breadcrumb.
     assert "Devices" in body
-    assert "Lounge" in body
     # The combined form is hoisted and every field associates to it.
     assert f'id="device-{dev}-combined"' in body
     assert f'action="/settings/devices/{dev}/save"' in body
     assert 'name="device_name"' in body
-    # Header actions.
-    assert f"/preview/{dev}.png" in body
-    assert f"/mirror/{dev}" in body
-    assert f"/settings/devices/{dev}/push-now" in body
-    assert f"/settings/devices/{dev}/calibration" in body
+    # The rail's actions: More (mirror, raw PNG), Preview, Push now.
+    rail = _rail_html(body)
+    assert f"/preview/{dev}.png" in rail
+    assert f"/mirror/{dev}" in rail
+    assert f'form="device-{dev}-push-now"' in rail
+    assert f'action="/settings/devices/{dev}/push-now"' in body
+    # Calibrate heads the Rendering group.
+    assert f"/settings/devices/{dev}/calibration" in _section_html(body, "display")
+
+
+def test_old_section_anchors_still_resolve_inside_the_new_sections(app: Flask) -> None:
+    client, dev = _full_device(app)
+    body = client.get(f"/settings/devices/{dev}").get_data(as_text=True)
+    for old, parent in OLD_ANCHORS.items():
+        assert body.count(f'id="{old}"') == 1, old
+        assert f'id="{old}"' in _section_html(body, parent), (old, parent)
+    # The groups are marked up as such, with a group heading.
+    assert 'class="dx-grp" id="lineups" data-devsub' in body
+    assert '<h3 class="dx-grp-title">Lineups</h3>' in body
+
+
+def test_each_section_is_a_collapsible_with_a_toggle_button(app: Flask) -> None:
+    """The sections use the shared collapsible component."""
+    client, dev = _full_device(app)
+    body = client.get(f"/settings/devices/{dev}").get_data(as_text=True)
+    assert "data-devsec" not in body  # the page's own collapse code is retired
+    assert 'data-collapsible-scope="device-page"' in body
+    for anchor in SECTIONS[:-1]:  # everything but the Remove danger zone
+        html = _section_html(body, anchor)
+        assert "data-collapsible " in html or "data-collapsible>" in html, anchor
+        assert "data-collapsible-head" in html, anchor
+        assert "data-collapsible-toggle" in html, anchor
+        assert f'aria-controls="{anchor}-body"' in html, anchor
+        assert 'aria-expanded="true"' in html, anchor
+        assert f'id="{anchor}-body" data-collapsible-body' in html, anchor
+        assert "ph-caret-down" in html, anchor
+        # Every section starts expanded in the markup.
+        assert f'id="{anchor}-body" hidden' not in html, anchor
+    assert "data-collapsible" not in _section_html(body, "remove")
+
+
+# Every field, button and form the page carried before the redesign (device
+# with every feature): only their place changed.
+_CONTROLS = {
+    "battery_offset_mv",
+    "battery_offset_pct",
+    "button_map_json",
+    "device_icon",
+    "device_id_readonly",
+    "device_name",
+    "locale",
+    "panel_h",
+    "panel_orientation",
+    "panel_underscan",
+    "panel_w",
+    "quiet_hours_all_day",
+    "quiet_hours_days",
+    "quiet_hours_enabled",
+    "quiet_hours_end",
+    "quiet_hours_sleep",
+    "quiet_hours_start",
+    "refresh_mode",
+    "sleep_interval_s",
+    "transport",
+    "wake_align_anchor",
+    "wake_align_apply_all",
+    "wake_align_mode",
+    "wake_align_times",
+    "wakes",
+}
+_ACTIONS = ("delete", "logs/collect", "regenerate-token", "reveal-token", "set-transport")
+
+
+def test_regrouping_loses_no_control(app: Flask) -> None:
+    client, dev = _full_device(app)
+    body = client.get(f"/settings/devices/{dev}").get_data(as_text=True)
+    body = body[body.index("data-device-page") :]
+    names = set(re.findall(r'<(?:input|select|textarea|button)[^>]*?name="([^"]+)"', body))
+    assert names >= _CONTROLS, sorted(_CONTROLS - names)
+    for action in _ACTIONS:
+        assert f'action="/settings/devices/{dev}/{action}"' in body, action
+    # Where the controls now live.
+    placed = {
+        "device_name": "display",
+        "panel_w": "display",
+        "locale": "display",
+        "sleep_interval_s": "schedule",
+        "quiet_hours_start": "schedule",
+        "button_map_json": "controls",
+        "battery_offset_mv": "power",
+        "wakes": "troubleshooting",
+    }
+    page = client.get(f"/settings/devices/{dev}").get_data(as_text=True)
+    for name, section in placed.items():
+        assert f'name="{name}"' in _section_html(page, section), name
+    assert "Calibrate" in _section_html(page, "display")
+    assert "Nothing scheduled yet" in _section_html(page, "schedule")
+    trouble = _section_html(page, "troubleshooting")
+    for text in (
+        "Regenerate token",
+        "Firmware page",
+        "Advanced: access token and transport",
+        "Advanced: debug details and raw manifest",
+        "Advanced: last status report",
+    ):
+        assert text in trouble, text
+
+
+def test_display_fields_are_compact_rows_with_their_actions(app: Flask) -> None:
+    """Identity, panel and rendering fields are compact field rows; the
+    orientation card is a compass icon button beside Rotation, Calibrate heads
+    the Rendering group, and underscan is a plain number box."""
+    client, dev = _full_device(app)
+    page = client.get(f"/settings/devices/{dev}").get_data(as_text=True)
+    display = _section_html(page, "display")
+    assert display.count('<div class="dx-fg">') == 3
+    assert "dx-band" not in display
+    panel = display[display.index('id="display-panel"') : display.index('id="rendering"')]
+    assert 'type="number" id="device-kitchen-panel-underscan" name="panel_underscan"' in panel
+    assert 'type="range"' not in panel
+    assert f'form="device-{dev}-calibrate"' in panel
+    assert 'aria-label="Send orientation card"' in panel
+    assert "data-size-swap" in panel  # the swap button between width and height
+    rendering = display[display.index('id="rendering"') :]
+    head = rendering[: rendering.index("</div>")]
+    assert f'href="/settings/devices/{dev}/calibration"' in head
+    # While the numbered card is out, the answer band appears under the row
+    # and the compass button steps aside.
+    answering = _section_html(
+        client.get(f"/settings/devices/{dev}?calibrating={dev}").get_data(as_text=True),
+        "display",
+    )
+    assert 'id="orientation-card"' in answering
+    assert answering.count(f'form="device-{dev}-calibrate-apply"') == 4
+    assert 'aria-label="Send orientation card"' not in answering
+
+
+def test_rail_vitals_link_to_the_settings_behind_them(app: Flask) -> None:
+    client, dev = _full_device(app)
+    rail = _rail_html(client.get(f"/settings/devices/{dev}").get_data(as_text=True))
+    assert re.search(r'<a class="dx-now" href="#lineups"', rail)
+    for label, anchor in (
+        ("Battery", "#power"),
+        ("Next update", "#timing"),
+        ("Firmware", "#connection"),
+        ("Checked in", "#connection"),
+    ):
+        m = re.search(
+            rf'<a class="dx-vital" href="{anchor}"[^>]*>\s*<span class="dx-vital-k">{label}</span>',
+            rail,
+        )
+        assert m, label
+
+
+def test_sub_nav_only_links_to_sections_that_exist(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    dev = _add(client)
+    registry = client.application.config["DEVICE_REGISTRY"]
+    registry.get(dev).manifest["buttons"] = False
+    registry.get(dev).manifest["touch"] = False
+    body = client.get(f"/settings/devices/{dev}").get_data(as_text=True)
+    assert 'id="controls"' not in body
+    linked = re.findall(r'data-subnav-link="([^"]+)"', body)
+    assert "controls" not in linked
+    assert {"display", "schedule", "troubleshooting"} <= set(linked)
+    for anchor in linked:
+        assert f'id="{anchor}"' in body, anchor
+
+
+def test_devices_quick_panel_tiles_link_into_the_device_page(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    dev = _add(client)
+    body = client.get("/settings/devices").get_data(as_text=True)
+    assert f'href="/settings/devices/{dev}#lineups"' in body
+    assert f'href="/settings/devices/{dev}#timing"' in body
+    assert f'href="/settings/devices/{dev}#connection"' in body
 
 
 def test_device_page_unknown_device_redirects_to_the_list(app: Flask) -> None:
@@ -298,13 +528,19 @@ def test_connection_chips_link_to_the_firmware_page(app: Flask, monkeypatch) -> 
         ),
     )
     body = client.get(f"/settings/devices/{dev}").get_data(as_text=True)
-    chips = body[body.index("dx-conn-chips") : body.index("dx-conn-chips") + 1400]
+    # The rail says an update is out: a badge on the firmware vital and a
+    # call-out whose Update link goes to the Firmware page.
+    rail = _rail_html(body)
+    assert "dx-v-badge" in rail
     assert re.search(
-        r'<a class="tg tg--warn" href="/settings/firmware"[^>]*>v1.40.0 available</a>', chips
+        r'<span>Firmware v1.40.0 available</span><a href="/settings/firmware" title="Faster wakes',
+        rail,
     )
-    assert 'href="https://github.com/example/firmware/releases/tag/v1.40.0"' in chips
-    assert "release notes" in chips
-    assert "Faster wakes" in chips
+    # The Connection head keeps the release notes, left of the Firmware page.
+    conn = body[body.index('id="connection"') :]
+    head = conn[: conn.index('class="dx-kv"')]
+    assert 'href="https://github.com/example/firmware/releases/tag/v1.40.0"' in head
+    assert head.index("Release notes") < head.index("Firmware page")
 
 
 @pytest.mark.parametrize("source", ["ios_ble", "android_ble"])

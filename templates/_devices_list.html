@@ -127,7 +127,7 @@
       {{ render_thumb(section, 'dx-thumb--quick') }}
       <div class="dx-devquick-body">
         <div class="dx-devquick-tiles">
-          {{ overview_tiles(section) }}
+          {{ overview_tiles(section, section.page_url) }}
         </div>
         <div class="dx-devquick-actions">
           {% set _now = section.now_line %}

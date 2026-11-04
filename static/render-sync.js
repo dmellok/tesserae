@@ -1,4 +1,4 @@
-// Keeps a device's thumbnail, tiles and Queued line current.
+// Keeps a device's thumbnail, tiles (or vital signs) and Queued line current.
 //
 // Settings > Devices and the device page are server-rendered, so a push (or
 // the frame fetching it) after the page loaded would leave the old image on
@@ -19,7 +19,10 @@
     const resp = await fetch(window.location.href, { credentials: "same-origin" });
     if (!resp.ok) return;
     const fresh = new DOMParser().parseFromString(await resp.text(), "text/html");
-    ["thumb:", "tiles:"].forEach((kind) => {
+    // thumb: the thumbnail (the device page's "what is on now" block), tiles:
+    // the headline tiles or the rail's vital signs, callouts: the rail's
+    // call-outs (the Queued line comes and goes with a push).
+    ["thumb:", "tiles:", "callouts:"].forEach((kind) => {
       const key = kind + id;
       const next = fresh.querySelector('[data-render-sync="' + key + '"]');
       const now = document.querySelector('[data-render-sync="' + key + '"]');

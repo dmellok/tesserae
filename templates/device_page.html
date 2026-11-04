@@ -1,983 +1,867 @@
 {% extends "_base.html" %}
-{# Per-device settings page (2026-09 redesign): /settings/devices/<id>.
-   Everything the expandable card used to carry, laid out as anchored
-   sections (Overview, Identity, Display, Timing, Controls, Rendering,
-   Power, Lineups, Connection, Remove) behind a sticky sub-nav.
+{# Per-device settings page: /settings/devices/<id> (2026-11 redesign).
+
+   A sticky status rail on the left is the SUMMARY: who the display is, what
+   it shows, five vital signs (each links to its settings), call-outs only
+   when something needs attention, and the More / Preview / Push now actions.
+   The settings column holds the collapsible sections (Display, Schedule,
+   Controls, Power, Troubleshooting, then Remove) behind a sticky section
+   strip. Phones get the rail as a compact strip above the sections.
+
+   Sections use the shared collapsible component (static/collapsible.js,
+   ``data-collapsible``). The groups inside them keep the ids the old, finer
+   sections had (#identity, #rendering, #timing, #lineups, #connection,
+   #logs), and the rail is #overview, so old links and save redirects land;
+   a jump to an id inside a collapsed section opens it first.
+
+   Fields are compact rows (``dx-fg`` > ``dx-f``, see the ``fld`` macro in
+   _device_parts.html): a label line over a control line, sized to content,
+   up to five across. One control per setting. Rarely used settings sit
+   behind a quiet "Advanced" disclosure.
 
    Every editable field posts through ONE combined form to
-   ``section.combined_endpoint``. The form itself is an empty element
-   hoisted above the sections (a <form> start tag seen while another
-   form is open is dropped by the HTML5 parser, and the sections carry
-   their own action forms: reveal token, switch transport, resync,
-   orientation card, delete). Inputs associate to it via the HTML5
-   ``form="..."`` attribute, which every shared macro emits.
+   ``section.combined_endpoint``. The form is an empty element hoisted above
+   the layout (a <form> start tag seen while another form is open is dropped
+   by the HTML5 parser, and the page carries its own action forms: reveal
+   token, switch transport, resync, orientation card, delete). Inputs
+   associate to it via the HTML5 ``form="..."`` attribute.
 
-   Colour calibration (test patterns, palette, tone) has its own page,
+   The type scale and control styling are page-scoped (``.dx-dp`` in
+   static/style/dx-devpage.css). Colour calibration has its own page,
    device_calibration.html. #}
-{% from "_components.html" import auto_field, info_pop, number_input, select_field, slider, switch, text_input, days_field with context %}
-{% from "_components.html" import settings_tabs, tg_tone %}
-{% from "_device_parts.html" import overview_tiles, render_thumb with context %}
+{% from "_components.html" import auto_field, info_pop, settings_tabs, tg_tone with context %}
+{% from "_device_parts.html" import fld, toggle_fld, dx_select, dx_days, config_field, dsec_head, rail_now, rail_vitals, rail_callouts, mode_badge with context %}
+{% from "_battery_chart.html" import battery_chart, battery_stat_tiles, battery_chart_assets %}
 
 {% set _name = section.device_name or section.device_id %}
-{% set _combined_form_id = section.id ~ '-combined' %}
+{% set _form = section.id ~ '-combined' %}
+{% set _combined_form_id = _form %}
+{% set vs = section.visionect_setup %}
+{% set sign = vs.sign if vs and vs.sign else none %}
 
 {% block title %}{{ _name }}: Devices, Tesserae{% endblock %}
 {% block page_class %}dx-devpage{% endblock %}
+{% block head_extra %}<link rel="stylesheet" href="{{ url_for('static', filename='style/dx-devpage.css') }}">{% endblock %}
 {% block main %}
-<header class="page-head">
-  <h1><i class="ph ph-gear-six"></i> Settings</h1>
-  <p class="lede">Every display this server talks to. Pair a new one, or open a device to change how it looks and behaves.</p>
-</header>
-
 {{ settings_tabs('devices') }}
 
 <script src="{{ url_for('static', filename='pages/settings.js') }}"></script>
 
-{% set is_calibration = False %}
-{% include '_device_page_head.html' %}
+<p class="dx-crumb">
+  <a href="{{ url_for('auth.settings_area', area='server') }}">Settings</a>
+  <span aria-hidden="true">›</span>
+  <a href="{{ url_for('auth.settings_area', area='devices') }}">Devices</a>
+  <span aria-hidden="true">›</span>
+  <span>{{ _name }}</span>
+</p>
 
-{# HOISTED ACTION FORMS (empty; buttons point at them via form="") #}
+{# HOISTED ACTION FORMS (empty; controls point at them via form="") #}
 <form method="post" action="{{ section.combined_endpoint }}"
-      id="{{ _combined_form_id }}" class="device-combined-form" data-dirty-form></form>
-<input type="hidden" name="_active_tab" value="general" form="{{ _combined_form_id }}">
-<input type="hidden" name="_section" value="" form="{{ _combined_form_id }}" data-section-field>
+      id="{{ _form }}" class="device-combined-form" data-dirty-form></form>
+<input type="hidden" name="_active_tab" value="general" form="{{ _form }}">
+<input type="hidden" name="_section" value="" form="{{ _form }}" data-section-field>
 <form method="post" id="album-resync-{{ section.device_id }}"
       action="{{ url_for('auth.devices_album_resync', instance_id=section.device_id) }}"></form>
+<form method="post" id="{{ section.id }}-push-now" action="{{ section.push_now_endpoint }}"></form>
 {% if section.calibrate_endpoint %}
 <form method="post" id="{{ section.id }}-calibrate" action="{{ section.calibrate_endpoint }}"></form>
 <form method="post" id="{{ section.id }}-calibrate-apply" action="{{ section.calibrate_apply_endpoint }}"></form>
 {% endif %}
 
-<div class="dx-devpage-layout" id="{{ section.id }}" data-device-page data-device-id="{{ section.device_id }}">
+<div class="dx-dp" id="{{ section.id }}" data-device-page data-device-id="{{ section.device_id }}"
+     data-collapsible-scope="device-page">
 
-  {# SUB-NAV #}
-  <nav class="dx-subnav" aria-label="Sections" data-subnav>
-    {% set _nav = [('overview', 'Overview'), ('identity', 'Identity'), ('display', 'Display'), ('timing', 'Timing')] + ([('controls', 'Controls')] if section.has_controls else []) + [('rendering', 'Rendering'), ('power', 'Power'), ('lineups', 'Lineups'), ('connection', 'Connection')] %}
-    {% if section.logs %}{% set _nav = _nav + [('logs', 'Logs')] %}{% endif %}
-    {% for anchor, label in _nav + [('remove', 'Remove')] %}
-    <a href="#{{ anchor }}" class="dx-subnav-link{% if loop.first %} is-active{% endif %}{% if anchor == 'remove' %} is-danger{% endif %}" data-subnav-link="{{ anchor }}">{{ label }}</a>
-    {% endfor %}
-  </nav>
-
-  <div class="dx-devpage-main">
-
-    {# ---------------- OVERVIEW ---------------- #}
-    <section class="dx-section-card dx-devsec" id="overview" data-devsec>
-      <header class="dx-section-head">
-        <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-monitor"></i></span>
-        <div class="dx-section-titleblock">
-          <h3 class="dx-section-title">Overview</h3>
-          <p class="dx-section-desc">What the panel is doing right now.</p>
-        </div>
-      </header>
-      <div class="dx-section-body">
-        <div class="dx-overview">
-          {{ render_thumb(section, 'dx-thumb--page') }}
-          <div class="dx-overview-tiles">
-            {{ overview_tiles(section) }}
-            {% set tiles = section.status.tiles %}
-            {% if tiles.signal %}
-            <div class="dx-qtile">
-              <span class="dx-qtile-label">Signal</span>
-              <span class="dx-qtile-value">
-                <span class="dx-bars" aria-hidden="true">
-                  {% for n in [1, 2, 3, 4] %}<span class="dx-bar{% if n <= tiles.signal.bars %} is-on{% endif %}"></span>{% endfor %}
-                </span>
-                {{ tiles.signal.label }}
-              </span>
-              <span class="dx-qtile-sub">{{ tiles.signal.sub }}</span>
-            </div>
-            {% endif %}
-            {% if tiles.environment %}
-            <div class="dx-qtile">
-              <span class="dx-qtile-label">Environment</span>
-              <span class="dx-qtile-value">{{ tiles.environment.value }}</span>
-              <span class="dx-qtile-sub">{{ tiles.environment.sub or '' }}</span>
-            </div>
-            {% endif %}
-          </div>
-        </div>
-
-        {% if section.mode_observation %}
-        <div class="dx-status-line dx-mode-observation" data-device-mode-observation>
-          <span class="dx-status-muted">Phone last confirmed</span>
-          <span class="dx-status-headline">{{ section.mode_observation.label }}</span>
-          <span class="dx-status-muted" aria-hidden="true">·</span>
-          <time class="dx-status-muted" datetime="{{ section.mode_observation.observed_at }}">{{ section.mode_observation.observed_label }}</time>
-        </div>
-        {% endif %}
-
-        {# SMART SYNC PANEL #}
-        {% if section.status.smart_sync and section.status.smart_sync.state != 'off' %}
-        {% set ss = section.status.smart_sync %}
-        {% set ssh = section.status.smart_sync_header %}
-        <section class="dx-smart-sync">
-          <div class="dx-smart-sync-head">
-            <div class="dx-smart-sync-head-left">
-              <span class="dx-smart-sync-label">SMART SYNC</span>
-              <span class="dx-smart-sync-pill dx-tone-{{ ssh.tone }}">{{ ssh.tag }}</span>
-            </div>
-            <span class="dx-smart-sync-confidence">confidence {{ ss.confidence|default(0) }}/10</span>
-          </div>
-          <div class="dx-smart-sync-meter">
-            <div class="dx-smart-sync-meter-fill dx-tone-{{ ssh.tone }}" style="width: {{ ssh.confidence_pct }}%;"></div>
-          </div>
-          <p class="dx-smart-sync-explainer">{{ ssh.explainer }}</p>
-          {% if ss.next_update %}<p class="dx-smart-sync-explainer" data-next-update>{{ ss.next_update.text_display }}</p>{% endif %}
-          <dl class="dx-smart-sync-grid">
-            <div><dt>Last heartbeat</dt><dd>{{ ss.last_heartbeat_rel or section.status.relative }}</dd></div>
-            <div><dt>Next wake</dt><dd>{{ ss.predicted_rel or '-' }}</dd></div>
-            <div><dt>Sleep cycle</dt><dd>{% if ss.interval_s %}{{ ss.interval_s }} s{% else %}-{% endif %}</dd></div>
-            <div><dt>Last offset</dt><dd class="{% if ss.offset_text and ss.offset_text.startswith('+') %}dx-tone-ok{% endif %}">{{ ss.offset_text or '-' }}</dd></div>
-          </dl>
-        </section>
-        {% endif %}
-
-        {# OFFLINE ALBUM: the device's own playback report. Never a
-           specific frame: once playback is local the server can't
-           truthfully claim what's on glass. #}
-        {% set coll = section.status.collection %}
-        {% if coll %}
-        <div class="dx-status-line dx-album-line">
-          <span class="dx-status-muted">Offline album</span>
-          <span class="dx-status-headline">{{ coll.album_name }}</span>
-          {% if coll.pill_class %}<span class="tg tg--sm {{ tg_tone(coll.pill_class) }}">{{ coll.state }}</span>{% else %}<span class="dx-status-muted">no report yet</span>{% endif %}
-          {% if coll.counts %}<span class="dx-status-muted">·</span><span class="dx-status-muted">{{ coll.counts }}</span>{% endif %}
-          {% if coll.relative %}<span class="dx-status-muted">·</span><span class="dx-status-muted">reported {{ coll.relative }}</span>{% endif %}
-          <button type="submit" form="album-resync-{{ section.device_id }}" class="dx-btn-ghost-sm"
-                  title="Re-send this album on the device's next check-in">
-            <i class="ph ph-arrows-clockwise" aria-hidden="true"></i><span>Resync</span>
-          </button>
-        </div>
-        {% endif %}
-
-        {# OPENDISPLAY SETUP HELPER (HA vs bridge) #}
-        {% if section.opendisplay_setup %}
-        {% set od = section.opendisplay_setup %}
-        <div class="{% if od.ok %}dx-hint-band{% else %}dx-warn-band{% endif %}" style="margin-top: 14px;">
-          <i class="ph {% if od.ok %}ph-info{% else %}ph-warning{% endif %}" aria-hidden="true"></i>
-          <p><strong>{{ od.title }}</strong><br>{{ od.body }} <a href="{{ od.link.url }}" target="_blank" rel="noopener noreferrer">{{ od.link.label }}</a>.</p>
-        </div>
-        {% endif %}
-
-        {# VISIONECT LISTENER + SIGN STATE #}
-        {% if section.visionect_setup %}
-        {% set vs = section.visionect_setup %}
-        <div class="{% if vs.ok %}dx-hint-band{% else %}dx-warn-band{% endif %}" style="margin-top: 14px;">
-          <i class="ph {% if vs.ok %}ph-info{% else %}ph-warning{% endif %}" aria-hidden="true"></i>
-          <p><strong>{{ vs.title }}</strong><br>{{ vs.body }} <a href="{{ vs.link.url }}" target="_blank" rel="noopener noreferrer">{{ vs.link.label }}</a>.</p>
-        </div>
-        {% if vs.sign %}
-        {#- What the bound sign last reported, and what it can be asked to do
-            (devices_visionect_action; only while it is connected). -#}
-        <div class="dx-visionect-sign">
-          {% if vs.sign.rows %}
-          <dl class="status-fields">
-            {% for label, value in vs.sign.rows %}
-            <div><dt>{{ label }}</dt><dd>{{ value }}</dd></div>
-            {% endfor %}
-          </dl>
-          {% endif %}
-          {% if vs.sign.error %}
-          <div class="dx-warn-band" style="margin-top: 10px;"><i class="ph ph-warning" aria-hidden="true"></i><p>{{ vs.sign.error }}</p></div>
-          {% endif %}
-          <div class="dx-visionect-actions">
-            {% for action, icon, label, title in [
-                ('status', 'heartbeat', 'Report in', 'Ask the frame for its battery, signal and state now'),
-                ('refresh', 'arrows-clockwise', 'Full refresh', 'Repaint the picture it shows from scratch, to clear ghosting'),
-                ('reboot', 'power', 'Reboot', 'Restart the frame; it reconnects in a minute or two')] %}
-            <form method="post" action="{{ url_for('auth.devices_visionect_action', instance_id=section.device_id, action=action) }}"
-                  {% if action == 'reboot' %}onsubmit="return confirm('Reboot the frame? It reconnects in a minute or two and then gets the latest picture.');"{% endif %}>
-              <button type="submit" class="dx-btn-ghost-sm" title="{{ title }}"{% if not vs.sign.connected %} disabled{% endif %}>
-                <i class="ph ph-{{ icon }}" aria-hidden="true"></i><span>{{ label }}</span>
-              </button>
-            </form>
-            {% endfor %}
-            {% if vs.sign.note %}<span class="field-help">{{ vs.sign.note }}</span>
-            {% elif not vs.sign.connected %}<span class="field-help">The frame takes these while it's connected.</span>{% endif %}
-          </div>
-        </div>
-        {% endif %}
-        {% endif %}
-
-        {% if section.visionect_setup and section.visionect_setup.sign %}
-        {#- A Visionect frame's report is all shown above; what helps instead
-            is what went each way between Tesserae and the frame. -#}
-        <details class="dx-advanced-diag">
-          <summary><i class="ph ph-caret-right" aria-hidden="true"></i><span>Frame log</span></summary>
-          {% if section.visionect_setup.sign.log %}
-          <pre class="dx-code dx-log-view dx-log-view--wrap" data-log-tail>{{ section.visionect_setup.sign.log | join('\n') }}</pre>
-          <p class="field-help">→ Tesserae to the frame, ← the frame to Tesserae; the last {{ section.visionect_setup.sign.log | length }} since Tesserae started.</p>
-          {% else %}
-          <p class="field-help">Nothing yet: the frame hasn't connected since Tesserae started.</p>
-          {% endif %}
-        </details>
-        {% elif section.status.parsed %}
-        <details class="dx-advanced-diag">
-          <summary><i class="ph ph-caret-right" aria-hidden="true"></i><span>Advanced diagnostics</span></summary>
-          <dl class="status-fields">
-            {% for key, value in section.status.parsed.items() %}
-            <div><dt>{{ key }}</dt><dd>{{ value if value is not none else '-' }}</dd></div>
-            {% endfor %}
-          </dl>
-        </details>
-        {% endif %}
-      </div>
-    </section>
-
-    {# ---------------- IDENTITY ---------------- #}
-    <section class="dx-section-card dx-devsec" id="identity" data-devsec>
-      <header class="dx-section-head">
-        <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-note"></i></span>
-        <div class="dx-section-titleblock">
-          <h3 class="dx-section-title">Identity</h3>
-          <p class="dx-section-desc">How this display is named.</p>
-        </div>
-      </header>
-      <div class="dx-section-body">
-        <div class="dx-field-grid">
-          {{ text_input(section.id ~ '-device-name', 'device_name', 'Display name',
-              value=section.device_name, required=True, form=_combined_form_id) }}
-          {% set current_icon = section.icon or 'device-mobile' %}
-          {% set picker_id = section.id ~ '-icon' %}
-          <input type="hidden" name="device_icon" value="{{ current_icon }}" form="{{ _combined_form_id }}"
-                 data-icon-value data-icon-picker-id="{{ picker_id }}">
-          <div class="field">
-            <label for="{{ picker_id }}-btn">Icon</label>
-            <div class="icon-picker" data-icon-picker data-icon-picker-id="{{ picker_id }}">
-              <button type="button" id="{{ picker_id }}-btn" class="icon-picker-trigger" data-icon-trigger>
-                <span class="icon-picker-current"><i class="ph ph-{{ current_icon }}" aria-hidden="true"></i></span>
-                <span class="icon-picker-label" data-icon-label>{{ current_icon }}</span>
-                <i class="ph ph-caret-down caret-soft" aria-hidden="true" style="margin-left:auto;"></i>
-              </button>
-              <div class="icon-picker-popover" data-icon-popover hidden>
-                <div class="icon-picker-search">
-                  <input type="search" placeholder="Search icons…" data-icon-search autocomplete="off" spellcheck="false">
-                </div>
-                <div class="icon-picker-grid" data-icon-grid></div>
-                <div class="icon-picker-empty" data-icon-empty hidden>No icons match that search.</div>
-              </div>
-            </div>
-          </div>
-          {{ text_input(section.id ~ '-device-id', 'device_id_readonly', 'Device id',
-              value=section.device_id, readonly=True,
-              help='Used in URLs and MQTT topics. Cannot change.') }}
+  {# ================= SUMMARY RAIL ================= #}
+  <aside class="dx-rail" id="overview" aria-label="Summary">
+    <header class="dx-rail-head">
+      <span class="dx-rail-icon" aria-hidden="true"><i class="ph ph-{{ section.icon or 'device-mobile' }}" data-device-head-icon></i></span>
+      <div class="dx-rail-titles">
+        <h1 class="dx-rail-name" data-device-head-name>{{ _name }}</h1>
+        <div class="dx-rail-meta">
+          <span>{{ section.kind_name }}</span>
+          <span class="tg tg--mono" title="Transport">{{ section.transport_badge }}</span>
+          {{ mode_badge(section) }}
         </div>
       </div>
-    </section>
+    </header>
 
-    {# ---------------- DISPLAY ---------------- #}
-    {% if section.panel %}
-    <section class="dx-section-card dx-devsec" id="display" data-devsec data-orient-swap>
-      <header class="dx-section-head">
-        <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-image-square"></i></span>
-        <div class="dx-section-titleblock">
-          <h3 class="dx-section-title">Display</h3>
-          <p class="dx-section-desc">Panel geometry the composer renders at.</p>
-        </div>
-      </header>
-      <div class="dx-section-body">
-        <div class="dx-field-grid dx-field-grid--3">
-          {{ number_input(section.id ~ '-panel-w', 'panel_w', 'Logical panel width (px)', value=section.panel.w, min=1, step=1, form=_combined_form_id) }}
-          {{ number_input(section.id ~ '-panel-h', 'panel_h', 'Logical panel height (px)', value=section.panel.h, min=1, step=1, form=_combined_form_id) }}
-          {# Degrees are the turn from the panel's own framebuffer, so a
-             portrait-native panel reads 0° when it paints its buffer as-is
-             (issue #200). #}
-          {{ select_field(section.id ~ '-orientation', 'panel_orientation', 'Rotation',
-              value=section.panel.get('orientation', 'landscape'),
-              options=section.panel_rotation_options,
-              help='Clockwise turn to match the mount.',
-              form=_combined_form_id) }}
-        </div>
-        <p class="field-help">Composition orientation, the size dashboards are rendered at. Not the physical size the device reports.</p>
-        {% if section.status.reported_panel_hint %}
-        <p class="dx-hint"><i class="ph ph-info" aria-hidden="true"></i> {{ section.status.reported_panel_hint }}</p>
-        {% endif %}
-        <div class="dx-field-grid">
-          {% set us_max = [section.panel.w, section.panel.h]|min // 4 %}
-          {{ slider(section.id ~ '-panel-underscan', 'panel_underscan', 'Underscan', value=section.panel.get('underscan', 0), min=0, max=us_max, step=1, unit='px',
-              help='Inset content by this many pixels on every edge so it clears a mat or bezel.',
-              form=_combined_form_id) }}
-          {% if section.gamut_capable %}
-          {{ select_field(section.id ~ '-gamut', 'panel_gamut', 'Colour gamut',
-              value=section.panel.get('gamut', 'waveshare_e6'),
-              options=[{'value':'waveshare_e6','label':'Waveshare E6 / Spectra 6 (6-colour)'},
-                       {'value':'inky_7colour','label':'Inky Impression 7-colour (adds orange)'}],
-              form=_combined_form_id) }}
-          {% endif %}
-        </div>
+    {{ rail_now(section) }}
+    {{ rail_vitals(section) }}
 
-        {# ORIENTATION CARD BAND. Buttons post to the hoisted calibrate
-           forms via form=""; the 1-4 answer flow appears in the band
-           while ?calibrating=<id> matches. #}
-        {% if section.calibrate_endpoint %}
-        <div class="dx-band{% if calibrating == section.device_id %} is-active{% endif %}" id="orientation-card">
-          <span class="dx-band-icon" aria-hidden="true"><i class="ph ph-compass"></i></span>
-          {% if calibrating == section.device_id %}
-          <div class="dx-band-text">
-            <p class="dx-band-title">A numbered card was sent to {{ _name }}. Which number is in the top-left corner?</p>
-            <p class="dx-band-desc">Look at the panel and pick the number you see top-left; the rotation is set to match and the card is re-sent to confirm.</p>
-          </div>
-          <div class="dx-band-actions calibrate-choices">
-            <button type="submit" form="{{ section.id }}-calibrate" class="dx-btn is-ghost">
-              <i class="ph ph-arrow-clockwise" aria-hidden="true"></i><span>Re-send card</span>
-            </button>
-            {% for n in [1, 2, 3, 4] %}
-            <button type="submit" form="{{ section.id }}-calibrate-apply" name="top_left" value="{{ n }}" class="dx-btn calibrate-num">{{ n }}</button>
-            {% endfor %}
-          </div>
-          {% else %}
-          <div class="dx-band-text">
-            <p class="dx-band-title">Not sure which way it is mounted?</p>
-            <p class="dx-band-desc">Send a numbered card once, then pick the rotation that reads upright.</p>
-          </div>
-          <div class="dx-band-actions">
-            <button type="submit" form="{{ section.id }}-calibrate" class="dx-btn">
-              <i class="ph ph-compass" aria-hidden="true"></i><span>Send orientation card</span>
-            </button>
-          </div>
-          {% endif %}
-        </div>
-        {% endif %}
-      </div>
-    </section>
+    {% set env = section.status.tiles.environment %}
+    {% set mo = section.mode_observation %}
+    {% if env or (mo and mo.mode != 'bluetooth') %}
+    <p class="dx-rail-aside">
+      {%- if env %}<span>{{ env.value }}{% if env.sub %} · {{ env.sub }}{% endif %} at the display</span>{% endif %}
+      {%- if mo and mo.mode != 'bluetooth' %}<span class="dx-mode-observation" data-device-mode-observation>Phone last confirmed {{ mo.label }} · <time datetime="{{ mo.observed_at }}">{{ mo.observed_label }}</time></span>{% endif -%}
+    </p>
     {% endif %}
 
-    {# ---------------- TIMING ---------------- #}
-    <section class="dx-section-card dx-devsec" id="timing" data-devsec>
-      <header class="dx-section-head">
-        <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-clock"></i></span>
-        <div class="dx-section-titleblock">
-          <h3 class="dx-section-title">Timing</h3>
-          <p class="dx-section-desc">When the panel wakes and how long it stays up.</p>
-        </div>
-      </header>
-      <div class="dx-section-body">
-        {% if section.fields %}
-        <div class="dx-field-grid">
-          {% for field in section.fields %}
-            {% set value = section.state.get(field.name, field.get('default', '')) %}
-            {{ auto_field(section.id ~ '-' ~ field.name, field.name, field, value, form=_combined_form_id) }}
-          {% endfor %}
-        </div>
-        {% endif %}
+    {{ rail_callouts(section) }}
 
-        {# Update delivery (#271), REST only. #}
-        {% if section.refresh_mode_capable %}
-        <div class="dx-field-grid">
-          {{ select_field(section.id ~ '-refresh-mode', 'refresh_mode', 'Update delivery',
-              value=section.refresh_mode, blank_label='Auto (partial refresh when possible)',
-              options=[{'value': 'full', 'label': 'Always full refresh'}],
-              help='Auto delivers small changes as partial-refresh patches on capable firmware and falls back to a full frame on the next poll otherwise. Always full refresh repaints the whole panel on every change; use it if updates look incomplete or ghosted.',
-              form=_combined_form_id) }}
+    <div class="dx-rail-actions">
+      <details class="dx-more" data-more-menu>
+        <summary class="dx-btn is-ghost is-icon" aria-label="More actions" title="More actions"><i class="ph ph-dots-three" aria-hidden="true"></i></summary>
+        <div class="dx-more-pop">
+          <a href="{{ section.mirror_url }}" target="_blank" rel="noopener" title="Auto-refreshing browser page (good for iPad / kiosk dashboards)."><i class="ph ph-monitor-play" aria-hidden="true"></i>Open mirror</a>
+          <a href="{{ section.preview_url }}" target="_blank" rel="noopener" title="Latest composition PNG, raw image (good for Home Assistant, Grafana, etc)."><i class="ph ph-file-image" aria-hidden="true"></i>Raw PNG preview</a>
         </div>
-        {% endif %}
+      </details>
+      <a class="dx-btn" href="{{ section.preview_url }}" target="_blank" rel="noopener"
+         title="Latest composition PNG, raw image (good for Home Assistant, Grafana, etc)."><i class="ph ph-image" aria-hidden="true"></i><span>Preview</span></a>
+      <button type="submit" form="{{ section.id }}-push-now" class="dx-btn is-primary"
+              title="Re-send the page this display is on (its lineup step, or the last page pushed to it)."><i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Push now</span></button>
+    </div>
+  </aside>
 
-        {# Synchronized wake (wake alignment), REST only. #}
-        {% if section.wake_align_capable %}
-        <hr class="dx-divider">
-        <p class="device-subhead">Synchronized wake</p>
-        <p class="field-help" style="margin: 0 0 4px;">
-          Align this device's wakes to the clock instead of counting from its last check-in.
-          Devices set to the same grid wake and repaint together; the server learns each
-          device's wake-to-paint latency and shifts the wake earlier so the paint lands on the grid.
-        </p>
-        <div class="dx-field-grid">
-          {{ select_field(section.id ~ '-wa-mode', 'wake_align_mode', 'Mode',
-              value=section.wake_align.mode,
-              blank_label='Off (wake every sleep interval)',
-              options=[{'value': 'interval', 'label': 'On the clock (sleep interval, aligned)'},
-                       {'value': 'times', 'label': 'At set times only'}],
-              help='"On the clock" keeps the sleep interval as the period but lands each wake on anchor + multiples of it, e.g. a 15-minute interval anchored at 00:05 wakes at :05, :20, :35, :50. "At set times" ignores the interval and wakes only at the times listed. Scheduled dashboards can still wake the device early in interval mode.',
-              form=_combined_form_id) }}
-          {{ text_input(section.id ~ '-wa-anchor', 'wake_align_anchor', 'Anchor (on-the-clock mode)',
-              value=section.wake_align.anchor, placeholder='00:00', type='time',
-              help='Offset of the wall-clock grid. 00:00 lands wakes on the hour boundaries; 00:05 shifts the whole grid five minutes later.',
-              form=_combined_form_id) }}
-          {{ text_input(section.id ~ '-wa-times', 'wake_align_times', 'Times (set-times mode)',
-              value=section.wake_align.times_csv, placeholder='07:00, 12:30, 19:00',
-              help='Comma-separated HH:MM local times. The device sleeps from one listed time to the next.',
-              form=_combined_form_id) }}
-          {{ switch(section.id ~ '-wa-apply-all', 'wake_align_apply_all', 'Apply to all devices on save',
-              checked=False,
-              help='Copies this synchronized-wake setting to every REST device on this server, so one save puts the whole fleet on the same grid. Not remembered between saves.',
-              form=_combined_form_id) }}
-        </div>
-        {% endif %}
+  {# ================= SETTINGS COLUMN ================= #}
+  <div class="dx-dp-main">
+    <nav class="dx-secnav" aria-label="Sections" data-subnav>
+      {% set _nav = [('display', 'Display'), ('schedule', 'Schedule')]
+          + ([('controls', 'Controls')] if section.has_controls else [])
+          + ([('power', 'Power')] if section.battery_offset_endpoint else [])
+          + [('troubleshooting', 'Troubleshooting')]
+          + ([('remove', 'Remove')] if section.delete_endpoint else []) %}
+      {% for anchor, label in _nav %}
+      <a href="#{{ anchor }}" class="dx-subnav-link{% if loop.first %} is-active{% endif %}{% if anchor == 'remove' %} is-danger{% endif %}" data-subnav-link="{{ anchor }}">{{ label }}</a>
+      {% endfor %}
+    </nav>
 
-        {# Quiet hours override: toggle row + dependent fields. #}
-        {% if section.quiet_hours_endpoint %}
-        <hr class="dx-divider">
-        <div class="dx-quiet-hours" data-dep-group>
-          <div class="dx-toggle-row">
-            <div class="dx-toggle-row-text">
-              <label class="dx-toggle-row-label" for="{{ section.id }}-qh-enabled">Override the server's quiet hours</label>
-              <p class="dx-toggle-row-desc">On, this display uses only the hours below and the server's quiet hours don't apply to it. Off, it follows Settings › Server › Quiet hours.</p>
-            </div>
-            <label class="dx-toggle-switch" for="{{ section.id }}-qh-enabled">
-              <input id="{{ section.id }}-qh-enabled" type="checkbox" name="quiet_hours_enabled"
-                     form="{{ _combined_form_id }}" data-master
-                     {% if section.quiet_hours.get('enabled', False) %}checked{% endif %}>
-              <span class="dx-toggle-track" aria-hidden="true"><span class="dx-toggle-knob"></span></span>
-            </label>
+    {# ---------------- DISPLAY ---------------- #}
+    {% set _rot_label = (section.panel_rotation_options or [])|selectattr('value', 'equalto', (section.panel or {}).get('orientation', 'landscape'))|map(attribute='label')|first if section.panel else '' %}
+    <section class="dx-dsec" id="display" data-collapsible data-orient-swap>
+      {{ dsec_head('display', 'image-square', 'Display', _name ~ ((' · ' ~ section.panel.w ~ ' × ' ~ section.panel.h ~ ' · ' ~ _rot_label) if section.panel else '')) }}
+      <div class="dx-dsec-body" id="display-body" data-collapsible-body>
+
+        {% set id_fields = (section.fields or [])|selectattr('type', 'in', ['string', 'ha_device_picker'])|list %}
+        <div class="dx-grp" id="identity" data-devsub>
+          <div class="dx-grp-head"><h3 class="dx-grp-title">Identity</h3></div>
+          <div class="dx-fg">
+            {% set current_icon = section.icon or 'device-mobile' %}
+            {% set picker_id = section.id ~ '-icon' %}
+            {% call fld(section.id ~ '-device-name', 'Name and icon', w='lg', cls='dx-f--name') %}
+              <input type="hidden" name="device_icon" value="{{ current_icon }}" form="{{ _form }}"
+                     data-icon-value data-icon-picker-id="{{ picker_id }}">
+              <div class="icon-picker dx-icon-picker" data-icon-picker data-icon-picker-id="{{ picker_id }}">
+                <button type="button" id="{{ picker_id }}-btn" class="icon-picker-trigger dx-icon-trigger" data-icon-trigger aria-haspopup="true" title="Icon">
+                  <span class="icon-picker-current"><i class="ph ph-{{ current_icon }}" aria-hidden="true"></i></span>
+                  <span class="sr-only">Icon: </span><span class="icon-picker-label sr-only" data-icon-label>{{ current_icon }}</span>
+                  <i class="ph ph-caret-down caret-soft" aria-hidden="true"></i>
+                </button>
+                <div class="icon-picker-popover" data-icon-popover hidden>
+                  <div class="icon-picker-search">
+                    <input type="search" placeholder="Search icons…" aria-label="Search icons" data-icon-search autocomplete="off" spellcheck="false">
+                  </div>
+                  <div class="icon-picker-grid" data-icon-grid></div>
+                  <div class="icon-picker-empty" data-icon-empty hidden>No icons match that search.</div>
+                </div>
+              </div>
+              <input class="dx-in" type="text" id="{{ section.id }}-device-name" name="device_name"
+                     value="{{ section.device_name or '' }}" required form="{{ _form }}" data-device-name-input>
+            {% endcall %}
+            {% call fld(section.id ~ '-device-id', 'Device id', help='Used in URLs and MQTT topics. Cannot change.', w='num') %}
+              <input class="dx-in dx-mono" type="text" id="{{ section.id }}-device-id" name="device_id_readonly"
+                     value="{{ section.device_id }}" readonly>
+            {% endcall %}
+            {% for field in id_fields %}{{ config_field(section, field, _form) }}{% endfor %}
           </div>
-          {#- Left: the window's days with its Start and End under them, no
-              wider than the day chips; right: the all-day days. Side by side
-              when both fit, stacked otherwise. -#}
-          <div class="dx-field-grid dx-qh-days" data-dep-target>
-            <div class="dx-qh-window">
-              {{ days_field(section.id ~ '-qh-days', 'quiet_hours_days', 'Window applies on',
-                  value=section.quiet_hours.get('days', ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']),
-                  help='The days the Start to End window runs, each by its own clock: an overnight window covers that morning up to End and that evening from Start.',
-                  form=_combined_form_id) }}
-              <div class="dx-qh-times">
-                {{ text_input(section.id ~ '-qh-start', 'quiet_hours_start', 'Start',
-                    value=section.quiet_hours.get('start', ''), placeholder='HH:MM', type='time', form=_combined_form_id) }}
-                {{ text_input(section.id ~ '-qh-end', 'quiet_hours_end', 'End',
-                    value=section.quiet_hours.get('end', ''), placeholder='HH:MM', type='time', form=_combined_form_id) }}
+        </div>
+
+        {% if section.panel %}
+        <div class="dx-grp" id="display-panel" data-devsub>
+          <div class="dx-grp-head"><h3 class="dx-grp-title">Panel</h3></div>
+          {% set _size_help = 'Width × height that dashboards compose at, not the size the device reports. Changing Rotation between portrait and landscape swaps them.' ~ ((' ' ~ section.status.reported_panel_hint ~ '.') if section.status.reported_panel_hint else '') %}
+          <div class="dx-fg">
+            {% call fld(section.id ~ '-panel-w', 'Render size (px)', help=_size_help, w='lg', cls='dx-f--size') %}
+              <span class="dx-size-row">
+                <input class="dx-in" type="number" id="{{ section.id }}-panel-w" name="panel_w" value="{{ section.panel.w }}" min="1" step="1" aria-label="Width (px)" form="{{ _form }}">
+                <button type="button" class="dx-btn is-icon dx-swap" data-size-swap aria-label="Swap width and height" title="Swap width and height"><i class="ph ph-arrows-left-right" aria-hidden="true"></i></button>
+                <input class="dx-in" type="number" id="{{ section.id }}-panel-h" name="panel_h" value="{{ section.panel.h }}" min="1" step="1" aria-label="Height (px)" form="{{ _form }}">
+              </span>
+            {% endcall %}
+            {% call fld(section.id ~ '-panel-underscan', 'Underscan', help='Inset content by this many pixels on every edge so it clears a mat or bezel.', w='num') %}
+              <span class="dx-in-unit"><input class="dx-in" type="number" id="{{ section.id }}-panel-underscan" name="panel_underscan" value="{{ section.panel.get('underscan', 0) }}" min="0" step="1" form="{{ _form }}"><span aria-hidden="true">px</span></span>
+            {% endcall %}
+            {#- Degrees are the turn from the panel's own framebuffer, so a
+                portrait-native panel reads 0° when it paints its buffer as-is
+                (issue #200). -#}
+            {% set _send_card = section.calibrate_endpoint and calibrating != section.device_id %}
+            {% call fld(section.id ~ '-orientation', 'Rotation', help='Clockwise turn to match the mount.' ~ (' Not sure which way it is mounted? Send the numbered orientation card (compass button), then pick the number that reads upright.' if _send_card else ''), w='md') %}
+              {{ dx_select(section.id ~ '-orientation', 'panel_orientation', section.panel.get('orientation', 'landscape'), section.panel_rotation_options, form=_form) }}
+              {% if _send_card %}
+              <button type="submit" form="{{ section.id }}-calibrate" class="dx-btn is-icon" aria-label="Send orientation card" title="Send orientation card"><i class="ph ph-compass" aria-hidden="true"></i></button>
+              {% endif %}
+            {% endcall %}
+            {% if section.gamut_capable %}
+            {% call fld(section.id ~ '-gamut', 'Colour gamut', help='The palette the .bin frame is packed to on the server.', w='lg') %}
+              {{ dx_select(section.id ~ '-gamut', 'panel_gamut', section.panel.get('gamut', 'waveshare_e6'),
+                  [{'value':'waveshare_e6','label':'Waveshare E6 / Spectra 6 (6-colour)'},
+                   {'value':'inky_7colour','label':'Inky Impression 7-colour (adds orange)'}], form=_form) }}
+            {% endcall %}
+            {% endif %}
+          </div>
+
+          {# ORIENTATION CARD ANSWER BAND: while ?calibrating=<id> matches,
+             this band takes the 1-4 answer. Buttons post to the hoisted
+             calibrate forms via form="". #}
+          {% if section.calibrate_endpoint and calibrating == section.device_id %}
+          <div class="dx-band is-active" id="orientation-card">
+            <i class="ph ph-compass" aria-hidden="true"></i>
+            <div class="dx-band-text">
+              <p class="dx-band-title">A numbered card was sent to {{ _name }}. Which number is in the top-left corner?</p>
+              <p class="dx-help">The rotation is set to match and the card is re-sent to confirm.</p>
+              <div class="dx-band-actions calibrate-choices">
+                <button type="submit" form="{{ section.id }}-calibrate" class="dx-link-btn"><i class="ph ph-arrow-clockwise" aria-hidden="true"></i><span>Re-send card</span></button>
+                <span class="dx-band-spacer"></span>
+                {% for n in [1, 2, 3, 4] %}
+                <button type="submit" form="{{ section.id }}-calibrate-apply" name="top_left" value="{{ n }}" class="dx-btn is-num calibrate-num">{{ n }}</button>
+                {% endfor %}
               </div>
             </div>
-            {{ days_field(section.id ~ '-qh-all-day', 'quiet_hours_all_day', 'Quiet all day',
-                value=section.quiet_hours.get('all_day', []),
-                help='No scheduled or automatic pictures from midnight to midnight on these days; the display keeps what it shows, and sending one yourself still works. With Sleep through quiet hours on, it sleeps all day.',
-                form=_combined_form_id) }}
           </div>
-          {#- Toggle rows like the override above: what it does, in words, beside its switch. -#}
-          {% set qh_toggles = [(section.id ~ '-qh-sleep', 'quiet_hours_sleep', 'Sleep through quiet hours',
-                'The display sleeps until the window ends instead of waking on its usual interval inside it. Saves power; a picture sent during the window shows when it ends.',
-                section.quiet_hours.get('sleep', False))] %}
-          {% if section.quiet_hours_touch %}
-          {% set qh_toggles = qh_toggles + [(section.id ~ '-qh-touch-off', 'quiet_hours_touch_off', 'Touch off during quiet hours',
-                'The touchscreen sleeps with the panel, so a tap does nothing until the window ends; the buttons still wake it.',
-                section.quiet_hours.get('touch_off', False))] %}
           {% endif %}
-          {% for toggle_id, toggle_name, toggle_label, toggle_desc, toggle_on in qh_toggles %}
-          <div class="dx-toggle-row" data-dep-target>
-            <div class="dx-toggle-row-text">
-              <label class="dx-toggle-row-label" for="{{ toggle_id }}">{{ toggle_label }}</label>
-              <p class="dx-toggle-row-desc">{{ toggle_desc }}</p>
-            </div>
-            <label class="dx-toggle-switch" for="{{ toggle_id }}">
-              <input id="{{ toggle_id }}" type="checkbox" name="{{ toggle_name }}"
-                     form="{{ _combined_form_id }}" {% if toggle_on %}checked{% endif %}>
-              <span class="dx-toggle-track" aria-hidden="true"><span class="dx-toggle-knob"></span></span>
-            </label>
-          </div>
-          {% endfor %}
         </div>
         {% endif %}
+
+        <div class="dx-grp" id="rendering" data-devsub>
+          <div class="dx-grp-head">
+            <h3 class="dx-grp-title">Rendering</h3>
+            <a class="dx-btn is-sm dx-grp-end" href="{{ section.calibration_url }}" title="Colour calibration: test patterns, palette recalibration and tone curves"><i class="ph ph-palette" aria-hidden="true"></i><span>Calibrate</span></a>
+          </div>
+          {% set _cd = section.colour_depth %}
+          {% if _cd and _cd.prompt %}
+          {# One-time upgrade prompt: firmware on this board now paints 4-level
+             grey. "Keep mono" is remembered per device. #}
+          <div class="dx-band is-active" data-grey-prompt>
+            <i class="ph ph-circle-half" aria-hidden="true"></i>
+            <div class="dx-band-text">
+              <p class="dx-band-title">This display can now show 4 shades of grey</p>
+              <p class="dx-help">Its firmware paints 4-level grey as well as mono, so photos and shading look smoother. Grey takes a slower full refresh and uses a little more battery per update.</p>
+              <div class="dx-band-actions">
+                <span class="dx-band-spacer"></span>
+                <form method="post" action="{{ url_for('auth.devices_colour_depth', instance_id=section.device_id) }}">
+                  <input type="hidden" name="choice" value="mono">
+                  <button type="submit" class="dx-link-btn">Keep mono</button>
+                </form>
+                <form method="post" action="{{ url_for('auth.devices_colour_depth', instance_id=section.device_id) }}">
+                  <input type="hidden" name="choice" value="grey">
+                  <button type="submit" class="dx-btn is-sm is-primary">Switch to grey</button>
+                </form>
+              </div>
+            </div>
+          </div>
+          {% endif %}
+          <div class="dx-fg">
+            {% if section.locale_editable %}
+            {% call fld(section.id ~ '-locale', 'Panel text locale', help='Overrides the app-wide default for widgets rendered on this device. Only widgets that have shipped a translation for the picked language actually change; others keep their built-in English text.', w='md') %}
+              {{ dx_select(section.id ~ '-locale', 'locale', section.locale, section.locale_choices, blank_label='App default', form=_form) }}
+            {% endcall %}
+            {% endif %}
+            {% if section.renderer_choice %}
+            {% call fld(section.id ~ '-renderer', 'Renderer', help='Which wire format this panel is sent. Switch to a grey renderer only for a panel that paints real greys (KOReader e-readers and the TRMNL X take 16 greys; TRMNL firmware 1.6.0 and later takes the 4-grey PNG); a 1-bit-only client should stay on the mono renderer. The colour gamut shown for this panel follows the renderer picked here.', w='lg') %}
+              {{ dx_select(section.id ~ '-renderer', 'renderer_id', section.renderer_choice.value, section.renderer_choice.options, form=_form) }}
+            {% endcall %}
+            {% endif %}
+            {% if _cd %}
+            {% if _cd.enabled %}
+            {% call fld(section.id ~ '-colour-depth', 'Colour depth', help='Mono or 4-level grey. Grey makes photos and shading smoother, and takes a slower full refresh and a little more battery per update.', w='md') %}
+              {{ dx_select(section.id ~ '-colour-depth', 'renderer_id', _cd.value, _cd.options, form=_form) }}
+            {% endcall %}
+            {% else %}
+            {% call fld(section.id ~ '-colour-depth', 'Colour depth', help='A firmware update adds 4-level grey to this display.' ~ (' Grey is picked and starts once the display reports it can paint grey; until then it gets mono.' if _cd.waiting else ''), w='md') %}
+              {{ dx_select(section.id ~ '-colour-depth', '', _cd.value, _cd.options, attrs='disabled') }}
+            {% endcall %}
+            {% endif %}
+            {% endif %}
+            {% for field in (section.fields or []) if field.type == 'select' %}{{ config_field(section, field, _form) }}{% endfor %}
+            {% for pq in section.picture_quality %}
+            {% for field in pq.fields %}
+              {% set fid = section.id ~ '-pq-' ~ pq.base_id ~ '-' ~ field.name %}
+              {% set value = pq.state.get(field.name, field.get('default', '')) %}
+              {% if field.get('type') == 'select' %}
+              {% call fld(fid, field.get('label', field.name)|replace(' (quarter-turns)', '')|replace('Client-side scale mode', 'Client scale'), help=field.get('help'), w='md', data={'pq-renderer': pq.base_name}) %}
+                {{ dx_select(fid, pq.clone_id ~ ':' ~ field.name, value, field.get('choices', []), form=_form) }}
+              {% endcall %}
+              {% else %}
+              <div class="dx-f w-xl dx-f--legacy">{{ auto_field(fid, pq.clone_id ~ ':' ~ field.name, field, value, form=_form) }}</div>
+              {% endif %}
+            {% endfor %}
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    {# ---------------- SCHEDULE ---------------- #}
+    {% set qh = section.quiet_hours %}
+    {% set _n_lineups = (section.lineup_rows|length) + (section.timetable_entries|length) %}
+    <section class="dx-dsec" id="schedule" data-collapsible>
+      {{ dsec_head('schedule', 'calendar-blank', 'Schedule',
+          (section.overview.next_wake.sub ~ ' · ' if section.overview.next_wake.sub else '')
+          ~ ('own quiet hours' if qh.get('enabled') else 'server quiet hours')
+          ~ ' · ' ~ _n_lineups ~ (' lineup' if _n_lineups == 1 else ' lineups')) }}
+      <div class="dx-dsec-body" id="schedule-body" data-collapsible-body>
+
+        {% set t_fields = (section.fields or [])|rejectattr('type', 'in', ['string', 'ha_device_picker', 'select'])|list %}
+        {% set awake_spec = t_fields|selectattr('name', 'equalto', 'awake_poll_s')|first %}
+        {% set has_always_on = t_fields|selectattr('name', 'equalto', 'always_on')|list|length > 0 %}
+        <div class="dx-grp" id="timing" data-devsub>
+          <div class="dx-grp-head"><h3 class="dx-grp-title">Timing</h3></div>
+          <div class="dx-fg">
+            {#- One control per setting: a Visionect sign sets its own check-in
+                interval, read here; every other kind picks it below. -#}
+            {% set _sign_interval = (sign.rows|selectattr(0, 'in', ['Check-in interval', 'Next check-in'])|first) if sign else none %}
+            {% if _sign_interval and not t_fields %}
+            {% call fld(section.id ~ '-sleep-ro', 'Heart beat interval', help='This frame sleeps between check-ins on its own interval, set on the frame and read at each check-in.', w='md', label_for=False) %}
+              <p class="dx-f-value" aria-labelledby="{{ section.id }}-sleep-ro-label">{{ _sign_interval[1] }} <span class="dx-help">· set on the frame</span></p>
+            {% endcall %}
+            {% endif %}
+            {% for field in t_fields if field.name in ('sleep_interval_s', 'refresh_rate_s') %}{{ config_field(section, field, _form) }}{% endfor %}
+            {# Update delivery (#271), REST only. #}
+            {% if section.refresh_mode_capable %}
+            {% call fld(section.id ~ '-refresh-mode', 'Update delivery', help='Auto delivers small changes as partial-refresh patches on capable firmware and falls back to a full frame on the next poll otherwise. Always full refresh repaints the whole panel on every change; use it if updates look incomplete or ghosted.', w='md') %}
+              {{ dx_select(section.id ~ '-refresh-mode', 'refresh_mode', section.refresh_mode, [{'value': 'full', 'label': 'Always full refresh'}], blank_label='Auto (partial)', form=_form) }}
+            {% endcall %}
+            {% endif %}
+            {% for field in t_fields if field.name not in ('sleep_interval_s', 'refresh_rate_s', 'always_on') and not (field.name == 'awake_poll_s' and has_always_on) %}{{ config_field(section, field, _form) }}{% endfor %}
+            {% for field in t_fields if field.name == 'always_on' %}{{ config_field(section, field, _form, awake=awake_spec) }}{% endfor %}
+          </div>
+
+          {# Synchronized wake (wake alignment), REST only. #}
+          {% if section.wake_align_capable %}
+          {% set wa = section.wake_align %}
+          <details class="dx-adv" id="sync-wake"{% if wa.mode %} open{% endif %}>
+            <summary><i class="ph ph-caret-right" aria-hidden="true"></i><span>Advanced: synchronized wake</span></summary>
+            <div class="dx-fg dx-adv-body" data-wake-align>
+              {% call fld(section.id ~ '-wa-mode', 'Wake on the clock', help='Align this device\'s wakes to the clock instead of counting from its last check-in. "On the clock" keeps the sleep interval as the period but lands each wake on anchor + multiples of it, e.g. a 15-minute interval anchored at 00:05 wakes at :05, :20, :35, :50. "At set times" ignores the interval and wakes only at the times listed. Devices on the same grid wake and repaint together; the server learns each device\'s wake-to-paint latency and wakes it that much earlier. Scheduled dashboards can still wake the device early in interval mode.', w='md') %}
+                {{ dx_select(section.id ~ '-wa-mode', 'wake_align_mode', wa.mode, [{'value': 'interval', 'label': 'On the clock'}, {'value': 'times', 'label': 'At set times only'}], blank_label='Off', form=_form, attrs='data-wa-mode') }}
+              {% endcall %}
+              {% call fld(section.id ~ '-wa-anchor', 'Anchor', help='Offset of the wall-clock grid. 00:00 lands wakes on the hour boundaries; 00:05 shifts the whole grid five minutes later.', w='time', attrs='data-wa="interval"' ~ (' hidden' if wa.mode != 'interval' else '')) %}
+                <input class="dx-in" type="time" id="{{ section.id }}-wa-anchor" name="wake_align_anchor" value="{{ wa.anchor }}" placeholder="00:00" form="{{ _form }}">
+              {% endcall %}
+              {% call fld(section.id ~ '-wa-times', 'Times', help='Comma-separated HH:MM local times. The device sleeps from one listed time to the next.', w='lg', attrs='data-wa="times"' ~ (' hidden' if wa.mode != 'times' else '')) %}
+                <input class="dx-in" type="text" id="{{ section.id }}-wa-times" name="wake_align_times" value="{{ wa.times_csv }}" placeholder="07:00, 12:30, 19:00" form="{{ _form }}" spellcheck="false">
+              {% endcall %}
+              {{ toggle_fld(section.id ~ '-wa-apply-all', 'wake_align_apply_all', 'Apply to all', checked=False,
+                  help='Copies this synchronized-wake setting to every REST device on this server on save, so one save puts the whole fleet on the same grid. Not remembered between saves.', form=_form) }}
+            </div>
+          </details>
+          {% endif %}
+        </div>
+
+        {# Quiet hours: the override's switch heads the fields it governs;
+           off hides them (and disables them, so they are not posted). #}
+        {% if section.quiet_hours_endpoint %}
+        <div class="dx-grp" id="quiet-hours" data-devsub data-dep-group data-dep-hide>
+          <div class="dx-grp-head"><h3 class="dx-grp-title">Quiet hours</h3></div>
+          <div class="dx-fg">
+            {{ toggle_fld(section.id ~ '-qh-enabled', 'quiet_hours_enabled', 'Own hours', checked=qh.get('enabled', False),
+                help="On, this display uses only the hours set here and the server's quiet hours don't apply to it. Off, it follows Settings › Server › Quiet hours.",
+                form=_form, input_attrs='data-master') }}
+            {{ toggle_fld(section.id ~ '-qh-sleep', 'quiet_hours_sleep', 'Sleep through', checked=qh.get('sleep', False),
+                help='The display sleeps until the window ends instead of waking on its usual interval inside it. Saves power; a picture sent during the window shows when it ends.',
+                form=_form, attrs='data-dep-target') }}
+            {% if section.quiet_hours_touch %}
+            {{ toggle_fld(section.id ~ '-qh-touch-off', 'quiet_hours_touch_off', 'Touch off', checked=qh.get('touch_off', False),
+                help='The touchscreen sleeps with the panel, so a tap does nothing until the window ends; the buttons still wake it.',
+                form=_form, attrs='data-dep-target') }}
+            {% endif %}
+            <p class="dx-f-note dx-help" data-dep-off-note hidden>Follows Settings › Server › Quiet hours.</p>
+          </div>
+          <div class="dx-fg" data-dep-target>
+            {% call fld(section.id ~ '-qh-days', 'Window', help='The days the Start to End window runs, each by its own clock: an overnight window covers that morning up to End and that evening from Start.', w='auto', label_for=False, cls='f-break', attrs='data-dep-target') %}
+              {{ dx_days(section.id ~ '-qh-days', 'quiet_hours_days', 'Window applies on', value=qh.get('days', ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']), form=_form) }}
+              <span class="dx-qh-times">
+                <input class="dx-in dx-in-time" type="time" id="{{ section.id }}-qh-start" name="quiet_hours_start" value="{{ qh.get('start', '') }}" placeholder="HH:MM" aria-label="Start" form="{{ _form }}">
+                <span class="dx-help">to</span>
+                <input class="dx-in dx-in-time" type="time" id="{{ section.id }}-qh-end" name="quiet_hours_end" value="{{ qh.get('end', '') }}" placeholder="HH:MM" aria-label="End" form="{{ _form }}">
+              </span>
+            {% endcall %}
+            {% call fld(section.id ~ '-qh-all-day', 'Quiet all day', help='No scheduled or automatic pictures from midnight to midnight on these days; the display keeps what it shows, and sending one yourself still works. With Sleep through on, it sleeps all day.', w='auto', label_for=False, cls='f-break', attrs='data-dep-target') %}
+              {{ dx_days(section.id ~ '-qh-all-day', 'quiet_hours_all_day', 'Quiet all day', value=qh.get('all_day', []), form=_form) }}
+            {% endcall %}
+          </div>
+        </div>
+        {% endif %}
+
+        <div class="dx-grp" id="lineups" data-devsub>
+          <div class="dx-grp-head">
+            <h3 class="dx-grp-title">Lineups</h3>
+            <a class="dx-link-btn dx-grp-end" href="{{ url_for('decks.index') }}"><i class="ph ph-arrow-square-out" aria-hidden="true"></i><span>Lineups page</span></a>
+          </div>
+          {% if section.lineup_rows or section.timetable_entries %}
+          <ul class="dx-list"{% if section.lineup_rows %} data-device-lineups{% endif %}>
+            {% for lu in section.lineup_rows %}
+            <li class="dx-li{% if not lu.enabled %} is-off{% endif %}">
+              <i class="ph ph-monitor-play" aria-hidden="true"></i>
+              <div class="dx-li-main">
+                <a class="dx-li-name" href="{{ lu.url }}">{{ lu.name }}</a>
+                {% if lu.status == 'live' %}<span class="tg tg--sm tg--ok">Live</span>{% elif not lu.enabled %}<span class="tg tg--sm">Off</span>{% endif %}
+                <span class="dx-li-meta">{{ lu.when }} · {{ lu.days }} · {{ lu.mode }} · {{ lu.steps }} dashboard{{ '' if lu.steps == 1 else 's' }}{% if lu.enabled and lu.status != 'live' and lu.next %} · {{ lu.next }}{% endif %}</span>
+              </div>
+              <div class="dx-li-end">
+                <a class="dx-btn is-sm is-ghost is-icon" href="{{ lu.edit_url }}" aria-label="Edit {{ lu.name }}" title="Edit"><i class="ph ph-pencil-simple" aria-hidden="true"></i></a>
+              </div>
+            </li>
+            {% endfor %}
+            {% for entry in section.timetable_entries %}
+            <li class="dx-li{% if not entry.enabled %} is-off{% endif %}">
+              <i class="ph ph-squares-four" aria-hidden="true"></i>
+              <div class="dx-li-main">
+                <span class="dx-li-name">{{ entry.page_name }}</span>
+                {% if not entry.enabled %}<span class="tg tg--sm">disabled</span>{% endif %}
+                {% if entry.wont_send %}<span class="tg tg--sm tg--warn" title="This dashboard isn't bound to any device, so it won't send. Bind it to a device, or enable legacy unbound broadcast in Settings.">unbound · won't send</span>{% endif %}
+                <span class="dx-li-meta">schedule ·
+                  {% if entry.type == 'daily' %}daily{% elif entry.window_start and entry.window_end %}{{ entry.window_start }} → {{ entry.window_end }}{% elif entry.window_start %}from {{ entry.window_start }}{% else %}always{% endif %}
+                  · {{ entry.days_label }}{% if entry.interval_minutes %} · every {{ entry.interval_minutes }} min{% endif %}</span>
+              </div>
+              <div class="dx-li-end">
+                <a class="dx-btn is-sm is-ghost is-icon" href="{{ url_for('schedules.index') }}#schedule-{{ entry.schedule_id }}" aria-label="Edit {{ entry.page_name }}" title="Edit"><i class="ph ph-pencil-simple" aria-hidden="true"></i></a>
+              </div>
+            </li>
+            {% endfor %}
+          </ul>
+          {% if section.timetable_entries %}
+          <p class="dx-help dx-list-note">Schedules show here when their dashboard is bound to this display. Edit them on the <a href="{{ url_for('decks.index') }}">Lineups</a> page.</p>
+          {% endif %}
+          {% else %}
+          <div class="dx-empty">
+            <i class="ph ph-calendar-blank" aria-hidden="true"></i>
+            <div class="dx-empty-text">
+              <p class="dx-empty-title">Nothing scheduled yet</p>
+              <p class="dx-help">Bind a dashboard to this display and add it to a lineup; it shows up here.</p>
+            </div>
+            <a class="dx-btn is-sm" href="{{ url_for('decks.index') }}"><i class="ph ph-calendar-plus" aria-hidden="true"></i><span>Open Lineups</span></a>
+          </div>
+          {% endif %}
+        </div>
       </div>
     </section>
 
     {# ---------------- CONTROLS ----------------
        Only for a device with buttons or a touch panel. #}
     {% if section.has_controls %}
-    <section class="dx-section-card dx-devsec" id="controls" data-devsec>
-      <header class="dx-section-head">
-        <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-hand-tap"></i></span>
-        <div class="dx-section-titleblock">
-          <h3 class="dx-section-title">Controls</h3>
-          <p class="dx-section-desc">Physical buttons and touch.</p>
-        </div>
-      </header>
-      <div class="dx-section-body">
-        {% if section.button_map_capable %}
-        <div class="dx-button-map">
-          <div class="field">
-            <label for="{{ section.id }}-button-map">Button map (JSON){{ info_pop("Button map for this device. Overrides the built-in defaults shown under Effective map. Leave it empty to use the defaults.") }}</label>
-            <textarea id="{{ section.id }}-button-map" name="button_map_json" form="{{ _combined_form_id }}"
-                      class="input dx-button-map-input" rows="6" spellcheck="false" autocomplete="off"
+    <section class="dx-dsec" id="controls" data-collapsible>
+      {{ dsec_head('controls', 'hand-tap', 'Controls',
+          ('Custom button map' if section.button_map_json else 'Default button map') if section.button_map_capable else 'Touch panel') }}
+      <div class="dx-dsec-body" id="controls-body" data-collapsible-body>
+        <div class="dx-grp" id="button-map" data-devsub>
+          <div class="dx-grp-head">
+            <h3 class="dx-grp-title">{{ 'Button map' if section.button_map_capable else 'Touch' }}</h3>
+            {% if section.touch_monitor_url %}
+            <a class="dx-btn is-sm dx-grp-end" href="{{ section.touch_monitor_url }}" title="Watch taps, swipes and sliders land on this display in real time."><i class="ph ph-hand-tap" aria-hidden="true"></i><span>Touch monitor</span></a>
+            {% endif %}
+          </div>
+          {% if section.button_map_capable %}
+          <div class="dx-f dx-f-span">
+            <div class="dx-f-head">
+              <label class="dx-f-label" for="{{ section.id }}-button-map">JSON</label>
+              {{ info_pop('Map each button name to an action; actions with arguments use the action:arg form, e.g. page:Kitchen, step:2, webhook:https://… A page: binding takes a dashboard name or its id; a name binding breaks if the dashboard is renamed, an id binding does not. Leave it empty to use the defaults shown under Effective map.') }}
+            </div>
+            <textarea id="{{ section.id }}-button-map" name="button_map_json" form="{{ _form }}"
+                      class="dx-in dx-mono dx-button-map-input" rows="5" spellcheck="false" autocomplete="off"
                       placeholder='{&#10;  "left": "rotate_prev",&#10;  "right": "rotate_next",&#10;  "refresh": "refresh"&#10;}'>{{ section.button_map_json or '' }}</textarea>
-            <p class="field-help">
-              Map each button name to an action. Actions with arguments use the <code>action:arg</code> form.
-              Available actions:
-              {% for name in section.button_actions_available %}<code>{{ name }}</code>{% if not loop.last %}, {% endif %}{% endfor %}.
-              Examples: <code>rotate_next</code>, <code>page:Kitchen</code>, <code>step:2</code>, <code>webhook:https://…</code>.
-              <code>page:</code> takes a dashboard's name or its id. A name binding breaks if the dashboard is renamed; an id binding doesn't.
-            </p>
-            {% if section.button_page_ids %}
-            <details class="dx-button-map-effective">
-              <summary class="u-muted">Dashboard ids for <code>page:</code></summary>
-              <pre class="dx-button-map-preview"><code>{% for name, pid in section.button_page_ids %}page:{{ pid }}  {{ name }}
-{% endfor %}</code></pre>
-            </details>
-            {% endif %}
-            {% if section.button_map_effective %}
-            <details class="dx-button-map-effective">
-              <summary class="u-muted">Effective map (this device)</summary>
-              <pre class="dx-button-map-preview"><code>{{ section.button_map_effective }}</code></pre>
-            </details>
-            {% endif %}
+            <p class="dx-help">Empty uses the defaults. Actions: {% for name in section.button_actions_available %}<code>{{ name }}</code>{% if not loop.last %} {% endif %}{% endfor %}</p>
           </div>
+          {% if section.button_map_effective or section.button_page_ids %}
+          <details class="dx-adv">
+            <summary><i class="ph ph-caret-right" aria-hidden="true"></i><span>Advanced: effective map and dashboard ids</span></summary>
+            <div class="dx-adv-body dx-adv-cols">
+              {% if section.button_map_effective %}
+              <div><p class="dx-eyebrow">Effective map (this device)</p><pre class="dx-code dx-button-map-preview"><code>{{ section.button_map_effective }}</code></pre></div>
+              {% endif %}
+              {% if section.button_page_ids %}
+              <div><p class="dx-eyebrow">Dashboard ids for page:</p><pre class="dx-code dx-button-map-preview"><code>{% for name, pid in section.button_page_ids %}page:{{ pid }}  {{ name }}
+{% endfor %}</code></pre></div>
+              {% endif %}
+            </div>
+          </details>
+          {% endif %}
+          {% else %}
+          <p class="dx-help">Watch taps, swipes and sliders land on this display in real time with the Touch monitor.</p>
+          {% endif %}
         </div>
-        {% endif %}
-        {% if section.touch_monitor_url %}
-        <div class="dx-band" style="margin-top: 14px;">
-          <span class="dx-band-icon" aria-hidden="true"><i class="ph ph-hand-tap"></i></span>
-          <div class="dx-band-text">
-            <p class="dx-band-title">Touch panel</p>
-            <p class="dx-band-desc">Watch taps, swipes and sliders land on this display in real time.</p>
-          </div>
-          <div class="dx-band-actions">
-            <a class="dx-btn" href="{{ section.touch_monitor_url }}"><i class="ph ph-hand-tap" aria-hidden="true"></i><span>Touch monitor</span></a>
-          </div>
-        </div>
-        {% endif %}
       </div>
     </section>
     {% endif %}
-
-    {# ---------------- RENDERING ---------------- #}
-    <section class="dx-section-card dx-devsec" id="rendering" data-devsec>
-      <header class="dx-section-head">
-        <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-palette"></i></span>
-        <div class="dx-section-titleblock">
-          <h3 class="dx-section-title">Rendering</h3>
-          <p class="dx-section-desc">Text and picture quality.</p>
-        </div>
-      </header>
-      <div class="dx-section-body">
-        {% set _cd = section.colour_depth %}
-        {% if _cd and _cd.prompt %}
-        {# One-time upgrade prompt: firmware on this board now paints 4-level
-           grey. "Keep mono" is remembered per device. #}
-        <div class="dx-band is-active" data-grey-prompt style="margin-bottom: 16px;">
-          <span class="dx-band-icon" aria-hidden="true"><i class="ph ph-circle-half"></i></span>
-          <div class="dx-band-text">
-            <p class="dx-band-title">This display can now show 4 shades of grey</p>
-            <p class="dx-band-desc">Its firmware paints 4-level grey as well as mono, so photos and shading look smoother. Grey takes a slower full refresh and uses a little more battery per update.</p>
-          </div>
-          <div class="dx-band-actions">
-            <form method="post" action="{{ url_for('auth.devices_colour_depth', instance_id=section.device_id) }}">
-              <input type="hidden" name="choice" value="mono">
-              <button type="submit" class="dx-btn is-ghost"><span>Keep mono</span></button>
-            </form>
-            <form method="post" action="{{ url_for('auth.devices_colour_depth', instance_id=section.device_id) }}">
-              <input type="hidden" name="choice" value="grey">
-              <button type="submit" class="dx-btn is-primary"><span>Switch to grey</span></button>
-            </form>
-          </div>
-        </div>
-        {% endif %}
-        <div class="dx-field-grid">
-          {% if _cd %}
-          {% if _cd.enabled %}
-          {{ select_field(section.id ~ '-colour-depth', 'renderer_id', 'Colour depth',
-              value=_cd.value, options=_cd.options,
-              help='Mono or 4-level grey. Grey makes photos and shading smoother, and takes a slower full refresh and a little more battery per update.',
-              form=_combined_form_id) }}
-          {% else %}
-          <div class="field">
-            <label for="{{ section.id }}-colour-depth">Colour depth</label>
-            <select id="{{ section.id }}-colour-depth" disabled aria-describedby="{{ section.id }}-colour-depth-hint">
-              {% for opt in _cd.options %}
-              <option value="{{ opt.value }}" {% if opt.value == _cd.value %}selected{% endif %}>{{ opt.label }}</option>
-              {% endfor %}
-            </select>
-            <p class="field-help" id="{{ section.id }}-colour-depth-hint">A firmware update adds 4-level grey to this display.{% if _cd.waiting %} Grey is picked and starts once the display reports it can paint grey; until then it gets mono.{% endif %}</p>
-          </div>
-          {% endif %}
-          {% endif %}
-          {% if section.renderer_choice %}
-          {{ select_field(section.id ~ '-renderer', 'renderer_id', 'Renderer',
-              value=section.renderer_choice.value, options=section.renderer_choice.options,
-              help='Which wire format this panel is sent. Switch to a grey renderer only for a panel that paints real greys (KOReader e-readers and the TRMNL X take 16 greys; TRMNL firmware 1.6.0 and later takes the 4-grey PNG); a 1-bit-only client should stay on the mono renderer. The colour gamut shown for this panel follows the renderer picked here.',
-              form=_combined_form_id) }}
-          {% endif %}
-          {% if section.locale_editable %}
-          {{ select_field(section.id ~ '-locale', 'locale', 'Panel text locale',
-              value=section.locale, blank_label='Use app default', options=section.locale_choices,
-              help='Overrides the app-wide default for widgets rendered on this device. Only widgets that have shipped a translation for the picked language actually change; others keep their built-in English text.',
-              form=_combined_form_id) }}
-          {% endif %}
-        </div>
-        {% if section.picture_quality %}
-        {% for pq in section.picture_quality %}
-        <hr class="dx-divider">
-        <p class="device-subhead">{{ pq.base_name }} · rendering</p>
-        <div class="dx-field-grid">
-          {% for field in pq.fields %}
-            {% set value = pq.state.get(field.name, field.get('default', '')) %}
-            {{ auto_field(section.id ~ '-pq-' ~ pq.base_id ~ '-' ~ field.name, pq.clone_id ~ ':' ~ field.name, field, value, form=_combined_form_id) }}
-          {% endfor %}
-        </div>
-        {% endfor %}
-        {% endif %}
-        <div class="dx-band" style="margin-top: 16px;">
-          <span class="dx-band-icon" aria-hidden="true"><i class="ph ph-palette"></i></span>
-          <div class="dx-band-text">
-            <p class="dx-band-title">Colour calibration</p>
-            <p class="dx-band-desc">Test patterns, palette recalibration and tone curves live on their own page.</p>
-          </div>
-          <div class="dx-band-actions">
-            <a class="dx-btn" href="{{ section.calibration_url }}"><i class="ph ph-palette" aria-hidden="true"></i><span>Open calibration</span></a>
-          </div>
-        </div>
-      </div>
-    </section>
 
     {# ---------------- POWER ---------------- #}
     {% if section.battery_offset_endpoint %}
-    <section class="dx-section-card dx-devsec" id="power" data-devsec>
-      <header class="dx-section-head">
-        <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-battery-charging"></i></span>
-        <div class="dx-section-titleblock">
-          <h3 class="dx-section-title">Power</h3>
-          <p class="dx-section-desc">Battery as reported, with display offsets.</p>
-        </div>
-      </header>
-      <div class="dx-section-body">
-        <div class="dx-power-grid">
-          <div class="dx-qtile">
-            <span class="dx-qtile-label">Battery</span>
-            <span class="dx-qtile-value{% if section.overview.battery.muted %} is-muted{% endif %}{% if section.overview.battery.low %} is-warn{% endif %}">{{ section.overview.battery.value }}</span>
-            <span class="dx-qtile-sub">{{ section.overview.battery.sub }}</span>
+    {% set _mv = section.battery_offset.get('mv', 0) or 0 %}
+    {% set _pct = section.battery_offset.get('pct', 0) or 0 %}
+    {% set _offset_text = ('%+d' % _mv) ~ ' mV, ' ~ ('%+d' % _pct) ~ ' %' if (_mv or _pct) else 'none' %}
+    {% set _wk = section.battery_card.wake_stats if section.battery_card else none %}
+    <section class="dx-dsec" id="power" data-collapsible>
+      {{ dsec_head('power', 'battery-charging', 'Power',
+          section.overview.battery.value
+          ~ ((' · ' ~ ('%g' % _wk.per_day) ~ ' wakes a day') if _wk and _wk.per_day is not none else '')
+          ~ ' · offset ' ~ _offset_text) }}
+      <div class="dx-dsec-body" id="power-body" data-collapsible-body>
+        {% if section.battery_card %}
+        <div class="dx-grp dx-power-chart" id="battery-history" data-devsub>
+          <div class="dx-grp-head">
+            <h3 class="dx-grp-title">Battery history</h3>
+            <a class="dx-link-btn dx-grp-end" href="{{ url_for('device_battery.index') }}"><i class="ph ph-arrow-up-right" aria-hidden="true"></i><span>All batteries</span></a>
           </div>
-          {{ number_input(section.id ~ '-bo-mv', 'battery_offset_mv', 'mV offset',
-              value=section.battery_offset.get('mv', 0), min=-2000, max=2000, step=10,
-              help='Added to the device-reported voltage (mV) before display. Positive bumps up, negative bumps down. Range ±2000 mV.',
-              form=_combined_form_id) }}
-          {{ number_input(section.id ~ '-bo-pct', 'battery_offset_pct', '% offset',
-              value=section.battery_offset.get('pct', 0), min=-100, max=100, step=1,
-              help='Added to the displayed percent on top of the mV-derived bump. Range ±100.',
-              form=_combined_form_id) }}
+          {{ battery_chart(section.battery_card) }}
+          {{ battery_stat_tiles(section.battery_card) }}
         </div>
-        <p class="field-help" style="margin-top: 10px;">
-          Adjust the displayed battery to match a voltmeter reading. Raw values stay in the
-          history store unchanged; only the displayed numbers (here, on the battery page and
-          on Home Assistant sensors) shift. Both zero means no override.
-        </p>
+        {% endif %}
+        {#- The display offset is rarely touched: a quiet line, and Edit reveals the fields. -#}
+        <div class="dx-grp" id="battery-offset" data-devsub>
+          <details class="dx-offset"{% if _mv or _pct %} data-set{% endif %}>
+            <summary>
+              <span class="dx-offset-k">Display offset</span>
+              <span class="dx-offset-v">{{ _offset_text }}</span>
+              <span class="dx-link-btn dx-offset-edit">Edit</span>
+            </summary>
+            <div class="dx-fg dx-adv-body">
+              {% call fld(section.id ~ '-bo-mv', 'Voltage', w='num') %}
+                <span class="dx-in-unit"><input class="dx-in" type="number" id="{{ section.id }}-bo-mv" name="battery_offset_mv" value="{{ section.battery_offset.get('mv', 0) }}" min="-2000" max="2000" step="10" form="{{ _form }}" aria-label="Voltage offset (mV)"><span aria-hidden="true">mV</span></span>
+              {% endcall %}
+              {% call fld(section.id ~ '-bo-pct', 'Percent', w='num') %}
+                <span class="dx-in-unit"><input class="dx-in" type="number" id="{{ section.id }}-bo-pct" name="battery_offset_pct" value="{{ section.battery_offset.get('pct', 0) }}" min="-100" max="100" step="1" form="{{ _form }}" aria-label="Percent offset"><span aria-hidden="true">%</span></span>
+              {% endcall %}
+              <p class="dx-f-note dx-help">Match a voltmeter: mV is added to the reported voltage, % on top of that. Only displayed numbers change (the summary, the battery page, Home Assistant sensors); the history keeps the raw readings.</p>
+            </div>
+          </details>
+          {% if not section.battery_card %}<p class="dx-help">No battery history yet; the chart appears after the first readings.</p>{% endif %}
+        </div>
       </div>
     </section>
     {% endif %}
 
-    {# ---------------- LINEUPS ---------------- #}
-    <section class="dx-section-card dx-devsec" id="lineups" data-devsec>
-      <header class="dx-section-head">
-        <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-calendar-blank"></i></span>
-        <div class="dx-section-titleblock">
-          <h3 class="dx-section-title">Lineups</h3>
-          <p class="dx-section-desc">The lineups and schedules on this display.</p>
-        </div>
-        <a class="dx-btn is-sm" href="{{ url_for('decks.index') }}"><i class="ph ph-arrow-square-out" aria-hidden="true"></i><span>Lineups page</span></a>
-      </header>
-      <div class="dx-section-body">
-        {% if section.lineup_rows %}
-        <ul class="timetable-list" data-device-lineups>
-          {% for lu in section.lineup_rows %}
-          <li class="timetable-row {% if not lu.enabled %}is-disabled{% endif %}">
-            <div class="timetable-when">
-              <strong>{{ lu.when }}</strong>
-              <span class="muted"> · {{ lu.days }}</span>
-            </div>
-            <div class="timetable-what">
-              <i class="ph ph-monitor-play" aria-hidden="true"></i>
-              <a href="{{ lu.url }}">{{ lu.name }}</a>
-              <span class="muted">{{ lu.mode }} · {{ lu.steps }} dashboard{{ '' if lu.steps == 1 else 's' }}</span>
-              {% if lu.status == 'live' %}<span class="tg tg--sm tg--ok">Live</span>
-              {% elif not lu.enabled %}<span class="tg tg--sm">Off</span>
-              {% elif lu.next %}<span class="muted">· {{ lu.next }}</span>{% endif %}
-            </div>
-            <div class="timetable-edit">
-              <a class="button ghost" href="{{ lu.edit_url }}">
-                <i class="ph ph-pencil-simple" aria-hidden="true"></i><span>Edit</span>
-              </a>
-            </div>
-          </li>
-          {% endfor %}
-        </ul>
-        {% endif %}
-        {% if section.timetable_entries %}
-        <ul class="timetable-list">
-          {% for entry in section.timetable_entries %}
-          <li class="timetable-row {% if not entry.enabled %}is-disabled{% endif %}">
-            <div class="timetable-when">
-              {% if entry.type == 'daily' %}<strong>Daily</strong>
-              {% elif entry.window_start and entry.window_end %}<strong>{{ entry.window_start }} → {{ entry.window_end }}</strong>
-              {% elif entry.window_start %}<strong>from {{ entry.window_start }}</strong>
-              {% else %}<strong>Always</strong>{% endif %}
-              <span class="muted"> · {{ entry.days_label }}</span>
-              {% if entry.interval_minutes %}<span class="muted"> · every {{ entry.interval_minutes }} min</span>{% endif %}
-            </div>
-            <div class="timetable-what">
-              <i class="ph ph-squares-four" aria-hidden="true"></i>
-              <span>{{ entry.page_name }}</span>
-              {% if not entry.enabled %}<span class="tg tg--sm">disabled</span>{% endif %}
-              {% if entry.wont_send %}<span class="tg tg--sm tg--warn" title="This dashboard isn't bound to any device, so it won't send. Bind it to a device, or enable legacy unbound broadcast in Settings.">unbound · won't send</span>{% endif %}
-            </div>
-            <div class="timetable-edit">
-              <a class="button ghost" href="{{ url_for('schedules.index') }}#schedule-{{ entry.schedule_id }}">
-                <i class="ph ph-pencil-simple" aria-hidden="true"></i><span>Edit</span>
-              </a>
-            </div>
-          </li>
-          {% endfor %}
-        </ul>
-        <p class="field-help">Schedules whose target dashboard is bound to this device. Edit them on the <a href="{{ url_for('decks.index') }}">Lineups</a> page.</p>
-        {% endif %}
-        {% if not section.lineup_rows and not section.timetable_entries %}
-        <div class="dx-empty">
-          <div class="dx-empty-icon"><i class="ph ph-calendar-blank" aria-hidden="true"></i></div>
-          <p class="dx-empty-title">Nothing scheduled yet</p>
-          <p class="dx-empty-help">Bind a dashboard to this display and add it to a lineup, it will show up here.</p>
-          <a class="button primary" href="{{ url_for('decks.index') }}">
-            <i class="ph ph-calendar-plus" aria-hidden="true"></i><span>Open Lineups</span>
-          </a>
-        </div>
-        {% endif %}
-      </div>
-    </section>
-
-    {# ---------------- CONNECTION ---------------- #}
-    <section class="dx-section-card dx-devsec" id="connection" data-devsec>
-      <header class="dx-section-head">
-        <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-globe"></i></span>
-        <div class="dx-section-titleblock">
-          <h3 class="dx-section-title">Connection</h3>
-          <p class="dx-section-desc">How the device reaches this server.</p>
-        </div>
-        {% set _fw = section.status.firmware %}
-        {% set _ota = section.status.ota %}
-        <div class="dx-conn-chips">
-          {% if _fw and _fw.current %}
-          <span class="tg">firmware<span class="tg-count">{{ _fw.current if _fw.current.startswith('v') else 'v' ~ _fw.current }}</span></span>
-          {# A newer build leads to the Firmware page, where the update is
-             actually rolled out; the GitHub release stays one step away for
-             the notes. #}
-          {% if _fw.state == 'outdated' and _fw.latest %}
-          <a class="tg tg--warn" href="{{ url_for('auth.firmware_index') }}"
-             title="{{ _fw.notes_headline or ('Latest available: v' ~ _fw.latest) }}. Open the Firmware page to roll it out.">v{{ _fw.latest }} available</a>
-          {% if _fw.release_url %}
-          <a class="tg" href="{{ _fw.release_url }}" target="_blank" rel="noopener"
-             title="Release notes for v{{ _fw.latest }} on GitHub"><i class="ph ph-arrow-square-out" aria-hidden="true"></i>release notes</a>
-          {% endif %}
-          {% endif %}
-          {% endif %}
-          <a class="tg" href="{{ url_for('auth.firmware_index') }}" data-firmware-page-link
-             title="Firmware versions and rollouts for every display"><i class="ph ph-cpu" aria-hidden="true"></i>Firmware page</a>
-          {% if _ota %}
-          <span class="tg {{ tg_tone(_ota.pill_class) }}"{% if _ota.detail %} title="{{ _ota.detail }}"{% endif %}>OTA
-            <span class="tg-count">{{ _ota.phase }}{% if _ota.target_fw %} {{ _ota.target_fw if _ota.target_fw.startswith('v') else 'v' ~ _ota.target_fw }}{% endif %}{% if _ota.reason and _ota.pill_class == 'is-danger' %} ({{ _ota.reason }}){% endif %}</span>
-          </span>
-          {% endif %}
-        </div>
-      </header>
-      <div class="dx-section-body">
-        {% if section.connection_details %}
-        <dl class="dx-conn-grid dx-conn-grid--page">
-          {% for row in section.connection_details %}
-          <div>
-            <dt>{{ row.label }}</dt>
-            <dd>
-              <code{% if not row.monospace %} class="dx-conn-plain"{% endif %}>{{ row.value }}</code>
-              {% if row.action == 'reveal' and section.reveal_token_endpoint %}
-              <form method="post" action="{{ section.reveal_token_endpoint }}" class="form form--inline"
-                    onsubmit="return confirm('Show the full access token? Anyone watching your screen will see it.');">
-                <button type="submit" class="dx-reveal-btn">Reveal</button>
-              </form>
-              {% endif %}
-            </dd>
-          </div>
-          {% endfor %}
-          {% if section.set_transport_endpoint %}
-          <div>
-            <dt>Transport</dt>
-            <dd>
-              <span class="dx-transport-current">{{ section.transport_badge }}</span>
-              <form method="post" action="{{ section.set_transport_endpoint }}" class="form form--inline"
-                    onsubmit="return confirm({% if section.transport == 'rest' %}'Switch this device to MQTT? The firmware will need its broker settings re-flashed.'{% else %}'Switch this device to REST? An access token will be minted (or reused) and shown to copy into firmware.'{% endif %});">
-                <input type="hidden" name="transport" value="{% if section.transport == 'rest' %}mqtt{% else %}rest{% endif %}">
-                <button type="submit" class="dx-reveal-btn">Switch to {% if section.transport == 'rest' %}MQTT{% else %}REST{% endif %}</button>
-              </form>
-            </dd>
-          </div>
-          {% endif %}
-        </dl>
-        {% endif %}
-
-        {% if section.regenerate_token_endpoint %}
-        <form method="post" action="{{ section.regenerate_token_endpoint }}" class="form form--inline" style="margin-top: 14px;"
-              onsubmit="return confirm('Regenerate the access token? The current token stops working immediately.');">
-          <button type="submit" class="dx-btn is-sm">
-            <i class="ph ph-arrows-clockwise" aria-hidden="true"></i><span>Regenerate token</span>
-          </button>
-        </form>
-        {% endif %}
-
-        {# Read-only diagnostic block; secrets are masked server-side. #}
-        {% if section.debug_info %}
-        <details class="dx-debug">
-          <hr class="dx-divider">
-          <summary class="device-subhead">Debug &amp; diagnostics</summary>
-          <div class="dx-debug-body">
-            <dl class="dx-debug-list">
-              <dt>Tesserae version</dt><dd><code>{{ section.debug_info.app_version }}</code></dd>
-              <dt>Kind</dt><dd><code>{{ section.debug_info.kind_of or '-' }}</code></dd>
-              <dt>Device id</dt><dd><code>{{ section.debug_info.device_id }}</code></dd>
-              <dt>Renderer clones</dt>
-              <dd>{% for rid in section.debug_info.renderer_ids %}<code>{{ rid }}</code>{% if not loop.last %}, {% endif %}{% else %}<span class="u-muted">none</span>{% endfor %}</dd>
-              <dt>Transport</dt><dd><code>{{ section.debug_info.transport }}</code></dd>
-              {% if section.debug_info.transport == 'mqtt' and section.debug_info.status_topic %}
-              <dt>MQTT status topic</dt><dd><code>{{ section.debug_info.status_topic }}</code></dd>
-              {% endif %}
-              {% if section.debug_info.transport == 'mqtt' and section.debug_info.config_topic %}
-              <dt>MQTT config topic</dt><dd><code>{{ section.debug_info.config_topic }}</code></dd>
-              {% endif %}
-              {% if section.debug_info.panel %}
-              <dt>Panel</dt>
-              <dd>
-                <code>{{ section.debug_info.panel.w }}×{{ section.debug_info.panel.h }}</code>
-                {% if section.debug_info.panel.orientation %} · <code>{{ section.debug_info.panel.orientation }}</code>{% endif %}
-                {% if section.debug_info.panel.gamut %} · <code>{{ section.debug_info.panel.gamut }}</code>{% endif %}
-                {% if section.debug_info.panel.underscan %} · underscan <code>{{ section.debug_info.panel.underscan }}</code>{% endif %}
-              </dd>
-              {% endif %}
-              <dt>Instance file</dt><dd><code class="dx-debug-path">{{ section.debug_info.instance_file }}</code></dd>
-            </dl>
-            <p class="field-help" style="margin: 8px 0 4px;">Raw instance manifest (secrets masked):</p>
-            <pre class="code-snippet dx-debug-json"><code>{{ section.debug_info.raw_manifest_json }}</code></pre>
-          </div>
-        </details>
-        {% endif %}
-      </div>
-    </section>
-
-    {# ---------------- LOGS ----------------
-       Only for firmware that advertised log upload (logs.schema). The
-       log text is device-supplied: it is only ever rendered autoescaped. #}
-    {% if section.logs %}
-    {% set lg = section.logs %}
-    <section class="dx-section-card dx-devsec" id="logs" data-devsec>
-      <header class="dx-section-head">
-        <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-scroll"></i></span>
-        <div class="dx-section-titleblock">
-          <h3 class="dx-section-title">Logs</h3>
-          <p class="dx-section-desc">The panel's own log, uploaded on the wakes you ask for.</p>
-        </div>
-      </header>
-      <div class="dx-section-body">
-        {% if lg.failure %}
-        <div class="dx-warn-band">
-          <i class="ph ph-warning" aria-hidden="true"></i>
-          <p><strong>Last detected failure:</strong> {{ lg.failure.text }}{% if lg.failure.received_at %}, reported {{ lg.failure.relative }} ({{ lg.failure.received_at|fmt_time }}){% endif %}</p>
-        </div>
-        {% endif %}
-
-        <div class="dx-band{% if lg.remaining %} is-active{% endif %}" style="margin-top: 0;">
-          <span class="dx-band-icon" aria-hidden="true"><i class="ph ph-scroll"></i></span>
-          <div class="dx-band-text">
-            {% if lg.remaining %}
-            <p class="dx-band-title">Collecting: {{ lg.remaining }} wake{{ '' if lg.remaining == 1 else 's' }} left</p>
-            {% else %}
-            <p class="dx-band-title">Not collecting</p>
+    {# ---------------- TROUBLESHOOTING ----------------
+       Connection, the device log (only for firmware that advertised log
+       upload; the log text is device-supplied and only ever rendered
+       autoescaped) and the diagnostics. #}
+    {% set _conn_rows = (section.connection_details or [])|rejectattr('label', 'in', ['Device id', 'Renderer', 'Instance of'])|list %}
+    {% set _token_rows = [] %}{% set _plain_rows = [] %}
+    {% for row in _conn_rows %}{% set _ = (_token_rows if 'token' in row.label|lower else _plain_rows).append(row) %}{% endfor %}
+    <section class="dx-dsec" id="troubleshooting" data-collapsible>
+      {{ dsec_head('troubleshooting', 'wrench', 'Troubleshooting', section.transport_badge ~ ' · ' ~ section.kind_name) }}
+      <div class="dx-dsec-body" id="troubleshooting-body" data-collapsible-body>
+        <div class="dx-grp" id="connection" data-devsub>
+          {% set _fw = section.status.firmware %}
+          {% set _ota = section.status.ota %}
+          <div class="dx-grp-head">
+            <h3 class="dx-grp-title">Connection</h3>
+            {% if _ota %}
+            <span class="tg {{ tg_tone(_ota.pill_class) }}"{% if _ota.detail %} title="{{ _ota.detail }}"{% endif %}>OTA
+              <span class="tg-count">{{ _ota.phase }}{% if _ota.target_fw %} {{ _ota.target_fw if _ota.target_fw.startswith('v') else 'v' ~ _ota.target_fw }}{% endif %}{% if _ota.reason and _ota.pill_class == 'is-danger' %} ({{ _ota.reason }}){% endif %}</span>
+            </span>
             {% endif %}
-            <p class="dx-band-desc">Collect logs for the next 1, 5 or 20 wakes. A sleeping panel starts on its next check-in.</p>
+            <span class="dx-grp-end">
+              {% if _fw and _fw.state == 'outdated' and _fw.latest and _fw.release_url %}
+              <a class="dx-link-btn" href="{{ _fw.release_url }}" target="_blank" rel="noopener" title="Release notes for v{{ _fw.latest }} on GitHub">Release notes</a>
+              {% endif %}
+              <a class="dx-btn is-sm" href="{{ url_for('auth.firmware_index') }}" data-firmware-page-link
+                 title="Firmware versions and rollouts for every display"><i class="ph ph-cpu" aria-hidden="true"></i><span>Firmware page</span></a>
+            </span>
           </div>
-          <form method="post" action="{{ lg.collect_endpoint }}" class="dx-band-actions">
-            {% if lg.remaining %}
-            <button type="submit" name="wakes" value="0" class="dx-btn is-sm is-ghost">
-              <i class="ph ph-stop" aria-hidden="true"></i><span>Stop</span>
-            </button>
-            {% endif %}
-            {% for n in [1, 5, 20] %}
-            <button type="submit" name="wakes" value="{{ n }}" class="dx-btn is-sm">{{ n }} wake{{ '' if n == 1 else 's' }}</button>
+
+          {% for band in [section.opendisplay_setup, vs] if band and not band.ok %}
+          <div class="dx-band is-warn">
+            <i class="ph ph-warning" aria-hidden="true"></i>
+            <div class="dx-band-text">
+              <p class="dx-band-title">{{ band.title }}</p>
+              <p class="dx-help">{{ band.body }} <a href="{{ band.link.url }}" target="_blank" rel="noopener noreferrer">{{ band.link.label }}</a>.</p>
+            </div>
+          </div>
+          {% endfor %}
+
+          {#- The sign's report, minus what is shown once elsewhere: the
+              interval (Timing), and firmware / battery / temperature when the
+              rail's vitals already carry them. -#}
+          {% set _dup = (['Check-in interval', 'Next check-in'] if not t_fields else [])
+              + ([] if section.overview.firmware.muted else ['Firmware'])
+              + ([] if section.overview.battery.muted else ['Battery'])
+              + (['Temperature'] if section.status.tiles.environment else []) %}
+          {% set _sign_rows = (sign.rows|rejectattr(0, 'in', _dup)|list) if sign else [] %}
+          <dl class="dx-kv">
+            {% for band in [section.opendisplay_setup, vs] if band and band.ok %}
+            <div><dt>{{ 'Listener' if band is sameas vs else 'Setup' }}</dt><dd><span>{{ band.title }}. <span class="dx-help">{{ band.body }}</span></span> <a class="dx-help" href="{{ band.link.url }}" target="_blank" rel="noopener noreferrer">{{ band.link.label }}</a></dd></div>
             {% endfor %}
-          </form>
-        </div>
-        <p class="field-help">
-          {% if lg.auto_on_error %}A failed paint or an abnormal reset also pulls the log up once, on the wake that reports it.{% else %}Collecting after a failed paint is off in Settings › Server.{% endif %}
-          The newest 20 uploads are kept, up to 1 MB.
-        </p>
+            {% for label, value in _sign_rows %}
+            <div><dt>{{ label }}</dt><dd>{{ value }}</dd></div>
+            {% endfor %}
+            {% for row in _plain_rows %}
+            <div><dt>{{ row.label }}</dt><dd>{% if row.monospace %}<code>{{ row.value }}</code>{% else %}{{ row.value }}{% endif %}</dd></div>
+            {% endfor %}
+          </dl>
 
-        <hr class="dx-divider">
-        {% if lg.uploads %}
-        <ul class="dx-discovered-list dx-log-list">
-          {% for up in lg.uploads %}
-          <li class="dx-inset-row dx-log-row{% if lg.viewing and lg.viewing.name == up.name %} is-active{% endif %}">
-            <div class="dx-log-info">
-              <span class="dx-log-when">{{ up.received_at|fmt_time }}</span>
-              <span class="dx-log-meta">{{ up.relative }} · {{ up.size }} · {{ up.lines }} line{{ '' if up.lines == 1 else 's' }}</span>
+          {% if sign %}
+          {#- What the bound sign can be asked to do (devices_visionect_action;
+              only while it is connected). -#}
+          <div class="dx-frame-actions">
+            {% if sign.note %}<span class="dx-help">{{ sign.note }}</span>
+            {% elif not sign.connected %}<span class="dx-help">The frame takes these while it's connected.</span>{% endif %}
+            <span class="dx-btn-row">
+              {% for action, icon, label, title in [
+                  ('refresh', 'arrows-clockwise', 'Full refresh', 'Repaint the picture it shows from scratch, to clear ghosting'),
+                  ('reboot', 'power', 'Reboot', 'Restart the frame; it reconnects in a minute or two'),
+                  ('status', 'heartbeat', 'Report in', 'Ask the frame for its battery, signal and state now')] %}
+              <form method="post" action="{{ url_for('auth.devices_visionect_action', instance_id=section.device_id, action=action) }}"
+                    {% if action == 'reboot' %}onsubmit="return confirm('Reboot the frame? It reconnects in a minute or two and then gets the latest picture.');"{% endif %}>
+                <button type="submit" class="dx-btn is-sm" title="{{ title }}"{% if not sign.connected %} disabled{% endif %}>
+                  <i class="ph ph-{{ icon }}" aria-hidden="true"></i><span>{{ label }}</span>
+                </button>
+              </form>
+              {% endfor %}
+            </span>
+          </div>
+          {% if sign.error %}
+          <div class="dx-band is-warn"><i class="ph ph-warning" aria-hidden="true"></i><div class="dx-band-text"><p>{{ sign.error }}</p></div></div>
+          {% endif %}
+          {% endif %}
+
+          {% if _token_rows or section.set_transport_endpoint or section.regenerate_token_endpoint %}
+          <details class="dx-adv" id="access-token">
+            <summary><i class="ph ph-caret-right" aria-hidden="true"></i><span>Advanced: access token and transport</span></summary>
+            <dl class="dx-kv dx-adv-body">
+              {% for row in _token_rows %}
+              <div>
+                <dt>{{ row.label }}</dt>
+                <dd>
+                  <code>{{ row.value }}</code>
+                  <span class="dx-btn-row">
+                    {% if section.regenerate_token_endpoint and loop.first %}
+                    <form method="post" action="{{ section.regenerate_token_endpoint }}" class="form--inline"
+                          onsubmit="return confirm('Regenerate the access token? The current token stops working immediately.');">
+                      <button type="submit" class="dx-link-btn">Regenerate token</button>
+                    </form>
+                    {% endif %}
+                    {% if row.action == 'reveal' and section.reveal_token_endpoint %}
+                    <form method="post" action="{{ section.reveal_token_endpoint }}" class="form--inline"
+                          onsubmit="return confirm('Show the full access token? Anyone watching your screen will see it.');">
+                      <button type="submit" class="dx-btn is-sm dx-reveal-btn">Reveal</button>
+                    </form>
+                    {% endif %}
+                  </span>
+                </dd>
+              </div>
+              {% endfor %}
+              {% if section.regenerate_token_endpoint and not _token_rows %}
+              <div><dt>Access token</dt><dd>
+                <form method="post" action="{{ section.regenerate_token_endpoint }}" class="form--inline"
+                      onsubmit="return confirm('Regenerate the access token? The current token stops working immediately.');">
+                  <button type="submit" class="dx-link-btn">Regenerate token</button>
+                </form>
+              </dd></div>
+              {% endif %}
+              {% if section.set_transport_endpoint %}
+              <div>
+                <dt>Transport</dt>
+                <dd>
+                  <span class="dx-transport-current">{{ section.transport_badge }}</span>
+                  <form method="post" action="{{ section.set_transport_endpoint }}" class="form--inline"
+                        onsubmit="return confirm({% if section.transport == 'rest' %}'Switch this device to MQTT? The firmware will need its broker settings re-flashed.'{% else %}'Switch this device to REST? An access token will be minted (or reused) and shown to copy into firmware.'{% endif %});">
+                    <input type="hidden" name="transport" value="{% if section.transport == 'rest' %}mqtt{% else %}rest{% endif %}">
+                    <button type="submit" class="dx-btn is-sm">Switch to {% if section.transport == 'rest' %}MQTT{% else %}REST{% endif %}</button>
+                  </form>
+                </dd>
+              </div>
+              {% endif %}
+            </dl>
+          </details>
+          {% endif %}
+        </div>
+
+        {% if section.logs %}
+        {% set lg = section.logs %}
+        <div class="dx-grp" id="logs" data-devsub>
+          <div class="dx-grp-head"><h3 class="dx-grp-title">Logs</h3></div>
+          {% if lg.failure %}
+          <div class="dx-band is-warn">
+            <i class="ph ph-warning" aria-hidden="true"></i>
+            <div class="dx-band-text">
+              <p class="dx-band-title">Last detected failure: {{ lg.failure.text }}</p>
+              {% if lg.failure.received_at %}<p class="dx-help">Reported {{ lg.failure.relative }} ({{ lg.failure.received_at|fmt_time }}).</p>{% endif %}
             </div>
-            <div class="dx-band-actions">
-              <a class="dx-btn-ghost-sm" href="{{ up.view_url }}"><i class="ph ph-eye" aria-hidden="true"></i><span>View</span></a>
-              <a class="dx-btn-ghost-sm" href="{{ up.download_url }}"><i class="ph ph-download-simple" aria-hidden="true"></i><span>Download</span></a>
+          </div>
+          {% endif %}
+          <div class="dx-collect{% if lg.remaining %} is-active{% endif %}">
+            <div class="dx-collect-text">
+              <span class="dx-f-label">{% if lg.remaining %}Collecting: {{ lg.remaining }} wake{{ '' if lg.remaining == 1 else 's' }} left{% else %}Not collecting{% endif %}</span>
+              <p class="dx-help">Collect logs for the next 1, 5 or 20 wakes; a sleeping panel starts on its next check-in.
+                {% if lg.auto_on_error %}A failed paint or an abnormal reset also pulls the log up once, on the wake that reports it.{% else %}Collecting after a failed paint is off in Settings › Server.{% endif %}</p>
             </div>
-          </li>
-          {% endfor %}
-        </ul>
-        {% if lg.viewing %}
-        <p class="device-subhead" style="margin-top: 14px;">Upload from {{ lg.viewing.received_at|fmt_time }}</p>
-        <pre class="dx-code dx-log-view">{{ lg.viewing.text }}</pre>
+            <form method="post" action="{{ lg.collect_endpoint }}" class="dx-btn-row">
+              {% if lg.remaining %}
+              <button type="submit" name="wakes" value="0" class="dx-link-btn"><i class="ph ph-stop" aria-hidden="true"></i><span>Stop</span></button>
+              {% endif %}
+              {% for n in [1, 5, 20] %}
+              <button type="submit" name="wakes" value="{{ n }}" class="dx-btn is-sm">{{ n }} wake{{ '' if n == 1 else 's' }}</button>
+              {% endfor %}
+            </form>
+          </div>
+
+          {% if lg.uploads %}
+          <ul class="dx-list dx-log-list" data-log-list>
+            {% for up in lg.uploads %}
+            <li class="dx-li dx-log-row{% if lg.viewing and lg.viewing.name == up.name %} is-active{% endif %}"{% if loop.index > 3 %} data-log-extra hidden{% endif %}>
+              <div class="dx-li-main">
+                <span class="dx-li-when">{{ up.received_at|fmt_time }}</span>
+                <span class="dx-li-meta">{{ up.relative }} · {{ up.size }} · {{ up.lines }} line{{ '' if up.lines == 1 else 's' }}</span>
+              </div>
+              <div class="dx-li-end">
+                <a class="dx-btn is-sm is-ghost is-icon" href="{{ up.view_url }}" aria-label="View the upload from {{ up.received_at|fmt_time }}" title="View"><i class="ph ph-eye" aria-hidden="true"></i></a>
+                <a class="dx-btn is-sm is-ghost is-icon" href="{{ up.download_url }}" aria-label="Download the upload from {{ up.received_at|fmt_time }}" title="Download"><i class="ph ph-download-simple" aria-hidden="true"></i></a>
+              </div>
+            </li>
+            {% endfor %}
+          </ul>
+          <div class="dx-list-foot">
+            {% if lg.uploads|length > 3 %}
+            <button type="button" class="dx-link-btn" data-log-more aria-expanded="false" data-more-label="Show all {{ lg.uploads|length }} uploads" data-less-label="Show the newest 3"><i class="ph ph-caret-down" aria-hidden="true"></i><span>Show all {{ lg.uploads|length }} uploads</span></button>
+            {% endif %}
+            <span class="dx-help">The newest 20 uploads are kept, up to 1 MB.</span>
+          </div>
+          {% if lg.viewing %}
+          <div class="dx-log-viewer">
+            <div class="dx-code-head">
+              <span class="dx-f-label">Upload from {{ lg.viewing.received_at|fmt_time }}</span>
+              <span class="dx-btn-row">
+                <a class="dx-link-btn" href="{{ url_for('auth.device_page', instance_id=section.device_id) }}#logs">Close</a>
+                <button type="button" class="dx-btn is-sm" data-copy-target="#{{ section.id }}-log-view"><i class="ph ph-copy" aria-hidden="true"></i><span>Copy</span></button>
+              </span>
+            </div>
+            <pre class="dx-code is-tall dx-log-view" id="{{ section.id }}-log-view">{{ lg.viewing.text }}</pre>
+          </div>
+          {% endif %}
+          {% else %}
+          <div class="dx-empty">
+            <i class="ph ph-scroll" aria-hidden="true"></i>
+            <div class="dx-empty-text">
+              <p class="dx-empty-title">No logs uploaded yet</p>
+              <p class="dx-help">Start a collection above; each wake's log lands here after the panel's next check-in.</p>
+            </div>
+          </div>
+          {% endif %}
+        </div>
         {% endif %}
-        {% else %}
-        <div class="dx-empty">
-          <div class="dx-empty-icon"><i class="ph ph-scroll" aria-hidden="true"></i></div>
-          <p class="dx-empty-title">No logs uploaded yet</p>
-          <p class="dx-empty-help">Start a collection above; each wake's log lands here after the panel's next check-in.</p>
+
+        {% if section.debug_info or sign or section.status.parsed %}
+        <div class="dx-grp" id="diagnostics" data-devsub>
+          <div class="dx-grp-head"><h3 class="dx-grp-title">Diagnostics</h3></div>
+          {% if sign %}
+          {#- A Visionect frame's report is shown above; what helps instead is
+              what went each way between Tesserae and the frame. -#}
+          <div id="frame-log" class="dx-frame-log">
+            <div class="dx-code-head">
+              <span><span class="dx-f-label">Frame log</span> <span class="dx-help">→ Tesserae to the frame, ← the frame to Tesserae</span></span>
+              {% if sign.log %}<button type="button" class="dx-btn is-sm" data-copy-target="#{{ section.id }}-frame-log-all"><i class="ph ph-copy" aria-hidden="true"></i><span>Copy</span></button>{% endif %}
+            </div>
+            {% if sign.log %}
+            {% if sign.log|length > 8 %}
+            <pre class="dx-code dx-log-view" data-log-tail data-flog-short>{{ sign.log[-8:] | join('\n') }}</pre>
+            <pre class="dx-code is-tall dx-log-view" id="{{ section.id }}-frame-log-all" data-flog-all hidden>{{ sign.log | join('\n') }}</pre>
+            <button type="button" class="dx-link-btn dx-flog-more" data-flog-more aria-expanded="false" data-more-label="Show all {{ sign.log|length }} lines" data-less-label="Show the last 8 lines"><i class="ph ph-caret-down" aria-hidden="true"></i><span>Show all {{ sign.log|length }} lines</span></button>
+            {% else %}
+            <pre class="dx-code dx-log-view" id="{{ section.id }}-frame-log-all" data-log-tail>{{ sign.log | join('\n') }}</pre>
+            {% endif %}
+            <p class="dx-help">The last {{ sign.log | length }} exchanges since Tesserae started.</p>
+            {% else %}
+            <p class="dx-help">Nothing yet: the frame hasn't connected since Tesserae started.</p>
+            {% endif %}
+          </div>
+          {% elif section.status.parsed %}
+          <details class="dx-adv">
+            <summary><i class="ph ph-caret-right" aria-hidden="true"></i><span>Advanced: last status report</span></summary>
+            <dl class="dx-kv dx-adv-body">
+              {% for key, value in section.status.parsed.items() %}
+              <div><dt><code>{{ key }}</code></dt><dd>{{ value if value is not none else '-' }}</dd></div>
+              {% endfor %}
+            </dl>
+          </details>
+          {% endif %}
+
+          {# Read-only diagnostic block; secrets are masked server-side. #}
+          {% if section.debug_info %}
+          {% set dbg = section.debug_info %}
+          <details class="dx-adv dx-debug">
+            <summary><i class="ph ph-caret-right" aria-hidden="true"></i><span>Advanced: debug details and raw manifest</span></summary>
+            <div class="dx-adv-body">
+              <dl class="dx-kv">
+                <div><dt>Tesserae version</dt><dd><code>{{ dbg.app_version }}</code></dd></div>
+                <div><dt>Kind</dt><dd><code>{{ dbg.kind_of or '-' }}</code></dd></div>
+                <div><dt>Device id</dt><dd><code>{{ dbg.device_id }}</code></dd></div>
+                <div><dt>Renderer clones</dt><dd>{% for rid in dbg.renderer_ids %}<code>{{ rid }}</code>{% if not loop.last %}, {% endif %}{% else %}<span class="dx-help">none</span>{% endfor %}</dd></div>
+                <div><dt>Transport</dt><dd><code>{{ dbg.transport }}</code></dd></div>
+                {% if dbg.transport == 'mqtt' and dbg.status_topic %}<div><dt>MQTT status topic</dt><dd><code>{{ dbg.status_topic }}</code></dd></div>{% endif %}
+                {% if dbg.transport == 'mqtt' and dbg.config_topic %}<div><dt>MQTT config topic</dt><dd><code>{{ dbg.config_topic }}</code></dd></div>{% endif %}
+                {% if dbg.panel %}
+                <div><dt>Panel</dt><dd><code>{{ dbg.panel.w }}×{{ dbg.panel.h }}</code>{% if dbg.panel.orientation %} · <code>{{ dbg.panel.orientation }}</code>{% endif %}{% if dbg.panel.gamut %} · <code>{{ dbg.panel.gamut }}</code>{% endif %}{% if dbg.panel.underscan %} · underscan <code>{{ dbg.panel.underscan }}</code>{% endif %}</dd></div>
+                {% endif %}
+                <div><dt>Instance file</dt><dd><code class="dx-debug-path">{{ dbg.instance_file }}</code></dd></div>
+              </dl>
+              <div class="dx-code-head">
+                <span class="dx-help">Raw instance manifest (secrets masked)</span>
+                <button type="button" class="dx-btn is-sm" data-copy-target="#{{ section.id }}-manifest"><i class="ph ph-copy" aria-hidden="true"></i><span>Copy</span></button>
+              </div>
+              <pre class="dx-code dx-debug-json" id="{{ section.id }}-manifest"><code>{{ dbg.raw_manifest_json }}</code></pre>
+            </div>
+          </details>
+          {% endif %}
         </div>
         {% endif %}
       </div>
     </section>
-    {% endif %}
 
     {# ---------------- REMOVE ---------------- #}
     {% if section.delete_endpoint %}
-    <section class="dx-section-card dx-devsec is-danger" id="remove" data-devsec>
-      <div class="dx-remove-row">
+    <section class="dx-dsec is-danger" id="remove">
+      <div class="dx-remove" data-delete-details>
         <div class="dx-remove-text">
-          <p class="dx-band-title">Remove this device</p>
-          <p class="dx-band-desc">Unbinds its dashboards and lineups. The hardware keeps running until it is re-paired.</p>
+          <h2 class="dx-dsec-title">Remove</h2>
+          <p class="dx-help">Unbinds its dashboards and lineups. The hardware keeps running until it is re-paired.</p>
         </div>
-        <details class="dx-delete-details" data-delete-details>
-          <summary class="dx-btn is-danger"><i class="ph ph-trash" aria-hidden="true"></i><span>Delete</span></summary>
-          <form method="post" action="{{ section.delete_endpoint }}" class="form dx-delete-form">
-            <p class="field-help">Delete this device? Its renderers stop publishing and its registry entry is removed.</p>
-            {% if section.orphan_state and section.orphan_state.total > 0 %}
-            <label class="dx-delete-wipe">
-              <input type="checkbox" name="wipe_orphan" value="1">
-              <span>
-                Also wipe
-                {% set parts = [] %}
-                {% if section.orphan_state.page_count %}{% set _ = parts.append(section.orphan_state.page_count ~ ' bound dashboard' ~ ('s' if section.orphan_state.page_count != 1 else '')) %}{% endif %}
-                {% if section.orphan_state.event_count %}{% set _ = parts.append(section.orphan_state.event_count ~ ' history row' ~ ('s' if section.orphan_state.event_count != 1 else '')) %}{% endif %}
-                {% if section.orphan_state.settings_count %}{% set _ = parts.append('per-device settings') %}{% endif %}
-                {% if section.orphan_state.has_calibration_image %}{% set _ = parts.append('uploaded calibration image') %}{% endif %}
-                {% if section.orphan_state.unbound_page_count %}{% set _ = parts.append('this device off ' ~ section.orphan_state.unbound_page_count ~ ' shared dashboard' ~ ('s' if section.orphan_state.unbound_page_count != 1 else '')) %}{% endif %}
-                {% if section.orphan_state.relabelled_event_count %}{% set _ = parts.append('this device off ' ~ section.orphan_state.relabelled_event_count ~ ' shared history row' ~ ('s' if section.orphan_state.relabelled_event_count != 1 else '')) %}{% endif %}
-                {{ parts | join(', ') }}.
-              </span>
-            </label>
-            <p class="field-help" style="margin-top: 6px;">
-              Leave unticked to keep the state around in case you re-register the same physical
-              device (matched by MAC). A future register with a different MAC will wipe it automatically.
-            </p>
-            {% else %}
-            <p class="field-help">Nothing else to wipe; the delete is already clean.</p>
-            {% endif %}
-            <div class="dx-delete-actions">
-              <button type="button" class="button ghost" data-delete-cancel>Cancel</button>
-              <button type="submit" class="button dx-danger"><i class="ph ph-trash" aria-hidden="true"></i><span>Delete device</span></button>
-            </div>
-          </form>
-        </details>
+        <button type="button" class="dx-btn is-danger" data-del-open aria-expanded="false" aria-controls="{{ section.id }}-delete"><i class="ph ph-trash" aria-hidden="true"></i><span>Delete</span></button>
+        <form method="post" action="{{ section.delete_endpoint }}" class="dx-delete-form" id="{{ section.id }}-delete" data-del-form hidden>
+          <p>Delete this device? Its renderers stop publishing and its registry entry is removed.</p>
+          {% if section.orphan_state and section.orphan_state.total > 0 %}
+          <label class="dx-check">
+            <input type="checkbox" name="wipe_orphan" value="1">
+            <span>
+              Also wipe
+              {% set parts = [] %}
+              {% if section.orphan_state.page_count %}{% set _ = parts.append(section.orphan_state.page_count ~ ' bound dashboard' ~ ('s' if section.orphan_state.page_count != 1 else '')) %}{% endif %}
+              {% if section.orphan_state.event_count %}{% set _ = parts.append(section.orphan_state.event_count ~ ' history row' ~ ('s' if section.orphan_state.event_count != 1 else '')) %}{% endif %}
+              {% if section.orphan_state.settings_count %}{% set _ = parts.append('per-device settings') %}{% endif %}
+              {% if section.orphan_state.has_calibration_image %}{% set _ = parts.append('uploaded calibration image') %}{% endif %}
+              {% if section.orphan_state.unbound_page_count %}{% set _ = parts.append('this device off ' ~ section.orphan_state.unbound_page_count ~ ' shared dashboard' ~ ('s' if section.orphan_state.unbound_page_count != 1 else '')) %}{% endif %}
+              {% if section.orphan_state.relabelled_event_count %}{% set _ = parts.append('this device off ' ~ section.orphan_state.relabelled_event_count ~ ' shared history row' ~ ('s' if section.orphan_state.relabelled_event_count != 1 else '')) %}{% endif %}
+              {{ parts | join(', ') }}.
+            </span>
+          </label>
+          <p class="dx-help">Leave unticked to keep the state around in case you re-register the same physical device (matched by MAC). A future register with a different MAC will wipe it automatically.</p>
+          {% else %}
+          <p class="dx-help">Nothing else to wipe; the delete is already clean.</p>
+          {% endif %}
+          <div class="dx-btn-row dx-delete-actions">
+            <button type="button" class="dx-link-btn" data-delete-cancel>Cancel</button>
+            <button type="submit" class="dx-btn is-danger is-solid"><i class="ph ph-trash" aria-hidden="true"></i><span>Delete device</span></button>
+          </div>
+        </form>
       </div>
     </section>
     {% endif %}
 
     {# STICKY SAVE BAR (hidden until the combined form goes dirty). #}
-    <div class="dx-save-bar dx-save-bar--page" data-save-bar data-save-bar-for="{{ _combined_form_id }}" hidden>
+    <div class="dx-save-bar dx-save-bar--page" data-save-bar data-save-bar-for="{{ _form }}" hidden>
       <span class="dx-save-bar-msg">Unsaved changes on {{ _name }}</span>
       <div class="dx-save-bar-actions">
-        <button type="reset" form="{{ _combined_form_id }}" class="dx-save-bar-discard">Discard</button>
-        <button type="submit" form="{{ _combined_form_id }}" class="dx-save-bar-save">
+        <button type="reset" form="{{ _form }}" class="dx-save-bar-discard">Discard</button>
+        <button type="submit" form="{{ _form }}" class="dx-save-bar-save">
           <i class="ph ph-floppy-disk" aria-hidden="true"></i><span>Save</span>
         </button>
       </div>
     </div>
 
-  </div>{# /dx-devpage-main #}
-</div>{# /dx-devpage-layout #}
+  </div>{# /dx-dp-main #}
+</div>{# /dx-dp #}
 
 {% include '_token_reveal_modal.html' %}
 <script src="{{ url_for('static', filename='render-sync.js') }}"></script>
+{% if section.battery_card %}{{ battery_chart_assets() }}{% endif %}
 {% endblock %}

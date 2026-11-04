@@ -1669,6 +1669,7 @@ def _day_bar(
     roles: Mapping[tuple[str, int], str],
     next_tick: int | None,
     screens: Mapping[str, ScreenView],
+    next_epoch: float | None = None,
 ) -> DayBarView:
     today = clk.now_abs // DAY_MIN
     is_today = day == today
@@ -1721,7 +1722,7 @@ def _day_bar(
                     if not push and s < m < e:
                         is_next = live_now and next_tick is not None and abs_t == next_tick
                         in_sec = (
-                            max(0, int(clk.epoch_of(abs_t % WEEK_MIN) - clk.epoch))
+                            max(0, int((next_epoch or clk.epoch_of(abs_t % WEEK_MIN)) - clk.epoch))
                             if is_next
                             else None
                         )
@@ -1737,6 +1738,30 @@ def _day_bar(
                                 in_label=update_in_label(in_min) if in_min is not None else "",
                             )
                         )
+        if (
+            next_epoch is not None
+            and next_tick is not None
+            and live_now
+            and not push
+            and not any(t.next for t in ticks)
+        ):
+            # A held advance lands off the window's grid (the wake after quiet
+            # hours), so it gets a tick of its own.
+            m = next_tick % WEEK_MIN - day * DAY_MIN
+            if s < m < e:
+                in_sec = max(0, int(next_epoch - clk.epoch))
+                ticks.append(
+                    TickView(
+                        minute=m,
+                        pct=round((m - s) / (e - s) * 100, 4),
+                        next=True,
+                        label=clock(m),
+                        in_min=in_sec // 60,
+                        in_sec=in_sec,
+                        in_label=update_in_label(in_sec // 60),
+                    )
+                )
+                ticks.sort(key=lambda t: t.minute)
         steps: list[SegmentStepView] = []
         for point in points[:60]:
             screen = screens[point.dashboard_id]
@@ -1862,6 +1887,38 @@ def build_display(
         sched = _Scheduled(sched.lineup, idx, since, hold=False)
         if runtime.next_at is not None:
             next_adv = clk.week_minute(runtime.next_at)
+
+    # An advance that comes due inside quiet hours (or a pause) doesn't happen
+    # then. The scheduler's projection knows when this lineup really fires next
+    # (the first grid step after the hold, not the moment it ends); without a
+    # projection, the end of the hold stands in. The bar and the pill mark that
+    # step, and "Update in" counts to when it lands on the display.
+    adv_lands: _Lands | None = None
+    if next_adv is not None and lb is not None:
+        adv_epoch = (
+            runtime.next_at
+            if runtime is not None and runtime.next_at is not None
+            else clk.epoch_of(next_adv)
+        )
+        held_adv = _lands_at(d, clk, adv_epoch)
+        if held_adv.held and held_adv.epoch is not None:
+            if d.upcoming is None:
+                adv_lands = held_adv
+                next_adv = clk.week_minute(held_adv.epoch)
+            else:
+                fires = next(
+                    (
+                        ev.at
+                        for ev in d.upcoming
+                        if ev.at > clk.epoch and ev.lineup_id == lb.lineup.id
+                    ),
+                    None,
+                )
+                if fires is None:
+                    next_adv = None
+                else:
+                    adv_lands = _lands_at(d, clk, fires)
+                    next_adv = clk.week_minute(fires)
 
     # A daily push that fired after the live window's latest step owns the
     # panel (a noon override inside an hourly rotation); windows alone miss
@@ -2139,7 +2196,11 @@ def build_display(
     next_tick = next_adv % WEEK_MIN if next_adv is not None else None
     dashboard_ids = {step.dashboard_id for lineup in d.lineups for step in lineup.steps}
     screens = {pid: _screen(dashboards.get(pid), pid, d) for pid in dashboard_ids}
-    week = [_day_bar(d, model, i, clk, dashboards, roles, next_tick, screens) for i in range(7)]
+    next_epoch = adv_lands.epoch if adv_lands is not None else None
+    week = [
+        _day_bar(d, model, i, clk, dashboards, roles, next_tick, screens, next_epoch)
+        for i in range(7)
+    ]
     return DisplayView(
         gamut=d.gamut,
         grey_levels=d.grey_levels,

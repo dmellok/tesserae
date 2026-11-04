@@ -207,7 +207,7 @@ def _deck_to_rotation(deck: Deck) -> Rotation | None:
         return None
 
 
-# A display's catch-up after a per-display pause waits this long after an
+# A display's catch-up after a per-display pause (or quiet hours) waits this long after an
 # attempt that didn't reach the panel (a failed render) before trying again.
 # Quiet hours don't count as an attempt: the catch-up just waits them out.
 PAUSE_CATCHUP_RETRY_S = 300.0
@@ -239,6 +239,10 @@ class _PauseCatchup:
     since: float = 0.0
     fires: dict[str, _PendingFire] = field(default_factory=dict)
     retry_after: float = 0.0
+    # Its cycles were skipped by quiet hours rather than a pause: the display
+    # gets a fresh frame when they end even if it is on the same page, the way
+    # a keep-fresh lineup re-fires every dwell window.
+    after_quiet: bool = False
 
 
 @dataclass(frozen=True)
@@ -975,6 +979,24 @@ class Scheduler:
                 entry = self._pause_catchups.setdefault(device_id, _PauseCatchup())
                 entry.fires[schedule.id] = pending
 
+    def _quiet_device_ids(self, device_ids: set[str]) -> set[str]:
+        quiet = getattr(self._push_factory(), "device_in_quiet_hours", None)
+        if not callable(quiet):
+            return set()
+        return {device_id for device_id in device_ids if quiet(device_id) is True}
+
+    def _note_quiet_skip(self, device_ids: set[str], now: datetime) -> None:
+        """A cycle step passed these displays by because of quiet hours. The
+        window is used up either way, so without this they would wait for the
+        next one after quiet hours end; a frame waking then would find nothing
+        new. Delivered by ``_run_pause_catchups`` once they end."""
+        for device_id in self._quiet_device_ids(device_ids):
+            with self._lock:
+                entry = self._pause_catchups.setdefault(device_id, _PauseCatchup())
+                entry.cycles = True
+                entry.after_quiet = True
+                entry.since = entry.since or now.timestamp()
+
     def _catchup_satisfied(self, device_ids: set[str]) -> None:
         """A regular delivery reached these displays after their pause: it's
         newer than anything they missed, so their catch-up is done."""
@@ -1143,7 +1165,12 @@ class Scheduler:
                 rec = self._deck_nav_store.get(device_id)
             except Exception:
                 rec = None
-            if rec is not None and rec.get("deck_id") == deck.id and rec.get("page_id") == target:
+            if (
+                not entry.after_quiet
+                and rec is not None
+                and rec.get("deck_id") == deck.id
+                and rec.get("page_id") == target
+            ):
                 # The panel is already on the lineup's current page: nothing
                 # was missed, so don't repaint it.
                 return True
@@ -1157,9 +1184,15 @@ class Scheduler:
         with self._lock:
             fired_step = self._rotation_last_step.get(rotation.id)
             fired_at = self._rotation_last_pushed_at.get(rotation.id)
-        if fired_step == step_index and fired_at is not None and fired_at >= entry.since:
+        # (A fire inside quiet hours stamps these too, without reaching it.)
+        if (
+            not entry.after_quiet
+            and fired_step == step_index
+            and fired_at is not None
+            and fired_at >= entry.since
+        ):
             return True  # the rotation fired to it since its pause ended
-        if self._device_is_showing(device_id, target):
+        if not entry.after_quiet and self._device_is_showing(device_id, target):
             # The panel is already on the rotation's current page: nothing
             # was missed, so don't repaint it (the bound-lineup branch's
             # same check, from the last frame published to the display).
@@ -1965,6 +1998,7 @@ class Scheduler:
         quiet_check = getattr(pusher, "device_in_quiet_hours", None)
         if callable(quiet_check) and quiet_check(device_id):
             self._log_deck_skip(device_id, deck.id, target, "quiet hours")
+            self._note_quiet_skip({device_id}, now)
             return False
         promoter = getattr(pusher, "promote_deck_page", None)
         promoted = (
@@ -2746,6 +2780,12 @@ class Scheduler:
                 device_filter if device_filter is not None else self._page_devices(step.page_id)
             )
             self._catchup_satisfied(reached - on_pause)
+        if respect_quiet_hours and not bypass_holds:
+            self._note_quiet_skip(
+                (device_filter if device_filter is not None else self._page_devices(step.page_id))
+                - on_pause,
+                now,
+            )
         # Same status semantics as _fire: a quiet result still counts
         # as "we tried" so the next tick doesn't re-attempt within the
         # quiet window. Failures don't bump so the next tick retries.
@@ -3030,6 +3070,17 @@ class Scheduler:
             self._note_missed_fire(paused_targets, schedule, target_page, nav_deck, now)
         if paused is not None and result.status in DELIVERED_STATUSES and known_targets:
             self._catchup_satisfied(known_targets - paused_targets)
+        if respect_quiet_hours and schedule.interval_minutes is not None:
+            # An interval that came due in quiet hours is delivered when they
+            # end. A daily fire isn't: it is for its moment, and is skipped.
+            reached = known_targets or set(device_ids or ()) or self._page_devices(target_page)
+            self._note_missed_fire(
+                self._quiet_device_ids(reached - paused_targets),
+                schedule,
+                target_page,
+                nav_deck,
+                now,
+            )
         with self._lock:
             self._last_status[schedule.id] = result.status
             if held:

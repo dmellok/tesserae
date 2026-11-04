@@ -1463,6 +1463,7 @@ def _build_device_section(store: Any, device: Device) -> dict[str, Any] | None:
     section["has_controls"] = bool(section["button_map_capable"] or section["touch_monitor_url"])
     section["push_now_endpoint"] = url_for("auth.devices_push_now", instance_id=device.id)
     section["overview"] = _device_overview(device, section)
+    section["battery_card"] = _battery_card_or_none(device.id) if is_instance else None
     section["lineup_names"] = _lineup_names_for(device.id, section["timetable_entries"])
     section["now_line"] = _now_line_for(device.id)
     section["lineup_rows"] = _lineup_rows_for(device.id) if is_instance else []
@@ -1589,6 +1590,18 @@ def _now_line_for(device_id: str) -> dict[str, Any] | None:
         }
     meta = f"next {nxt.name} {nxt.next_run.main}" if nxt and nxt.next_run else ""
     return {"state": "idle", "name": "Nothing running", "meta": meta, "url": url}
+
+
+def _battery_card_or_none(device_id: str) -> dict[str, Any] | None:
+    """The Batteries page's chart card for this device (last 7 days), for the
+    Power section; ``None`` without history or when it can't be built."""
+    from app.device_battery_routes import device_card
+
+    try:
+        return device_card(device_id, window_days=7)
+    except Exception:
+        current_app.logger.debug("devices: no battery card for %s", device_id, exc_info=True)
+        return None
 
 
 def _device_overview(device: Device, section: dict[str, Any]) -> dict[str, Any]:

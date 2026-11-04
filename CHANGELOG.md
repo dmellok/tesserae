@@ -13,6 +13,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   where a reference picture would pull the composition towards itself. It
   takes the same quality and size as the edit model, and goes straight to
   OpenAI when only an OpenAI key is set.
+- Device page: a summary rail beside Display, Schedule, Controls, Power, Troubleshooting and Remove sections, with compact field rows and Advanced disclosures.
 - Collapsible sections on the Server, System, About, Stats and other admin pages, remembered per page.
 - Sub-section titles are one heading style on every page, with a hairline above.
 - Paper's section title marker follows the theme's accent colour instead of a fixed red.
@@ -21,6 +22,9 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - Device batteries: a Wakes / day tile, and time with no readings is shaded instead of drawn as a line.
 - Device batteries: each chart has its own 12h / 24h / 7d / 30d range and drag-to-zoom.
 - Device batteries: a readable dark tooltip, no drain predictions for Visionect, and Clear history is a corner link.
+- Device page: six collapsible sections instead of eleven, and the top tiles jump to their section.
+- Lineups: next update times are right for a display asleep in quiet hours, such as no more ~6:31 PM after a 9 AM wake.
+- Quiet hours: a lineup step or interval skipped overnight now lands as quiet hours end, and a sleeping display wakes for it.
 - A widget that paints with GPT Image can ask for the quality (low, medium
   or high) and the exact size of the picture, so a poster can be painted
   sharp at its panel's own resolution (1200x1600 for a 13.3" or OpenPaper L

@@ -10,7 +10,8 @@
  * The chevron button is the keyboard / screen-reader control; the empty space
  * of the header toggles too (links, buttons and fields inside it keep their own
  * job). Every section starts expanded; the choice is remembered per page and
- * section in localStorage (tesserae-collapsed:<path>#<id>). A #hash link, or a
+ * section in localStorage (tesserae-collapsed:<path>#<id>), or per scope when a
+ * wrapper carries data-collapsible-scope (tesserae-collapsed:scope:<x>#<id>). A #hash link, or a
  * form field that fails validation inside a collapsed section, opens it first.
  * The body is hidden with the hidden attribute, so nothing animates layout. */
 (function () {
@@ -18,7 +19,24 @@
   var PREFIX = 'tesserae-collapsed:';
   var page = (window.location.pathname.replace(/\/+$/, '') || '/');
 
-  function key(sec) { return PREFIX + page + '#' + sec.id; }
+  // A section inside ``[data-collapsible-scope="x"]`` shares its state with
+  // every page using that scope (the device page: collapsing Power on one
+  // display collapses it on all of them), instead of being kept per path.
+  function scopeOf(sec) {
+    var holder = sec.closest('[data-collapsible-scope]');
+    return holder ? 'scope:' + holder.getAttribute('data-collapsible-scope') : page;
+  }
+  function key(sec) { return PREFIX + scopeOf(sec) + '#' + sec.id; }
+  // The device page kept its own keys before it moved to this component
+  // (tesserae-devsec-collapsed:<section>); carry a collapsed one over once.
+  function migrate(sec) {
+    var old = sec.closest('[data-device-page]') ? 'tesserae-devsec-collapsed:' + sec.id : '';
+    if (!old) return;
+    try {
+      if (window.localStorage.getItem(old) === '1') window.localStorage.setItem(key(sec), '1');
+      window.localStorage.removeItem(old);
+    } catch (e) { /* private mode */ }
+  }
   function stored(sec) {
     try { return window.localStorage.getItem(key(sec)) === '1'; } catch (e) { return false; }
   }
@@ -80,6 +98,7 @@
     if (!secs.length) return;
     var anyCollapsed = false;
     secs.forEach(function (sec) {
+      migrate(sec);
       if (stored(sec)) { setCollapsed(sec, true, false); anyCollapsed = true; }
       var head = sec.querySelector('[data-collapsible-head]');
       if (!head) return;

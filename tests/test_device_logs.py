@@ -271,12 +271,13 @@ def test_device_page_shows_logs_only_when_advertised(app: Flask) -> None:
     _status(client, token, {})
     body = client.get(f"/settings/devices/{DEV}").get_data(as_text=True)
     assert 'id="logs"' not in body
-    assert 'href="#logs"' not in body
 
     _status(client, token, {**CAP, "diag": {"id": 5, "paint_error": "refresh_timeout"}})
     body = client.get(f"/settings/devices/{DEV}").get_data(as_text=True)
     assert 'id="logs"' in body
-    assert 'href="#logs"' in body
+    # The Logs sub-group lives inside Troubleshooting (#logs still resolves).
+    trouble = body[body.index('id="troubleshooting"') :]
+    assert 'id="logs"' in trouble
     assert "No logs uploaded yet" in body
     assert "paint failed: refresh_timeout" in body
 

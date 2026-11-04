@@ -571,10 +571,10 @@ def test_visionect_device_page_shows_the_signs_report_and_its_actions(
         "6.17.4168",
         "61%",
         "home-wifi · -53 dBm",
-        "Every 5 min",
+        "Every 5 min",  # the Sleep interval, read-only: set on the frame
+        "set on the frame",
         "Off (stays awake)",
         "Full refresh asked",
-        "Check-in interval",
         "Sleep between check-ins",
     ):
         assert text in page, text
