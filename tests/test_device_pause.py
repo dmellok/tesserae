@@ -703,6 +703,91 @@ def test_a_pause_ending_in_quiet_hours_catches_up_when_they_end(tmp_path: Path) 
     assert len(rig.push.calls) == 1
 
 
+def test_a_step_skipped_by_quiet_hours_lands_when_they_end(tmp_path: Path) -> None:
+    """A keep-fresh single page: every window inside quiet hours is used up,
+    so without the catch-up the first new frame waits for the next window, and
+    a frame that wakes as they end finds nothing new."""
+    rig = _rig(tmp_path)
+    rig.decks.upsert(_cycle(["frame"], pages=[DeckPage(page_id="a")]))
+    rig.sched._tick_once(at(0, 0))
+    rig.push.quiet.add("frame")
+    rig.push.calls.clear()
+    rig.sched._tick_once(at(0, 30))
+    rig.sched._tick_once(at(8, 30))
+    rig.sched._tick_once(at(9, 0))
+    assert rig.push.calls == []  # quiet hours are respected
+    rig.push.quiet.discard("frame")
+    rig.sched._tick_once(at(9, 1))
+    assert rig.push.to() == [("a", frozenset({"frame"}))]  # once, on the first tick after
+    assert "frame" not in rig.sched._pause_catchups
+    rig.sched._tick_once(at(9, 1, 30))
+    rig.sched._tick_once(at(9, 29))
+    assert len(rig.push.calls) == 1
+    rig.sched._tick_once(at(9, 30))  # and the grid carries on
+    assert len(rig.push.calls) == 2
+
+
+def test_a_cycle_lands_the_step_current_when_quiet_hours_end(tmp_path: Path) -> None:
+    rig = _rig(tmp_path)
+    rig.decks.upsert(_cycle(["frame"], advance_interval_minutes=60))
+    rig.sched._tick_once(at(0, 0))
+    rig.push.quiet.add("frame")
+    rig.push.calls.clear()
+    rig.sched._tick_once(at(1, 0))
+    rig.sched._tick_once(at(2, 0))
+    rig.sched._tick_once(at(3, 0))
+    rig.push.quiet.discard("frame")
+    rig.sched._tick_once(at(3, 1))
+    assert rig.push.to() == [("b", frozenset({"frame"}))]
+
+
+def test_a_step_skipped_by_quiet_hours_stops_if_the_lineup_has_ended(tmp_path: Path) -> None:
+    rig = _rig(tmp_path)
+    rig.decks.upsert(_cycle(["frame"], advance_end_at="02:00"))
+    rig.sched._tick_once(at(0, 0))
+    rig.push.quiet.add("frame")
+    rig.push.calls.clear()
+    rig.sched._tick_once(at(1, 30))
+    rig.push.quiet.discard("frame")
+    rig.sched._tick_once(at(3, 0))
+    assert rig.push.calls == []
+    assert "frame" not in rig.sched._pause_catchups
+
+
+def test_an_interval_due_in_quiet_hours_lands_when_they_end(tmp_path: Path) -> None:
+    rig = _rig(tmp_path)
+    rig.decks.upsert(_cycle(["frame"], advance_trigger="interval", pages=[DeckPage(page_id="a")]))
+    rig.sched._tick_once(at(0, 0))
+    rig.push.quiet.add("frame")
+    rig.push.calls.clear()
+    rig.sched._tick_once(at(0, 31))
+    rig.sched._tick_once(at(1, 2))
+    rig.push.calls.clear()  # (the quiet attempts themselves)
+    rig.push.quiet.discard("frame")
+    rig.sched._tick_once(at(1, 5))
+    assert rig.push.to() == [("a", frozenset({"frame"}))]
+    assert "frame" not in rig.sched._pause_catchups
+
+
+def test_a_daily_fire_in_quiet_hours_stays_skipped(tmp_path: Path) -> None:
+    rig = _rig(tmp_path)
+    rig.decks.upsert(
+        _cycle(
+            ["frame"],
+            advance_trigger="daily",
+            advance_fires_at="01:00",
+            pages=[DeckPage(page_id="a")],
+        )
+    )
+    rig.sched._tick_once(at(0, 0))
+    rig.push.quiet.add("frame")
+    rig.sched._tick_once(at(1, 0))
+    rig.push.calls.clear()
+    rig.push.quiet.discard("frame")
+    rig.sched._tick_once(at(2, 0))
+    assert rig.push.calls == []
+
+
 def test_a_missed_fire_waits_out_quiet_hours_too(tmp_path: Path) -> None:
     rig = _rig(tmp_path)
     rig.decks.upsert(_shared_dinner())

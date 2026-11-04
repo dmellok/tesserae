@@ -1591,6 +1591,23 @@ def test_a_sleeping_display_counts_to_the_scheduler_s_first_step_after_quiet_hou
     assert "9:30" in pill.label, pill
 
 
+def test_a_sleeping_display_counts_to_the_wake_when_the_catch_up_lands_on_it() -> None:
+    """The scheduler delivers the skipped step as quiet hours end (09:01), so
+    the frame waking then is when the update happens."""
+    from app.lineups_view import UpcomingInput
+
+    ends = SAMPLE_NOW.replace(day=29, hour=9, minute=1).timestamp()
+    now, out = _asleep_in_quiet_hours((UpcomingInput(at=ends, lineup_id="i", dashboard_id="art"),))
+    assert out.next_update is not None and out.next_update.at_epoch == ends
+    assert out.next_line.at.startswith("~9:01"), out.next_line
+    assert [(t.minute, t.in_label) for t in _next_ticks(out)] == [
+        (9 * 60 + 1, "Update in 8 h 41 min")
+    ]
+    pill = next(st.pill for st in _lineup(out, "i").steps if st.pill and st.pill.kind == "next")
+    assert "9:01" in pill.label, pill
+    assert now.hour == 0
+
+
 def test_a_sleeping_display_without_a_projection_waits_for_the_hold_to_end() -> None:
     now, out = _asleep_in_quiet_hours(None)
     wake = now.replace(hour=9, minute=1).timestamp()

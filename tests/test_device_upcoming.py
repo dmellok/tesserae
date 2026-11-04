@@ -373,9 +373,9 @@ def test_a_fallback_dashboard_makes_the_target_unknowable() -> None:
 # -- quiet hours ---------------------------------------------------------
 
 
-def test_updates_inside_quiet_hours_are_left_out() -> None:
-    """A fire that reaches a quiet panel repaints nothing, and the endpoint
-    only describes what the glass does."""
+def test_interval_fires_inside_quiet_hours_land_once_when_they_end() -> None:
+    """A fire inside quiet hours repaints nothing then. The scheduler delivers
+    it when the window ends, so that is where it is projected, once."""
     night = datetime(2026, 8, 17, 21, 30, tzinfo=UTC)
     events = project_upcoming(
         ProjectionInputs(
@@ -396,6 +396,7 @@ def test_updates_inside_quiet_hours_are_left_out() -> None:
     )
     assert [e.scheduled_at.isoformat() for e in events] == [
         "2026-08-17T21:31:00+00:00",
+        "2026-08-18T07:01:00+00:00",
         "2026-08-18T07:31:00+00:00",
         "2026-08-18T08:31:00+00:00",
     ]

@@ -2583,6 +2583,52 @@ def test_next_poll_s_sleeps_through_quiet_hours_when_asked(app: Flask) -> None:
     assert 7200 <= poll <= 7320  # ~2 h to end, +1 min inclusive end, +30 s margin
 
 
+def _quiet_ending_soon(app: Flask) -> None:
+    from datetime import UTC, timedelta
+
+    now = datetime.now(UTC)
+    app.config["SETTINGS_STORE"].patch_section(
+        "app",
+        {
+            "timezone": "UTC",
+            "quiet_hours_enabled": True,
+            "quiet_hours_start": (now - timedelta(hours=9)).strftime("%H:%M"),
+            "quiet_hours_end": (now + timedelta(minutes=2)).strftime("%H:%M"),
+            "quiet_hours_sleep": True,
+        },
+    )
+
+
+def test_a_frame_waking_just_before_quiet_hours_end_wakes_again_as_they_end(app: Flask) -> None:
+    """A long sleep drifts: frames wake a couple of minutes before the window
+    ends. With a lineup due, the next wake is the window's end, when the
+    catch-up lands, not a whole interval later."""
+    from app.state.deck_model import Deck, DeckPage
+
+    client, token = _paired_client(app)
+    _set_sleep_interval(app, "poll_panel", 1800)
+    _quiet_ending_soon(app)
+    app.config["DECK_STORE"].upsert(
+        Deck(
+            id="all_day",
+            name="All day",
+            device_ids=["poll_panel"],
+            pages=[DeckPage(page_id="sky")],
+            advance="timer",
+            advance_interval_minutes=30,
+            advance_anchor="00:00",
+        )
+    )
+    assert 100 <= _poll_after_status(app, client, token) <= 300
+
+
+def test_a_frame_with_nothing_due_keeps_its_interval_as_quiet_hours_end(app: Flask) -> None:
+    client, token = _paired_client(app)
+    _set_sleep_interval(app, "poll_panel", 1800)
+    _quiet_ending_soon(app)
+    assert _poll_after_status(app, client, token) == 1800
+
+
 def test_next_poll_s_keeps_the_interval_inside_quiet_hours_by_default(app: Flask) -> None:
     """Quiet hours alone only filter automation; the panel still wakes on
     its interval unless sleep-through is switched on."""
