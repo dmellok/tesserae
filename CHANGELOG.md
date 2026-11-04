@@ -137,6 +137,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- History: 12-hour times no longer overlap the thumbnail.
+
 - A lineup step that lands a pre-rendered frame now shows up everywhere the
   newest push is read. Home Assistant's Next and Previous, a physical button,
   a tap, the companion API, the Lineups page's step and a home return could
