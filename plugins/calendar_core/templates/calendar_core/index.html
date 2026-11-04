@@ -202,12 +202,6 @@
            invisible to users who couldn't SSH to clear the cache. Now
            labelled + flashes an event-count message on click so HA / Docker
            users can tell whether the refresh pulled new events. #}
-        <form method="post" action="{{ url_for('calendar_core_admin.refresh_feed', feed_id=f.id) }}" class="inline">
-          <button type="submit" class="button" title="Drop the cache and re-fetch now.">
-            <i class="ph ph-arrows-clockwise" aria-hidden="true"></i>
-            <span>Refresh</span>
-          </button>
-        </form>
         {% if f.source != 'ha' %}
         <button type="button" class="ghost" title="Credentials" onclick="document.getElementById('cf-auth-{{ f.id }}').hidden = !document.getElementById('cf-auth-{{ f.id }}').hidden">
           <i class="ph ph-lock-simple" aria-hidden="true"></i>
@@ -228,6 +222,12 @@
         </form>
         <form method="post" action="{{ url_for('calendar_core_admin.delete_feed', feed_id=f.id) }}" class="inline" onsubmit="return confirm('Delete feed {{ f.name }}?');">
           <button type="submit" class="ghost danger" title="Delete"><i class="ph ph-trash" aria-hidden="true"></i></button>
+        </form>
+        <form method="post" action="{{ url_for('calendar_core_admin.refresh_feed', feed_id=f.id) }}" class="inline">
+          <button type="submit" class="button" title="Drop the cache and re-fetch now.">
+            <i class="ph ph-arrows-clockwise" aria-hidden="true"></i>
+            <span>Refresh</span>
+          </button>
         </form>
       </div>
       {% if f.source != 'ha' %}

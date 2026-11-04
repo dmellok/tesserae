@@ -302,7 +302,6 @@
   .bind-dialog .wizard-footer { flex-wrap: wrap; }
   .bind-dialog .wizard-footer-spacer { display: none; }
   .bind-dialog .wizard-footer button { flex: 1 1 100%; }
-  .bind-dialog .wizard-footer .ghost { order: 3; }
 }
 
 /* form controls reuse the app's field styling, all one height */

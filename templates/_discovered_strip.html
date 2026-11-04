@@ -26,12 +26,12 @@
       {% endfor %}
     </p>
     <div class="dx-disc-banner-actions">
-      {% if _registrable %}
-      <button type="button" class="dx-btn is-sm" data-disc-reveal="{{ _registrable[0].id }}">Register {{ _registrable[0].id }}</button>
-      {% endif %}
       <button type="button" class="dx-btn is-sm is-ghost" data-disc-dismiss-all>
         {% if _discovered|length == 1 %}Dismiss{% elif _discovered|length == 2 %}Dismiss both{% else %}Dismiss all{% endif %}
       </button>
+      {% if _registrable %}
+      <button type="button" class="dx-btn is-sm" data-disc-reveal="{{ _registrable[0].id }}">Register {{ _registrable[0].id }}</button>
+      {% endif %}
     </div>
   </div>
 
@@ -52,6 +52,9 @@
       </span>
     </div>
     <div class="dx-disc-row-actions">
+      <form method="post" action="{{ url_for('auth.devices_dismiss_discovered', discovered_id=d.id) }}" class="form form--inline" data-disc-dismiss-form>
+        <button type="submit" class="dx-btn-ghost-sm"><i class="ph ph-x" aria-hidden="true"></i><span>Dismiss</span></button>
+      </form>
       {% if d.kind %}
       <form method="post" action="{{ url_for('auth.devices_register_discovered', discovered_id=d.id) }}" class="form form--inline">
         {# Prefilled from the announce's optional ``name`` (discussion #24);
@@ -73,9 +76,6 @@
       {% else %}
       <span class="dx-discovered-hint">No <code>kind</code> in the heartbeat, add it through Add device instead.</span>
       {% endif %}
-      <form method="post" action="{{ url_for('auth.devices_dismiss_discovered', discovered_id=d.id) }}" class="form form--inline" data-disc-dismiss-form>
-        <button type="submit" class="dx-btn-ghost-sm"><i class="ph ph-x" aria-hidden="true"></i><span>Dismiss</span></button>
-      </form>
     </div>
   </div>
   {% endfor %}

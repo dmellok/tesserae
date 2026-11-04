@@ -171,10 +171,10 @@
   </details>
 
   <div class="actions">
-    {{ button('Save changes' if edit_mode else 'Create schedule', icon='floppy-disk' if edit_mode else 'plus') }}
     {% if in_dialog %}
     <button type="button" class="ghost" data-schedule-dialog-close>Cancel</button>
     {% elif edit_mode %}<a class="ghost-link" href="{{ url_for('schedules.index') }}">Cancel</a>{% endif %}
+    {{ button('Save changes' if edit_mode else 'Create schedule', icon='floppy-disk' if edit_mode else 'plus') }}
   </div>
 </form>
 {% endmacro %}

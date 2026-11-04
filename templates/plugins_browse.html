@@ -132,12 +132,6 @@
       </form>
       <div class="cat-toolbar-divider" aria-hidden="true"></div>
       <span class="cat-mono cat-count" data-cat-count aria-live="polite"></span>
-      {# Lit only while installed widgets have a newer release the server can
-         run; one click runs the same install as each row's "Update to vX". #}
-      <button type="button" class="cat-btn cat-btn--primary cat-update-all" data-cat-update-all hidden>
-        <i class="ph-bold ph-arrow-circle-up" aria-hidden="true"></i>
-        <span data-cat-update-all-label>Update all</span>
-      </button>
       {# Row roominess. Cozy leads because the screenshot is the thing being
          shopped for and a 152px thumb showed too little of it; Compact is for
          scanning a long catalog by name. Persisted per browser, so the choice
@@ -162,6 +156,12 @@
         <i class="ph ph-arrows-clockwise" aria-hidden="true"></i>
         <span class="sr-only">Refresh catalog</span>
       </a>
+      {# Lit only while installed widgets have a newer release the server can
+         run; one click runs the same install as each row's "Update to vX". #}
+      <button type="button" class="cat-btn cat-btn--primary cat-update-all" data-cat-update-all hidden>
+        <i class="ph-bold ph-arrow-circle-up" aria-hidden="true"></i>
+        <span data-cat-update-all-label>Update all</span>
+      </button>
     </div>
 
     <div class="cat-results" data-cat-results aria-live="polite" aria-busy="true">
@@ -196,6 +196,7 @@
         <strong>{{ e.name }}</strong> <code>v{{ e.version }}</code>
         {% if e.author_name %}<span class="muted">by {{ e.author_name }}</span>{% endif %}
         <p>{{ e.description }}</p>
+        {% if e.source %}<a href="{{ e.source }}" target="_blank" rel="noopener">Source</a>{% endif %}
         {% if not e.installed %}
         <form method="post" action="{{ url_for('marketplace.install') }}" class="inline">
           <input type="hidden" name="catalog_id" value="{{ e.id }}">
@@ -212,7 +213,6 @@
           <button type="submit" class="ghost danger">Uninstall</button>
         </form>
         {% endif %}
-        {% if e.source %}<a href="{{ e.source }}" target="_blank" rel="noopener">Source</a>{% endif %}
       </li>
       {% endfor %}
     </ul>

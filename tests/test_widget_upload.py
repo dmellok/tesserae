@@ -176,6 +176,15 @@ def test_bundled_rows_have_no_remove_button(app: Flask) -> None:
     assert "Remove" not in body.split('data-sort-id="clock_analog"', 1)[1].split("</li>", 1)[0]
 
 
+def test_header_actions_end_with_the_primary_one(app: Flask) -> None:
+    """Upload widget, then Browse catalog: the primary action is rightmost,
+    in the page's right-hand action cluster."""
+    body = _client(app).get("/plugins/").get_data(as_text=True)
+    head = body.split('class="page-head', 1)[1].split("</header>", 1)[0]
+    assert "dx-dash-head-actions" in head
+    assert head.index("Upload widget") < head.index("Browse catalog")
+
+
 # -- zip repack guards --------------------------------------------------
 
 

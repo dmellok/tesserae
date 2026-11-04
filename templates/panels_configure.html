@@ -25,8 +25,8 @@
   <form method="post" action="{{ url_for('panels.configure', canvas_id=page.id) }}">
     {% include "panels_configure_fields.html" %}
     <div class="actions">
-      {% if inputs %}{{ button('Save settings', icon='check') }}{% endif %}
       <a class="ghost-link" href="{{ url_for('panels.editor', canvas_id=page.id) }}">Open in composer</a>
+      {% if inputs %}{{ button('Save settings', icon='check') }}{% endif %}
     </div>
   </form>
 {% endcall %}

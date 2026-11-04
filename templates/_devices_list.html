@@ -21,15 +21,15 @@
 
   {# TOOLBAR #}
   <div class="dx-devtb" data-devtb>
-    <button type="button" class="dx-btn is-primary" data-add-toggle
-            aria-controls="add-device-panel" aria-expanded="{% if _show_add %}true{% else %}false{% endif %}">
-      <i class="ph ph-plus" aria-hidden="true"></i><span>Add device</span>
-    </button>
     <button type="button" class="dx-btn" data-disc-toggle aria-controls="discovered-devices"
             {% if not _discovered %}disabled title="Nothing has announced itself yet."{% endif %}>
       <i class="ph ph-broadcast" aria-hidden="true"></i>
       <span class="tg-count">{{ _discovered|length }}</span><span>discovered</span>
       {% if _discovered %}<span class="dx-devtb-dot" aria-hidden="true"></span>{% endif %}
+    </button>
+    <button type="button" class="dx-btn is-primary" data-add-toggle
+            aria-controls="add-device-panel" aria-expanded="{% if _show_add %}true{% else %}false{% endif %}">
+      <i class="ph ph-plus" aria-hidden="true"></i><span>Add device</span>
     </button>
     <div class="dx-devtb-right">
       <label class="dx-devtb-search">
@@ -130,7 +130,6 @@
           {{ overview_tiles(section) }}
         </div>
         <div class="dx-devquick-actions">
-          {{ device_actions(section, 'is-sm') }}
           {% set _now = section.now_line %}
           {% if _now %}
           {# What's on now, not every lineup name: the full list lives on Lineups. #}
@@ -146,6 +145,7 @@
             {% if section.lineup_names %}{{ section.lineup_names|join(' · ') }}{% else %}No lineups yet{% endif %}
           </span>
           {% endif %}
+          {{ device_actions(section, 'is-sm') }}
           <a class="dx-btn is-primary is-sm dx-devquick-open" href="{{ section.page_url }}">
             <span>Open settings</span><i class="ph ph-caret-right" aria-hidden="true"></i>
           </a>

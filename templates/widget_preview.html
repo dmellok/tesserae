@@ -393,13 +393,13 @@
 
       <input type="hidden" name="opts" id="opts-hidden" value="{{ opts_json }}">
       <div class="form-actions">
-        <button type="submit" class="btn-primary">
-          <i class="ph ph-eye" aria-hidden="true"></i> Apply
-        </button>
         <a href="{{ url_for('composer.test_widget_preview', widget=widget.id, panel=panel_id) }}" class="btn-ghost"
            style="text-decoration: none; display: inline-flex; align-items: center; justify-content: center;">
           Reset
         </a>
+        <button type="submit" class="btn-primary">
+          <i class="ph ph-eye" aria-hidden="true"></i> Apply
+        </button>
       </div>
     </form>
   </aside>

@@ -214,6 +214,12 @@
         {% endif %}
       </form>
       <div class="fw-fleet-kind__actions">
+        {% if k.state != 'paused' %}
+        <form method="post" action="{{ url_for('auth.firmware_pause') }}" class="inline">
+          <input type="hidden" name="kind_id" value="{{ k.kind_id }}">
+          <button type="submit" class="ghost"><i class="ph ph-pause" aria-hidden="true"></i><span>Pause</span></button>
+        </form>
+        {% endif %}
         <form method="post" action="{{ url_for('auth.firmware_promote') }}" class="inline"
               onsubmit="return confirm('Promote {{ fw(k.fw_version) }} to {{ k.kind_id }}? {{ k.offer_count }} device(s) will be offered the update on their next heartbeat.');">
           <input type="hidden" name="kind_id" value="{{ k.kind_id }}">
@@ -221,12 +227,6 @@
             <i class="ph ph-rocket-launch" aria-hidden="true"></i><span>Promote to kind</span>
           </button>
         </form>
-        {% if k.state != 'paused' %}
-        <form method="post" action="{{ url_for('auth.firmware_pause') }}" class="inline">
-          <input type="hidden" name="kind_id" value="{{ k.kind_id }}">
-          <button type="submit" class="ghost"><i class="ph ph-pause" aria-hidden="true"></i><span>Pause</span></button>
-        </form>
-        {% endif %}
       </div>
       {% if not k.can_promote and k.state != 'promoted' %}
       <p class="cf-hint">Promote unlocks once a canary device reports <code>confirmed</code> on {{ fw(k.fw_version) }} ({{ k.confirmed_count }} so far).</p>

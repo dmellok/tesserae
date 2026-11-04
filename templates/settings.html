@@ -1048,15 +1048,18 @@ docker compose up -d</code></pre>
                     value='', placeholder='Paste a token to match what your automation already uses',
                     help='Use this only if you need a specific value (e.g. an existing secret in Home Assistant). Leave blank and click Clear to disable webhooks entirely.') }}
       <div class="actions">
-        {{ button('Save custom token', icon='floppy-disk') }}
+        {#- Clear sits left of Save but posts through its own form, so Enter in
+            the token box still submits Save rather than Clear. -#}
         {% if system_webhook_token_set %}
-        <button type="submit" class="ghost" name="clear" value="1"
+        <button type="submit" class="ghost" form="webhook-clear" name="clear" value="1"
                 onclick="return confirm('Clear the webhook token? POST /api/v1/push will return 503 until you set or regenerate one.');">
           <i class="ph ph-x" aria-hidden="true"></i><span>Clear</span>
         </button>
         {% endif %}
+        {{ button('Save custom token', icon='floppy-disk') }}
       </div>
     </form>
+    {% if system_webhook_token_set %}<form id="webhook-clear" method="post" action="{{ url_for('auth.system_webhook_set') }}"></form>{% endif %}
   </section>
 
 {% if system_webhook_reveal_token %}
@@ -1243,13 +1246,13 @@ docker compose up -d</code></pre>
 
     <form method="post" action="{{ url_for('auth.system_mcp_regenerate') }}" class="form" onsubmit="return confirm('Generate a new MCP token? Any agent using the old token will stop authenticating.');">
       <div class="actions">
-        {{ button('Regenerate token', icon='arrows-clockwise') }}
         {% if system_mcp_token_set %}
         <button type="submit" class="ghost" formaction="{{ url_for('auth.system_mcp_clear') }}"
                 onclick="return confirm('Clear the MCP token? Remote agents can no longer authenticate.');">
           <i class="ph ph-x" aria-hidden="true"></i><span>Clear</span>
         </button>
         {% endif %}
+        {{ button('Regenerate token', icon='arrows-clockwise') }}
       </div>
     </form>
     {% endif %}
