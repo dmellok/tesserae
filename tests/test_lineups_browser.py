@@ -1163,7 +1163,9 @@ def test_editor_shows_deleted_step_and_remove_persists(real: tuple[str, Flask]) 
         assert page.locator("#dxe-pages-field").input_value() == "news"
         assert page.locator("#dxe-avail .dxe-chip", has_text="Missing").count() == 0
         page.locator("#deck-form").evaluate("f => f.requestSubmit()")
-        page.wait_for_url(re.compile(r".*/decks.*"))
+        # ``/decks/gone/edit`` already matches ``.*/decks.*``: wait until the save
+        # redirected away from the editor, or the store is read before the POST lands.
+        page.wait_for_url(lambda url: "/edit" not in url)
         assert [p_.page_id for p_ in app.config["DECK_STORE"].get("gone").pages] == ["news"]
         assert errors == []
         browser.close()
