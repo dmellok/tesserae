@@ -285,6 +285,55 @@ class EventLog:
             row = conn.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone()
         return _row_to_event(row) if row else None
 
+    def device_status_events(
+        self, device_ids: Sequence[str], *, since: float, limit: int = 5000
+    ) -> dict[str, list[EventRow]]:
+        """Status-heartbeat rows (``type='device'``, not client-log uploads)
+        for several devices since ``since`` (epoch seconds), oldest first per
+        device, in one query. Served by ``events_by_type_time``. ``limit``
+        keeps the newest rows overall, so a runaway log can't make a page
+        read an unbounded number of rows."""
+        ids = [i for i in device_ids if i]
+        if not ids:
+            return {}
+        placeholders = ",".join("?" * len(ids))
+        sql = (
+            "SELECT * FROM events WHERE type = 'device' AND timestamp >= ? "
+            "AND target != 'client_log' "
+            f"AND source IN ({placeholders}) ORDER BY timestamp DESC LIMIT ?"
+        )
+        with self._lock, self._conn() as conn:
+            rows = conn.execute(sql, [since, *ids, int(limit)]).fetchall()
+        out: dict[str, list[EventRow]] = {}
+        for row in reversed(rows):
+            event = _row_to_event(row)
+            out.setdefault(event.source, []).append(event)
+        return out
+
+    def context_events(
+        self, types: Sequence[str], *, since: float, limit: int = 5000
+    ) -> dict[str, list[EventRow]]:
+        """Rows of the given ``types`` since ``since`` (epoch seconds) in one
+        query, oldest first, grouped by type. Like :meth:`device_status_events`
+        it serves ``events_by_type_time`` and keeps only the newest ``limit``
+        rows, so a page that correlates pushes with wakes reads a bounded
+        slice of the log."""
+        kinds = [t for t in types if t]
+        if not kinds:
+            return {}
+        placeholders = ",".join("?" * len(kinds))
+        sql = (
+            f"SELECT * FROM events WHERE type IN ({placeholders}) AND timestamp >= ? "
+            "ORDER BY timestamp DESC LIMIT ?"
+        )
+        with self._lock, self._conn() as conn:
+            rows = conn.execute(sql, [*kinds, since, int(limit)]).fetchall()
+        out: dict[str, list[EventRow]] = {}
+        for row in reversed(rows):
+            event = _row_to_event(row)
+            out.setdefault(event.type, []).append(event)
+        return out
+
     def list(
         self,
         *,

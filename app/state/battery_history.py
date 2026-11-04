@@ -99,7 +99,7 @@ class Prediction:
     days_to_empty: float | None
     days_to_full: float | None
     samples: int
-    window_days: int
+    window_days: float
 
 
 @dataclass(frozen=True)
@@ -227,7 +227,7 @@ class BatteryHistory:
         self,
         device_id: str,
         *,
-        window_days: int = DEFAULT_WINDOW_DAYS,
+        window_days: float = DEFAULT_WINDOW_DAYS,
     ) -> Prediction | None:
         """Robust phase-aware battery trend over the last
         ``window_days``.

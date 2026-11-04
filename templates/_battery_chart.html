@@ -1,0 +1,239 @@
+{#-
+Battery chart component for ONE device: the history line, wake-up dots and the
+stat tiles. The Device batteries page renders one per device; the device page's
+Power section can embed the same.
+
+Inputs: every macro takes ``card``, the dict returned by
+``app.battery_chart.build_battery_chart(...)``:
+
+  card.id / card.name        device id and display name
+  card.window_hours          chart window (x axis spans this); window_label is
+                             it as words, ranges the 12h / 24h / 7d / 30d
+                             buttons [{hours, label, pressed}]
+  card.tone                  'ok' | 'low' | 'critical' (drives nothing here
+                             beyond the chart's data-tone hook)
+  card.series                [{t_ms, pct}] battery line, oldest first
+  card.wakes                 [{t_ms, pct, cat, label, detail, reason}] wake-up
+                             dots: cat is the cause category (scheduled,
+                             lineup, ha, device, manual, webhook, reconnect,
+                             problem, other), label the one-line cause, detail an
+                             optional second line, reason the raw device text
+  card.wake_stats            {per_day, summary, breakdown, total} for the
+                             "Wakes / day" tile (counts every wake, not just
+                             the dots drawn)
+  card.legend                [{cat, name}] categories present, for the legend
+  card.gaps                  [{start_ms, end_ms, kind}] spans with no readings
+                             ('asleep' = quiet hours, 'offline'); drawn as a
+                             hatched band with a dashed connector
+  card.samples               sample count in the window
+  card.predictions_apply     False for a Visionect frame: no drain / reaches /
+                             charging tiles and no "need 8 samples" hint
+  card.prediction            {slope_per_day, is_charging, ...} or None
+
+Macros:
+
+  battery_chart_assets()     once per page, after the content: Chart.js, the
+                             shared admin chart helpers and
+                             static/battery-chart.js, which finds every
+                             ``canvas.battery-chart`` and draws it (theme-aware,
+                             hover and arrow-key tooltips on the line and dots).
+  battery_chart(card)        the chart block: a range switch (12h | 24h | 7d |
+                             30d, buttons with aria-pressed; each chart keeps
+                             its own choice in localStorage and fetches that
+                             range from /devices/battery/<id>/card.json
+                             without reloading), the chart (drag across it to
+                             zoom, "Reset zoom" to undo) and its legend; or
+                             "No samples in this window."
+  battery_stat_tiles(card)   the tile grid: Samples and Wakes / day for every
+                             device, predictions only where they apply (+ the
+                             not-enough-samples hint). Use it as a
+                             {% call %} block to append the caller's tiles to
+                             the same grid (the device page adds Battery).
+                             Its own tiles are swapped when the range changes;
+                             the caller's are left alone.
+  battery_clear_link(card)   a small quiet "Clear battery history" link (POSTs
+                             to device_battery.clear_history after a confirm).
+
+The component styles live in static/style/dx-battery.css. Dots, bands and the
+tooltip read the theme tokens off <html>, so it needs no per-page colours. The
+dot shape and colour per category are defined twice and must agree: in
+static/battery-chart.js (STYLES) and in dx-battery.css (.dx-wake-key).
+-#}
+
+{%- macro _wake_shape(cat) -%}
+<svg class="dx-wake-shape" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" focusable="false">
+  {%- if cat == 'scheduled' %}<circle cx="6" cy="6" r="2.6" class="is-hollow"/>
+  {%- elif cat == 'lineup' %}<circle cx="6" cy="6" r="3.8"/>
+  {%- elif cat == 'ha' %}<polygon points="6,1 11,6 6,11 1,6"/>
+  {%- elif cat == 'device' %}<polygon points="6,1.3 11,10.5 1,10.5"/>
+  {%- elif cat == 'manual' %}<rect x="2" y="2" width="8" height="8"/>
+  {%- elif cat == 'webhook' %}<polygon points="6,0.8 7.5,4.4 11.4,4.6 8.4,7.1 9.4,10.9 6,8.8 2.6,10.9 3.6,7.1 0.6,4.6 4.5,4.4"/>
+  {%- elif cat == 'reconnect' %}<rect x="2.4" y="2.4" width="7.2" height="7.2" rx="2" class="is-hollow is-thick"/>
+  {%- elif cat == 'problem' %}<path d="M2.5 2.5 L9.5 9.5 M9.5 2.5 L2.5 9.5" class="is-stroke"/>
+  {%- else %}<circle cx="6" cy="6" r="3"/>
+  {%- endif %}
+</svg>
+{%- endmacro -%}
+
+{%- macro battery_chart_assets() -%}
+<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+<script src="{{ url_for('static', filename='admin-chart.js') }}"></script>
+<script src="{{ url_for('static', filename='battery-chart.js') }}"></script>
+{%- endmacro -%}
+
+{%- macro battery_legend(card) -%}
+{% if card.legend or card.gaps %}
+<ul class="dx-wake-legend" aria-label="Chart key">
+  {% for item in card.legend %}
+  <li class="dx-wake-key" data-cat="{{ item.cat }}">{{ _wake_shape(item.cat) }}<span>{{ item.name }}</span></li>
+  {% endfor %}
+  {% if card.gaps %}
+  <li class="dx-wake-key dx-wake-key--gap"><span class="dx-gap-swatch" aria-hidden="true"></span><span>No readings (asleep or offline)</span></li>
+  {% endif %}
+</ul>
+{% endif %}
+{%- endmacro -%}
+
+{%- macro battery_chart(card) -%}
+<div class="dx-battery-chartbox" data-battery-chart="{{ card.id }}"
+     data-url="{{ url_for('device_battery.card_json', device_id=card.id) }}"
+     data-window-hours="{{ card.window_hours }}">
+  {#- One toolbar row: the key on the left, zoom reset and the range on the right. -#}
+  <div class="dx-battery-bar">
+    <div class="dx-battery-bar-key" data-battery-legend>{{ battery_legend(card) }}</div>
+    <div class="dx-battery-bar-end">
+      <button type="button" class="dx-battery-quiet" data-battery-zoom-reset hidden>Reset zoom</button>
+      <div class="dx-battery-range" role="group" aria-label="Chart range for {{ card.name }}">
+        {% for r in card.ranges %}
+        <button type="button" data-hours="{{ r.hours }}" aria-pressed="{{ 'true' if r.pressed else 'false' }}">{{ r.label }}</button>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  <div class="dx-battery-chart"{% if not card.series %} hidden{% endif %}>
+    <canvas class="battery-chart"
+            tabindex="0"
+            role="img"
+            data-series='{{ card.series | tojson }}'
+            data-wakes='{{ card.wakes | tojson }}'
+            data-gaps='{{ card.gaps | tojson }}'
+            data-tone="{{ card.tone }}"
+            data-window-hours="{{ card.window_hours }}"
+            aria-label="Battery percent over the last {{ card.window_label }}{% if card.wakes %}, with a dot at each wake-up. Use the left and right arrow keys to step through them. Drag across the chart to zoom.{% endif %}"></canvas>
+    <span class="sr-only" aria-live="polite" data-battery-chart-live></span>
+  </div>
+  <p class="dx-battery-empty" data-battery-empty{% if card.series %} hidden{% endif %}>No samples in this window.</p>
+</div>
+{%- endmacro -%}
+
+{%- macro battery_clear_link(card) -%}
+{% if card.samples %}
+<form method="post" action="{{ url_for('device_battery.clear_history', device_id=card.id) }}"
+      class="dx-battery-clear"
+      onsubmit="return confirm('Clear battery history for {{ card.name|e }}? This deletes every recorded sample for this device and cannot be undone.');">
+  <button type="submit" class="dx-battery-quiet dx-battery-quiet--danger">Clear battery history</button>
+</form>
+{% endif %}
+{%- endmacro -%}
+
+{%- macro battery_tiles(card) -%}
+{% set prediction = card.prediction %}
+  <div class="dx-stat-tile" data-battery-tile>
+    <div class="dx-stat-label">Samples</div>
+    <div class="dx-stat-value">{{ card.samples }}</div>
+    <div class="dx-stat-sub">in window</div>
+  </div>
+  {% set wk = card.wake_stats %}
+  {% if wk and wk.total %}
+  <div class="dx-stat-tile" data-battery-tile>
+    <div class="dx-stat-label">Wakes / day</div>
+    <div class="dx-stat-value">{% if wk.per_day is not none %}{{ '%g' % wk.per_day }}{% else %}—{% endif %}</div>
+    <div class="dx-stat-sub dx-battery-wake-sub" title="{{ wk.total }} wake{{ '' if wk.total == 1 else 's' }} in the window: {{ wk.summary_full or wk.summary }}">{{ wk.summary }}</div>
+  </div>
+  {% endif %}
+  {% if card.predictions_apply %}
+  {% if prediction and prediction.is_charging %}
+  <div class="dx-stat-tile" data-battery-tile>
+    <div class="dx-stat-label">Charging</div>
+    <div class="dx-stat-value">active</div>
+    <div class="dx-stat-sub">live phase</div>
+  </div>
+  <div class="dx-stat-tile" data-battery-tile>
+    <div class="dx-stat-label">Charge rate</div>
+    <div class="dx-stat-value">
+      {{ '%+.1f' % prediction.charge_rate_per_day }}
+    </div>
+    <div class="dx-stat-sub">%/day</div>
+  </div>
+  <div class="dx-stat-tile" data-battery-tile>
+    <div class="dx-stat-label">Full in</div>
+    <div class="dx-stat-value">
+      {% if prediction.days_to_full == 0 %}
+        now
+      {% elif prediction.days_to_full < 1 %}
+        {{ '%.1f' % (prediction.days_to_full * 24) }}
+      {% else %}
+        {{ '%.1f' % prediction.days_to_full }}
+      {% endif %}
+    </div>
+    <div class="dx-stat-sub">
+      {% if prediction.days_to_full == 0 %}charged
+      {% elif prediction.days_to_full < 1 %}hours
+      {% else %}days{% endif %}
+    </div>
+  </div>
+  <div class="dx-stat-tile" data-battery-tile>
+    <div class="dx-stat-label">Last drain rate</div>
+    <div class="dx-stat-value">
+      {% if prediction.slope_per_day is not none %}
+        {{ '%+.1f' % prediction.slope_per_day }}
+      {% else %}—{% endif %}
+    </div>
+    <div class="dx-stat-sub">%/day</div>
+  </div>
+  {% else %}
+  <div class="dx-stat-tile" data-battery-tile>
+    <div class="dx-stat-label">Drain rate</div>
+    <div class="dx-stat-value">
+      {% if prediction and prediction.slope_per_day is not none %}
+        {{ '%+.1f' % prediction.slope_per_day }}
+      {% else %}—{% endif %}
+    </div>
+    <div class="dx-stat-sub">%/day</div>
+  </div>
+  <div class="dx-stat-tile" data-battery-tile>
+    <div class="dx-stat-label">Reaches 20%</div>
+    <div class="dx-stat-value">
+      {% if prediction and prediction.days_to_20pct is not none %}
+        {{ '%.1f' % prediction.days_to_20pct }}
+      {% else %}—{% endif %}
+    </div>
+    <div class="dx-stat-sub">days</div>
+  </div>
+  <div class="dx-stat-tile" data-battery-tile>
+    <div class="dx-stat-label">Reaches 0%</div>
+    <div class="dx-stat-value">
+      {% if prediction and prediction.days_to_empty is not none %}
+        {{ '%.1f' % prediction.days_to_empty }}
+      {% else %}—{% endif %}
+    </div>
+    <div class="dx-stat-sub">days</div>
+  </div>
+  {% endif %}
+  {% endif %}
+{%- endmacro -%}
+
+{%- macro battery_hint(card) -%}
+{% if card.predictions_apply and not card.prediction %}
+<p class="dx-battery-hint" data-battery-hint>Need at least 8 samples in this window for a prediction.</p>
+{% endif %}
+{%- endmacro -%}
+
+{%- macro battery_stat_tiles(card) -%}
+<div class="dx-stat-grid dx-battery-stats" data-battery-stats="{{ card.id }}">
+  {{ battery_tiles(card) }}
+  {#- Called with {% call %}: the caller's tile(s) join the same grid. -#}
+  {% if caller is defined %}{{ caller() }}{% endif %}
+</div>
+{{ battery_hint(card) }}
+{%- endmacro -%}
