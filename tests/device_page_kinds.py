@@ -17,7 +17,6 @@ colour-depth prompt, and a mains Pi with a pushed render and a queued one.
 from __future__ import annotations
 
 import io
-import json
 import time
 from pathlib import Path
 from types import SimpleNamespace
@@ -170,16 +169,32 @@ def build_app(data_root: Path, *, live: bool = False) -> Flask:
     # What the sign's status packets put in the status cache.
     app.config["DEVICE_STATUS"]["frame"] = {
         "received_at": time.time() - 120,
-        "parsed": {"battery_pct": 99, "battery_mv": 4146, "rssi": -58,
-                   "fw_version": "6.17.4168", "temperature_c": 21.5},
+        "parsed": {
+            "battery_pct": 99,
+            "battery_mv": 4146,
+            "rssi": -58,
+            "fw_version": "6.17.4168",
+            "temperature_c": 21.5,
+        },
     }
 
     # Pico .bin: buttons, battery, logs, REST token.
-    tok = _register(app, client, "kitchen", "pico_bin_client", panel_w=800, panel_h=480,
-                    fw_version="1.41.0")
-    _status(client, "kitchen", tok, {"battery_pct": 76, "battery_mv": 3980, "rssi": -61,
-                                       "logs": {"schema": 1, "ring_bytes": 3072},
-                                       "temperature_c": 20.4, "humidity_pct": 48})
+    tok = _register(
+        app, client, "kitchen", "pico_bin_client", panel_w=800, panel_h=480, fw_version="1.41.0"
+    )
+    _status(
+        client,
+        "kitchen",
+        tok,
+        {
+            "battery_pct": 76,
+            "battery_mv": 3980,
+            "rssi": -61,
+            "logs": {"schema": 1, "ring_bytes": 3072},
+            "temperature_c": 20.4,
+            "humidity_pct": 48,
+        },
+    )
     for i in range(5):
         client.post(
             "/api/v1/device/kitchen/log",
@@ -194,8 +209,10 @@ def build_app(data_root: Path, *, live: bool = False) -> Flask:
     _status(client, "hall", tok, {"rssi": -70, "panel_w": 1200, "panel_h": 1600})
 
     # ESP32 on MQTT.
-    client.post("/settings/devices/add",
-                data={"id": "porch", "kind": "esp32_client", "name": "Porch", "transport": "mqtt"})
+    client.post(
+        "/settings/devices/add",
+        data={"id": "porch", "kind": "esp32_client", "name": "Porch", "transport": "mqtt"},
+    )
 
     # TRMNL and CrossPoint.
     tok = _register(app, client, "trmnl", "trmnl_client", panel_w=800, panel_h=480)
@@ -217,35 +234,54 @@ def build_app(data_root: Path, *, live: bool = False) -> Flask:
     folder = Path(reg.get("picture_gallery").data_dir) / "family"
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "a.jpg").write_bytes(b"img-a")
-    app.config["ALBUM_STORE"].upsert(Album.model_validate({
-        "id": "family", "name": "Family photos", "device_ids": ["photos"],
-        "source_folder": "family", "fit": "fill",
-        "playback": {"mode": "sequential", "interval_s": 1800, "repeat": "loop"},
-    }))
+    app.config["ALBUM_STORE"].upsert(
+        Album.model_validate(
+            {
+                "id": "family",
+                "name": "Family photos",
+                "device_ids": ["photos"],
+                "source_folder": "family",
+                "fit": "fill",
+                "playback": {"mode": "sequential", "interval_s": 1800, "repeat": "loop"},
+            }
+        )
+    )
 
     # Bluetooth, phone confirmed.
-    client.post("/settings/devices/add",
-                data={"id": "garden", "kind": "esp32_client", "name": "Garden", "transport": "rest"})
-    app.config["DEVICE_FACTS"].record_mode_observation("garden", {
-        "mode": "bluetooth", "source": "ios_ble", "observed_at": "2026-01-02T03:04:05Z",
-        "battery": {"percent": 65, "observed_at": "2026-01-02T03:04:06Z"},
-    })
+    client.post(
+        "/settings/devices/add",
+        data={"id": "garden", "kind": "esp32_client", "name": "Garden", "transport": "rest"},
+    )
+    app.config["DEVICE_FACTS"].record_mode_observation(
+        "garden",
+        {
+            "mode": "bluetooth",
+            "source": "ios_ble",
+            "observed_at": "2026-01-02T03:04:05Z",
+            "battery": {"percent": 65, "observed_at": "2026-01-02T03:04:06Z"},
+        },
+    )
 
     # Grey-capable mono board: the one-time colour-depth prompt.
     tok = _register(app, client, "xiao", "xiao_epaper_75", panel_w=800, panel_h=480)
     _status(client, "xiao", tok, {"battery_pct": 80, "gamuts": ["mono", "gray_4"]})
 
     # A REST frame that fetched one render and has a newer one queued.
-    client.post("/settings/devices/add",
-                data={"id": "door", "kind": "esp32_client", "name": "Hallway Frame",
-                      "transport": "rest"})
+    client.post(
+        "/settings/devices/add",
+        data={"id": "door", "kind": "esp32_client", "name": "Hallway Frame", "transport": "rest"},
+    )
     pages = app.config["PAGE_STORE"]
     pages.save(Page(id="agenda", name="Evening agenda", device_ids=["door", "kitchen"]))
     pages.save(Page(id="weather", name="Weather", device_ids=["door"]))
-    app.config["DECK_STORE"].upsert(Deck(
-        id="night", name="Night", device_ids=["door", "kitchen"],
-        pages=[DeckPage(page_id="agenda"), DeckPage(page_id="weather")],
-    ))
+    app.config["DECK_STORE"].upsert(
+        Deck(
+            id="night",
+            name="Night",
+            device_ids=["door", "kitchen"],
+            pages=[DeckPage(page_id="agenda"), DeckPage(page_id="weather")],
+        )
+    )
     pm = app.config["PUSH_MANAGER"]
     _push(app, "door", "A", "compA", page_id="agenda")
     pm.record_frame_served("door", pm.latest_render_for("door"))

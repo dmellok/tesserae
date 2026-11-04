@@ -172,9 +172,13 @@ def test_dependent_controls_follow_their_switches(live: tuple[str, Flask], brows
     # Synchronized wake: the mode picks Anchor or Times.
     pg.click("#sync-wake > summary")
     pg.select_option("#device-tablet-wa-mode", "times")
-    assert pg.is_visible("#device-tablet-wa-times") and not pg.is_visible("#device-tablet-wa-anchor")
+    assert pg.is_visible("#device-tablet-wa-times") and not pg.is_visible(
+        "#device-tablet-wa-anchor"
+    )
     pg.select_option("#device-tablet-wa-mode", "interval")
-    assert pg.is_visible("#device-tablet-wa-anchor") and not pg.is_visible("#device-tablet-wa-times")
+    assert pg.is_visible("#device-tablet-wa-anchor") and not pg.is_visible(
+        "#device-tablet-wa-times"
+    )
     # Edits show the save bar; Discard puts it away.
     assert pg.is_visible("[data-save-bar]")
     pg.click(".dx-save-bar-discard")
@@ -203,9 +207,7 @@ def test_rotation_swaps_the_size_only_when_the_aspect_changes(
     pg.context.close()
 
 
-def test_more_menu_and_delete_work_from_the_keyboard(
-    live: tuple[str, Flask], browser: Any
-) -> None:
+def test_more_menu_and_delete_work_from_the_keyboard(live: tuple[str, Flask], browser: Any) -> None:
     base, _app = live
     pg = _open(browser, f"{base}/settings/devices/study")
     pg.focus("[data-more-menu] > summary")

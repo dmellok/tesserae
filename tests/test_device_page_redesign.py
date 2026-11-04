@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+
 from tests.device_page_kinds import KINDS, build_app, fake_visionect_service
 
 BASELINE = Path(__file__).parent / "fixtures" / "device_page_inventory.json"
@@ -66,9 +67,7 @@ class _Inventory(HTMLParser):
         a = {k: v or "" for k, v in attrs}
         if "name" in a and tag in ("input", "select", "textarea", "button"):
             form = a.get("form", "")
-            self.names.add(
-                f"{tag}[name={a['name']}]" + (f"@{form.split('-')[-1]}" if form else "")
-            )
+            self.names.add(f"{tag}[name={a['name']}]" + (f"@{form.split('-')[-1]}" if form else ""))
         if tag == "form" and a.get("action"):
             self.actions.add(a["action"].split("?")[0])
 
@@ -194,7 +193,9 @@ def test_every_setting_is_a_standard_field(seeded: Any) -> None:
         for cls in fields:
             assert re.match(r"(w-(num|time|sm|md|lg|xl|auto)|is-toggle|dx-f-span)\b", cls), cls
         # A toggle carries no label line: switch and label share the control line.
-        for toggle in re.findall(r'<div class="dx-f is-toggle[^"]*"[^>]*>(.*?)</label>', main, re.S):
+        for toggle in re.findall(
+            r'<div class="dx-f is-toggle[^"]*"[^>]*>(.*?)</label>', main, re.S
+        ):
             assert "dx-f-head" not in toggle
             assert 'class="dx-sw"' in toggle
 
@@ -229,11 +230,11 @@ def test_dependent_controls_appear_only_when_relevant(seeded: Any) -> None:
     # Poll every sits beside the Stay awake switch, hidden while it is off.
     stay = tablet[tablet.index('name="always_on"') :]
     stay = stay[: stay.index("</div>")]
-    assert re.search(r'data-awake-poll hidden', stay)
+    assert re.search(r"data-awake-poll hidden", stay)
     assert 'name="awake_poll_s"' in stay
     # Quiet hours: the fields hide (the script hides and disables them) while
     # Own hours is off, and a note says what applies.
-    assert 'data-dep-group data-dep-hide' in tablet
+    assert "data-dep-group data-dep-hide" in tablet
     assert "data-dep-off-note" in tablet
 
 
@@ -247,7 +248,12 @@ def test_advanced_disclosures_hold_the_rarely_used_controls(seeded: Any) -> None
 
     pico = _main(_page(client, "kitchen"))
     wake = details(pico, "Advanced: synchronized wake")
-    for name in ("wake_align_mode", "wake_align_anchor", "wake_align_times", "wake_align_apply_all"):
+    for name in (
+        "wake_align_mode",
+        "wake_align_anchor",
+        "wake_align_times",
+        "wake_align_apply_all",
+    ):
         assert f'name="{name}"' in wake, name
     token = details(pico, "Advanced: access token and transport")
     for action in ("reveal-token", "regenerate-token", "set-transport"):
@@ -291,4 +297,3 @@ def test_field_ids_are_unique(seeded: Any) -> None:
         ids = re.findall(r'\sid="([^"]+)"', _page(client, dev))
         dup = {i for i in ids if ids.count(i) > 1}
         assert not dup, (dev, dup)
-

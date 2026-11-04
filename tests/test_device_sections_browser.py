@@ -162,7 +162,9 @@ def test_chevron_and_header_collapse_and_the_choice_is_remembered(
     assert _expanded(pg, "display")
     assert pg.evaluate("k => localStorage.getItem(k)", KEY + "display") is None
     # Screen readers hear what the button will do.
-    assert pg.locator("#schedule [data-collapsible-toggle] .sr-only").inner_text() == "Expand Schedule"
+    assert (
+        pg.locator("#schedule [data-collapsible-toggle] .sr-only").inner_text() == "Expand Schedule"
+    )
 
     pg.reload()
     assert _collapsed(pg, "schedule")
