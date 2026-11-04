@@ -17,6 +17,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - Sub-section titles are one heading style on every page, with a hairline above.
 - Paper's section title marker follows the theme's accent colour instead of a fixed red.
 - The Lineups page is centred like the other pages instead of sitting left.
+- Device batteries: the chart marks each wake-up with a dot and why it happened.
+- Device batteries: a Wakes / day tile, and time with no readings is shaded instead of drawn as a line.
+- Device batteries: each chart has its own 12h / 24h / 7d / 30d range and drag-to-zoom.
+- Device batteries: a readable dark tooltip, no drain predictions for Visionect, and Clear history is a corner link.
 - A widget that paints with GPT Image can ask for the quality (low, medium
   or high) and the exact size of the picture, so a poster can be painted
   sharp at its panel's own resolution (1200x1600 for a 13.3" or OpenPaper L
