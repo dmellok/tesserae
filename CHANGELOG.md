@@ -8,6 +8,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- GPT Image from words alone (`gpt_image_t2i`) for a widget that puts a
+  picture's whole layout in its prompt, such as a card with its own type,
+  where a reference picture would pull the composition towards itself. It
+  takes the same quality and size as the edit model, and goes straight to
+  OpenAI when only an OpenAI key is set.
 - A widget that paints with GPT Image can ask for the quality (low, medium
   or high) and the exact size of the picture, so a poster can be painted
   sharp at its panel's own resolution (1200x1600 for a 13.3" or OpenPaper L

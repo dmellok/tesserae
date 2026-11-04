@@ -82,3 +82,30 @@ def test_direct_openai_gets_the_quality(monkeypatch: pytest.MonkeyPatch) -> None
     client.generate("gpt_image", "p", refs=["data:x"], aspect="3:4", quality="high")
     assert seen["quality"] == "high"
     assert charged == [fal.cents_of("gpt_image_openai", "high")]
+
+
+def test_text_to_image_gpt_takes_quality_and_size() -> None:
+    body = fal.request_body("gpt_image_t2i", "p", [], "3:4", quality="high", size=(1200, 1600))
+    assert body == {
+        "prompt": "p",
+        "image_size": {"width": 1200, "height": 1600},
+        "quality": "high",
+        "output_format": "jpeg",
+        "num_images": 1,
+    }
+    assert fal.cents_of("gpt_image_t2i", "high") == 20
+    assert fal.MODELS["gpt_image_t2i"]["kind"] == "t2i"
+
+
+def test_text_to_image_gpt_goes_direct_to_openai(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, Any] = {}
+
+    def fake_generate(key: str, prompt: str, **kw: Any) -> bytes:
+        seen.update(kw)
+        return b"jpeg"
+
+    monkeypatch.setattr(openai_images, "generate", fake_generate)
+    client = fal.FalClient("", openai_key="sk", gemini_key="")
+    assert client.direct_model("gpt_image_t2i") == "gpt_image_openai_t2i"
+    client.generate("gpt_image_t2i", "p", aspect="3:4", quality="high")
+    assert seen["quality"] == "high" and seen["refs"] == []

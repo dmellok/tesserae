@@ -87,6 +87,16 @@ MODELS: dict[str, dict[str, Any]] = {
         "kind": "t2i",
         "refs": 0,
     },
+    # GPT Image from words alone, for a picture whose whole layout is in the
+    # prompt (a reference picture pulls the composition towards itself).
+    "gpt_image_t2i": {
+        "endpoint": "openai/gpt-image-2",
+        "label": "GPT Image 2",
+        "cents": 5,
+        "cents_high": 20,
+        "kind": "t2i",
+        "refs": 0,
+    },
     "flux_schnell": {
         "endpoint": "fal-ai/flux/schnell",
         "label": "FLUX.1 Schnell",
@@ -165,7 +175,7 @@ _SAME_ON = {
         "nano_banana_pro": "nano_banana_pro_gemini",
         "nano_banana_t2i": "nano_banana_gemini_t2i",
     },
-    "openai": {"gpt_image": "gpt_image_openai"},
+    "openai": {"gpt_image": "gpt_image_openai", "gpt_image_t2i": "gpt_image_openai_t2i"},
 }
 # What any other edit or text-to-picture call goes to with no fal.ai key.
 _FALLBACK = {
@@ -262,6 +272,16 @@ def request_body(
                 "image_size": "portrait_4_3" if portrait else "landscape_4_3",
                 "num_images": 1,
                 "num_inference_steps": 4,
+            }
+        if model == "gpt_image_t2i":
+            return {
+                "prompt": prompt,
+                "image_size": size16(size)
+                if size
+                else ("portrait_4_3" if portrait else "landscape_4_3"),
+                "quality": quality if quality in QUALITIES else "medium",
+                "output_format": "jpeg",
+                "num_images": 1,
             }
         return {"prompt": prompt, "num_images": 1, "output_format": "jpeg", "aspect_ratio": aspect}
     if model == "flux_kontext":
