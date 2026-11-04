@@ -825,7 +825,9 @@ macro here instead.
    ``id``, or a slug of the title). Pass ``collapsible=False`` for a page
    with one section, or a card that must always show. -#}
 {%- macro section_card(icon, title, description=None, cta=None, meta=None, id=None, extra_class='', collapsible=True) -%}
-{%- set sid = id or ('sec-' ~ ((title|lower|list|select('in', 'abcdefghijklmnopqrstuvwxyz0123456789 ')|join).split()|join('-'))) -%}
+{%- set slug = (title|lower|list|select('in', 'abcdefghijklmnopqrstuvwxyz0123456789 ')|join).split()|join('-') -%}
+{#- A title with no a-z or 0-9 (another script) falls back to its URL-encoded bytes, so it still gets its own id. -#}
+{%- set sid = id or ('sec-' ~ (slug or (title|urlencode|replace('%', '')|lower))) -%}
 <section class="dx-section-card {{ extra_class }}"{% if collapsible %} data-collapsible{% endif %}{% if id or collapsible %} id="{{ sid }}"{% endif %}>
   <header class="dx-section-head"{% if collapsible %} data-collapsible-head{% endif %}>
     {% if icon %}

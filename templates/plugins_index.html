@@ -39,7 +39,7 @@
 {% if errors %}
 {% call section_card(icon='warning-octagon', title='Loader errors',
                      description='These widgets failed to load and were skipped. Fix the manifest or remove the folder, then restart. A duplicate id can be cleared from here.',
-                     extra_class='dx-section-card--danger') %}
+                     extra_class='dx-section-card--danger', collapsible=False) %}
   <ul class="dx-discovered-list">
     {% for err in errors %}
     <li class="dx-inset-row">
@@ -81,7 +81,8 @@
 {% set always_on_ids = always_on_ids if always_on_ids is defined else [] %}
 {% if not plugins and not disabled_plugins %}
 {% call section_card(icon='puzzle-piece', title='No widgets loaded',
-                     description='Drop a folder under plugins/&lt;id&gt;/ and restart, or install community ones via Browse.') %}
+                     description='Drop a folder under plugins/&lt;id&gt;/ and restart, or install community ones via Browse.',
+                     collapsible=False) %}
   <div class="dx-empty">
     <div class="dx-empty-icon"><i class="ph ph-puzzle-piece" aria-hidden="true"></i></div>
     <p class="dx-empty-title">Nothing installed yet</p>

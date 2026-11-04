@@ -138,6 +138,15 @@ def test_section_card_opt_out_and_default(app: Flask) -> None:
     assert "ph-caret-down" not in off
     assert 'class="dx-section-body"' in off
 
+    # titles in another script get distinct ids, not a shared bare "sec-"
+    other = env.from_string(
+        '{% from "_components.html" import section_card %}'
+        "{% call section_card(icon='gear', title='ネットワーク') %}a{% endcall %}"
+        "{% call section_card(icon='gear', title='Сеть') %}b{% endcall %}"
+    ).render()
+    ids = [a["id"] for a in _parse(other).sections]
+    assert len(set(ids)) == 2 and "sec-" not in ids, ids
+
     explicit = env.from_string(
         '{% from "_components.html" import section_card %}'
         "{% call section_card(icon='gear', title='Network', id='net') %}body{% endcall %}"
