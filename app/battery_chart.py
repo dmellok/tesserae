@@ -492,7 +492,7 @@ def wake_stats(
     parts = [f"{b['count']} {b['short']}" for b in breakdown]
     # The tile shows the top three causes; the rest fold into "N more" (the
     # full list is the tile's tooltip).
-    rest = sum(b["count"] for b in breakdown[3:])
+    rest = sum(counts[c] for c in ranked[3:])
     summary = ", ".join(parts[:3]) + (f", {rest} more" if rest else "")
     return {
         "total": len(wakes),
