@@ -1539,6 +1539,55 @@ def test_a_pause_that_ends_first_does_not_hold_later_runs() -> None:
     assert nu2 is not None and nu2.held and nu2.at_label == "18:45"
 
 
+def test_sleeping_display_next_advance_waits_for_quiet_hours_to_end() -> None:
+    """Asleep in quiet hours (23:12-09:00) at 00:20, a 30-minute interval's
+    nominal 00:30 advance only lands when the frame wakes after the window:
+    the flag, the NEXT pill, the next tick and the header all say so."""
+    from app.lineups_view import OnScreenInput, RuntimeStep, UpcomingInput
+    from app.next_update import MODE_SLEEPS, Reach
+
+    now = SAMPLE_NOW.replace(day=29, hour=0, minute=20)
+    wake = now.replace(hour=9, minute=1).timestamp()
+    every = LineupInput(
+        "i",
+        "Google Photos all day",
+        "interval",
+        (StepInput("art"), StepInput("weather")),
+        interval_minutes=30,
+        runtime=RuntimeStep(
+            0, since=now.replace(minute=0).timestamp(), next_at=now.replace(minute=30).timestamp()
+        ),
+    )
+    for upcoming in (
+        None,
+        (
+            UpcomingInput(
+                at=now.replace(hour=9, minute=20).timestamp(), lineup_id="i", dashboard_id="art"
+            ),
+        ),
+    ):
+        d, dashboards, _ = _one_display(
+            every,
+            pause=PauseInput(23 * 60 + 12, 9 * 60),
+            reach=Reach(MODE_SLEEPS, next_checkin_at=wake, gap_s=1800.0),
+            published_known=True,
+            upcoming=upcoming,
+        )
+        d = replace(d, on_screen=OnScreenInput("weather", since=now.replace(minute=0).timestamp()))
+        out = build_view([d], dashboards, now=now, time_cycle="h12").displays[0]
+        nu = out.next_update
+        assert nu is not None and nu.at_epoch == wake and nu.held, upcoming
+        assert out.next_line.at.startswith("~9:01"), out.next_line
+        # The day bar's flag counts to the wake, not to 00:30.
+        ticks = [t for s in out.day.segments for t in s.ticks if t.next]
+        assert [(t.minute, t.in_sec, t.in_label) for t in ticks] == [
+            (9 * 60 + 1, int(wake - now.timestamp()), "Update in 8 h 41 min")
+        ], upcoming
+        # The step pill names the same moment.
+        pill = next(st.pill for st in _lineup(out, "i").steps if st.pill and st.pill.kind == "next")
+        assert pill.label.startswith("Next ") and "9:01" in pill.label, pill
+
+
 def test_all_day_pause_label() -> None:
     from app.lineups_view import pause_label
 
