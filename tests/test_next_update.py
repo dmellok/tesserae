@@ -246,7 +246,7 @@ def test_device_page_says_when_a_sleeping_frame_gets_its_next_update(
     body = _device_page(client, "panel")
     assert "Next update ~" in body  # the Smart sync card's sentence
     assert "frame sleeps; next check-in ~" in body
-    assert '<span class="dx-qtile-label">Next update</span>' in body  # the overview tile
+    assert '<span class="dx-vital-k">Next update</span>' in body  # the rail's vital sign
 
 
 def test_device_page_says_connected_for_a_frame_with_a_live_connection(

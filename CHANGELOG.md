@@ -8,6 +8,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Device page: a summary rail beside Display, Schedule, Controls, Power, Troubleshooting and Remove sections, with compact field rows and Advanced disclosures.
 - Collapsible sections on the Server, System, About, Stats and other admin pages, remembered per page.
 - Sub-section titles are one heading style on every page, with a hairline above.
 - Paper's section title marker follows the theme's accent colour instead of a fixed red.

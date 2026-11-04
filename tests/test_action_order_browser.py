@@ -133,6 +133,8 @@ _SWEEP_JS = r"""
     'a[href], button, input[type=submit], input[type=button], [role=button]')]
     .filter((el) => !el.closest(SKIP_ANC)
       && !el.matches('.info-pop, [aria-pressed], [aria-selected], [role=switch], [role=tab], [role=menuitem]')
+      // headline summary tiles that link to a settings section (information, not actions)
+      && !el.matches('a.dx-qtile--link')
       // a thumbnail or QR code that is a link, and corner close / dismiss icons
       && !(el.tagName === 'A' && el.querySelector('img') && !el.textContent.trim())
       && !/^(close|dismiss|hide)\b/i.test(el.getAttribute('aria-label') || '')

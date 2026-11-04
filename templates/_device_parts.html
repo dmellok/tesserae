@@ -1,4 +1,5 @@
 {% from "_preview_color.html" import attrs as color_attrs with context %}
+{% from "_components.html" import info_pop, auto_field, collapsible_toggle with context %}
 {# Small building blocks shared by the Devices table (quick panel), the
    device page and the calibration page. Import with context so
    ``url_for`` and ``request`` resolve inside the macros. #}
@@ -13,25 +14,6 @@
   <span class="dx-qtile-value{% if t.muted %} is-muted{% endif %}{% if t.low %} is-warn{% endif %}" title="{{ t.value }}">{{ t.value }}</span>
   <span class="dx-qtile-sub">{{ t.sub or '' }}</span>
 </{{ _tag }}>
-{%- endmacro -%}
-
-{# Head of a collapsible device-page section: icon, title, blurb and a
-   chevron button. The button is the keyboard and screen-reader control;
-   settings.js (initDevSections) also makes the rest of the header a click
-   target, remembers the choice per section id, and expands the section for
-   a jump or a #hash. The body it controls is ``<id>-body``. #}
-{%- macro devsec_head(id, icon, title, desc) -%}
-<header class="dx-section-head" data-devsec-head>
-  <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-{{ icon }}"></i></span>
-  <div class="dx-section-titleblock">
-    <h3 class="dx-section-title">{{ title }}</h3>
-    <p class="dx-section-desc">{{ desc }}</p>
-  </div>
-  <button type="button" class="dx-sec-toggle" data-devsec-toggle aria-expanded="true" aria-controls="{{ id }}-body">
-    <i class="ph ph-caret-down" aria-hidden="true"></i>
-    <span class="sr-only">Collapse {{ title }}</span>
-  </button>
-</header>
 {%- endmacro -%}
 
 {%- macro mode_badge(section) -%}
@@ -128,4 +110,292 @@
   <i class="ph ph-hand-tap" aria-hidden="true"></i><span>Touch monitor</span>
 </a>
 {% endif %}
+{%- endmacro -%}
+
+{# =====================================================================
+   Device page (2026-11 redesign): the standard field and the summary rail.
+   ===================================================================== #}
+
+{#- ``attrs`` / ``input_attrs`` on these macros are raw attribute text
+    written by the templates; escape any data put into them (``|e``).
+
+    One standard field: a label line (label, one info popover, one kind tag)
+    over a control line. ``w`` sizes it by its content (num 110, time 140,
+    sm 150, md 196, lg 232, xl 300, auto); the control(s) come from the
+    caller. ``label_for`` False labels a group of controls (days, a size
+    pair) with a span instead, whose id the group can point at. -#}
+{%- macro fld(id, label, help=None, w='md', tag=None, cls='', attrs='', label_for=True, data=None) -%}
+<div class="dx-f w-{{ w }}{% if cls %} {{ cls }}{% endif %}"{% if attrs %} {{ attrs|safe }}{% endif %}{% for k, v in (data or {}).items() %} data-{{ k }}="{{ v }}"{% endfor %}>
+  <div class="dx-f-head">
+    {%- if label_for %}<label class="dx-f-label" for="{{ id }}">{{ label }}</label>
+    {%- else %}<span class="dx-f-label" id="{{ id }}-label">{{ label }}</span>{% endif -%}
+    {{ info_pop(help) }}{% if tag %}<span class="dx-f-tag">{{ tag }}</span>{% endif -%}
+  </div>
+  <div class="dx-f-ctl">{{ caller() }}</div>
+</div>
+{%- endmacro -%}
+
+{#- A toggle setting: switch, label, info and tag on ONE control line, set
+    level with the inputs beside it. A caller adds what appears beside the
+    switch when it is on (Poll every). -#}
+{%- macro toggle_fld(id, name, label, checked=False, help=None, form=None, tag=None, cls='', attrs='', input_attrs='') -%}
+<div class="dx-f is-toggle{% if cls %} {{ cls }}{% endif %}"{% if attrs %} {{ attrs|safe }}{% endif %}>
+  <div class="dx-f-ctl">
+    <span class="dx-sw">
+      <input type="checkbox" id="{{ id }}" name="{{ name }}"{% if form %} form="{{ form }}"{% endif %}{% if checked %} checked{% endif %}{% if input_attrs %} {{ input_attrs|safe }}{% endif %}>
+      <span class="dx-sw-track" aria-hidden="true"><span class="dx-sw-knob"></span></span>
+    </span>
+    <label class="dx-f-label" for="{{ id }}">{{ label }}</label>
+    {{- info_pop(help) }}{% if tag %}<span class="dx-f-tag">{{ tag }}</span>{% endif %}
+    {%- if caller is defined %}{{ caller() }}{% endif %}
+  </div>
+</div>
+{%- endmacro -%}
+
+{#- A bare select for a field's control line: the shared select_field's
+    value matching (a saved value no option carries stays visible as
+    "Unavailable: x" instead of the first option posing as the choice). -#}
+{%- macro dx_select(id, name, value='', options=[], blank_label=None, form=None, attrs='') -%}
+{%- set value_key = '' if value is none else value|string -%}
+{%- set selected = namespace(found=false) -%}
+{%- for opt in options -%}
+  {%- set ov = opt.value if opt is mapping else opt[0] -%}
+  {%- if value_key == ov|string %}{% set selected.found = true %}{% endif -%}
+{%- endfor -%}
+{%- set has_value = value_key != '' -%}
+<select class="dx-in" id="{{ id }}"{% if name %} name="{{ name }}"{% endif %}{% if form %} form="{{ form }}"{% endif %}{% if attrs %} {{ attrs|safe }}{% endif %}>
+  {%- if blank_label is not none %}<option value=""{% if not has_value %} selected{% endif %}>{{ blank_label }}</option>{% endif %}
+  {%- if not selected.found and (has_value or blank_label is none) %}<option value="{{ value_key }}" selected data-unmatched-option>{% if has_value %}Unavailable: {{ value_key }}{% else %}(not set){% endif %}</option>{% endif %}
+  {%- set ns = namespace(group='') %}
+  {%- for opt in options %}
+    {%- if opt is mapping %}{% set v = opt.value %}{% set l = opt.label %}{% set g = opt.get('group', '') %}{% else %}{% set v = opt[0] %}{% set l = opt[1] %}{% set g = '' %}{% endif %}
+    {%- if g != ns.group %}{% if ns.group %}</optgroup>{% endif %}{% if g %}<optgroup label="{{ g }}">{% endif %}{% set ns.group = g %}{% endif %}
+  <option value="{{ v }}"{% if value_key == v|string %} selected{% endif %}>{{ l }}</option>
+  {%- endfor %}
+  {%- if ns.group %}</optgroup>{% endif %}
+</select>
+{%- endmacro -%}
+
+{#- A preset select (named nothing) and its Custom number (named the field):
+    components.js shows the number only while Custom is picked. -#}
+{%- macro dx_preset(id, name, value, presets, min=None, max=None, step=1, form=None, label='', prefix='') -%}
+{%- set preset_values = presets | map(attribute='value') | list -%}
+{%- set is_custom = value is not none and value not in preset_values -%}
+<span class="dx-preset" data-preset-field>
+  <select class="dx-in" id="{{ id }}-preset" data-preset-select{% if form %} form="{{ form }}"{% endif %}{% if prefix %} aria-label="{{ label }}"{% endif %}>
+    {%- for p in presets %}
+    <option value="{{ p.value }}"{% if not is_custom and p.value == value %} selected{% endif %}>{{ prefix }}{{ p.label }}</option>
+    {%- endfor %}
+    <option value="__custom__"{% if is_custom %} selected{% endif %}>Custom…</option>
+  </select>
+  <input class="dx-in dx-in-sec" type="number" id="{{ id }}" name="{{ name }}" value="{{ value }}" data-preset-custom
+         aria-label="{{ label }} (custom)"{% if form %} form="{{ form }}"{% endif %}{% if min is not none %} min="{{ min }}"{% endif %}{% if max is not none %} max="{{ max }}"{% endif %} step="{{ step }}"{% if not is_custom %} hidden{% endif %}>
+</span>
+{%- endmacro -%}
+
+{#- A device config field (from the kind's config_schema) as a standard
+    field. Number, select, string and switch types get the field-row shape;
+    anything else (an HA device picker, ...) keeps the shared auto_field
+    markup inside a wide field. ``awake`` is the awake_poll_s spec when this
+    is the Stay awake switch: its interval then sits beside the switch,
+    shown only while the switch is on. -#}
+{%- macro config_field(section, field, form, awake=None) -%}
+{%- set fid = section.id ~ '-' ~ field.name -%}
+{%- set value = section.state.get(field.name, field.get('default', '')) -%}
+{%- set ftype = field.get('type', 'string') -%}
+{%- set show_if = field.get('show_if') -%}
+{%- set wrap_attrs = ('data-show-if="' ~ (show_if|tojson|forceescape) ~ '"') if show_if else '' -%}
+{%- if ftype in ('boolean', 'switch') -%}
+  {%- if awake -%}
+  {%- set aval = section.state.get(awake.name, awake.get('default', '')) -%}
+  {% call toggle_fld(fid, field.name, field.get('label', field.name), checked=value, help=field.get('help'), form=form, cls='opt-cond' if show_if else '', attrs=wrap_attrs, input_attrs='data-awake-toggle') %}
+    <span class="dx-awake-poll" data-awake-poll{% if not value %} hidden{% endif %}>
+      {%- if awake.get('presets') -%}
+      {{ dx_preset(section.id ~ '-' ~ awake.name, awake.name, aval if aval is not none else awake.get('default', 0), awake.get('presets'), min=awake.get('min'), max=awake.get('max'), step=awake.get('step', 1), form=form, label='Poll every', prefix='Poll every ') }}
+      {%- else -%}
+      <input class="dx-in dx-in-sec" type="number" id="{{ section.id }}-{{ awake.name }}" name="{{ awake.name }}" value="{{ aval }}" aria-label="{{ awake.get('label', 'Poll every') }}" form="{{ form }}"{% if awake.get('min') is not none %} min="{{ awake.min }}"{% endif %}{% if awake.get('max') is not none %} max="{{ awake.max }}"{% endif %} step="{{ awake.get('step', 1) }}">
+      {%- endif -%}
+    </span>
+  {% endcall %}
+  {%- else -%}
+  {{ toggle_fld(fid, field.name, field.get('label', field.name), checked=value, help=field.get('help'), form=form, cls='opt-cond' if show_if else '', attrs=wrap_attrs) }}
+  {%- endif -%}
+{%- elif ftype == 'number' -%}
+  {%- set nval = value if value is not none and value != '' else field.get('default', 0) -%}
+  {% call fld(fid ~ ('-preset' if field.get('presets') else ''), field.get('label', field.name), help=field.get('help'), w='md' if field.get('presets') else 'num', cls='opt-cond' if show_if else '', attrs=wrap_attrs) %}
+    {%- if field.get('presets') -%}
+    {{ dx_preset(fid, field.name, nval, field.get('presets'), min=field.get('min'), max=field.get('max'), step=field.get('step', 1), form=form, label=field.get('label', field.name)) }}
+    {%- else -%}
+    <input class="dx-in" type="number" id="{{ fid }}" name="{{ field.name }}" value="{{ nval }}" form="{{ form }}"{% if field.get('min') is not none %} min="{{ field.min }}"{% endif %}{% if field.get('max') is not none %} max="{{ field.max }}"{% endif %} step="{{ field.get('step', 1) }}">
+    {%- endif -%}
+  {% endcall %}
+{%- elif ftype == 'select' -%}
+  {% call fld(fid, field.get('label', field.name), help=field.get('help'), w='md', cls='opt-cond' if show_if else '', attrs=wrap_attrs) %}{{ dx_select(fid, field.name, value, field.get('choices', []), form=form) }}{% endcall %}
+{%- elif ftype in ('string', 'time') -%}
+  {%- set mask = field.get('mask', field.get('secret')) -%}
+  {% call fld(fid, field.get('label', field.name), help=field.get('help'), w='xl' if field.name == 'uuid' else ('time' if ftype == 'time' else 'lg'), cls='opt-cond' if show_if else '', attrs=wrap_attrs) %}
+    <input class="dx-in{% if field.name in ('uuid',) %} dx-mono{% endif %}" type="{{ 'time' if ftype == 'time' else ('password' if mask else 'text') }}" id="{{ fid }}" name="{{ field.name }}" value="{{ value or '' }}" form="{{ form }}"
+           {%- if field.get('placeholder') %} placeholder="{{ field.placeholder }}"{% endif %} spellcheck="false" autocapitalize="off" autocorrect="off"{% if mask %} autocomplete="new-password"{% endif %}>
+  {% endcall %}
+{%- else -%}
+  <div class="dx-f w-xl dx-f--legacy">{{ auto_field(fid, field.name, field, value, form=form) }}</div>
+{%- endif -%}
+{%- endmacro -%}
+
+{#- What the display shows now: one thumbnail (a small Queued badge when a
+    newer picture waits), what it is and where it came from. The whole block
+    links to the lineups. It is the render-sync thumbnail region: the sync
+    script swaps it when the device's render signature moves. -#}
+{%- macro rail_now(section) -%}
+{%- set ov = section.overview -%}
+{%- set nl = section.now_line -%}
+<a class="dx-now" href="#lineups" title="Open this display's lineups" data-render-sync="thumb:{{ section.get('device_id') }}" data-render-sig="{{ ov.sync_sig }}">
+  <span {{ color_attrs(section.get("device_id")) }} class="dx-thumb dx-now-thumb{% if section.panel and section.panel.h and section.panel.w and section.panel.h > section.panel.w %} dx-thumb--portrait{% endif %}"{% if section.panel and section.panel.w and section.panel.h %} style="--thumb-ar: {{ section.panel.w }} / {{ section.panel.h }}"{% endif %}>
+    {%- if ov.has_render %}
+    <img src="{{ ov.thumb_url }}" alt="{{ 'Last image ' ~ ov.get('taken_verb', 'fetched') ~ ' by' if ov.queued and not ov.queued_is_only_thumb else 'Latest render on' }} {{ section.device_name }}" loading="lazy"{% if ov.preview_is_artifact|default(false) %} data-device-quantised{% endif %}>
+    {%- else %}
+    <span class="dx-thumb-empty"><i class="ph ph-image" aria-hidden="true"></i><span>No render yet</span></span>
+    {%- endif %}
+    {%- if ov.queued_thumb_url %}
+    <span class="dx-q-badge" data-device-queued-thumb data-queued-src="{{ ov.queued_thumb_url }}" title="A newer picture is queued: {{ ov.queued.text if ov.queued else 'it goes out at the next check-in' }}"><i class="ph ph-clock-countdown" aria-hidden="true"></i>Queued</span>
+    {%- elif ov.queued_is_only_thumb %}
+    <span class="dx-q-badge" data-device-queued-thumb title="Queued, not {{ ov.get('taken_verb', 'fetched') }} yet"><i class="ph ph-clock-countdown" aria-hidden="true"></i>Queued</span>
+    {%- endif %}
+  </span>
+  <span class="dx-now-text">
+    <span class="dx-eyebrow">Showing</span>
+    <span class="dx-now-name{% if ov.showing.muted %} is-muted{% endif %}">{{ ov.showing.value }}</span>
+    {%- if nl and nl.state == 'running' %}
+    <span class="dx-help">{{ nl.name }}{% if nl.meta %} · {{ nl.meta }}{% endif %}</span>
+    {%- endif %}
+    {%- if ov.showing.sub %}<span class="dx-help">{{ ov.showing.sub }}</span>{% endif %}
+  </span>
+</a>
+{%- endmacro -%}
+
+{#- The five vital signs, each a link to the settings behind it. The
+    sub-captions (mV, dBm, the smart-sync detail) live in the tooltip and in
+    a screen-reader span. A render-sync region: it refreshes with the
+    thumbnail. -#}
+{%- macro rail_vitals(section) -%}
+{%- set ov = section.overview -%}
+{%- set st = section.status -%}
+{%- set tiles = st.tiles -%}
+{%- set fw = st.firmware or {} -%}
+{%- set ss = st.smart_sync or {} -%}
+{%- set ssh = st.smart_sync_header or {} -%}
+{%- set vs = section.visionect_setup -%}
+<ul class="dx-vitals" aria-label="Vital signs" data-render-sync="tiles:{{ section.get('device_id') }}">
+  {%- set bat_tip = ov.battery.sub or '' %}
+  <li><a class="dx-vital" href="{{ '#power' if section.battery_offset_endpoint else '#connection' }}"{% if bat_tip %} title="{{ bat_tip }}"{% endif %}>
+    <span class="dx-vital-k">Battery</span>
+    <span class="dx-vital-v{% if ov.battery.low %} is-warn{% endif %}{% if ov.battery.muted %} is-muted{% endif %}">{{ ov.battery.value }}</span>
+    {%- if bat_tip %}<span class="sr-only">, {{ bat_tip }}</span>{% endif %}</a></li>
+  {%- set nu_parts = [] %}
+  {%- if ov.next_wake.sub %}{% set _ = nu_parts.append(ov.next_wake.sub) %}{% endif %}
+  {%- if ss.next_update %}{% set _ = nu_parts.append(ss.next_update.text_display) %}{% endif %}
+  {%- if ss and ss.state and ss.state != 'off' %}
+    {%- set ss_bits = ['Smart sync: ' ~ (ssh.tag or ss.state), 'confidence ' ~ (ss.confidence|default(0)) ~ '/10'] %}
+    {%- if ss.offset_text %}{% set _ = ss_bits.append('last offset ' ~ ss.offset_text) %}{% endif %}
+    {%- if ss.interval_s %}{% set _ = ss_bits.append('sleep cycle ' ~ ss.interval_s ~ ' s') %}{% endif %}
+    {%- if ss.last_heartbeat_rel %}{% set _ = ss_bits.append('last heartbeat ' ~ ss.last_heartbeat_rel) %}{% endif %}
+    {%- set _ = nu_parts.append(ss_bits|join(', ') ~ '.') %}
+    {%- if ssh.explainer %}{% set _ = nu_parts.append(ssh.explainer) %}{% endif %}
+  {%- endif %}
+  {%- set nu_tip = nu_parts|join(' ') %}
+  <li><a class="dx-vital" href="#timing"{% if nu_tip %} title="{{ nu_tip }}"{% endif %} data-next-update>
+    <span class="dx-vital-k">Next update</span>
+    <span class="dx-vital-v{% if ov.next_wake.muted %} is-muted{% endif %}">{{ ov.next_wake.value }}</span>
+    {%- if nu_tip %}<span class="sr-only">, {{ nu_tip }}</span>{% endif %}</a></li>
+  {%- if tiles.signal %}
+  {%- set sig_tip = tiles.signal.sub ~ ((' on ' ~ vs.sign.wifi) if vs and vs.sign and vs.sign.wifi else '') %}
+  <li><a class="dx-vital" href="#connection" title="{{ sig_tip }}">
+    <span class="dx-vital-k">Signal</span>
+    <span class="dx-vital-v"><span class="dx-bars" aria-hidden="true">{% for n in [1, 2, 3, 4] %}<span class="dx-bar{% if n <= tiles.signal.bars %} is-on{% endif %}"></span>{% endfor %}</span>{{ tiles.signal.label }}</span>
+    <span class="sr-only">, {{ sig_tip }}</span></a></li>
+  {%- endif %}
+  <li><a class="dx-vital" href="#connection"{% if ov.firmware.sub %} title="{{ ov.firmware.sub }}"{% endif %}>
+    <span class="dx-vital-k">Firmware</span>
+    <span class="dx-vital-v{% if ov.firmware.muted %} is-muted{% endif %}">{{ ov.firmware.value }}
+      {%- if fw.state == 'outdated' and fw.latest %}<span class="tg tg--warn dx-v-badge">update</span>{% endif %}</span>
+    {%- if ov.firmware.sub %}<span class="sr-only">, {{ ov.firmware.sub }}</span>{% endif %}</a></li>
+  {%- set h = st.health %}
+  <li><a class="dx-vital" href="#connection" title="{% if h == 'ok' %}Online{% elif h == 'warn' %}Quiet{% elif h == 'stale' %}Stale{% else %}No heartbeat yet{% endif %}">
+    <span class="dx-vital-k">Checked in</span>
+    <span class="dx-vital-v dx-devstatus is-{{ h }}"><span class="dx-dot is-{{ h }}" aria-hidden="true"></span>{% if h in ('ok', 'warn', 'stale') %}{{ st.relative }}{% else %}Never{% endif %}</span>
+    <span class="sr-only">, {% if h == 'ok' %}online{% elif h == 'warn' %}quiet{% elif h == 'stale' %}stale{% else %}no heartbeat yet{% endif %}</span></a></li>
+</ul>
+{%- endmacro -%}
+
+{#- Call-outs: only what needs attention, each one line. The list renders
+    nothing (no rule, no gap) when there is nothing to say. Also a
+    render-sync region (the Queued line comes and goes with a push). -#}
+{%- macro rail_callouts(section) -%}
+{%- set ov = section.overview -%}
+{%- set st = section.status -%}
+{%- set fw = st.firmware or {} -%}
+{%- set coll = st.collection -%}
+{%- set mo = section.mode_observation -%}
+{%- set low = ov.battery.low -%}
+{%- set overdue = st.health == 'stale' -%}
+{%- set outdated = fw.state == 'outdated' and fw.latest -%}
+{%- set bt = mo and mo.mode == 'bluetooth' -%}
+<div class="dx-callouts-wrap" data-render-sync="callouts:{{ section.get('device_id') }}">
+{%- if ov.queued or outdated or overdue or low or bt or coll %}
+<ul class="dx-callouts" aria-label="Needs attention">
+  {%- if ov.queued %}
+  <li class="dx-callout{% if ov.queued.live %} is-live{% endif %}" role="status" title="{{ ov.queued.title }}" data-device-queued>
+    <i class="ph ph-clock-countdown is-warn" aria-hidden="true"></i><span>{{ ov.queued.text }}</span>
+  </li>
+  {%- endif %}
+  {%- if outdated %}
+  <li class="dx-callout"><i class="ph ph-arrow-circle-up is-warn" aria-hidden="true"></i><span>Firmware v{{ fw.latest }} available</span><a href="{{ url_for('auth.firmware_index') }}" title="{{ fw.notes_headline or ('Latest available: v' ~ fw.latest) }}. Open the Firmware page to roll it out.">Update</a></li>
+  {%- endif %}
+  {%- if overdue %}
+  <li class="dx-callout"><i class="ph ph-wifi-slash is-bad" aria-hidden="true"></i><span>Overdue: last check-in {{ st.relative }}</span></li>
+  {%- endif %}
+  {%- if low %}
+  <li class="dx-callout"><i class="ph ph-battery-warning is-bad" aria-hidden="true"></i><span>Battery low, {{ ov.battery.value }}</span></li>
+  {%- endif %}
+  {%- if bt %}
+  <li class="dx-callout dx-mode-observation" data-device-mode-observation>
+    <i class="ph ph-bluetooth" aria-hidden="true"></i><span>Phone last confirmed {{ mo.label }} mode · <time datetime="{{ mo.observed_at }}">{{ mo.observed_label }}</time></span>
+  </li>
+  {%- endif %}
+  {%- if coll %}
+  <li class="dx-callout dx-album-line">
+    <i class="ph ph-images{% if coll.pill_class in ('is-warn', 'is-danger') %} is-warn{% endif %}" aria-hidden="true"></i>
+    <span>Offline album {{ coll.album_name }}: {% if coll.state %}{{ coll.state }}{% else %}no report yet{% endif %}{% if coll.counts %} · {{ coll.counts }}{% endif %}{% if coll.relative %} · reported {{ coll.relative }}{% endif %}</span>
+    <button type="submit" form="album-resync-{{ section.device_id }}" class="dx-link-btn" title="Re-send this album on the device's next check-in">Resync</button>
+  </li>
+  {%- endif %}
+</ul>
+{%- endif %}
+</div>
+{%- endmacro -%}
+
+{#- Weekday chips for a field's control line: one checkbox name shared by the
+    seven chips, plus the ``<name>__present`` marker the save handler reads
+    to tell "every day unticked" from "picker not on the form". -#}
+{%- macro dx_days(id, name, label, value=None, form=None) -%}
+{%- set sel = (value if (value is not string and value is iterable) else ((value.split(',') if value else []))) | map('trim') | map('lower') | list -%}
+<span class="dx-days" role="group" aria-label="{{ label }}">
+  <input type="hidden" name="{{ name }}__present" value="1"{% if form %} form="{{ form }}"{% endif %}>
+  {%- for key, day in [('mon', 'Mon'), ('tue', 'Tue'), ('wed', 'Wed'), ('thu', 'Thu'), ('fri', 'Fri'), ('sat', 'Sat'), ('sun', 'Sun')] %}
+  <label class="dx-day" for="{{ id }}-{{ key }}"><input type="checkbox" id="{{ id }}-{{ key }}" name="{{ name }}" value="{{ key }}"{% if form %} form="{{ form }}"{% endif %}{% if key in sel %} checked{% endif %}><span>{{ day }}</span></label>
+  {%- endfor %}
+</span>
+{%- endmacro -%}
+
+{#- Collapsible section head for the device page: the shared component's
+    markup (static/collapsible.js), a one-line summary shown while it is
+    collapsed, and the chevron last. -#}
+{%- macro dsec_head(id, icon, title, summary='') -%}
+<header class="dx-dsec-head" data-collapsible-head>
+  <span class="dx-dsec-icon" aria-hidden="true"><i class="ph ph-{{ icon }}"></i></span>
+  <h2 class="dx-dsec-title" data-collapsible-title>{{ title }}</h2>
+  {%- if caller is defined %}{{ caller() }}{% endif %}
+  {%- if summary %}<span class="dx-dsec-sum">{{ summary }}</span>{% endif %}
+  {{ collapsible_toggle(id, title) }}
+</header>
 {%- endmacro -%}

@@ -796,7 +796,10 @@ def test_device_card_exposes_pi_png_settings(app_with_gate: Flask) -> None:
         data={"id": "png_lab", "kind": "pi_png_client", "panel_preset": "inky_7_3"},
     )
     body = client.get("/settings/devices/png_lab").get_data(as_text=True)
-    assert "Pi PNG client · rendering" in body
+    # The client fields sit in the Rendering row, tagged with their renderer.
+    rendering = body[body.index('id="rendering"') :]
+    assert 'data-pq-renderer="Pi PNG client"' in rendering
+    assert 'name="pi_png__png_lab:rotate"' in rendering
     body += client.get("/settings/devices/png_lab/calibration").get_data(as_text=True)
     assert "Pi PNG client · tone" in body
     assert 'name="pi_png__png_lab:rotate"' in body
@@ -1010,7 +1013,9 @@ def test_debug_section_surfaces_resolved_renderer_and_version(app_with_gate: Fla
         data={"id": "esp32_kitchen", "kind": "esp32_client", "name": "Kitchen"},
     )
     body = client.get("/settings/devices/esp32_kitchen").get_data(as_text=True)
-    assert "Debug &amp; diagnostics" in body, "expected the Debug summary label on the device page"
+    assert "Advanced: debug details and raw manifest" in body, (
+        "expected the Debug summary label on the device page"
+    )
     # Tesserae version shows in the debug block.
     assert app_with_gate.config["APP_VERSION"] in body
     # Renderer clone id follows the ``<renderer>__<instance>`` convention
@@ -1308,7 +1313,7 @@ def test_device_card_renders_humanized_status_tiles(app_with_gate: Flask) -> Non
     assert "Signal" in body
     assert "Battery" in body
     assert "Firmware" in body
-    assert "Environment" in body
+    assert "at the display" in body  # the environment line under the vitals
     # Humanized signal label + dBm sub-line.
     assert "Good" in body
     assert "-64 dBm" in body
@@ -1548,7 +1553,7 @@ def test_quiet_hours_weekday_pickers_render_on_both_layers(
     assert 'name="quiet_hours_days"' in server and 'name="quiet_hours_all_day"' in server
     assert 'name="quiet_hours_sleep"' in server
     devices = client.get("/settings/devices/esp32_lab").get_data(as_text=True)
-    assert "days-picker" in devices
+    assert 'class="dx-days"' in devices
     import re
 
     assert re.search(r'name="quiet_hours_all_day" value="sat"[^>]*\bchecked', devices)

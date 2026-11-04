@@ -4331,7 +4331,8 @@ select.dx-input:hover {
 }
 .dx-devsec :is(.dx-section-body, .dx-subgroup) > .field-help { margin: 10px 0 0; font-size: 12px; color: var(--dx-faint); }
 .dx-devsec .dx-divider { margin: 18px 0 14px; }
-.dx-devsec .device-subhead { margin: 0 0 4px; }
+/* The device page draws its own separators between groups. */
+.dx-devsec .device-subhead { margin: 0 0 4px; padding-top: 0; border-top: 0; }
 .dx-devsec .dx-toggle-row { padding: 6px 0 14px; }
 .dx-devsec .dx-quiet-hours [data-dep-target] + [data-dep-target] { margin-top: 14px; }
 .dx-devsec .dx-quiet-hours[data-dep-off] [data-dep-target] { opacity: 0.55; pointer-events: none; }
@@ -4471,7 +4472,14 @@ a.dx-qtile--link:focus-visible { outline: 2px solid var(--t-accent); outline-off
 .dx-band-desc { margin: 2px 0 0; font-size: 12px; color: var(--dx-faint); }
 .dx-band-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
-/* Power: one tile holding the reading and its display offsets. */
+/* Power: the battery history chart, then one tile holding the reading
+   and its display offsets. */
+.dx-power-chart { margin-bottom: var(--t-space-4, 16px); }
+.dx-section-head:has(.dx-section-actions) .dx-section-titleblock { flex: 1 1 auto; }
+.dx-section-head > .dx-section-actions { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 8px; margin-left: auto; align-self: center; }
+.dx-section-link { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--dx-faint); text-decoration: none; }
+.dx-section-link:hover { color: var(--t-fg); }
+.dx-section-link:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; border-radius: 3px; }
 .dx-qtile.dx-power-tile {
   display: flex;
   flex-direction: row;
@@ -4481,11 +4489,24 @@ a.dx-qtile--link:focus-visible { outline: 2px solid var(--t-accent); outline-off
   gap: 12px 24px;
   max-width: 560px;
 }
+/* With history the reading is one tile in the chart's stat grid (3 across). */
+.dx-power-chart .dx-battery-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.dx-stat-tile.dx-power-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; max-width: none; }
+@media (max-width: 720px) { .dx-power-chart .dx-battery-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .dx-power-reading { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; text-align: left; }
-.dx-power-offsets { display: flex; flex-direction: column; gap: 6px; }
-.dx-power-offset-fields { display: flex; gap: 8px; }
-.dx-power-offset { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
-.dx-power-offset input[type="number"] { width: 84px; padding: 6px 8px; font-size: 13px; }
+/* Display offset: a quiet line; Edit (the <summary>) reveals the fields. */
+.dx-power-offsets > summary { list-style: none; display: inline-flex; align-items: baseline; gap: 8px; cursor: pointer; font-size: 12px; color: var(--dx-faint); }
+.dx-power-offsets > summary::-webkit-details-marker { display: none; }
+.dx-power-offsets[data-set] .dx-power-offset-now { color: var(--t-fg-soft, var(--t-fg)); }
+.dx-power-offset-edit { color: var(--t-accent); text-decoration: underline; text-decoration-color: color-mix(in oklab, currentColor 40%, transparent); text-underline-offset: 2px; }
+.dx-power-offsets[open] .dx-power-offset-edit { display: none; }
+.dx-power-offsets > summary:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; border-radius: 3px; }
+.dx-power-offsets[open] > summary { margin-bottom: 8px; }
+.dx-power-offset-help { margin: 6px 0 0; font-size: 11.5px; color: var(--dx-faint); max-width: 34ch; }
+/* ``.field`` gives the offset inputs the app's standard input look. */
+.field.dx-power-offset-fields { display: flex; gap: 8px; }
+.field.dx-power-offset-fields > .dx-power-offset { display: inline-flex; flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 6px; margin: 0; font-weight: 400; }
+.field.dx-power-offset-fields input[type="number"] { width: 84px; }
 .dx-power-unit { font-size: 12px; color: var(--dx-faint); font-family: var(--t-font-mono); }
 
 /* Connection: header tags (.tg) + wider dl. */
@@ -4573,7 +4594,7 @@ a.dx-qtile--link:focus-visible { outline: 2px solid var(--t-accent); outline-off
   .dx-subnav-link.is-active { border-color: transparent; }
   .dx-devsec .dx-field-grid:where(:not(.dx-field-grid--auto)),
   .dx-devsec .dx-field-grid--3,
-  .dx-power-grid { grid-template-columns: 1fr; }
+  .dx-qtile.dx-power-tile { max-width: none; }
 }
 @media (max-width: 760px) {
   /* Register rows in the discovered banner: name, kind and Register stack

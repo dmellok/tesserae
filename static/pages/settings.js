@@ -55,7 +55,7 @@
       if (!sectionField || !target || !target.closest) return;
       // The sub-group (#timing, #rendering, ...) when there is one, so the
       // save lands on the part that was edited, not the top of its section.
-      const sec = target.closest('[data-devsub], [data-devsec]');
+      const sec = target.closest('[data-devsub], [data-collapsible]');
       if (sec && sec.id) sectionField.value = sec.id;
     }
     document.addEventListener('input', function (ev) {
@@ -127,6 +127,11 @@
     if (!master) return;
     const targets = group.querySelectorAll('[data-dep-target]');
 
+    // ``data-dep-hide`` (the device page's quiet hours): the dependent
+    // fields are hidden while the master is off, not just dimmed, and a
+    // ``data-dep-off-note`` says what applies instead.
+    const hide = group.hasAttribute('data-dep-hide');
+    const note = group.querySelector('[data-dep-off-note]');
     function sync() {
       const off = !master.checked;
       group.toggleAttribute('data-dep-off', off);
@@ -135,7 +140,9 @@
           if (el === master) return;
           el.disabled = off;
         });
+        if (hide) t.hidden = off;
       });
+      if (note) note.hidden = !off;
     }
     master.addEventListener('change', sync);
     sync();
@@ -275,109 +282,13 @@
   }
 
   // ---- Device page collapsible sections -----------------------------
-  // Each [data-devsec] has a header with a chevron button (aria-expanded /
-  // aria-controls the body). The whole header toggles too. The choice is
-  // remembered per section id in localStorage (shared by every device);
-  // sections start expanded. Jumping to a section, or to a sub-group inside
-  // one (#timing, #logs, ...), expands it first.
-  const DEVSEC_KEY = 'tesserae-devsec-collapsed:';
-  function devSecStored(id) {
-    try { return window.localStorage.getItem(DEVSEC_KEY + id) === '1'; } catch (e) { return false; }
-  }
-  function devSecStore(id, collapsed) {
-    try {
-      if (collapsed) window.localStorage.setItem(DEVSEC_KEY + id, '1');
-      else window.localStorage.removeItem(DEVSEC_KEY + id);
-    } catch (e) { /* private mode: the state just isn't remembered */ }
-  }
-  function setDevSecCollapsed(sec, collapsed, persist) {
-    const btn = sec.querySelector('[data-devsec-toggle]');
-    const body = btn && document.getElementById(btn.getAttribute('aria-controls'));
-    if (!btn || !body) return;
-    sec.classList.toggle('is-collapsed', collapsed);
-    body.hidden = collapsed;
-    btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-    const label = btn.querySelector('.sr-only');
-    const title = sec.querySelector('.dx-section-title');
-    if (label && title) label.textContent = (collapsed ? 'Expand ' : 'Collapse ') + title.textContent.trim();
-    if (persist && sec.id) devSecStore(sec.id, collapsed);
-  }
-  // Expand the collapsed section that holds ``el`` (if any). True when it
-  // changed something, so the caller knows the layout moved under it.
-  function expandDevSecFor(el, persist) {
-    const sec = el && el.closest ? el.closest('[data-devsec].is-collapsed') : null;
-    if (!sec) return false;
-    setDevSecCollapsed(sec, false, persist);
-    return true;
-  }
-  function initDevSections(page) {
-    const secs = Array.from(page.querySelectorAll('[data-devsec]'))
-      .filter(function (sec) { return sec.querySelector('[data-devsec-toggle]'); });
-    if (!secs.length) return;
-    let anyCollapsed = false;
-    secs.forEach(function (sec) {
-      if (devSecStored(sec.id)) { setDevSecCollapsed(sec, true, false); anyCollapsed = true; }
-      const head = sec.querySelector('[data-devsec-head]');
-      if (!head) return;
-      head.addEventListener('click', function (ev) {
-        // Links and controls in the header keep their own job; only the
-        // chevron button (and bare header space) toggles.
-        const inner = ev.target.closest('a, button, input, select, textarea, label, summary');
-        if (inner && !inner.hasAttribute('data-devsec-toggle')) return;
-        // Dragging across the title to select it is not a click on the header.
-        const sel = window.getSelection && window.getSelection();
-        if (!inner && sel && !sel.isCollapsed && sel.toString().trim()) return;
-        setDevSecCollapsed(sec, !sec.classList.contains('is-collapsed'), true);
-      });
-    });
-
-    // A required field inside a collapsed section would block Save with a
-    // "not focusable" error nobody can see: open its section instead.
-    document.addEventListener('invalid', function (ev) { expandDevSecFor(ev.target, false); }, true);
-
-    // #hash links (old anchors, redirects after a save, the Overview tiles):
-    // the browser scrolled before the section was open, so open it and scroll.
-    function targetFromHash() {
-      const id = decodeURIComponent(window.location.hash.slice(1));
-      return id ? document.getElementById(id) : null;
-    }
-    const first = targetFromHash();
-    if (first && page.contains(first)) {
-      const opened = expandDevSecFor(first, true);
-      if (opened || anyCollapsed) {
-        first.scrollIntoView({ block: 'start' });
-        // Images, fonts and late scripts can still shift the layout (and the
-        // browser may restore its own scroll on load): land on the target
-        // again once the page settles, unless the person has scrolled.
-        let moved = false;
-        const stop = function () { moved = true; };
-        ['wheel', 'touchstart', 'keydown', 'mousedown'].forEach(function (t) {
-          window.addEventListener(t, stop, { once: true, passive: true });
-        });
-        const again = function () {
-          if (!moved) first.scrollIntoView({ block: 'start' });
-        };
-        if (document.readyState === 'complete') requestAnimationFrame(again);
-        else window.addEventListener('load', function () { requestAnimationFrame(again); }, { once: true });
-      }
-    }
-    window.addEventListener('hashchange', function () {
-      const el = targetFromHash();
-      if (el && page.contains(el) && expandDevSecFor(el, true)) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    });
-    // Following a link whose hash is already current fires no hashchange.
-    document.addEventListener('click', function (ev) {
-      if (ev.defaultPrevented) return;
-      const a = ev.target.closest && ev.target.closest('a[href^="#"]');
-      if (!a || a.getAttribute('href').length < 2) return;
-      const el = document.getElementById(decodeURIComponent(a.getAttribute('href').slice(1)));
-      if (!el || !page.contains(el) || !expandDevSecFor(el, true)) return;
-      ev.preventDefault();
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      history.replaceState(null, '', '#' + el.id);
-    });
+  // The sections use the shared collapsible component (static/collapsible.js,
+  // ``data-collapsible``): chevron and bare header space toggle, the choice
+  // is remembered, and a #hash, a sub-nav click or an invalid field opens the
+  // section that holds its target. This opens one from here.
+  function expandSectionFor(el) {
+    const c = window.tesseraeCollapsible;
+    return !!(c && el && c.expandFor(el, true));
   }
 
   // ---- Device page sub-nav ------------------------------------------
@@ -406,8 +317,15 @@
         // of the viewport height ABOVE that line, and the section you just
         // jumped to then fails its own test and the pill above it lights
         // up instead (#326).
+        // The Paper sidebar is a fixed .topbar that clears nothing; the
+        // published --t-topbar-h says what actually sits over the page.
+        // A sticky section strip (this nav) adds its own height.
         const bar = document.querySelector('.topbar');
-        const barH = bar ? bar.getBoundingClientRect().height : 0;
+        let barH = bar ? bar.getBoundingClientRect().height : 0;
+        if (bar && getComputedStyle(bar).position === 'fixed') barH = 0;
+        if (getComputedStyle(nav).position === 'sticky' && getComputedStyle(nav).flexDirection === 'row') {
+          barH += nav.getBoundingClientRect().height;
+        }
         const probe = Math.max(barH + 24, window.innerHeight * 0.25);
         let current = sections[0].id;
         sections.forEach(function (s) {
@@ -421,7 +339,7 @@
         const target = document.getElementById(l.getAttribute('data-subnav-link'));
         if (!target) return;
         ev.preventDefault();
-        expandDevSecFor(target, true);
+        expandSectionFor(target);
         target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         history.replaceState(null, '', '#' + target.id);
         setActive(target.id);
@@ -462,13 +380,121 @@
     if (!orient || !w || !h) return;
     const isPortrait = function (v) { return v.indexOf('portrait') === 0; };
     let last = orient.value;
+    function swap() {
+      const tmp = w.value; w.value = h.value; h.value = tmp;
+      w.dispatchEvent(new Event('input', { bubbles: true }));
+    }
     orient.addEventListener('change', function () {
-      if (isPortrait(orient.value) !== isPortrait(last)) {
-        const tmp = w.value; w.value = h.value; h.value = tmp;
-        w.dispatchEvent(new Event('input', { bubbles: true }));
-      }
+      if (isPortrait(orient.value) !== isPortrait(last)) swap();
       last = orient.value;
     });
+    // The swap button beside the size: the same swap, by hand.
+    root.querySelectorAll('[data-size-swap]').forEach(function (btn) {
+      btn.addEventListener('click', swap);
+    });
+  }
+
+  // ---- Device page: the small behaviours of the redesign ----------------
+  function toggleList(btn, show) {
+    btn.setAttribute('aria-expanded', show ? 'true' : 'false');
+    const label = btn.querySelector('span');
+    if (label) label.textContent = btn.getAttribute(show ? 'data-less-label' : 'data-more-label') || label.textContent;
+    const icon = btn.querySelector('.ph');
+    if (icon) icon.className = 'ph ' + (show ? 'ph-caret-up' : 'ph-caret-down');
+  }
+  function initDevicePage(page) {
+    // Stay awake: its poll interval appears beside the switch only when on.
+    page.querySelectorAll('[data-awake-toggle]').forEach(function (sw) {
+      const poll = sw.closest('.dx-f-ctl') && sw.closest('.dx-f-ctl').querySelector('[data-awake-poll]');
+      if (!poll) return;
+      sw.addEventListener('change', function () { poll.hidden = !sw.checked; });
+    });
+    // Synchronized wake: the mode picks which of Anchor / Times shows.
+    page.querySelectorAll('[data-wake-align]').forEach(function (box) {
+      const mode = box.querySelector('[data-wa-mode]');
+      if (!mode) return;
+      const sync = function () {
+        box.querySelectorAll('[data-wa]').forEach(function (f) { f.hidden = f.getAttribute('data-wa') !== mode.value; });
+      };
+      mode.addEventListener('change', sync);
+      sync();
+    });
+    // More menu: closes on a click elsewhere and on Escape.
+    const menus = Array.from(page.querySelectorAll('[data-more-menu]'));
+    document.addEventListener('click', function (ev) {
+      menus.forEach(function (m) { if (m.open && !m.contains(ev.target)) m.open = false; });
+    });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Escape') return;
+      menus.forEach(function (m) {
+        if (!m.open) return;
+        m.open = false;
+        const s = m.querySelector('summary');
+        if (s) s.focus();
+      });
+    });
+    // Remove: Delete opens the confirmation form under it.
+    page.querySelectorAll('[data-del-open]').forEach(function (btn) {
+      const form = document.getElementById(btn.getAttribute('aria-controls'));
+      if (!form) return;
+      btn.addEventListener('click', function () {
+        form.hidden = !form.hidden;
+        btn.setAttribute('aria-expanded', form.hidden ? 'false' : 'true');
+        if (!form.hidden) {
+          const first = form.querySelector('input, button');
+          if (first) first.focus({ preventScroll: true });
+        }
+      });
+    });
+    // Logs: the newest three, then the rest on request.
+    page.querySelectorAll('[data-log-more]').forEach(function (btn) {
+      const list = page.querySelector('[data-log-list]');
+      if (!list) return;
+      btn.addEventListener('click', function () {
+        const show = btn.getAttribute('aria-expanded') !== 'true';
+        list.querySelectorAll('[data-log-extra]').forEach(function (li) { li.hidden = !show; });
+        toggleList(btn, show);
+      });
+    });
+    // Frame log: the last 8 lines, or all of them.
+    page.querySelectorAll('[data-flog-more]').forEach(function (btn) {
+      const box = btn.parentElement;
+      const short = box.querySelector('[data-flog-short]');
+      const all = box.querySelector('[data-flog-all]');
+      if (!short || !all) return;
+      btn.addEventListener('click', function () {
+        const show = btn.getAttribute('aria-expanded') !== 'true';
+        short.hidden = show;
+        all.hidden = !show;
+        if (show) all.scrollTop = all.scrollHeight;
+        toggleList(btn, show);
+      });
+    });
+    // Copy buttons (a log, the frame log, the raw manifest).
+    page.querySelectorAll('[data-copy-target]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const src = document.querySelector(btn.getAttribute('data-copy-target'));
+        if (!src || !navigator.clipboard) return;
+        navigator.clipboard.writeText(src.textContent || '').then(function () {
+          const label = btn.querySelector('span');
+          if (!label) return;
+          const was = label.textContent;
+          label.textContent = 'Copied';
+          setTimeout(function () { label.textContent = was; }, 1500);
+        }).catch(function () { /* nothing to undo */ });
+      });
+    });
+    // The rail's name and icon follow the Identity fields as they are edited.
+    const nameIn = page.querySelector('[data-device-name-input]');
+    const nameOut = page.querySelector('[data-device-head-name]');
+    if (nameIn && nameOut) {
+      nameIn.addEventListener('input', function () { nameOut.textContent = nameIn.value || page.getAttribute('data-device-id'); });
+    }
+    const iconIn = page.querySelector('input[data-icon-value]') || document.querySelector('input[data-icon-value]');
+    const iconOut = page.querySelector('[data-device-head-icon]');
+    if (iconIn && iconOut) {
+      iconIn.addEventListener('change', function () { iconOut.className = 'ph ph-' + (iconIn.value || 'device-mobile'); });
+    }
   }
 
   // ---- Boot --------------------------------------------------------------
@@ -789,7 +815,7 @@
     document.querySelectorAll('[data-devtable]').forEach(initDevicesTable);
     initAddDeviceToggle();
     initDiscoveredBanner();
-    document.querySelectorAll('[data-device-page]').forEach(initDevSections);
+    document.querySelectorAll('[data-device-page]').forEach(initDevicePage);
     document.querySelectorAll('[data-subnav]').forEach(initSubnav);
     document.querySelectorAll('[data-orient-swap]').forEach(initOrientSwap);
     document.querySelectorAll('[data-ha-device-picker]').forEach(initHaDevicePicker);
@@ -808,6 +834,11 @@
       if (!details) return;
       btn.addEventListener('click', function () {
         details.removeAttribute('open');
+        // The device page's Remove: a Delete button opens the form.
+        const form = details.querySelector('[data-del-form]');
+        const open = details.querySelector('[data-del-open]');
+        if (form) form.hidden = true;
+        if (open) { open.setAttribute('aria-expanded', 'false'); open.focus(); }
       });
     });
     // Live label for each tone slider so the user sees the exact

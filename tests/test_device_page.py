@@ -15,9 +15,9 @@ from flask import Flask
 
 from app.main import REPO_ROOT, create_app
 
-# The collapsible sections, in sub-nav order, for a device with every feature.
+# The collapsible sections, in sub-nav order, for a device with every
+# feature. The summary rail (#overview) heads the page beside them.
 SECTIONS = (
-    "overview",
     "display",
     "schedule",
     "controls",
@@ -25,7 +25,7 @@ SECTIONS = (
     "troubleshooting",
     "remove",
 )
-# Ids the older, finer sections had. They live on as sub-groups inside the
+# Ids the older, finer sections had. They live on as groups inside the
 # sections above, so old links (#lineups, #logs, ...) still land.
 OLD_ANCHORS = {
     "identity": "display",
@@ -99,9 +99,15 @@ def _full_device(app: Flask) -> tuple[object, str]:
 def _section_html(body: str, section_id: str) -> str:
     """The markup of one top-level section, from its opening tag to the
     next section."""
-    start = body.index(f'<section class="dx-section-card dx-devsec" id="{section_id}"')
-    end = body.find('<section class="dx-section-card dx-devsec', start + 1)
+    start = body.index(f'id="{section_id}"', body.index('<section class="dx-dsec'))
+    start = body.rindex("<section", 0, start)
+    end = body.find('<section class="dx-dsec', start + 1)
     return body[start : end if end != -1 else len(body)]
+
+
+def _rail_html(body: str) -> str:
+    start = body.index('<aside class="dx-rail" id="overview"')
+    return body[start : body.index("</aside>", start)]
 
 
 def test_device_page_renders_every_section_anchor(app: Flask) -> None:
@@ -112,22 +118,27 @@ def test_device_page_renders_every_section_anchor(app: Flask) -> None:
     for anchor in SECTIONS:
         assert f'id="{anchor}"' in body, anchor
         assert f'href="#{anchor}"' in body, anchor
+    # The rail is #overview (old links to the Overview section land on it).
+    assert body.count('id="overview"') == 1
     # One layout wrapper: the page script wires each one it finds.
     assert body.count("data-device-page") == 1
-    # Six sections and the danger zone, no more: the sub-nav is the list.
+    # Five sections and the danger zone, no more: the section strip is the list.
     nav = body[body.index("data-subnav>") : body.index("</nav>", body.index("data-subnav>"))]
     assert re.findall(r'data-subnav-link="([^"]+)"', nav) == list(SECTIONS)
-    # Breadcrumb + header.
+    # Breadcrumb.
     assert "Devices" in body
     # The combined form is hoisted and every field associates to it.
     assert f'id="device-{dev}-combined"' in body
     assert f'action="/settings/devices/{dev}/save"' in body
     assert 'name="device_name"' in body
-    # Header actions.
-    assert f"/preview/{dev}.png" in body
-    assert f"/mirror/{dev}" in body
-    assert f"/settings/devices/{dev}/push-now" in body
-    assert f"/settings/devices/{dev}/calibration" in body
+    # The rail's actions: More (mirror, raw PNG), Preview, Push now.
+    rail = _rail_html(body)
+    assert f"/preview/{dev}.png" in rail
+    assert f"/mirror/{dev}" in rail
+    assert f'form="device-{dev}-push-now"' in rail
+    assert f'action="/settings/devices/{dev}/push-now"' in body
+    # Calibrate heads the Rendering group.
+    assert f"/settings/devices/{dev}/calibration" in _section_html(body, "display")
 
 
 def test_old_section_anchors_still_resolve_inside_the_new_sections(app: Flask) -> None:
@@ -136,34 +147,33 @@ def test_old_section_anchors_still_resolve_inside_the_new_sections(app: Flask) -
     for old, parent in OLD_ANCHORS.items():
         assert body.count(f'id="{old}"') == 1, old
         assert f'id="{old}"' in _section_html(body, parent), (old, parent)
-    # The sub-groups are marked up as such, with a small heading.
-    assert 'class="dx-subgroup" id="lineups" data-devsub' in body
-    # Save redirects accept the sub-group ids too, so a save lands on the part edited.
-    for anchor in ("timing", "rendering", "identity", "schedule", "troubleshooting"):
-        resp = client.post(
-            f"/settings/devices/{dev}/save",
-            data={"device_name": "Lounge", "_section": anchor},
-            follow_redirects=False,
-        )
-        assert resp.location.endswith(f"/settings/devices/{dev}#{anchor}"), anchor
+    # The groups are marked up as such, with a group heading.
+    assert 'class="dx-grp" id="lineups" data-devsub' in body
+    assert '<h3 class="dx-grp-title">Lineups</h3>' in body
 
 
 def test_each_section_is_a_collapsible_with_a_toggle_button(app: Flask) -> None:
+    """The sections use the shared collapsible component."""
     client, dev = _full_device(app)
     body = client.get(f"/settings/devices/{dev}").get_data(as_text=True)
+    assert "data-devsec" not in body  # the page's own collapse code is retired
+    assert 'data-collapsible-scope="device-page"' in body
     for anchor in SECTIONS[:-1]:  # everything but the Remove danger zone
         html = _section_html(body, anchor)
-        assert "data-devsec-toggle" in html, anchor
+        assert "data-collapsible " in html or "data-collapsible>" in html, anchor
+        assert "data-collapsible-head" in html, anchor
+        assert "data-collapsible-toggle" in html, anchor
         assert f'aria-controls="{anchor}-body"' in html, anchor
         assert 'aria-expanded="true"' in html, anchor
-        assert f'id="{anchor}-body"' in html, anchor
+        assert f'id="{anchor}-body" data-collapsible-body' in html, anchor
         assert "ph-caret-down" in html, anchor
         # Every section starts expanded in the markup.
         assert f'id="{anchor}-body" hidden' not in html, anchor
+    assert "data-collapsible" not in _section_html(body, "remove")
 
 
-# Every field, button and form the page carried before the sections were
-# regrouped (device with every feature): only their place changed.
+# Every field, button and form the page carried before the redesign (device
+# with every feature): only their place changed.
 _CONTROLS = {
     "battery_offset_mv",
     "battery_offset_pct",
@@ -197,7 +207,7 @@ _ACTIONS = ("delete", "logs/collect", "regenerate-token", "reveal-token", "set-t
 def test_regrouping_loses_no_control(app: Flask) -> None:
     client, dev = _full_device(app)
     body = client.get(f"/settings/devices/{dev}").get_data(as_text=True)
-    body = body[body.index("dx-devpage-layout") :]
+    body = body[body.index("data-device-page") :]
     names = set(re.findall(r'<(?:input|select|textarea|button)[^>]*?name="([^"]+)"', body))
     assert names >= _CONTROLS, sorted(_CONTROLS - names)
     for action in _ACTIONS:
@@ -216,61 +226,63 @@ def test_regrouping_loses_no_control(app: Flask) -> None:
     page = client.get(f"/settings/devices/{dev}").get_data(as_text=True)
     for name, section in placed.items():
         assert f'name="{name}"' in _section_html(page, section), name
-    assert "Colour calibration" in _section_html(page, "display")
+    assert "Calibrate" in _section_html(page, "display")
     assert "Nothing scheduled yet" in _section_html(page, "schedule")
     trouble = _section_html(page, "troubleshooting")
     for text in (
         "Regenerate token",
         "Firmware page",
-        "Debug &amp; diagnostics",
-        "Advanced diagnostics",
+        "Advanced: access token and transport",
+        "Advanced: debug details and raw manifest",
+        "Advanced: last status report",
     ):
         assert text in trouble, text
 
 
-def test_display_fields_share_one_grid_row_with_their_actions(app: Flask) -> None:
-    """Identity, panel and rendering fields sit in multi-column grids, the
-    orientation and calibration actions are small buttons in those grids
-    (not full-width bands), and underscan is a plain number box."""
+def test_display_fields_are_compact_rows_with_their_actions(app: Flask) -> None:
+    """Identity, panel and rendering fields are compact field rows; the
+    orientation card is a compass icon button beside Rotation, Calibrate heads
+    the Rendering group, and underscan is a plain number box."""
     client, dev = _full_device(app)
     page = client.get(f"/settings/devices/{dev}").get_data(as_text=True)
     display = _section_html(page, "display")
-    assert display.count("dx-field-grid--auto") == 3
+    assert display.count('<div class="dx-fg">') == 3
     assert "dx-band" not in display
     panel = display[display.index('id="display-panel"') : display.index('id="rendering"')]
     assert 'type="number" id="device-kitchen-panel-underscan" name="panel_underscan"' in panel
     assert 'type="range"' not in panel
     assert f'form="device-{dev}-calibrate"' in panel
+    assert 'aria-label="Send orientation card"' in panel
+    assert "data-size-swap" in panel  # the swap button between width and height
     rendering = display[display.index('id="rendering"') :]
-    assert "Open calibration" in rendering
-    # While the numbered card is out, the answer band appears under the grid.
+    head = rendering[: rendering.index("</div>")]
+    assert f'href="/settings/devices/{dev}/calibration"' in head
+    # While the numbered card is out, the answer band appears under the row
+    # and the compass button steps aside.
     answering = _section_html(
         client.get(f"/settings/devices/{dev}?calibrating={dev}").get_data(as_text=True),
         "display",
     )
     assert 'id="orientation-card"' in answering
     assert answering.count(f'form="device-{dev}-calibrate-apply"') == 4
+    assert 'aria-label="Send orientation card"' not in answering
 
 
-def test_overview_tiles_link_to_the_settings_behind_them(app: Flask) -> None:
+def test_rail_vitals_link_to_the_settings_behind_them(app: Flask) -> None:
     client, dev = _full_device(app)
-    overview = _section_html(
-        client.get(f"/settings/devices/{dev}").get_data(as_text=True), "overview"
-    )
+    rail = _rail_html(client.get(f"/settings/devices/{dev}").get_data(as_text=True))
+    assert re.search(r'<a class="dx-now" href="#lineups"', rail)
     for label, anchor in (
-        ("Showing", "#lineups"),
         ("Battery", "#power"),
-        ("Firmware", "#connection"),
         ("Next update", "#timing"),
+        ("Firmware", "#connection"),
+        ("Checked in", "#connection"),
     ):
         m = re.search(
-            rf'<a class="dx-qtile dx-qtile--link" href="{anchor}"[^>]*>\s*'
-            rf'<span class="dx-qtile-label">{label}</span>',
-            overview,
+            rf'<a class="dx-vital" href="{anchor}"[^>]*>\s*<span class="dx-vital-k">{label}</span>',
+            rail,
         )
         assert m, label
-    # Signal / environment tiles are plain.
-    assert 'class="dx-qtile dx-qtile--link" href="#signal' not in overview
 
 
 def test_sub_nav_only_links_to_sections_that_exist(app: Flask) -> None:
@@ -284,7 +296,7 @@ def test_sub_nav_only_links_to_sections_that_exist(app: Flask) -> None:
     assert 'id="controls"' not in body
     linked = re.findall(r'data-subnav-link="([^"]+)"', body)
     assert "controls" not in linked
-    assert {"overview", "display", "schedule", "troubleshooting"} <= set(linked)
+    assert {"display", "schedule", "troubleshooting"} <= set(linked)
     for anchor in linked:
         assert f'id="{anchor}"' in body, anchor
 
@@ -516,13 +528,19 @@ def test_connection_chips_link_to_the_firmware_page(app: Flask, monkeypatch) -> 
         ),
     )
     body = client.get(f"/settings/devices/{dev}").get_data(as_text=True)
-    chips = body[body.index("dx-conn-chips") : body.index("dx-conn-chips") + 1400]
+    # The rail says an update is out: a badge on the firmware vital and a
+    # call-out whose Update link goes to the Firmware page.
+    rail = _rail_html(body)
+    assert "dx-v-badge" in rail
     assert re.search(
-        r'<a class="tg tg--warn" href="/settings/firmware"[^>]*>v1.40.0 available</a>', chips
+        r'<span>Firmware v1.40.0 available</span><a href="/settings/firmware" title="Faster wakes',
+        rail,
     )
-    assert 'href="https://github.com/example/firmware/releases/tag/v1.40.0"' in chips
-    assert "release notes" in chips
-    assert "Faster wakes" in chips
+    # The Connection head keeps the release notes, left of the Firmware page.
+    conn = body[body.index('id="connection"') :]
+    head = conn[: conn.index('class="dx-kv"')]
+    assert 'href="https://github.com/example/firmware/releases/tag/v1.40.0"' in head
+    assert head.index("Release notes") < head.index("Firmware page")
 
 
 @pytest.mark.parametrize("source", ["ios_ble", "android_ble"])

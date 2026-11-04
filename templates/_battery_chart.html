@@ -147,7 +147,7 @@ static/battery-chart.js (STYLES) and in dx-battery.css (.dx-wake-key).
   {% if wk and wk.total %}
   <div class="dx-stat-tile" data-battery-tile>
     <div class="dx-stat-label">Wakes / day</div>
-    <div class="dx-stat-value">{% if wk.per_day is not none %}{{ '%g' % wk.per_day }}{% else %}—{% endif %}</div>
+    <div class="dx-stat-value">{% if wk.per_day is not none %}{{ '%g' % wk.per_day }}{% else %}-{% endif %}</div>
     <div class="dx-stat-sub dx-battery-wake-sub" title="{{ wk.total }} wake{{ '' if wk.total == 1 else 's' }} in the window: {{ wk.summary_full or wk.summary }}">{{ wk.summary }}</div>
   </div>
   {% endif %}
@@ -187,7 +187,7 @@ static/battery-chart.js (STYLES) and in dx-battery.css (.dx-wake-key).
     <div class="dx-stat-value">
       {% if prediction.slope_per_day is not none %}
         {{ '%+.1f' % prediction.slope_per_day }}
-      {% else %}—{% endif %}
+      {% else %}-{% endif %}
     </div>
     <div class="dx-stat-sub">%/day</div>
   </div>
@@ -197,7 +197,7 @@ static/battery-chart.js (STYLES) and in dx-battery.css (.dx-wake-key).
     <div class="dx-stat-value">
       {% if prediction and prediction.slope_per_day is not none %}
         {{ '%+.1f' % prediction.slope_per_day }}
-      {% else %}—{% endif %}
+      {% else %}-{% endif %}
     </div>
     <div class="dx-stat-sub">%/day</div>
   </div>
@@ -206,7 +206,7 @@ static/battery-chart.js (STYLES) and in dx-battery.css (.dx-wake-key).
     <div class="dx-stat-value">
       {% if prediction and prediction.days_to_20pct is not none %}
         {{ '%.1f' % prediction.days_to_20pct }}
-      {% else %}—{% endif %}
+      {% else %}-{% endif %}
     </div>
     <div class="dx-stat-sub">days</div>
   </div>
@@ -215,7 +215,7 @@ static/battery-chart.js (STYLES) and in dx-battery.css (.dx-wake-key).
     <div class="dx-stat-value">
       {% if prediction and prediction.days_to_empty is not none %}
         {{ '%.1f' % prediction.days_to_empty }}
-      {% else %}—{% endif %}
+      {% else %}-{% endif %}
     </div>
     <div class="dx-stat-sub">days</div>
   </div>

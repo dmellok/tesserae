@@ -18,6 +18,9 @@ sticky topbar, because both the sub-nav's sticky offset and the section's
 scroll-margin were fixed 16px. The topbar's nav wraps onto a second row
 between roughly 900px and 1100px wide, so no fixed number works; the height is
 measured into ``--t-topbar-h`` and both offsets are derived from it.
+
+Since the 2026-11 redesign the nav is a sticky strip over the settings column
+(on a desktop too), so a section comes to rest under the topbar AND the strip.
 """
 
 from __future__ import annotations
@@ -51,7 +54,6 @@ pytestmark = pytest.mark.skipif(
 
 # The anchors device_page.html emits, in order.
 _ANCHORS = [
-    ("overview", "Overview"),
     ("display", "Display"),
     ("schedule", "Schedule"),
     ("controls", "Controls"),
@@ -82,10 +84,11 @@ _SCROLL_SETTLED = """() => {
   return y > 0 && stable;
 }"""
 
-# #power comes to rest 16px under the topbar, not 16px under the viewport.
+# #power comes to rest 16px under the sticky strip (itself under the topbar),
+# not 16px under the viewport.
 _GAP_ABOVE_SECTION = """() => {
-  const bar = document.querySelector('.topbar').getBoundingClientRect().height;
-  return document.getElementById('power').getBoundingClientRect().top - bar;
+  const nav = document.querySelector('[data-subnav]').getBoundingClientRect().bottom;
+  return document.getElementById('power').getBoundingClientRect().top - nav;
 }"""
 
 _NAV = "document.querySelector('[data-subnav]')"
@@ -104,31 +107,36 @@ def page_path(tmp_path: Path) -> Path:
         for i, (a, label) in enumerate(_ANCHORS)
     )
     sections = "".join(
-        f'<section class="dx-section-card dx-devsec" id="{a}" data-devsec>{label}</section>'
+        f'<section class="dx-dsec" id="{a}" data-collapsible>{label}</section>'
         for a, label in _ANCHORS
     )
-    css = (REPO_ROOT / "static" / "style" / "settings.css").read_text(encoding="utf-8")
-    shell = (REPO_ROOT / "static" / "style" / "shell.css").read_text(encoding="utf-8")
+    style = REPO_ROOT / "static" / "style"
+    css = "".join(
+        f"<style>{(style / name).read_text(encoding='utf-8')}</style>"
+        for name in ("shell.css", "settings.css", "dx-devpage.css")
+    )
     script = (REPO_ROOT / "static" / "pages" / "settings.js").read_text(encoding="utf-8")
     # components.js is what measures the topbar and publishes --t-topbar-h.
     components = (REPO_ROOT / "static" / "components.js").read_text(encoding="utf-8")
     path = tmp_path / "subnav.html"
     path.write_text(
         '<!doctype html><html><head><meta charset="utf-8">'
-        f"<style>{shell}</style><style>{css}</style>"
+        f"{css}"
         # Give the sections real height so there is somewhere to scroll to.
         # A fixed topbar height so the landing point is deterministic; the
         # real bar measures 61px on one row and 100px on two.
-        "<style>.topbar { height: 61px; }"
-        " .dx-devsec { height: 600px; }"
+        "<style>.topbar { height: 61px; position: sticky; top: 0; z-index: 9; }"
+        " .dx-dsec { height: 600px; }"
         " html, body { overflow-x: hidden; overflow-x: clip; margin: 0; }</style>"
         "</head><body>"
         # The real sticky topbar: what both offsets have to clear.
         '<header class="topbar"><a href="#">Tesserae</a></header>'
-        '<div class="dx-devpage-layout">'
-        f'<nav class="dx-subnav" aria-label="Sections" data-subnav>{links}</nav>'
-        f'<div class="dx-devpage-main">{sections}</div>'
-        "</div>"
+        '<main class="page dx-devpage"><div class="dx-dp">'
+        '<aside class="dx-rail" id="overview">Summary</aside>'
+        '<div class="dx-dp-main">'
+        f'<nav class="dx-secnav" aria-label="Sections" data-subnav>{links}</nav>'
+        f"{sections}"
+        "</div></div></main>"
         f"<script>{components}</script><script>{script}</script>"
         "</body></html>",
         encoding="utf-8",
@@ -174,9 +182,9 @@ def test_desktop_click_scrolls_the_page_once(browser, page_path: Path) -> None: 
     )
 
 
-def test_desktop_column_nav_never_scrolls_itself(browser, page_path: Path) -> None:  # type: ignore[no-untyped-def]
-    """On desktop the nav is a sticky column that never overflows, so there is
-    no pill to chase and nothing to scroll."""
+def test_desktop_strip_never_scrolls_itself(browser, page_path: Path) -> None:  # type: ignore[no-untyped-def]
+    """On a desktop every section fits in the strip, so there is no pill to
+    chase and nothing to scroll."""
     pg = _open(browser, page_path, width=1280)
     assert pg.evaluate(_NAV_OVERFLOWS) is False
 
@@ -189,8 +197,8 @@ def test_desktop_column_nav_never_scrolls_itself(browser, page_path: Path) -> No
 def test_phone_strip_centres_the_pill_in_its_own_scrollport(  # type: ignore[no-untyped-def]
     browser, page_path: Path
 ) -> None:
-    """Under 900px the nav is a horizontal strip. The active pill still has to
-    come into view -- but by scrolling the strip, not the document."""
+    """On a phone the strip overflows. The active pill still has to come into
+    view -- but by scrolling the strip, not the document."""
     pg = _open(browser, page_path, width=420)
     assert pg.evaluate(_NAV_OVERFLOWS) is True
     assert pg.evaluate(_NAV_SCROLL_LEFT) == 0
@@ -236,7 +244,7 @@ def test_a_taller_topbar_pushes_the_landing_point_down(browser, page_path: Path)
     pg.wait_for_function(_SCROLL_SETTLED)
 
     assert pg.evaluate(_GAP_ABOVE_SECTION) == pytest.approx(16, abs=2)
-    # And the sticky column sits below the taller bar rather than under it.
+    # And the sticky strip sits below the taller bar rather than under it.
     assert pg.evaluate(
         "() => document.querySelector('[data-subnav]').getBoundingClientRect().top"
     ) >= pg.evaluate("() => document.querySelector('.topbar').getBoundingClientRect().height")
