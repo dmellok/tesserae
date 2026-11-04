@@ -12,16 +12,16 @@
    existing JS shows/hides off the ``embedded_enabled`` switch.
    Preserved here as-is. #}
 
-{% from "_components.html" import auto_field, options_more_open, options_more_close with context %}
+{% from "_components.html" import auto_field, collapsible_toggle, options_more_open, options_more_close with context %}
 
 {% set icon_name = section.icon or KIND_ICONS.get(section.kind, 'gear-six') %}
 
 <section class="dx-section-card{% if section.kind == 'panel' %} panel-section{% endif %}"
-         id="{{ section.id }}">
+         id="{{ section.id }}" data-collapsible>
   <form method="post" action="{{ section.endpoint }}"
         class="form dx-legacy-server-form" data-dirty-form>
 
-    <header class="dx-section-head">
+    <header class="dx-section-head" data-collapsible-head>
       <span class="dx-section-icon" aria-hidden="true">
         <i class="ph ph-{{ icon_name }}"></i>
       </span>
@@ -45,9 +45,10 @@
         {% endif %}
       {% endfor %}
       {% endif %}
+      {{ collapsible_toggle(section.id, section.title) }}
     </header>
 
-    <div class="dx-section-body">
+    <div class="dx-section-body" id="{{ section.id }}-body" data-collapsible-body>
 
       {# Optional renderer-style enable toggle. Kept off the broker
          path; broker's enabled state is the embedded_enabled mode

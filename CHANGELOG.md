@@ -8,6 +8,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Collapsible sections on the Server, System, About, Stats and other admin pages, remembered per page.
+- Sub-section titles are one heading style on every page, with a hairline above.
+- Paper's section title marker follows the theme's accent colour instead of a fixed red.
+- The Lineups page is centred like the other pages instead of sitting left.
 - Paper's phone shell. The four places you go most (Send, Dashboards,
   Lineups, History) sit in a tab bar along the bottom and More lifts the
   rest up as a sheet, in place of the hamburger drawer. Once a page's title

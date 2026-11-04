@@ -813,8 +813,8 @@
 :root[data-ui="paper"] .dx-stats-columns > .dx-section-card,
 :root[data-ui="paper"] .send-pair > .dx-section-card { margin-top: 0; }
 :root[data-ui="paper"] .dx-devtable { padding: 0; }
-/* Section heads lose their decorative icon tile; a small red square,
-   the one splash of colour, marks every section title instead. */
+/* Section heads lose their decorative icon tile; a small square in the
+   theme's accent colour, the one splash of colour, marks every section title instead. */
 :root[data-ui="paper"] .dx-section-card .dx-section-icon,
 :root[data-ui="paper"] .card-head > .icon-box,
 :root[data-ui="paper"] .card-head h2 > .icon-box { display: none; }
@@ -827,7 +827,7 @@
   width: 8px;
   height: 8px;
   margin-right: 10px;
-  background: var(--p-red);
+  background: var(--t-accent);
   vertical-align: middle;
   position: relative;
   top: -2px;

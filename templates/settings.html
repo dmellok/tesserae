@@ -609,14 +609,15 @@
      directory, so the in-app updater's git-based check / apply /
      rollback flows can't run. Show the running version, ask GitHub
      for the latest release, surface the appropriate upgrade hint. #}
-  <section class="dx-section-card">
+  <section class="dx-section-card" id="system-updates" data-collapsible>
     {% if system_in_container %}
-    {{ card_head('Updates', icon_name='arrow-clockwise', blurb='Tesserae is running from the official Docker image. Updates land via a new image, not an in-app pull, but we still check GitHub for newer releases so you know when one is out.') }}
+    {{ card_head('Updates', icon_name='arrow-clockwise', blurb='Tesserae is running from the official Docker image. Updates land via a new image, not an in-app pull, but we still check GitHub for newer releases so you know when one is out.', collapse='system-updates') }}
     {% elif system_install_method == 'community-script' %}
-    {{ card_head('Updates', icon_name='arrow-clockwise', blurb="Tesserae was installed by the Proxmox VE helper script, which owns the upgrade path. We still check GitHub for newer releases so you know when one is out.") }}
+    {{ card_head('Updates', icon_name='arrow-clockwise', blurb="Tesserae was installed by the Proxmox VE helper script, which owns the upgrade path. We still check GitHub for newer releases so you know when one is out.", collapse='system-updates') }}
     {% else %}
-    {{ card_head('Updates', icon_name='arrow-clockwise', blurb="This install isn't a git checkout, so the in-app pull-and-restart flow can't run, but we still check GitHub for newer releases so you know when one is out.") }}
+    {{ card_head('Updates', icon_name='arrow-clockwise', blurb="This install isn't a git checkout, so the in-app pull-and-restart flow can't run, but we still check GitHub for newer releases so you know when one is out.", collapse='system-updates') }}
     {% endif %}
+    <div id="system-updates-body" data-collapsible-body>
 
     {# The check itself runs off the request thread; while it is still
        running the block carries a pending marker and settings.js polls
@@ -639,10 +640,12 @@ docker compose up -d</code></pre>
     <pre class="code-snippet"><code>curl -fsSL https://raw.githubusercontent.com/dmellok/tesserae/main/install.sh | bash</code></pre>
     <p class="field-help">Or by hand: <code>git clone https://github.com/dmellok/tesserae.git ~/tesserae</code> &middot; <code>cd ~/tesserae</code> &middot; <code>python -m venv .venv</code> &middot; <code>.venv/bin/pip install -e ".[dev]"</code>. Either way, copy <code>data/</code> across if you want to preserve your existing pages, settings, and history. There's no <code>pip install --upgrade tesserae</code> path, the package isn't on PyPI yet.</p>
     {% endif %}
+    </div>{# /system-updates-body #}
   </section>
   {% else %}
-  <section class="dx-section-card">
-    {{ card_head('Updates', icon_name='arrow-clockwise', blurb='Pull a newer revision of Tesserae from this repo and restart. A pre-update snapshot of data/ is always taken, and a rollback path is always one click away.') }}
+  <section class="dx-section-card" id="system-updates" data-collapsible>
+    {{ card_head('Updates', icon_name='arrow-clockwise', blurb='Pull a newer revision of Tesserae from this repo and restart. A pre-update snapshot of data/ is always taken, and a rollback path is always one click away.', collapse='system-updates') }}
+    <div id="system-updates-body" data-collapsible-body>
 
     {% if system_state %}
     <p>
@@ -698,7 +701,7 @@ docker compose up -d</code></pre>
     {% if system_history %}
     <section class="history-block">
       <div class="history-head">
-        <h4>Recent updates</h4>
+        <h4 class="dx-subhead">Recent updates</h4>
         <form method="post" action="{{ url_for('auth.system_update_rollback') }}" class="inline" data-restart-form data-restart-label="Rolling back" data-restart-confirm="Roll back to {{ system_history[0].from_sha[:7] }} and restore its pre-update data snapshot? The server will restart.">
           <button type="submit" class="button ghost"{% if system_dev_mode %} disabled{% endif %}><i class="ph ph-arrow-u-up-left"></i> Roll back to {{ system_history[0].from_sha[:7] }}</button>
         </form>
@@ -725,11 +728,13 @@ docker compose up -d</code></pre>
     {% if system_dev_mode %}
     <p class="field-help">Update + Rollback are disabled under <code>--dev</code> &mdash; the Flask reloader owns restarts in dev mode.</p>
     {% endif %}
+    </div>{# /system-updates-body #}
   </section>
   {% endif %}
 
-  <section class="dx-section-card">
-    {{ card_head('Authentication', icon_name='lock-key', blurb='Change the admin password or turn off the password gate for a trusted LAN. Public IPs are blocked either way. Locked out? Run tesserae --reset-password on the host.') }}
+  <section class="dx-section-card" id="authentication" data-collapsible>
+    {{ card_head('Authentication', icon_name='lock-key', blurb='Change the admin password or turn off the password gate for a trusted LAN. Public IPs are blocked either way. Locked out? Run tesserae --reset-password on the host.', collapse='authentication') }}
+    <div id="authentication-body" data-collapsible-body>
 
     <p>
       Status:
@@ -791,10 +796,12 @@ docker compose up -d</code></pre>
     <p class="field-help">
       Forgot your password? Run <code>tesserae --reset-password</code> on the host. That clears the stored hash so the next page load drops to <code>/setup</code>.
     </p>
+    </div>{# /authentication-body #}
   </section>
 
-  <section class="dx-section-card">
-    {{ card_head('Backups', icon_name='archive', blurb='Snapshot data/ to a single zip. Gallery photos and the push render cache are skipped (their dot-config still rides along) so backups stay small; restoring leaves your photos and cached renders untouched. Backups still contain real secrets (API tokens, MQTT creds, OAuth), keep them somewhere safe.') }}
+  <section class="dx-section-card" id="backups" data-collapsible>
+    {{ card_head('Backups', icon_name='archive', blurb='Snapshot data/ to a single zip. Gallery photos and the push render cache are skipped (their dot-config still rides along) so backups stay small; restoring leaves your photos and cached renders untouched. Backups still contain real secrets (API tokens, MQTT creds, OAuth), keep them somewhere safe.', collapse='backups') }}
+    <div id="backups-body" data-collapsible-body>
 
     <form method="post" action="{{ url_for('auth.system_backup_create') }}" class="form">
       <div class="field">
@@ -1012,10 +1019,12 @@ docker compose up -d</code></pre>
     {% else %}
     <p class="lede">No backups yet.</p>
     {% endif %}
+    </div>{# /backups-body #}
   </section>
 
-  <section class="dx-section-card">
-    {{ card_head('Webhook', icon_name='webhooks-logo', blurb='POST to /api/v1/push to send a saved dashboard, or /api/v1/push/image to send a single picture, from anything that can fire HTTP: Home Assistant scripts, n8n, GitHub Actions, cron + curl, Shortcuts. The token is the bearer key.') }}
+  <section class="dx-section-card" id="webhook" data-collapsible>
+    {{ card_head('Webhook', icon_name='webhooks-logo', blurb='POST to /api/v1/push to send a saved dashboard, or /api/v1/push/image to send a single picture, from anything that can fire HTTP: Home Assistant scripts, n8n, GitHub Actions, cron + curl, Shortcuts. The token is the bearer key.', collapse='webhook') }}
+    <div id="webhook-body" data-collapsible-body>
 
     <p>
       Status: {% if system_webhook_token_set %}
@@ -1057,6 +1066,7 @@ docker compose up -d</code></pre>
         {% endif %}
       </div>
     </form>
+    </div>{# /webhook-body #}
   </section>
 
 {% if system_webhook_reveal_token %}
@@ -1122,8 +1132,9 @@ docker compose up -d</code></pre>
 </script>
 {% endif %}
 
-  <section class="dx-section-card" id="features">
-    {{ card_head('Features', icon_name='toggle-right', blurb='Optional features, all on by default. Switching one off hides it everywhere, immediately, no restart.') }}
+  <section class="dx-section-card" data-collapsible id="features">
+    {{ card_head('Features', icon_name='toggle-right', blurb='Optional features, all on by default. Switching one off hides it everywhere, immediately, no restart.', collapse='features') }}
+    <div id="features-body" data-collapsible-body>
     {% for exp in system_experiments %}
     <div class="field-row" style="display:flex;align-items:center;gap:12px;justify-content:space-between;padding:10px 0;{% if not loop.last %}border-bottom:1px solid var(--t-border, rgba(0,0,0,.08));{% endif %}">
       <div style="min-width:0">
@@ -1157,10 +1168,12 @@ docker compose up -d</code></pre>
       </form>
     </div>
     {% endfor %}
+    </div>{# /features-body #}
   </section>
 
-  <section class="dx-section-card" id="mcp">
-    {{ card_head('MCP (agent access)', icon_name='robot', blurb='Let an AI agent build freeform (canvas) dashboards for you: it lists your widgets, lays out a canvas, renders a preview to check its work, and pushes to a panel.') }}
+  <section class="dx-section-card" data-collapsible id="mcp">
+    {{ card_head('MCP (agent access)', icon_name='robot', blurb='Let an AI agent build freeform (canvas) dashboards for you: it lists your widgets, lays out a canvas, renders a preview to check its work, and pushes to a panel.', collapse='mcp') }}
+    <div id="mcp-body" data-collapsible-body>
 
     <p>
       Status:
@@ -1253,6 +1266,7 @@ docker compose up -d</code></pre>
       </div>
     </form>
     {% endif %}
+    </div>{# /mcp-body #}
   </section>
 
 {% if system_mcp_reveal_token %}
@@ -1378,8 +1392,9 @@ docker compose up -d</code></pre>
 {% if active_area == 'about' %}
 <div class="settings-stack settings-about">
 
-  <section class="dx-section-card">
-    {{ card_head('Tesserae', icon_name='info') }}
+  <section class="dx-section-card" id="about-project" data-collapsible>
+    {{ card_head('Tesserae', icon_name='info', collapse='about-project') }}
+    <div id="about-project-body" data-collapsible-body>
     <p class="lede">A self-hosted dashboard server. AGPL, no paid tier, no accounts. Contacts api.tesserae.ink only for update checks and anonymous install counts; turn it off under System &rarr; Online features.</p>
     <dl class="meta about-meta">
       <div><dt>Version</dt><dd><code>{{ about_app_version }}</code></dd></div>
@@ -1387,13 +1402,15 @@ docker compose up -d</code></pre>
       <div><dt>Source</dt><dd><a href="https://github.com/dmellok/tesserae" rel="noopener" target="_blank">github.com/dmellok/tesserae</a></dd></div>
       <div><dt>Docs</dt><dd><a href="https://docs.tesserae.ink" rel="noopener" target="_blank">docs.tesserae.ink</a></dd></div>
     </dl>
+    </div>{# /about-project-body #}
   </section>
 
   {# Same three CTAs as the onboarding wrap-up step and the app footer,
      kept in one place so users can find the community wherever they
      look. URLs come from the app-wide context processor. #}
-  <section class="dx-section-card">
-    {{ card_head('Join the community', icon_name='users-three') }}
+  <section class="dx-section-card" id="about-community" data-collapsible>
+    {{ card_head('Join the community', icon_name='users-three', collapse='about-community') }}
+    <div id="about-community-body" data-collapsible-body>
     <p class="lede">Come say hi, share your dashboards, help shape what's next, or support the project. Tesserae is built in spare time; the community is the reason it keeps growing.</p>
     <ul class="community-cta-list">
       <li>
@@ -1418,6 +1435,7 @@ docker compose up -d</code></pre>
         </a>
       </li>
     </ul>
+    </div>{# /about-community-body #}
   </section>
 
 </div>

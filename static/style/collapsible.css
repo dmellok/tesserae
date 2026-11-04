@@ -1,0 +1,59 @@
+/* Collapsible sections (static/collapsible.js, collapsible_toggle macro).
+   The whole header is a click target; the chevron button is the keyboard and
+   screen-reader control. The body is hidden with the attribute and
+   `is-collapsed` styles the header, so nothing animates layout; only the
+   chevron turns (a transform), and not at all under reduced motion. */
+[data-collapsible] { scroll-margin-top: calc(var(--t-topbar-h, 61px) + 16px); }
+[data-collapsible-head]:has([data-collapsible-toggle]) { cursor: pointer; }
+[data-collapsible-body][hidden] { display: none !important; }
+
+button.dx-collapse-toggle {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--t-radius-sm, 8px);
+  background: transparent;
+  color: var(--t-fg-soft);
+  font-size: 16px;
+  box-shadow: none;
+  cursor: pointer;
+  transition: background var(--t-trans-fast, 120ms), color var(--t-trans-fast, 120ms);
+}
+.dx-collapse-toggle .ph { transition: transform 160ms ease; }
+/* The global button rules (forms.css) lift, shadow and outline every button:
+   this one stays flat. */
+[data-collapsible-head]:hover button.dx-collapse-toggle,
+button.dx-collapse-toggle:hover {
+  background: var(--t-surface-soft);
+  border-color: transparent;
+  box-shadow: none;
+  transform: none;
+  color: var(--t-fg);
+}
+button.dx-collapse-toggle:active { transform: none; box-shadow: none; }
+button.dx-collapse-toggle:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; box-shadow: none; }
+.is-collapsed [data-collapsible-head] .dx-collapse-toggle .ph { transform: rotate(-90deg); }
+/* A collapsed section is just its header: no rule or gap under it. */
+.dx-section-card.is-collapsed .dx-section-head {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom-width: 0;
+}
+/* ``card_head`` cards (the .card chrome): the chevron sits last in the action
+   slot, and a collapsed card is just its header. */
+.card-head-action:has(.dx-collapse-toggle) { display: flex; align-items: center; gap: var(--t-space-2, 8px); }
+.is-collapsed > .card-head { margin-bottom: 0; }
+@media (max-width: 540px) {
+  button.dx-collapse-toggle { width: 36px; height: 36px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  button.dx-collapse-toggle,
+  .dx-collapse-toggle .ph { transition: none; }
+}
+@media print {
+  button.dx-collapse-toggle { display: none; }
+}

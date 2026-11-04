@@ -7,7 +7,7 @@
   <h1><i class="ph ph-puzzle-piece"></i> {{ plugin.name }}</h1>
   <p class="lede">This {{ plugin.kind }} is switched off, so its pages are not available.</p>
 </header>
-{% call section_card(icon='prohibit', title='Disabled') %}
+{% call section_card(icon='prohibit', title='Disabled', collapsible=False) %}
   <div class="dx-empty">
     <div class="dx-empty-icon"><i class="ph ph-prohibit" aria-hidden="true"></i></div>
     <p class="dx-empty-title">{{ plugin.name }} is disabled</p>

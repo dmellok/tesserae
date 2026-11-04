@@ -23,7 +23,8 @@
 </nav>
 
 {% call section_card(icon='battery-medium', title='Device batteries',
-                     description='Each card separates active charging from the latest clean drain phase across the selected ' ~ window_days ~ '-day window.') %}
+                     description='Each card separates active charging from the latest clean drain phase across the selected ' ~ window_days ~ '-day window.',
+                     collapsible=False) %}
   {% if not cards %}
   <div class="dx-empty">
     <div class="dx-empty-icon"><i class="ph ph-battery-low" aria-hidden="true"></i></div>

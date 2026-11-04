@@ -29,8 +29,9 @@
   <p class="page-blurb">Calendars that the calendar widgets read from. Add iCal URLs (Google Calendar → Settings → Integrate calendar → Secret address in iCal format; iCloud → Calendar → Share Calendar → Public), Discover a CalDAV server (Baikal / Radicale / Nextcloud / iCloud), or pull calendars straight from Home Assistant below.</p>
 </div>
 
-<section class="card">
-  {{ card_head('Discover a CalDAV server', icon_name='binoculars', level=2) }}
+<section id="cal-discover" data-collapsible class="card">
+  {{ card_head('Discover a CalDAV server', icon_name='binoculars', level=2, collapse='cal-discover') }}
+  <div id="cal-discover-body" data-collapsible-body>
   <p class="field-help" style="margin-top:0">Point this at your calendar-home URL (the folder holding your calendars, e.g. <code>https://baikal.lan/dav.php/calendars/you/</code>) and Tesserae lists the calendars + todo lists it finds, so you can add each in one click. For iCloud, use <code>https://caldav.icloud.com/</code> with your Apple ID and an <a href="https://support.apple.com/en-us/102654" target="_blank" rel="noopener">app-specific password</a> (basic auth). Fetches run server-side, so a LAN-only server works as long as Tesserae can reach it.</p>
   <form method="post" action="{{ url_for('calendar_core_admin.discover') }}" class="form">
     <div class="field">
@@ -43,7 +44,7 @@
 
   {% if discovered %}
   <div class="cf-discovered">
-    <h3 class="cf-sub">Found {{ discovered|length }} collection{{ 's' if discovered|length != 1 }}</h3>
+    <h3 class="cf-sub dx-subhead">Found {{ discovered|length }} collection{{ 's' if discovered|length != 1 }}</h3>
     <ul class="cf-list">
       {% for col in discovered %}
       <li class="cf-row cf-disc-row">
@@ -78,10 +79,12 @@
     </ul>
   </div>
   {% endif %}
+  </div>{# /cal-discover-body #}
 </section>
 
-<section class="card">
-  {{ card_head('Add from Home Assistant', icon_name='house-line', level=2) }}
+<section id="cal-ha" data-collapsible class="card">
+  {{ card_head('Add from Home Assistant', icon_name='house-line', level=2, collapse='cal-ha') }}
+  <div id="cal-ha-body" data-collapsible-body>
   <p class="field-help" style="margin-top:0">Show the calendars Home Assistant knows about (Local Calendar, Google, waste collection, anything with a <code>calendar.*</code> entity) and add each as a feed in one click. Uses the connection from Settings → Widgets → Home Assistant Core; events are fetched through Home Assistant, so no extra URLs or credentials.</p>
   <form method="post" action="{{ url_for('calendar_core_admin.ha_list') }}" class="form">
     <div class="actions">{{ button('List Home Assistant calendars', icon='magnifying-glass') }}</div>
@@ -89,7 +92,7 @@
 
   {% if ha_calendars %}
   <div class="cf-discovered">
-    <h3 class="cf-sub">Found {{ ha_calendars|length }} calendar{{ 's' if ha_calendars|length != 1 }}</h3>
+    <h3 class="cf-sub dx-subhead">Found {{ ha_calendars|length }} calendar{{ 's' if ha_calendars|length != 1 }}</h3>
     <ul class="cf-list">
       {% for cal in ha_calendars %}
       <li class="cf-row cf-disc-row">
@@ -118,10 +121,12 @@
     </ul>
   </div>
   {% endif %}
+  </div>{# /cal-ha-body #}
 </section>
 
-<section class="card">
-  {{ card_head('Add feed', icon_name='plus-circle', level=2) }}
+<section id="cal-add" data-collapsible class="card">
+  {{ card_head('Add feed', icon_name='plus-circle', level=2, collapse='cal-add') }}
+  <div id="cal-add-body" data-collapsible-body>
   <form method="post" action="{{ url_for('calendar_core_admin.create_feed') }}" class="form">
     <div class="field-grid">
       <div class="field" style="flex:1;">
@@ -146,10 +151,12 @@
     {{ auth_fields() }}
     <div class="actions">{{ button('Add feed', icon='plus') }}</div>
   </form>
+  </div>{# /cal-add-body #}
 </section>
 
-<section class="card">
-  {{ card_head('Your feeds', icon_name='list-bullets', level=2) }}
+<section id="cal-feeds" data-collapsible class="card">
+  {{ card_head('Your feeds', icon_name='list-bullets', level=2, collapse='cal-feeds') }}
+  <div id="cal-feeds-body" data-collapsible-body>
   {% if feeds %}
   <ul class="cf-list">
     {% for f in feeds %}
@@ -245,6 +252,7 @@
   {{ empty_state('calendar-blank', 'No feeds yet',
                  blurb='Add one above, or Discover a self-hosted server. Then drop a Calendar, Month / Week / Day widget into a dashboard and pick which feeds it should show.') }}
   {% endif %}
+  </div>{# /cal-feeds-body #}
 </section>
 
 <style>

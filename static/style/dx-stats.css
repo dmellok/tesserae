@@ -242,14 +242,6 @@
   color: var(--t-muted);
 }
 
-.dx-subhead {
-  margin: 18px 0 8px;
-  font-size: 0.82rem;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  color: var(--t-muted);
-}
-
 .dx-chip-list {
   display: flex;
   flex-wrap: wrap;

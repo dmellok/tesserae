@@ -6,18 +6,19 @@
    thing posts to one endpoint (the same one the legacy App card
    uses) so save semantics don't change. #}
 
-{% from "_components.html" import auto_field, info_pop, switch with context %}
+{% from "_components.html" import auto_field, collapsible_toggle, info_pop, switch with context %}
 
 <form method="post" action="{{ app_field_groups[0].endpoint if app_field_groups else '' }}"
       class="form dx-server-form" data-dirty-form>
   <div class="dx-server-cards">
 
     {% for group in app_field_groups %}
-    <section class="dx-section-card"
+    {% set sid = 'server-group-' ~ group.id %}
+    <section class="dx-section-card" id="{{ sid }}" data-collapsible
              data-group="{{ group.id }}"
              {% if group.master_field %}data-dep-group{% endif %}>
 
-      <header class="dx-section-head">
+      <header class="dx-section-head" data-collapsible-head>
         {% if group.icon %}
         <span class="dx-section-icon" aria-hidden="true">
           <i class="ph ph-{{ group.icon }}"></i>
@@ -51,9 +52,10 @@
           </span>
         </label>
         {% endif %}
+        {{ collapsible_toggle(sid, group.title) }}
       </header>
 
-      <div class="dx-section-body" {% if group.master_field %}data-dep-target{% endif %}>
+      <div class="dx-section-body" id="{{ sid }}-body" data-collapsible-body {% if group.master_field %}data-dep-target{% endif %}>
         {% for field in group.fields %}
           {% set value = group.state.get(field.name, field.get('default', '')) %}
           {% set field_id = 'server-' ~ field.name %}

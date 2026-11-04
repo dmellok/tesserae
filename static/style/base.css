@@ -394,6 +394,12 @@ a:hover { color: var(--t-accent-hover); }
    never follows the theme; a dark theme only adds a 1 px light hairline
    inside the tile edge. A server colour (#350) replaces --p-logo-a. */
 
+/* Sub-heading colour: the theme accent, drawn toward the text colour so it keeps
+   4.5:1 contrast at small sizes in every design and theme. */
+:root {
+  --t-subhead: color-mix(in oklab, var(--t-accent) 78%, var(--t-fg));
+}
+
 :root {
   --p-logo-tile: #1C1B19;
   --p-logo-a: #D0493C;
