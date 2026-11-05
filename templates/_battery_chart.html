@@ -26,8 +26,6 @@ Inputs: every macro takes ``card``, the dict returned by
                              ('asleep' = quiet hours, 'offline'); drawn as a
                              hatched band with a dashed connector
   card.samples               sample count in the window
-  card.predictions_apply     False for a Visionect frame: no drain / reaches /
-                             charging tiles and no "need 8 samples" hint
   card.prediction            {slope_per_day, is_charging, ...} or None
 
 Macros:
@@ -45,7 +43,7 @@ Macros:
                              zoom, "Reset zoom" to undo) and its legend; or
                              "No samples in this window."
   battery_stat_tiles(card)   the tile grid: Samples and Wakes / day for every
-                             device, predictions only where they apply (+ the
+                             device, then the predictions (+ the
                              not-enough-samples hint). Use it as a
                              {% call %} block to append the caller's tiles to
                              the same grid (the device page adds Battery).
@@ -151,7 +149,6 @@ static/battery-chart.js (STYLES) and in dx-battery.css (.dx-wake-key).
     <div class="dx-stat-sub dx-battery-wake-sub" title="{{ wk.total }} wake{{ '' if wk.total == 1 else 's' }} in the window: {{ wk.summary_full or wk.summary }}">{{ wk.summary }}</div>
   </div>
   {% endif %}
-  {% if card.predictions_apply %}
   {% if prediction and prediction.is_charging %}
   <div class="dx-stat-tile" data-battery-tile>
     <div class="dx-stat-label">Charging</div>
@@ -220,12 +217,11 @@ static/battery-chart.js (STYLES) and in dx-battery.css (.dx-wake-key).
     <div class="dx-stat-sub">days</div>
   </div>
   {% endif %}
-  {% endif %}
 {%- endmacro -%}
 
 {%- macro battery_hint(card) -%}
-{% if card.predictions_apply and not card.prediction %}
-<p class="dx-battery-hint" data-battery-hint>Need at least 8 samples in this window for a prediction.</p>
+{% if not card.prediction %}
+<p class="dx-battery-hint" data-battery-hint>Need at least 8 samples for a prediction.</p>
 {% endif %}
 {%- endmacro -%}
 
