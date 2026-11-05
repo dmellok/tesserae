@@ -186,6 +186,8 @@ class HeatPumpSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["supports"]["sizes"], ["xs", "sm", "md", "lg"])
         options = {option["name"]: option["default"] for option in manifest["cell_options"]}
         self.assertEqual(options["flow_entity"], "sensor.e3_vitocal_17_vorlauftemperatur")
+        self.assertTrue(options["show_heating"])
+        self.assertTrue(options["show_hot_water"])
         self.assertNotIn("return_entity", options)
         self.assertEqual(options["heating_entity"], "climate.e3_vitocal_17_heizung")
         self.assertEqual(options["hot_water_entity"], "water_heater.e3_vitocal_17_warmwasser")
@@ -217,6 +219,10 @@ class HeatPumpSmokeTests(unittest.TestCase):
         )
         self.assertIn(".hp-sm .hp-readings { grid-auto-rows: max-content; }", client)
         self.assertIn(".hp-sm .hp-reading { min-height: max-content; }", client)
+        self.assertIn(
+            ".hp-sm .hp-reading-value, .hp-md .hp-reading-value { width: 100%; text-align: right; }",
+            client,
+        )
         self.assertIn('size === "xs" ? t("water", "Water")', client)
         self.assertIn(".hp-xs .hp-readings { grid-template-columns: minmax(0, 1fr);", client)
         self.assertIn(
@@ -241,6 +247,10 @@ class HeatPumpSmokeTests(unittest.TestCase):
         self.assertIn('modeIndicator(heatingMode.mode, t("heating_mode"', client)
         self.assertIn('modeIndicator(hotWaterMode.mode, t("hot_water_mode"', client)
         self.assertIn("status-grid hp-readings", client)
+        self.assertIn("options.show_heating !== false", client)
+        self.assertIn("options.show_hot_water !== false", client)
+        self.assertIn(".hp-readings--single .hp-reading--full { grid-column: 1 / -1; }", client)
+        self.assertIn('singleReading ? "hp-reading--full" : ""', client)
         self.assertIn(".hp-lg .hp-current-power { display: flex; }", client)
         self.assertIn(".hp-lg .hp-energy-details", client)
         self.assertIn('role="meter" aria-label="${escapeHtml(label)}"', client)

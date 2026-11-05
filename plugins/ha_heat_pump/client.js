@@ -107,6 +107,10 @@ export default function render(shadow, ctx) {
   const hotWater = data.hot_water_temperature || {};
   const heatingMode = data.heating_mode || {};
   const hotWaterMode = data.hot_water_mode || {};
+  const options = ctx?.cell?.options || {};
+  const showHeating = options.show_heating !== false && options.show_heating !== "false";
+  const showHotWater = options.show_hot_water !== false && options.show_hot_water !== "false";
+  const singleReading = showHeating !== showHotWater;
   const power = data.power || {};
   const overallSpf = data.overall_spf || {};
   const energy = data.energy || {};
@@ -135,6 +139,38 @@ export default function render(shadow, ctx) {
     ? energyItems.map(({ label, current, yesterday, index }) =>
       energyReading(label, current, yesterday, index, t)).join("")
     : `<p class="u-muted hp-no-energy">${escapeHtml(t("no_energy_data", "Configure daily energy sensors to see details."))}</p>`;
+  const readings = [];
+  if (showHeating) {
+    readings.push(`
+      <div class="hp-reading hp-reading--heating status-cell ${singleReading ? "hp-reading--full" : ""}">
+        <div class="hp-reading-top">
+          <div class="hp-reading-caption">
+            <i class="ph-bold ph-thermometer-simple hp-reading-icon" aria-hidden="true"></i>
+            <span class="hp-reading-label">${escapeHtml(t("heating_temperature", "Heating"))}</span>
+            ${modeIndicator(heatingMode.mode, t("heating_mode", "Heating mode"), t)}
+          </div>
+          <strong class="hp-reading-value">${formatReading(heating, "°C")}</strong>
+        </div>
+        ${size === "lg" ? temperatureGauge(heating, t("heating_temperature", "Heating"), "--accent-1") : ""}
+      </div>`);
+  }
+  if (showHotWater) {
+    readings.push(`
+      <div class="hp-reading hp-reading--water status-cell ${singleReading ? "hp-reading--full" : ""}">
+        <div class="hp-reading-top">
+          <div class="hp-reading-caption">
+            <i class="ph-bold ph-drop hp-reading-icon" aria-hidden="true"></i>
+            <span class="hp-reading-label">${escapeHtml(size === "xs" ? t("water", "Water") : t("hot_water_temperature", "Hot water"))}</span>
+            ${modeIndicator(hotWaterMode.mode, t("hot_water_mode", "Hot-water mode"), t)}
+          </div>
+          <strong class="hp-reading-value">${formatReading(hotWater, "°C")}</strong>
+        </div>
+        ${size === "lg" ? temperatureGauge(hotWater, t("hot_water_temperature", "Hot water"), "--accent-2") : ""}
+      </div>`);
+  }
+  const readingsMarkup = readings.length
+    ? `<div class="status-grid hp-readings ${singleReading ? "hp-readings--single" : ""}">${readings.join("")}</div>`
+    : "";
 
   const layout = `
     .hp { container: heat-pump / size; color: var(--text-primary); }
@@ -161,6 +197,7 @@ export default function render(shadow, ctx) {
     .hp-hero-label { color: var(--text-muted); font-size: var(--fs-label); font-weight: var(--fw-bold); }
     .hp-state { overflow: visible; font-size: var(--fs-jumbo); font-weight: var(--fw-black); line-height: var(--lh-tight); white-space: nowrap; }
     .hp-readings { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+    .hp-readings--single .hp-reading--full { grid-column: 1 / -1; }
     .hp-reading {
       display: flex;
       min-width: 0;
@@ -216,7 +253,7 @@ export default function render(shadow, ctx) {
     .hp-sm .hp-readings { grid-auto-rows: max-content; }
     .hp-sm .hp-reading { min-height: max-content; }
     .hp-sm .hp-reading-top { align-items: flex-start; flex-direction: column; gap: 0; }
-    .hp-sm .hp-reading-value { text-align: left; }
+    .hp-sm .hp-reading-value, .hp-md .hp-reading-value { width: 100%; text-align: right; }
     .hp-lg .hp-current-power { display: flex; }
     .hp-lg .hp-energy-details { display: grid; }
     .hp-lg .hp-daily-total { display: none; }
@@ -230,7 +267,7 @@ export default function render(shadow, ctx) {
     .hp-md .hp-reading-top { align-items: flex-start; flex-direction: column; }
     .hp-md .hp-reading-caption { gap: var(--space-1); }
     .hp-md .hp-reading-mode { display: none; }
-    .hp-md .hp-reading-value { flex: 0 0 auto; text-align: left; }
+    .hp-md .hp-reading-value { flex: 0 0 auto; }
     .hp-lg .hp-reading-mode {
       display: inline-flex;
       width: auto;
@@ -276,30 +313,7 @@ export default function render(shadow, ctx) {
             <strong class="hp-hero-spf-value">${formatReading(overallSpf)}</strong>
           </div>
         </div>
-        <div class="status-grid hp-readings">
-          <div class="hp-reading hp-reading--heating status-cell">
-            <div class="hp-reading-top">
-              <div class="hp-reading-caption">
-                <i class="ph-bold ph-thermometer-simple hp-reading-icon" aria-hidden="true"></i>
-                <span class="hp-reading-label">${escapeHtml(t("heating_temperature", "Heating"))}</span>
-                ${modeIndicator(heatingMode.mode, t("heating_mode", "Heating mode"), t)}
-              </div>
-              <strong class="hp-reading-value">${formatReading(heating, "°C")}</strong>
-            </div>
-            ${size === "lg" ? temperatureGauge(heating, t("heating_temperature", "Heating"), "--accent-1") : ""}
-          </div>
-          <div class="hp-reading hp-reading--water status-cell">
-            <div class="hp-reading-top">
-              <div class="hp-reading-caption">
-                <i class="ph-bold ph-drop hp-reading-icon" aria-hidden="true"></i>
-                <span class="hp-reading-label">${escapeHtml(size === "xs" ? t("water", "Water") : t("hot_water_temperature", "Hot water"))}</span>
-                ${modeIndicator(hotWaterMode.mode, t("hot_water_mode", "Hot-water mode"), t)}
-              </div>
-              <strong class="hp-reading-value">${formatReading(hotWater, "°C")}</strong>
-            </div>
-            ${size === "lg" ? temperatureGauge(hotWater, t("hot_water_temperature", "Hot water"), "--accent-2") : ""}
-          </div>
-        </div>
+        ${readingsMarkup}
         ${power.value != null ? `
           <div class="hp-current-power">
             <i class="ph-bold ph-lightning" aria-hidden="true"></i>

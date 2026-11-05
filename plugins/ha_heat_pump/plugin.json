@@ -26,11 +26,23 @@
       "choices_from": "sensor"
     },
     {
+      "name": "show_heating",
+      "type": "boolean",
+      "label": "Show heating panel",
+      "default": true
+    },
+    {
       "name": "hot_water_temperature_entity",
       "type": "select",
       "label": "Hot-water temperature",
       "default": "sensor.e3_vitocal_17_ww_speichertemperatur",
       "choices_from": "sensor"
+    },
+    {
+      "name": "show_hot_water",
+      "type": "boolean",
+      "label": "Show hot-water panel",
+      "default": true
     },
     {
       "name": "power_entity",
