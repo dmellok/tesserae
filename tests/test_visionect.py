@@ -2335,6 +2335,55 @@ def test_a_write_the_frame_doesnt_answer_is_never_saved_to_flash(
         h.svc.stop()
 
 
+def test_a_write_the_frame_doesnt_answer_isnt_resent_on_each_connection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(visionect, "PARAM_WAIT_S", 0.3)
+    h = Harness(tmp_path, uuid=UUID)
+    h.settings.sections["devices"]["lobby"].update(heartbeat_min="5")
+
+    def writes(sign: FakeSign) -> list[Any]:
+        return [
+            item
+            for packet in _params(sign)
+            for item in packet
+            if item[0] == visionect.PARAM_HEARTBEAT and item[2]
+        ]
+
+    try:
+        assert h.svc.start()
+        first = FakeSign(h.svc.port)
+        try:
+            first.status()
+            assert first.wait_for(lambda s: len(_params(s)) == 1)
+            _answer(first, BASE)
+            assert first.wait_for(lambda s: writes(s))
+            assert _wait(
+                lambda: "didn't answer" in (h.svc.sign_view(UUID) or {}).get("param_error", "")
+            )
+        finally:
+            first.close()
+        # It reconnects: what it holds is read again, and the write stays back.
+        again = FakeSign(h.svc.port)
+        try:
+            again.status()
+            assert again.wait_for(lambda s: len(_params(s)) == 1)
+            _answer(again, BASE)
+            again.wait_for(lambda s: bool(writes(s)), timeout=1.0)
+            assert not writes(again)
+            assert _wait(
+                lambda: "may not have taken" in (h.svc.sign_view(UUID) or {}).get("param_error", "")
+            )
+            # A different value is a new request, so it goes out.
+            h.settings.sections["devices"]["lobby"].update(heartbeat_min="7")
+            h.push()
+            assert again.wait_for(lambda s: bool(writes(s)), timeout=3.0)
+        finally:
+            again.close()
+    finally:
+        h.svc.stop()
+
+
 def test_a_flash_save_with_no_answer_still_reads_back(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

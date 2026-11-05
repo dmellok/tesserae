@@ -713,6 +713,10 @@ class _Sign:
     network: dict[int, str] = field(default_factory=dict)
     stuck_warned: bool = False
     param_out: str = ""
+    param_out_values: dict[int, Any] = field(default_factory=dict)  # the write that is out
+    # Writes the frame never answered, as id -> (value, when). Kept across its
+    # connections, so a frame that reconnects often isn't sent them each time.
+    unanswered: dict[int, tuple[Any, float]] = field(default_factory=dict)
     settings_read_at: float = 0.0
     # Wall clock times of the sign's recent statuses, newest last. The gap
     # between them is its real check-in cadence, which the configured interval
@@ -1646,6 +1650,12 @@ class VisionectService:
                 sign.param_queue.clear()
                 sign.param_error = "The frame didn't answer a settings request; Tesserae stopped."
                 logger.warning("visionect: sign %s didn't answer %s", sign.uuid, sign.param_out)
+            if sign.param_out == "write":
+                # Whether it took them is unknown: read them next time it connects,
+                # and don't send them again meanwhile.
+                now = time.time()
+                sign.unanswered.update({pid: (v, now) for pid, v in sign.param_out_values.items()})
+                sign.settings_read_at = 0.0
             sign.param_out = ""
         if not sign.param_queue:
             return False
@@ -1666,6 +1676,7 @@ class VisionectService:
             logger.warning("visionect: settings for %s failed: %s", sign.uuid, exc)
             return False
         sign.param_out = kind
+        sign.param_out_values = dict(value) if kind == "write" else {}
         self._await_params(sign)
         await self._write(conn, writer)
         return True
@@ -1695,6 +1706,14 @@ class VisionectService:
                 continue
             if pid in WRITE_ONLY and sign.known_written.get(pid) == v:
                 continue  # can't be read back: written once, not on every connection
+            tried = sign.unanswered.get(pid)
+            if tried and tried[0] == v and time.time() - tried[1] < SETTINGS_REREAD_S:
+                sign.param_error = (
+                    f"The frame didn't answer when Tesserae set "
+                    f"{PARAM_NAMES.get(pid, f'setting {pid}')}, so it may not have taken it. "
+                    "Tesserae tries again in a few hours, or when you change it."
+                )
+                continue
             change.append((pid, v))
         # A (setting, value) pair goes out once per connection, so a stale
         # value still showing while a read back is in flight isn't rewritten.
@@ -1764,6 +1783,9 @@ class VisionectService:
                     # 0 and 2 both sleep; only 1 keeps the CPU awake.
                     sign.known_sleep_disabled = sign.params[pid] == 1
             sign.known_params[pid] = sign.params[pid]
+            # It holds what an unanswered write asked for: that write did take.
+            if sign.unanswered.get(pid, (None,))[0] == sign.params[pid]:
+                del sign.unanswered[pid]
 
     def request_action(self, device_id: str, action: str) -> str | None:
         """Ask the device's sign, from a request thread, to report its status
