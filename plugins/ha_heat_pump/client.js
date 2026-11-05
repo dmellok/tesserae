@@ -226,7 +226,7 @@ export default function render(shadow, ctx) {
       border-radius: var(--radius-1);
     }
     .hp-reading--heating { background: var(--accent-1-soft); }
-    .hp-reading--water { background: var(--accent-2-soft); }
+    .hp-reading--water { background: var(--accent-4-soft); }
     .hp-reading-top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); min-width: 0; }
     .hp-reading-lockup { display: flex; min-width: 0; flex-direction: column; gap: var(--space-1); }
     .hp-reading-caption { display: flex; min-width: 0; flex-direction: row; align-items: center; gap: var(--space-1); }
@@ -237,7 +237,7 @@ export default function render(shadow, ctx) {
     .hp-reading-label, .hp-energy-label { color: var(--text-muted); font-size: var(--fs-label); font-weight: var(--fw-bold); }
     .hp-reading-value { overflow: hidden; color: var(--text-primary); font-size: clamp(var(--fs-lead), 5cqw, var(--fs-display)); font-weight: var(--fw-black); line-height: var(--lh-tight); text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
     .hp-temperature-gauge { display: none; flex-direction: column; gap: var(--space-1); width: 100%; }
-    .hp-temperature-track { height: var(--space-2); overflow: hidden; border-radius: var(--pill-radius, var(--radius-1)); background: var(--surface-sunken); }
+    .hp-temperature-track { height: var(--space-2); overflow: hidden; border-radius: var(--radius-1); background: var(--surface-sunken); }
     .hp-temperature-fill { display: block; height: 100%; border-radius: inherit; }
     .hp-temperature-scale { display: flex; justify-content: space-between; color: var(--text-muted); font-size: var(--fs-caption); font-weight: var(--fw-bold); font-variant-numeric: tabular-nums; }
     .hp-current-power { display: none; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-radius: var(--radius-1); background: var(--accent-3-soft); }
@@ -248,9 +248,9 @@ export default function render(shadow, ctx) {
     .hp-daily-total { display: none; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-radius: var(--radius-1); background: var(--surface-sunken); }
     .hp-daily-total-value { color: var(--text-primary); font-size: var(--fs-lead); font-weight: var(--fw-black); font-variant-numeric: tabular-nums; }
     .hp-energy-card { display: flex; min-width: 0; flex-direction: column; gap: var(--space-2); padding: var(--space-3); border-radius: var(--radius-1); }
-    .hp-energy-total { background: var(--accent-1-soft); }
-    .hp-energy-heating { background: var(--accent-2-soft); }
-    .hp-energy-water { background: var(--accent-3-soft); }
+    .hp-energy-total { background: var(--accent-3-soft); }
+    .hp-energy-heating { background: var(--accent-1-soft); }
+    .hp-energy-water { background: var(--accent-4-soft); }
     .hp-energy-card strong { color: var(--text-primary); font-size: var(--fs-lead); font-weight: var(--fw-black); font-variant-numeric: tabular-nums; }
     .hp-yesterday { color: var(--text-muted); font-size: var(--fs-caption); font-weight: var(--fw-bold); font-variant-numeric: tabular-nums; }
     .hp-no-energy { grid-column: 1 / -1; margin: 0; }

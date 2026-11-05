@@ -296,6 +296,10 @@ class HeatPumpSmokeTests(unittest.TestCase):
         self.assertIn(".hp-lg .hp-energy-details", client)
         self.assertIn('role="meter" aria-label="${escapeHtml(label)}"', client)
         self.assertIn(".hp-lg .hp-temperature-gauge { display: flex; }", client)
+        self.assertIn(
+            ".hp-temperature-track { height: var(--space-2); overflow: hidden; border-radius: var(--radius-1);",
+            client,
+        )
         self.assertIn('size === "lg" || (fragment === "heating" && showTemperatureGauge)', client)
         self.assertIn('size === "lg" || (fragment === "hot_water" && showTemperatureGauge)', client)
         self.assertIn("const max = fahrenheit ? 176 : 80;", client)
