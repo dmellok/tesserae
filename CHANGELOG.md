@@ -8,6 +8,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Device page: summary tiles and the next picture in the left column, a Lineups link, accent group titles, Troubleshooting's buttons at its foot, and devices listed under Settings in the sidebar.
 - GPT Image from words alone (`gpt_image_t2i`) for a widget that puts a
   picture's whole layout in its prompt, such as a card with its own type,
   where a reference picture would pull the composition towards itself. It

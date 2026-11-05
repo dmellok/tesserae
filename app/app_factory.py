@@ -113,6 +113,19 @@ def _collect_discovered(app: Flask) -> list[dict[str, Any]]:
         return []
 
 
+def _collect_nav_devices(app: Flask) -> list[dict[str, str]]:
+    """Registered device instances as ``{id, name}``, sorted by name."""
+
+    registry = app.config.get("DEVICE_REGISTRY")
+
+    if registry is None:
+        return []
+
+    found = [{"id": d.id, "name": d.display_name} for d in registry.all() if d.kind_of is not None]
+
+    return sorted(found, key=lambda d: d["name"].lower())
+
+
 def _collect_battery_status(app: Flask) -> list[dict[str, Any]]:
     """Snapshot of every registered device instance that reported a
     battery_pct in its last heartbeat. Returns a list of ``{id, name,
@@ -1479,6 +1492,7 @@ def create_app(
                 "online_features_unanswered": False,
                 "nav_admin_plugins": [],
                 "nav_batteries": [],
+                "nav_devices": [],
                 "nav_discovered": [],
                 "app_settings": app_settings,
                 "server_identity": server_identity.resolve(app_settings),
@@ -1509,6 +1523,9 @@ def create_app(
                 key=lambda p: p.name.lower(),
             ),
             "nav_batteries": _collect_battery_status(app),
+            # Every device instance by name: Settings > Devices lists them in
+            # the sidebar for quick switching.
+            "nav_devices": _collect_nav_devices(app),
             # Heard-but-unregistered devices; lights the topbar chip that
             # links to the Devices tab with the register rows opened.
             "nav_discovered": _collect_discovered(app),

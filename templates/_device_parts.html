@@ -38,7 +38,8 @@
 <div class="dx-live" data-render-sync="tiles:{{ section.get('device_id') }}">
 {{ stat_tile('Showing', section.overview.showing, (base ~ '#lineups') if base is not none else '', "Open this display's lineups") }}
 {{ stat_tile('Battery', section.overview.battery, (base ~ '#power') if base is not none and section.battery_offset_endpoint else '', 'Open power settings') }}
-{{ stat_tile('Firmware', section.overview.firmware, (base ~ '#connection') if base is not none else '', 'Open firmware and connection details') }}
+{%- set _fw_update = (section.status.firmware or {}).state == 'outdated' and (section.status.firmware or {}).latest %}
+{{ stat_tile('Firmware', section.overview.firmware, url_for('auth.firmware_index') if _fw_update else ((base ~ '#connection') if base is not none else ''), 'Open the Firmware page' if _fw_update else 'Open firmware and connection details') }}
 {{ stat_tile('Next update', section.overview.next_wake, (base ~ '#timing') if base is not none else '', 'Open wake timing') }}
 {%- if section.overview.queued %}
 <p class="dx-queued{% if section.overview.queued.live %} is-live{% endif %}" role="status" data-device-queued>
@@ -249,28 +250,44 @@
 {%- macro rail_now(section) -%}
 {%- set ov = section.overview -%}
 {%- set nl = section.now_line -%}
-<a class="dx-now" href="#lineups" title="Open this display's lineups" data-render-sync="thumb:{{ section.get('device_id') }}" data-render-sig="{{ ov.sync_sig }}">
-  <span {{ color_attrs(section.get("device_id")) }} class="dx-thumb dx-now-thumb{% if section.panel and section.panel.h and section.panel.w and section.panel.h > section.panel.w %} dx-thumb--portrait{% endif %}"{% if section.panel and section.panel.w and section.panel.h %} style="--thumb-ar: {{ section.panel.w }} / {{ section.panel.h }}"{% endif %}>
-    {%- if ov.has_render %}
-    <img src="{{ ov.thumb_url }}" alt="{{ 'Last image ' ~ ov.get('taken_verb', 'fetched') ~ ' by' if ov.queued and not ov.queued_is_only_thumb else 'Latest render on' }} {{ section.device_name }}" loading="lazy"{% if ov.preview_is_artifact|default(false) %} data-device-quantised{% endif %}>
-    {%- else %}
-    <span class="dx-thumb-empty"><i class="ph ph-image" aria-hidden="true"></i><span>No render yet</span></span>
-    {%- endif %}
+<div class="dx-now" data-render-sync="thumb:{{ section.get('device_id') }}" data-render-sig="{{ ov.sync_sig }}">
+  <div class="dx-now-media">
+    <a class="dx-now-link" href="#lineups" title="Open this display's lineups">
+    <span {{ color_attrs(section.get("device_id")) }} class="dx-thumb dx-now-thumb{% if section.panel and section.panel.h and section.panel.w and section.panel.h > section.panel.w %} dx-thumb--portrait{% endif %}"{% if section.panel and section.panel.w and section.panel.h %} style="--thumb-ar: {{ section.panel.w }} / {{ section.panel.h }}"{% endif %}>
+      {%- if ov.has_render %}
+      <img src="{{ ov.thumb_url }}" alt="{{ 'Last image ' ~ ov.get('taken_verb', 'fetched') ~ ' by' if ov.queued and not ov.queued_is_only_thumb else 'Latest render on' }} {{ section.device_name }}" loading="lazy"{% if ov.preview_is_artifact|default(false) %} data-device-quantised{% endif %}>
+      {%- else %}
+      <span class="dx-thumb-empty"><i class="ph ph-image" aria-hidden="true"></i><span>No render yet</span></span>
+      {%- endif %}
+      {%- if ov.queued_is_only_thumb %}
+      <span class="dx-q-badge" data-device-queued-thumb title="Queued, not {{ ov.get('taken_verb', 'fetched') }} yet"><i class="ph ph-clock-countdown" aria-hidden="true"></i>Queued</span>
+      {%- endif %}
+    </span>
+    </a>
     {%- if ov.queued_thumb_url %}
-    <span class="dx-q-badge" data-device-queued-thumb data-queued-src="{{ ov.queued_thumb_url }}" title="A newer picture is queued: {{ ov.queued.text if ov.queued else 'it goes out at the next check-in' }}"><i class="ph ph-clock-countdown" aria-hidden="true"></i>Queued</span>
-    {%- elif ov.queued_is_only_thumb %}
-    <span class="dx-q-badge" data-device-queued-thumb title="Queued, not {{ ov.get('taken_verb', 'fetched') }} yet"><i class="ph ph-clock-countdown" aria-hidden="true"></i>Queued</span>
+    <div class="dx-next" data-device-queued-thumb title="{{ ov.queued.text if ov.queued else 'It goes out at the next check-in' }}">
+      <span {{ color_attrs(section.get("device_id")) }} class="dx-next-thumb"{% if section.panel and section.panel.w and section.panel.h %} style="--thumb-ar: {{ section.panel.w }} / {{ section.panel.h }}"{% endif %}><img src="{{ ov.queued_thumb_url }}" alt="Queued image for {{ section.device_name }}" loading="lazy"></span>
+      <span class="dx-next-tag is-queued"><i class="ph ph-clock-countdown" aria-hidden="true"></i>Queued</span>
+      <span class="dx-help">Goes out at the next update</span>
+    </div>
+    {%- elif nl and nl.next_thumb %}
+    <a class="dx-next" href="{{ nl.next_url }}" title="Next up: {{ nl.next_name }}{% if nl.next_when %}, {{ nl.next_when }}{% endif %}">
+      <span {{ color_attrs(section.get("device_id")) }} class="dx-next-thumb"{% if section.panel and section.panel.w and section.panel.h %} style="--thumb-ar: {{ section.panel.w }} / {{ section.panel.h }}"{% endif %}><img src="{{ nl.next_thumb }}" alt="Next up on {{ section.device_name }}: {{ nl.next_name }}" loading="lazy"></span>
+      <span class="dx-next-tag">Next</span>
+      <span class="dx-help">{{ nl.next_name }}{% if nl.next_when %}<br>{{ nl.next_when }}{% endif %}</span>
+    </a>
     {%- endif %}
-  </span>
-  <span class="dx-now-text">
+  </div>
+  <div class="dx-now-text">
     <span class="dx-eyebrow">Showing</span>
     <span class="dx-now-name{% if ov.showing.muted %} is-muted{% endif %}">{{ ov.showing.value }}</span>
     {%- if nl and nl.state == 'running' %}
     <span class="dx-help">{{ nl.name }}{% if nl.meta %} · {{ nl.meta }}{% endif %}</span>
     {%- endif %}
     {%- if ov.showing.sub %}<span class="dx-help">{{ ov.showing.sub }}</span>{% endif %}
-  </span>
-</a>
+    <a class="dx-link-btn dx-now-lineups" href="{{ nl.url if nl else url_for('decks.index') }}" title="Open this display on the Lineups page"><span>Lineups</span><i class="ph ph-arrow-right" aria-hidden="true"></i></a>
+  </div>
+</div>
 {%- endmacro -%}
 
 {#- The five vital signs, each a link to the settings behind it. The
@@ -290,7 +307,7 @@
   <li><a class="dx-vital" href="{{ '#power' if section.battery_offset_endpoint else '#connection' }}"{% if bat_tip %} title="{{ bat_tip }}"{% endif %}>
     <span class="dx-vital-k">Battery</span>
     <span class="dx-vital-v{% if ov.battery.low %} is-warn{% endif %}{% if ov.battery.muted %} is-muted{% endif %}">{{ ov.battery.value }}</span>
-    {%- if bat_tip %}<span class="sr-only">, {{ bat_tip }}</span>{% endif %}</a></li>
+    <span class="dx-vital-s">{{ bat_tip }}</span></a></li>
   {%- set nu_parts = [] %}
   {%- if ov.next_wake.sub %}{% set _ = nu_parts.append(ov.next_wake.sub) %}{% endif %}
   {%- if ss.next_update %}{% set _ = nu_parts.append(ss.next_update.text_display) %}{% endif %}
@@ -306,24 +323,33 @@
   <li><a class="dx-vital" href="#timing"{% if nu_tip %} title="{{ nu_tip }}"{% endif %} data-next-update>
     <span class="dx-vital-k">Next update</span>
     <span class="dx-vital-v{% if ov.next_wake.muted %} is-muted{% endif %}">{{ ov.next_wake.value }}</span>
-    {%- if nu_tip %}<span class="sr-only">, {{ nu_tip }}</span>{% endif %}</a></li>
+    <span class="dx-vital-s">{{ ov.next_wake.sub or '' }}</span></a></li>
+  {%- set fw_update = fw.state == 'outdated' and fw.latest %}
+  <li><a class="dx-vital" href="{{ url_for('auth.firmware_index') if fw_update else '#connection' }}"{% if ov.firmware.sub %} title="{{ ov.firmware.sub }}"{% endif %}>
+    <span class="dx-vital-k">Firmware</span>
+    <span class="dx-vital-v{% if ov.firmware.muted %} is-muted{% endif %}">{{ ov.firmware.value }}</span>
+    <span class="dx-vital-s">
+      {%- if fw_update %}<span class="tg tg--warn dx-v-badge">update</span>{% endif %}
+      {%- if ov.firmware.sub %} {{ ov.firmware.sub }}{% endif %}</span></a></li>
   {%- if tiles.signal %}
   {%- set sig_tip = tiles.signal.sub ~ ((' on ' ~ vs.sign.wifi) if vs and vs.sign and vs.sign.wifi else '') %}
   <li><a class="dx-vital" href="#connection" title="{{ sig_tip }}">
     <span class="dx-vital-k">Signal</span>
     <span class="dx-vital-v"><span class="dx-bars" aria-hidden="true">{% for n in [1, 2, 3, 4] %}<span class="dx-bar{% if n <= tiles.signal.bars %} is-on{% endif %}"></span>{% endfor %}</span>{{ tiles.signal.label }}</span>
-    <span class="sr-only">, {{ sig_tip }}</span></a></li>
+    <span class="dx-vital-s">{{ sig_tip }}</span></a></li>
   {%- endif %}
-  <li><a class="dx-vital" href="#connection"{% if ov.firmware.sub %} title="{{ ov.firmware.sub }}"{% endif %}>
-    <span class="dx-vital-k">Firmware</span>
-    <span class="dx-vital-v{% if ov.firmware.muted %} is-muted{% endif %}">{{ ov.firmware.value }}
-      {%- if fw.state == 'outdated' and fw.latest %}<span class="tg tg--warn dx-v-badge">update</span>{% endif %}</span>
-    {%- if ov.firmware.sub %}<span class="sr-only">, {{ ov.firmware.sub }}</span>{% endif %}</a></li>
+  {%- if tiles.environment %}
+  <li><a class="dx-vital" href="#connection">
+    <span class="dx-vital-k">Environment</span>
+    <span class="dx-vital-v">{{ tiles.environment.value }}</span>
+    <span class="dx-vital-s">{{ tiles.environment.sub or 'at the display' }}</span></a></li>
+  {%- endif %}
   {%- set h = st.health %}
-  <li><a class="dx-vital" href="#connection" title="{% if h == 'ok' %}Online{% elif h == 'warn' %}Quiet{% elif h == 'stale' %}Stale{% else %}No heartbeat yet{% endif %}">
+  {%- set h_text = 'Online' if h == 'ok' else ('Quiet' if h == 'warn' else ('Stale' if h == 'stale' else 'No heartbeat yet')) %}
+  <li><a class="dx-vital" href="#connection" title="{{ h_text }}">
     <span class="dx-vital-k">Checked in</span>
     <span class="dx-vital-v dx-devstatus is-{{ h }}"><span class="dx-dot is-{{ h }}" aria-hidden="true"></span>{% if h in ('ok', 'warn', 'stale') %}{{ st.relative }}{% else %}Never{% endif %}</span>
-    <span class="sr-only">, {% if h == 'ok' %}online{% elif h == 'warn' %}quiet{% elif h == 'stale' %}stale{% else %}no heartbeat yet{% endif %}</span></a></li>
+    <span class="dx-vital-s">{{ h_text }}</span></a></li>
 </ul>
 {%- endmacro -%}
 
