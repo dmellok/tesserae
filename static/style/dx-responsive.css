@@ -18,7 +18,9 @@
    the implicit ``min-content`` floor a flex item picks up from
    its contents (long ip addresses, placeholder text, etc.). */
 @media (max-width: 640px) {
-  input, select, textarea {
+  input,
+  select,
+  textarea {
     max-width: 100%;
     min-width: 0;
   }
@@ -36,7 +38,9 @@
   .dx-section-head {
     flex-wrap: wrap;
   }
-  .dx-section-head .dx-section-meta { margin-top: 6px; }
+  .dx-section-head .dx-section-meta {
+    margin-top: 6px;
+  }
 
   /* Field grids collapse to a single column. Pages already
      declare their own breakpoints, but the page-default
@@ -144,7 +148,14 @@
     flex-direction: column;
     align-items: stretch;
   }
-  .dx-pair-input { flex: 1 1 100%; }
-  .dx-pair-action { width: 100%; }
-  .dx-pair-action .dx-btn-primary { width: 100%; justify-content: center; }
+  .dx-pair-input {
+    flex: 1 1 100%;
+  }
+  .dx-pair-action {
+    width: 100%;
+  }
+  .dx-pair-action .dx-btn-primary {
+    width: 100%;
+    justify-content: center;
+  }
 }

@@ -70,7 +70,9 @@
   /* On narrow viewports the absolute pin would overlap the
      title; flow it back into the header layout and let it wrap
      to its own line below the title block. */
-  .dx-rotation-head { padding-right: 0; }
+  .dx-rotation-head {
+    padding-right: 0;
+  }
   .dx-rotation-status {
     position: static;
     width: 100%;
@@ -188,7 +190,9 @@
   align-items: center;
   gap: 4px;
 }
-.dx-rotation-stepwarn .ph { font-size: 13px; }
+.dx-rotation-stepwarn .ph {
+  font-size: 13px;
+}
 
 /* ACTIONS ROW: Disable / Fire now / Edit / Delete. The trash
    button is icon-only so it doesn't crowd the row at narrow
@@ -318,7 +322,10 @@ hr.dx-divider {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+  transition:
+    border-color 120ms ease,
+    color 120ms ease,
+    background 120ms ease;
 }
 .dx-rot-add-step:hover {
   border-color: var(--t-accent);

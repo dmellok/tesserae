@@ -36,8 +36,12 @@
 /* Solid fallback when the browser can't blur so the topbar never reads
    as washed-out. */
 @supports not (backdrop-filter: blur(1px)) {
-  .topbar { background: var(--t-surface); }
-  .topbar::before { display: none; }
+  .topbar {
+    background: var(--t-surface);
+  }
+  .topbar::before {
+    display: none;
+  }
 }
 
 .brand {
@@ -51,8 +55,12 @@
   font-size: var(--t-size-lg);
   transition: color var(--t-trans-fast);
 }
-.brand:hover { color: var(--t-accent); }
-.brand:hover .brand-mark { transform: rotate(8deg) scale(1.06); }
+.brand:hover {
+  color: var(--t-accent);
+}
+.brand:hover .brand-mark {
+  transform: rotate(8deg) scale(1.06);
+}
 
 /* The server mark (templates/_brand_mark.html), the same inline SVG in
    both designs; its colours are the --p-logo-* tokens in base.css. */
@@ -63,14 +71,22 @@
   height: 28px;
   transition: transform 220ms var(--t-ease-spring);
 }
-.brand-mark svg { width: 100%; height: 100%; display: block; }
+.brand-mark svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
 
 /* The self-hosted lockup: "Tesserae" in Inter 700 at -0.02em, then the
    SERVER tag, uppercase Inter 700 at 0.12em in an ink pill with paper
    text (light pill, ink text in the dark theme). The brand sheet sets the
    tag at ~0.35x the wordmark; at nav sizes that would be ~6px, so it
    holds a 9px floor and keeps the sheet's pill proportions. */
-.brand-name { display: inline-flex; align-items: center; font-size: var(--t-size-lg); }
+.brand-name {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--t-size-lg);
+}
 .brand-word {
   display: inline-flex;
   align-items: center;
@@ -84,8 +100,8 @@
   display: inline-block;
   padding: 3px 5px 3px 6px;
   border-radius: 3px;
-  background: #1C1B19;
-  color: #FFFDF8;
+  background: #1c1b19;
+  color: #fffdf8;
   font-family: "Tesserae UI Inter", var(--t-font);
   font-size: 9px;
   font-weight: 700;
@@ -93,7 +109,10 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
-:root[data-theme="dark"] .brand-tag { background: #EDE9DF; color: #1C1B19; }
+:root[data-theme="dark"] .brand-tag {
+  background: #ede9df;
+  color: #1c1b19;
+}
 
 .topnav {
   display: flex;
@@ -113,7 +132,9 @@
   font-size: var(--t-size-md);
   padding: var(--t-space-2) var(--t-space-3);
   border-radius: var(--t-radius-sm);
-  transition: background var(--t-trans-fast), color var(--t-trans-fast);
+  transition:
+    background var(--t-trans-fast),
+    color var(--t-trans-fast);
 }
 .topnav a .ph,
 .topnav .nav-dropdown summary .ph {
@@ -151,12 +172,16 @@
 }
 
 /* Plugin dropdown, anchored panel, not inline block. */
-.nav-dropdown { position: relative; }
+.nav-dropdown {
+  position: relative;
+}
 .nav-dropdown summary {
   list-style: none;
   cursor: pointer;
 }
-.nav-dropdown summary::-webkit-details-marker { display: none; }
+.nav-dropdown summary::-webkit-details-marker {
+  display: none;
+}
 .nav-dropdown-panel {
   position: absolute;
   top: calc(100% + 4px);
@@ -182,7 +207,10 @@
   font-size: var(--t-size-md);
   white-space: nowrap;
 }
-.nav-dropdown-link:hover { background: var(--t-surface-sunk); color: var(--t-accent); }
+.nav-dropdown-link:hover {
+  background: var(--t-surface-sunk);
+  color: var(--t-accent);
+}
 .nav-dropdown-sep {
   padding: var(--t-space-2) var(--t-space-3) 0;
   font-size: 11px;
@@ -214,12 +242,23 @@
   color: var(--t-fg-soft);
   padding: 0;
 }
-.theme-toggle:hover { color: var(--t-accent); background: var(--t-surface-sunk); }
-.theme-toggle .ph { font-size: 18px; }
-.theme-toggle-label { display: none; }
+.theme-toggle:hover {
+  color: var(--t-accent);
+  background: var(--t-surface-sunk);
+}
+.theme-toggle .ph {
+  font-size: 18px;
+}
+.theme-toggle-label {
+  display: none;
+}
 
-.theme-toggle--topbar { margin-left: auto; }
-.theme-toggle--drawer { display: none; }
+.theme-toggle--topbar {
+  margin-left: auto;
+}
+.theme-toggle--drawer {
+  display: none;
+}
 
 /* Show/hide based on the current theme. Dark icon is visible only when
    data-theme=dark, light icon is visible only when it's absent. */
@@ -227,11 +266,21 @@
    sun/moon once a choice is saved. Before the bootstrap runs the mode
    attribute is absent, which reads as "system". */
 :root[data-theme-mode="light"] .is-mode-system,
-:root[data-theme-mode="dark"] .is-mode-system { display: none; }
-:root:not([data-theme-mode="light"]) .is-mode-light { display: none; }
-:root:not([data-theme-mode="dark"]) .is-mode-dark { display: none; }
-:root[data-theme="dark"] .is-light-only { display: none; }
-:root:not([data-theme="dark"]) .is-dark-only { display: none; }
+:root[data-theme-mode="dark"] .is-mode-system {
+  display: none;
+}
+:root:not([data-theme-mode="light"]) .is-mode-light {
+  display: none;
+}
+:root:not([data-theme-mode="dark"]) .is-mode-dark {
+  display: none;
+}
+:root[data-theme="dark"] .is-light-only {
+  display: none;
+}
+:root:not([data-theme="dark"]) .is-dark-only {
+  display: none;
+}
 
 /* Topbar battery indicator. Rendered only when at least one
    registered device reports a battery_pct (nav_batteries non-empty);
@@ -241,8 +290,15 @@
 /* Update-available badge in the topnav. Accent-tinted so it reads as "new"
    against the plain nav links, with a small dot on the icon. Only rendered
    when the background version check found a newer release. */
-.topbar-update { position: relative; color: var(--t-accent, #2563eb) !important; font-weight: 600; }
-.topbar-update > .ph, .topbar-update > .ph-bold { font-size: 18px; }
+.topbar-update {
+  position: relative;
+  color: var(--t-accent, #2563eb) !important;
+  font-weight: 600;
+}
+.topbar-update > .ph,
+.topbar-update > .ph-bold {
+  font-size: 18px;
+}
 .topbar-update .topbar-update-dot {
   position: absolute;
   top: 5px;
@@ -277,25 +333,47 @@
   box-shadow: 0 0 0 2px var(--t-surface, #fff);
   pointer-events: none;
 }
-.nav-dropdown summary .nav-count { margin-left: auto; }
-.nav-dropdown-link .nav-count--inline { margin-left: auto; }
+.nav-dropdown summary .nav-count {
+  margin-left: auto;
+}
+.nav-dropdown-link .nav-count--inline {
+  margin-left: auto;
+}
 /* "New devices" tag: heard-but-unregistered devices, a .tg tg--teal
    tg--lg (chips.css) with the count as .tg-count. Sits first in the
    right-hand cluster, so it takes the auto margin and hands the tight
    4px spacing to whatever follows it (batteries, restart, theme). */
-.topbar-discovered--topbar { margin-left: auto; }
-.topbar-discovered--topbar > .ph-bold { font-size: 15px; }
-.topbar-discovered-count { font-variant-numeric: tabular-nums; }
+.topbar-discovered--topbar {
+  margin-left: auto;
+}
+.topbar-discovered--topbar > .ph-bold {
+  font-size: 15px;
+}
+.topbar-discovered-count {
+  font-variant-numeric: tabular-nums;
+}
 .topbar-discovered--topbar ~ .topbar-batteries--topbar,
 .topbar-discovered--topbar ~ .theme-toggle--topbar,
-.topbar-discovered--topbar ~ .topbar-optin { margin-left: 4px; }
-.topbar-discovered--topbar ~ .topbar-restart-form { margin-left: 0; }
-.topnav .topbar-discovered--drawer { display: none; }
-.topbar-batteries { position: relative; }
-.topbar-batteries--topbar { margin-left: auto; }
+.topbar-discovered--topbar ~ .topbar-optin {
+  margin-left: 4px;
+}
+.topbar-discovered--topbar ~ .topbar-restart-form {
+  margin-left: 0;
+}
+.topnav .topbar-discovered--drawer {
+  display: none;
+}
+.topbar-batteries {
+  position: relative;
+}
+.topbar-batteries--topbar {
+  margin-left: auto;
+}
 /* Push the theme-toggle's auto-margin off when the indicator is
    present, so they sit as a tight pair at the far right. */
-.topbar-batteries--topbar + .theme-toggle--topbar { margin-left: 4px; }
+.topbar-batteries--topbar + .theme-toggle--topbar {
+  margin-left: 4px;
+}
 .topbar-batteries--topbar > summary {
   display: inline-flex;
   align-items: center;
@@ -311,16 +389,37 @@
   font-variant-numeric: tabular-nums;
 }
 /* Hide the disclosure triangle the browser puts on <summary>. */
-.topbar-batteries--topbar > summary::-webkit-details-marker { display: none; }
-.topbar-batteries--topbar > summary::marker { content: ""; }
-.topbar-batteries--topbar > summary:hover { background: var(--t-surface-sunk); }
-.topbar-batteries--topbar > summary > .ph { font-size: 18px; }
-.topbar-batteries--topbar.is-tone-critical > summary { color: var(--t-danger); }
-.topbar-batteries--topbar.is-tone-low      > summary { color: var(--t-warn); }
-.topbar-batteries--topbar.is-tone-ok       > summary { color: var(--t-fg-soft); }
-.topbar-batteries-count { font-variant-numeric: tabular-nums; opacity: 1; }
-.topbar-batteries--topbar.is-tone-critical .topbar-batteries-count { color: var(--t-danger); }
-.topbar-batteries--topbar.is-tone-low .topbar-batteries-count { color: var(--t-warn); }
+.topbar-batteries--topbar > summary::-webkit-details-marker {
+  display: none;
+}
+.topbar-batteries--topbar > summary::marker {
+  content: "";
+}
+.topbar-batteries--topbar > summary:hover {
+  background: var(--t-surface-sunk);
+}
+.topbar-batteries--topbar > summary > .ph {
+  font-size: 18px;
+}
+.topbar-batteries--topbar.is-tone-critical > summary {
+  color: var(--t-danger);
+}
+.topbar-batteries--topbar.is-tone-low > summary {
+  color: var(--t-warn);
+}
+.topbar-batteries--topbar.is-tone-ok > summary {
+  color: var(--t-fg-soft);
+}
+.topbar-batteries-count {
+  font-variant-numeric: tabular-nums;
+  opacity: 1;
+}
+.topbar-batteries--topbar.is-tone-critical .topbar-batteries-count {
+  color: var(--t-danger);
+}
+.topbar-batteries--topbar.is-tone-low .topbar-batteries-count {
+  color: var(--t-warn);
+}
 .topbar-batteries-popover {
   position: absolute;
   top: calc(100% + 6px);
@@ -361,9 +460,15 @@
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
-.topbar-batteries-popover li.is-tone-critical .topbar-batteries-pct { color: var(--t-danger); }
-.topbar-batteries-popover li.is-tone-low      .topbar-batteries-pct { color: var(--t-warn); }
-.topbar-batteries-popover li.is-tone-ok       .topbar-batteries-pct { color: var(--t-fg-soft); }
+.topbar-batteries-popover li.is-tone-critical .topbar-batteries-pct {
+  color: var(--t-danger);
+}
+.topbar-batteries-popover li.is-tone-low .topbar-batteries-pct {
+  color: var(--t-warn);
+}
+.topbar-batteries-popover li.is-tone-ok .topbar-batteries-pct {
+  color: var(--t-fg-soft);
+}
 /* "View charts" footer link inside the popover. Separated from the
    list by a faint divider; hover-tinted so the affordance reads. */
 .topbar-batteries-link {
@@ -380,13 +485,23 @@
   text-decoration: none;
   letter-spacing: 0.01em;
 }
-.topbar-batteries-link:hover { background: var(--t-accent-soft); }
-.topbar-batteries-link .ph { font-size: 14px; }
+.topbar-batteries-link:hover {
+  background: var(--t-accent-soft);
+}
+.topbar-batteries-link .ph {
+  font-size: 14px;
+}
 /* Single-device case: the trigger already shows pct, so the popover
    is hidden — but we still want the icon to navigate to the page. */
-.topbar-batteries--topbar.is-single .topbar-batteries-popover { display: none; }
-.topbar-batteries--topbar.is-single > summary { cursor: pointer; }
-.topbar-batteries--topbar.is-single > summary { cursor: default; }
+.topbar-batteries--topbar.is-single .topbar-batteries-popover {
+  display: none;
+}
+.topbar-batteries--topbar.is-single > summary {
+  cursor: pointer;
+}
+.topbar-batteries--topbar.is-single > summary {
+  cursor: default;
+}
 /* Hover open + focus open on desktop so it behaves like a tooltip;
    click-to-toggle still works on touch via the native <details>. */
 @media (hover: hover) {
@@ -404,7 +519,9 @@
    specificity matches the generic .topnav a rule above — without that
    the drawer batteries (now an <a> for the link entry-point) leak
    into the desktop top nav. */
-.topnav .topbar-batteries--drawer { display: none; }
+.topnav .topbar-batteries--drawer {
+  display: none;
+}
 
 /* Hamburger + sidebar (mobile/tablet) ------------------------------ */
 
@@ -422,7 +539,9 @@
   border-radius: var(--t-radius-sm);
   cursor: pointer;
 }
-.nav-toggle:hover { background: var(--t-surface-sunk); }
+.nav-toggle:hover {
+  background: var(--t-surface-sunk);
+}
 .nav-scrim {
   position: fixed;
   inset: 0;
@@ -436,10 +555,14 @@
    show only on phones; nothing else ever draws them. */
 .tabbar,
 .topbar-page,
-.shell-notices { display: none; }
+.shell-notices {
+  display: none;
+}
 
 @media (max-width: 900px) {
-  .nav-toggle { display: inline-flex; }
+  .nav-toggle {
+    display: inline-flex;
+  }
   .topnav {
     position: fixed;
     top: 0;
@@ -460,8 +583,11 @@
     z-index: 60;
     flex-wrap: nowrap;
   }
-  body.nav-open .topnav { transform: translateX(0); }
-  .topnav a, .topnav .nav-dropdown summary {
+  body.nav-open .topnav {
+    transform: translateX(0);
+  }
+  .topnav a,
+  .topnav .nav-dropdown summary {
     padding: var(--t-space-3) var(--t-space-3);
     font-size: var(--t-size-md);
     justify-content: flex-start;
@@ -477,13 +603,17 @@
     border-left: 2px solid var(--t-border);
   }
   /* Drawer-only theme toggle takes over inside the drawer. */
-  .theme-toggle--topbar { display: none; }
+  .theme-toggle--topbar {
+    display: none;
+  }
   /* Topbar battery indicator is hidden in mobile; the drawer variant
      below renders the same data inline. Drawer rules scoped to .topnav
      so the specificity beats the generic .topnav a inline-flex rule
      (otherwise the <a>-wrapped drawer batteries inherit nav-link
      layout instead of the block list shape we want here). */
-  .topbar-discovered--topbar { display: none; }
+  .topbar-discovered--topbar {
+    display: none;
+  }
   .topnav .topbar-discovered--drawer {
     display: block;
     padding: var(--t-space-3) var(--t-space-3);
@@ -496,7 +626,9 @@
     gap: var(--t-space-2);
     font-weight: 600;
   }
-  .topnav .topbar-discovered--drawer .ph-bold { font-size: 18px; }
+  .topnav .topbar-discovered--drawer .ph-bold {
+    font-size: 18px;
+  }
   .topnav .topbar-discovered-drawer-list {
     list-style: none;
     margin: var(--t-space-1) 0 0;
@@ -504,9 +636,16 @@
     color: var(--t-fg-soft);
     font-size: 0.8rem;
   }
-  .topnav .topbar-discovered-drawer-list li { display: flex; gap: var(--t-space-2); }
-  .topnav .topbar-discovered-id { font-family: var(--t-font-mono); }
-  .topbar-batteries--topbar { display: none; }
+  .topnav .topbar-discovered-drawer-list li {
+    display: flex;
+    gap: var(--t-space-2);
+  }
+  .topnav .topbar-discovered-id {
+    font-family: var(--t-font-mono);
+  }
+  .topbar-batteries--topbar {
+    display: none;
+  }
   .topnav .topbar-batteries--drawer {
     display: block;
     padding: var(--t-space-3) var(--t-space-3);
@@ -519,9 +658,15 @@
     gap: var(--t-space-2);
     font-weight: 600;
   }
-  .topnav .topbar-batteries--drawer .ph { font-size: 18px; }
-  .topnav .topbar-batteries--drawer.is-tone-critical { color: var(--t-danger); }
-  .topnav .topbar-batteries--drawer.is-tone-low      { color: var(--t-warn); }
+  .topnav .topbar-batteries--drawer .ph {
+    font-size: 18px;
+  }
+  .topnav .topbar-batteries--drawer.is-tone-critical {
+    color: var(--t-danger);
+  }
+  .topnav .topbar-batteries--drawer.is-tone-low {
+    color: var(--t-warn);
+  }
   .topbar-batteries-drawer-list {
     list-style: none;
     padding: var(--t-space-2) 0 0;
@@ -539,8 +684,14 @@
     border-left: 2px solid var(--t-border);
     color: var(--t-fg-soft);
   }
-  .topbar-batteries-drawer-list li.is-tone-critical { border-color: var(--t-danger); color: var(--t-danger); }
-  .topbar-batteries-drawer-list li.is-tone-low      { border-color: var(--t-warn); color: var(--t-warn); }
+  .topbar-batteries-drawer-list li.is-tone-critical {
+    border-color: var(--t-danger);
+    color: var(--t-danger);
+  }
+  .topbar-batteries-drawer-list li.is-tone-low {
+    border-color: var(--t-warn);
+    color: var(--t-warn);
+  }
   .topbar-batteries-drawer-list .topbar-batteries-pct {
     font-weight: 700;
     font-variant-numeric: tabular-nums;
@@ -557,11 +708,17 @@
     color: var(--t-fg-soft);
     gap: var(--t-space-2);
   }
-  .theme-toggle--drawer .theme-toggle-label { display: inline; }
-  .theme-toggle--drawer:hover { background: var(--t-surface-sunk); }
+  .theme-toggle--drawer .theme-toggle-label {
+    display: inline;
+  }
+  .theme-toggle--drawer:hover {
+    background: var(--t-surface-sunk);
+  }
 }
 @media (min-width: 901px) {
-  .nav-scrim { display: none; }
+  .nav-scrim {
+    display: none;
+  }
 }
 
 /* ----- Layout -------------------------------------------------------- */
@@ -569,7 +726,9 @@
 /* Page column width, defined as a variable so the topbar can mirror
    it (see .topbar above). editor.css bumps this at ≥ 1100px because
    the editor needs the room and admin pages followed along. */
-:root { --t-page-max: 880px; }
+:root {
+  --t-page-max: 880px;
+}
 
 .page {
   max-width: var(--t-page-max);
@@ -577,7 +736,9 @@
   padding: var(--t-space-7) var(--t-space-6) var(--t-space-8);
 }
 
-.page.page-wide { max-width: 1440px; }
+.page.page-wide {
+  max-width: 1440px;
+}
 
 /* Phone-portrait tightening, the admin shell otherwise wastes a lot
    of the screen on edge padding + card chrome that's appropriate at
@@ -591,8 +752,12 @@
     margin-bottom: var(--t-space-3);
     border-radius: var(--t-radius-sm);
   }
-  .page-head { margin-bottom: var(--t-space-4); }
-  .page-head h1 { font-size: var(--t-size-2xl); }
+  .page-head {
+    margin-bottom: var(--t-space-4);
+  }
+  .page-head h1 {
+    font-size: var(--t-size-2xl);
+  }
   /* Touch targets, make buttons + selects at least 40px tall so
      they're tappable without zooming. */
   .form button,
@@ -621,7 +786,10 @@
   gap: var(--t-space-3);
 }
 
-.page-head h1 .ph { font-size: 0.85em; color: var(--t-accent); }
+.page-head h1 .ph {
+  font-size: 0.85em;
+  color: var(--t-accent);
+}
 
 .lede {
   color: var(--t-muted);
@@ -688,9 +856,13 @@
   align-items: center;
   gap: var(--t-space-2);
 }
-.card-head h2 .icon-box { margin-right: var(--t-space-1); }
+.card-head h2 .icon-box {
+  margin-right: var(--t-space-1);
+}
 
-.card-head .lede { margin-top: var(--t-space-1); }
+.card-head .lede {
+  margin-top: var(--t-space-1);
+}
 
 .card-head-row {
   display: flex;
@@ -755,7 +927,9 @@
   padding: 0;
 }
 
-.meta div { display: contents; }
+.meta div {
+  display: contents;
+}
 .meta dt {
   font-size: var(--t-size-xs);
   font-weight: 700;
@@ -790,7 +964,9 @@
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
 }
-.tabs::-webkit-scrollbar { display: none; }
+.tabs::-webkit-scrollbar {
+  display: none;
+}
 
 .tab {
   display: inline-flex;
@@ -801,18 +977,30 @@
   text-decoration: none;
   font-weight: 500;
   border-bottom: 2px solid transparent;
-  transition: color var(--t-trans-fast), border-color var(--t-trans),
-              background var(--t-trans-fast);
+  transition:
+    color var(--t-trans-fast),
+    border-color var(--t-trans),
+    background var(--t-trans-fast);
   border-top-left-radius: var(--t-radius-sm);
   border-top-right-radius: var(--t-radius-sm);
   white-space: nowrap;
   flex-shrink: 0;
 }
 @media (max-width: 600px) {
-  .tab { padding: var(--t-space-2) var(--t-space-3); font-size: var(--t-size-md); gap: var(--t-space-1); }
-  .tab .ph { font-size: 14px; }
+  .tab {
+    padding: var(--t-space-2) var(--t-space-3);
+    font-size: var(--t-size-md);
+    gap: var(--t-space-1);
+  }
+  .tab .ph {
+    font-size: 14px;
+  }
 }
-.tab .ph { font-size: 15px; opacity: 0.75; transition: opacity var(--t-trans-fast); }
+.tab .ph {
+  font-size: 15px;
+  opacity: 0.75;
+  transition: opacity var(--t-trans-fast);
+}
 .tab .muted {
   font-family: var(--t-font-mono);
   font-size: 11px;
@@ -827,12 +1015,16 @@
   border-bottom-color: var(--t-accent);
   font-weight: 600;
 }
-.tab.is-active .ph { opacity: 1; }
+.tab.is-active .ph {
+  opacity: 1;
+}
 .tab:hover {
   color: var(--t-fg);
   background: color-mix(in oklab, var(--t-fg) 4%, transparent);
 }
-.tab:hover .ph { opacity: 1; }
+.tab:hover .ph {
+  opacity: 1;
+}
 
 .page-name {
   display: inline-flex;
@@ -849,7 +1041,6 @@
   color: var(--t-accent);
   font-size: 16px;
 }
-
 
 /* ----- Lightbox ---------------------------------------------------- */
 /* Click any <a data-lightbox> to view the image in-page. Backdrop
@@ -877,7 +1068,9 @@
   background: #000;
   outline-offset: 4px;
 }
-.lightbox.is-zoomable .lightbox-img { cursor: zoom-in; }
+.lightbox.is-zoomable .lightbox-img {
+  cursor: zoom-in;
+}
 /* Large view: natural size, the overlay pans. */
 .lightbox.is-large .lightbox-img {
   max-width: none;
@@ -902,17 +1095,29 @@
   line-height: 1;
   transition: background 120ms ease;
 }
-.lightbox-close:hover { background: rgba(255, 255, 255, 0.22); }
-html.scroll-locked, html.scroll-locked body { overflow: hidden; }
+.lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+html.scroll-locked,
+html.scroll-locked body {
+  overflow: hidden;
+}
 @media (prefers-reduced-motion: reduce) {
-  .lightbox { animation: none; }
-  .lightbox-close { transition: none; }
+  .lightbox {
+    animation: none;
+  }
+  .lightbox-close {
+    transition: none;
+  }
 }
 @keyframes lightbox-fade {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
-
 
 /* ----- Modal ------------------------------------------------------- */
 /* Generic centred modal for one-shot reveals (e.g. freshly-minted
@@ -950,7 +1155,9 @@ html.scroll-locked, html.scroll-locked body { overflow: hidden; }
   align-items: center;
   gap: var(--t-space-3);
 }
-.modal-head { border-bottom: 1px solid var(--t-border); }
+.modal-head {
+  border-bottom: 1px solid var(--t-border);
+}
 .modal-foot {
   border-top: 1px solid var(--t-border);
   justify-content: flex-end;
@@ -976,14 +1183,22 @@ html.scroll-locked, html.scroll-locked body { overflow: hidden; }
   place-items: center;
   border-radius: var(--t-radius-sm);
   font-size: var(--t-size-xl);
-  transition: background 120ms ease, color 120ms ease;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
 }
 .modal-close:hover {
   background: var(--t-surface-soft);
   color: var(--t-fg);
 }
-.modal-body { padding: var(--t-space-5); color: var(--t-fg); }
-.modal-body .lede { margin-top: 0; color: var(--t-fg-soft); }
+.modal-body {
+  padding: var(--t-space-5);
+  color: var(--t-fg);
+}
+.modal-body .lede {
+  margin-top: 0;
+  color: var(--t-fg-soft);
+}
 .token-row {
   display: flex;
   gap: var(--t-space-2);
@@ -1005,7 +1220,9 @@ html.scroll-locked, html.scroll-locked body { overflow: hidden; }
   outline-offset: 2px;
   border-color: var(--t-accent);
 }
-body.modal-open { overflow: hidden; }
+body.modal-open {
+  overflow: hidden;
+}
 
 /* ============================================================================
    Tesserae-themed scrollbar
@@ -1056,10 +1273,19 @@ body.modal-open { overflow: hidden; }
    loud as a danger pill. Posts to /plugins/browse/restart via
    data-restart-form so clicking it opens the spinner modal and the
    page auto-reloads when the new process is back. */
-.topbar-restart-form { margin: 0; }
+.topbar-restart-form {
+  margin: 0;
+}
 /* Opt-in prompt for installs that never answered the online-features question. */
-.topbar-optin { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
-.topbar-optin .inline { margin: 0; }
+.topbar-optin {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+.topbar-optin .inline {
+  margin: 0;
+}
 .topbar-optin-yes {
   border-color: color-mix(in srgb, var(--t-accent, #2563eb) 50%, transparent);
   background: color-mix(in srgb, var(--t-accent, #2563eb) 12%, transparent);
@@ -1079,14 +1305,25 @@ body.modal-open { overflow: hidden; }
   font-size: 12px;
   cursor: pointer;
 }
-.topbar-optin-no:hover { color: var(--t-fg, #1a1a1a); text-decoration: underline; }
+.topbar-optin-no:hover {
+  color: var(--t-fg, #1a1a1a);
+  text-decoration: underline;
+}
 /* The x only shows on Paper's folded icon rail, where the words don't fit. */
-.topbar-optin-no > .ph { display: none; }
-.topbar-restart-form { margin-left: auto; }
+.topbar-optin-no > .ph {
+  display: none;
+}
+.topbar-restart-form {
+  margin-left: auto;
+}
 /* When batteries are also shown, batteries already grabbed the auto
    margin, so this row of trailing items collapses cleanly. */
-.topbar-batteries--topbar ~ .topbar-restart-form { margin-left: 0; }
-.topbar-restart-form + .theme-toggle--topbar { margin-left: 4px; }
+.topbar-batteries--topbar ~ .topbar-restart-form {
+  margin-left: 0;
+}
+.topbar-restart-form + .theme-toggle--topbar {
+  margin-left: 4px;
+}
 .topbar-restart {
   display: inline-flex;
   align-items: center;
@@ -1101,7 +1338,9 @@ body.modal-open { overflow: hidden; }
   font-weight: 600;
   font-size: 13px;
   cursor: pointer;
-  transition: background-color 120ms ease, border-color 120ms ease;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
 }
 .topbar-restart:hover,
 .topbar-restart:focus-visible {
@@ -1109,7 +1348,9 @@ body.modal-open { overflow: hidden; }
   border-color: var(--t-warn, #c98a00);
 }
 /* The reason line only shows in Paper's sidebar, where there's room. */
-.topbar-restart-sub { display: none; }
+.topbar-restart-sub {
+  display: none;
+}
 .topbar-restart .ph,
 .topbar-restart .ph-bold {
   color: var(--t-warn, #c98a00);
@@ -1119,6 +1360,10 @@ body.modal-open { overflow: hidden; }
    on mobile without crowding the row. The icon-only form keeps a
    tooltip via the form's ``title`` attribute. */
 @media (max-width: 640px) {
-  .topbar-restart-label { display: none; }
-  .topbar-restart { padding: 0 10px; }
+  .topbar-restart-label {
+    display: none;
+  }
+  .topbar-restart {
+    padding: 0 10px;
+  }
 }

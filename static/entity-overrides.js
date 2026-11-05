@@ -182,7 +182,7 @@
         row.classList.remove("is-drop-above", "is-drop-below");
         if (!draggedEid || row.dataset.entityId === draggedEid) return;
         const draggedRow = list.querySelector(
-          `.entity-override-row[data-entity-id="${CSS.escape(draggedEid)}"]`,
+          `.entity-override-row[data-entity-id="${CSS.escape(draggedEid)}"]`
         );
         if (!draggedRow) return;
         const rect = row.getBoundingClientRect();
@@ -275,7 +275,7 @@
       // checkbox values in DOM order, so submitting the form sends
       // the entities in the user-defined order.
       const newOrder = Array.from(list.querySelectorAll(".entity-override-row")).map(
-        (r) => r.dataset.entityId,
+        (r) => r.dataset.entityId
       );
       const msList = multiselect.querySelector("[data-ms-list]");
       if (!msList) return;
@@ -285,9 +285,7 @@
         .slice()
         .reverse()
         .forEach((eid) => {
-          const cb = msList.querySelector(
-            `input[type=checkbox][value="${CSS.escape(eid)}"]`,
-          );
+          const cb = msList.querySelector(`input[type=checkbox][value="${CSS.escape(eid)}"]`);
           const opt = cb ? cb.closest(".multiselect-opt") : null;
           if (opt) msList.insertBefore(opt, msList.firstChild);
         });
@@ -312,9 +310,7 @@
 
       // Append rows for newly-ticked entities (in multiselect order).
       const present = new Set(
-        Array.from(list.querySelectorAll(".entity-override-row")).map(
-          (r) => r.dataset.entityId,
-        ),
+        Array.from(list.querySelectorAll(".entity-override-row")).map((r) => r.dataset.entityId)
       );
       ticked.forEach(({ value, label }) => {
         if (!present.has(value)) {

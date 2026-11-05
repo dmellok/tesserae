@@ -17,8 +17,10 @@
 
   function insertAtCursor(textarea, text) {
     if (textarea.disabled || textarea.readOnly) return;
-    const start = typeof textarea.selectionStart === "number" ? textarea.selectionStart : textarea.value.length;
-    const end = typeof textarea.selectionEnd === "number" ? textarea.selectionEnd : textarea.value.length;
+    const start =
+      typeof textarea.selectionStart === "number" ? textarea.selectionStart : textarea.value.length;
+    const end =
+      typeof textarea.selectionEnd === "number" ? textarea.selectionEnd : textarea.value.length;
     const before = textarea.value.slice(0, start);
     const after = textarea.value.slice(end);
     textarea.value = before + text + after;

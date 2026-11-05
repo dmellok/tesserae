@@ -35,30 +35,54 @@
   --dx-inset: var(--t-inset);
 }
 
-:root[data-ui="paper"] body { font-feature-settings: normal; }
+:root[data-ui="paper"] body {
+  font-feature-settings: normal;
+}
 /* Plain paper: no dotted grid behind the pages. */
-:root[data-ui="paper"] body.admin { background-image: none; }
+:root[data-ui="paper"] body.admin {
+  background-image: none;
+}
 
 /* Navigation is monochrome in both layouts: no accent fill or underline
    on the active item (the sidebar/drawer rules below shade it instead). */
 :root[data-ui="paper"] .topnav a.is-active::after,
-:root[data-ui="paper"] .topnav .nav-dropdown.is-active summary::after { content: none; }
+:root[data-ui="paper"] .topnav .nav-dropdown.is-active summary::after {
+  content: none;
+}
 :root[data-ui="paper"] .topnav a.is-active,
 :root[data-ui="paper"] .topnav .nav-dropdown.is-active summary,
-:root[data-ui="paper"] .topnav .nav-dropdown[open] summary { color: var(--t-fg); background: var(--p-selected); }
-:root[data-ui="paper"] :focus-visible { outline: 2px solid var(--p-focus); outline-offset: 2px; }
+:root[data-ui="paper"] .topnav .nav-dropdown[open] summary {
+  color: var(--t-fg);
+  background: var(--p-selected);
+}
+:root[data-ui="paper"] :focus-visible {
+  outline: 2px solid var(--p-focus);
+  outline-offset: 2px;
+}
 
 /* ----- Brand: the server mark and lockup (shell.css, base.css) -------- */
 
-:root[data-ui="paper"] .brand { color: var(--t-fg); font-weight: 700; letter-spacing: -0.015em; }
-:root[data-ui="paper"] .brand:hover { color: var(--t-fg); }
-:root[data-ui="paper"] .brand-mark { transition: transform 220ms var(--p-ease); }
-:root[data-ui="paper"] .brand:hover .brand-mark { transform: rotate(-6deg); }
+:root[data-ui="paper"] .brand {
+  color: var(--t-fg);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+:root[data-ui="paper"] .brand:hover {
+  color: var(--t-fg);
+}
+:root[data-ui="paper"] .brand-mark {
+  transition: transform 220ms var(--p-ease);
+}
+:root[data-ui="paper"] .brand:hover .brand-mark {
+  transform: rotate(-6deg);
+}
 
 /* ----- Shell: left sidebar on desktop -------------------------------- */
 
 @media (min-width: 901px) {
-  :root[data-ui="paper"] body.admin { padding-left: var(--p-sidebar-w); }
+  :root[data-ui="paper"] body.admin {
+    padding-left: var(--p-sidebar-w);
+  }
   :root[data-ui="paper"] .topbar {
     position: fixed;
     inset: 0 auto 0 0;
@@ -74,10 +98,20 @@
     overflow-y: auto;
     overscroll-behavior: contain;
   }
-  :root[data-ui="paper"] .topbar::before { content: none; }
-  :root[data-ui="paper"] .brand { padding: 0 var(--t-space-2) var(--t-space-5); gap: 10px; }
-    /* "Tesserae" and its SERVER tag on one line, the #350 name chip below. */
-  :root[data-ui="paper"] .brand-name { display: flex; flex-direction: column; line-height: 1.1; font-size: 17px; }
+  :root[data-ui="paper"] .topbar::before {
+    content: none;
+  }
+  :root[data-ui="paper"] .brand {
+    padding: 0 var(--t-space-2) var(--t-space-5);
+    gap: 10px;
+  }
+  /* "Tesserae" and its SERVER tag on one line, the #350 name chip below. */
+  :root[data-ui="paper"] .brand-name {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.1;
+    font-size: 17px;
+  }
 
   :root[data-ui="paper"] .topnav {
     flex: 1 0 auto;
@@ -102,9 +136,15 @@
     transition: background-color 180ms ease-out;
   }
   :root[data-ui="paper"] .topnav > a .ph,
-  :root[data-ui="paper"] .topnav .nav-dropdown > summary .ph { font-size: 19px; color: var(--t-fg-soft); }
+  :root[data-ui="paper"] .topnav .nav-dropdown > summary .ph {
+    font-size: 19px;
+    color: var(--t-fg-soft);
+  }
   :root[data-ui="paper"] .topnav > a:hover,
-  :root[data-ui="paper"] .topnav .nav-dropdown > summary:hover { background: var(--p-hover); color: var(--t-fg); }
+  :root[data-ui="paper"] .topnav .nav-dropdown > summary:hover {
+    background: var(--p-hover);
+    color: var(--t-fg);
+  }
   :root[data-ui="paper"] .topnav > a.is-active,
   :root[data-ui="paper"] .topnav .nav-dropdown.is-active > summary {
     background: var(--p-selected);
@@ -112,10 +152,17 @@
     font-weight: 600;
   }
   :root[data-ui="paper"] .topnav > a.is-active .ph,
-  :root[data-ui="paper"] .topnav .nav-dropdown.is-active > summary .ph { color: var(--t-fg); }
+  :root[data-ui="paper"] .topnav .nav-dropdown.is-active > summary .ph {
+    color: var(--t-fg);
+  }
   :root[data-ui="paper"] .topnav > a::after,
-  :root[data-ui="paper"] .topnav .nav-dropdown.is-active summary::after { content: none; }
-  :root[data-ui="paper"] .topnav .nav-dropdown .caret-soft { margin-left: auto; font-size: 13px; }
+  :root[data-ui="paper"] .topnav .nav-dropdown.is-active summary::after {
+    content: none;
+  }
+  :root[data-ui="paper"] .topnav .nav-dropdown .caret-soft {
+    margin-left: auto;
+    font-size: 13px;
+  }
   /* Dropdowns open inline in the sidebar instead of floating. */
   :root[data-ui="paper"] .topnav .nav-dropdown-panel {
     position: static;
@@ -127,8 +174,15 @@
     margin: 2px 0 4px 21px;
     padding: 2px 0 2px 8px;
   }
-  :root[data-ui="paper"] .topnav .nav-dropdown-link { padding: 8px 10px; font-size: 13px; color: var(--t-fg); }
-  :root[data-ui="paper"] .topnav .nav-dropdown-link:hover { background: var(--p-hover); color: var(--t-fg); }
+  :root[data-ui="paper"] .topnav .nav-dropdown-link {
+    padding: 8px 10px;
+    font-size: 13px;
+    color: var(--t-fg);
+  }
+  :root[data-ui="paper"] .topnav .nav-dropdown-link:hover {
+    background: var(--p-hover);
+    color: var(--t-fg);
+  }
   /* The page you are on, inside its open dropdown. */
   :root[data-ui="paper"] .topnav .nav-dropdown-link.is-active {
     background: var(--p-selected);
@@ -153,17 +207,31 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  :root[data-ui="paper"] .topnav .nav-subdevice:hover { background: var(--p-hover); color: var(--t-fg); }
-  :root[data-ui="paper"] .topnav .nav-subdevice.is-active { color: var(--t-fg); font-weight: 600; background: var(--p-hover); }
-  :root[data-ui="paper"].sidebar-collapsed .topnav .nav-subdevices { display: none; }
+  :root[data-ui="paper"] .topnav .nav-subdevice:hover {
+    background: var(--p-hover);
+    color: var(--t-fg);
+  }
+  :root[data-ui="paper"] .topnav .nav-subdevice.is-active {
+    color: var(--t-fg);
+    font-weight: 600;
+    background: var(--p-hover);
+  }
+  :root[data-ui="paper"].sidebar-collapsed .topnav .nav-subdevices {
+    display: none;
+  }
 
   /* Everything after the nav (update badge, new devices, batteries,
      opt-in, restart, theme) collects at the sidebar foot. */
   :root[data-ui="paper"] .topbar > .topbar-discovered--topbar,
   :root[data-ui="paper"] .topbar > .topbar-optin,
   :root[data-ui="paper"] .topbar > .topbar-restart-form,
-  :root[data-ui="paper"] .topbar > .theme-toggle--topbar { margin: 0; align-self: flex-start; }
-  :root[data-ui="paper"] .topbar > .theme-toggle--topbar { display: none; }
+  :root[data-ui="paper"] .topbar > .theme-toggle--topbar {
+    margin: 0;
+    align-self: flex-start;
+  }
+  :root[data-ui="paper"] .topbar > .theme-toggle--topbar {
+    display: none;
+  }
   :root[data-ui="paper"] .topnav .theme-toggle--drawer {
     display: inline-flex;
     width: 100%;
@@ -176,20 +244,42 @@
     color: var(--t-fg-soft);
     font-size: 13px;
   }
-  :root[data-ui="paper"] .topnav .theme-toggle--drawer .theme-toggle-label { display: inline; }
-  :root[data-ui="paper"] .topnav .theme-toggle--drawer:hover { background: var(--p-hover); color: var(--t-fg); }
+  :root[data-ui="paper"] .topnav .theme-toggle--drawer .theme-toggle-label {
+    display: inline;
+  }
+  :root[data-ui="paper"] .topnav .theme-toggle--drawer:hover {
+    background: var(--p-hover);
+    color: var(--t-fg);
+  }
   /* The batteries leave the sidebar for the top-right corner (below).
      The drawer copy is a direct <a> of the nav, so the sidebar link
      rules above would otherwise lay its phone-only list out here. */
-  :root[data-ui="paper"] .topnav > a.topbar-batteries--drawer { display: none; }
-  :root[data-ui="paper"] .topbar > .topbar-batteries--topbar { position: fixed; top: 16px; right: 20px; margin: 0; }
+  :root[data-ui="paper"] .topnav > a.topbar-batteries--drawer {
+    display: none;
+  }
+  :root[data-ui="paper"] .topbar > .topbar-batteries--topbar {
+    position: fixed;
+    top: 16px;
+    right: 20px;
+    margin: 0;
+  }
   /* The pill gets a row of its own: pages start below it, so a page's
      title and its buttons never sit under it at rest. */
-  :root[data-ui="paper"] body:has(.topbar > .topbar-batteries--topbar) main.page { padding-top: 68px; }
-  :root[data-ui="paper"] .topbar-optin { flex-direction: column; align-items: stretch; gap: 4px; width: 100%; }
+  :root[data-ui="paper"] body:has(.topbar > .topbar-batteries--topbar) main.page {
+    padding-top: 68px;
+  }
+  :root[data-ui="paper"] .topbar-optin {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    width: 100%;
+  }
   /* Restart prompt: a full-width notice row, its icon in line with the
      sidebar's other icons (the 3px rule eats into the left padding). */
-  :root[data-ui="paper"] .topbar > .topbar-restart-form { align-self: stretch; margin: 6px 0; }
+  :root[data-ui="paper"] .topbar > .topbar-restart-form {
+    align-self: stretch;
+    margin: 6px 0;
+  }
   :root[data-ui="paper"] .topbar-restart-form .topbar-restart {
     width: 100%;
     height: auto;
@@ -207,15 +297,36 @@
   :root[data-ui="paper"] .topbar-restart-form .topbar-restart:focus-visible {
     background: color-mix(in srgb, var(--t-warn) 18%, transparent);
   }
-  :root[data-ui="paper"] .topbar-restart-form .topbar-restart .ph-bold { font-size: 19px; }
-  :root[data-ui="paper"] .topbar-restart-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-  :root[data-ui="paper"] .topbar-restart-form .topbar-restart-label { font-size: 13px; font-weight: 600; line-height: 1.25; }
-  :root[data-ui="paper"] .topbar-restart-sub { display: block; color: var(--t-fg-soft); font-size: 12px; font-weight: 400; line-height: 1.3; }
+  :root[data-ui="paper"] .topbar-restart-form .topbar-restart .ph-bold {
+    font-size: 19px;
+  }
+  :root[data-ui="paper"] .topbar-restart-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+  }
+  :root[data-ui="paper"] .topbar-restart-form .topbar-restart-label {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+  :root[data-ui="paper"] .topbar-restart-sub {
+    display: block;
+    color: var(--t-fg-soft);
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.3;
+  }
 
   /* Pages that stick to the top no longer need to clear a top bar. */
-  :root[data-ui="paper"] .editor-header { top: 0; }
+  :root[data-ui="paper"] .editor-header {
+    top: 0;
+  }
   /* ...but its actions run to the right edge, under the batteries pill. */
-  :root[data-ui="paper"] body:has(.topbar > .topbar-batteries--topbar) .editor-header { padding-right: 112px; }
+  :root[data-ui="paper"] body:has(.topbar > .topbar-batteries--topbar) .editor-header {
+    padding-right: 112px;
+  }
 }
 
 /* ----- Shell: the sidebar folds to an icon rail ---------------------- */
@@ -226,14 +337,21 @@
    flyouts to the right. Everything that measures from the sidebar
    (the page's left padding) follows the token. */
 .sidebar-toggle,
-.rail-tip { display: none; }
+.rail-tip {
+  display: none;
+}
 @media (min-width: 901px) {
-  :root[data-ui="paper"].sidebar-collapsed { --p-sidebar-w: 64px; }
+  :root[data-ui="paper"].sidebar-collapsed {
+    --p-sidebar-w: 64px;
+  }
   /* Only while the toggle is moving it (the script sets the class for the
      length of the slide), so a page load never animates the sidebar in. */
   :root[data-ui="paper"].sidebar-sliding body.admin,
   :root[data-ui="paper"].sidebar-sliding .topbar {
-    transition: padding-left 200ms var(--p-ease), width 200ms var(--p-ease), left 200ms var(--p-ease);
+    transition:
+      padding-left 200ms var(--p-ease),
+      width 200ms var(--p-ease),
+      left 200ms var(--p-ease);
   }
 
   :root[data-ui="paper"] .sidebar-toggle {
@@ -254,8 +372,14 @@
     font-size: 13px;
     font-weight: 500;
   }
-  :root[data-ui="paper"] .sidebar-toggle:hover { background: var(--p-hover); color: var(--t-fg); transform: none; }
-  :root[data-ui="paper"] .sidebar-toggle .ph { font-size: 19px; }
+  :root[data-ui="paper"] .sidebar-toggle:hover {
+    background: var(--p-hover);
+    color: var(--t-fg);
+    transform: none;
+  }
+  :root[data-ui="paper"] .sidebar-toggle .ph {
+    font-size: 19px;
+  }
 
   :root[data-ui="paper"].sidebar-collapsed .topbar {
     align-items: center;
@@ -271,9 +395,18 @@
     gap: 0;
   }
   :root[data-ui="paper"].sidebar-collapsed .brand-mark,
-  :root[data-ui="paper"].sidebar-collapsed .brand-mark svg { width: 30px; height: 30px; }
-  :root[data-ui="paper"].sidebar-collapsed .brand-name { display: none; }
-  :root[data-ui="paper"].sidebar-collapsed .topnav { align-items: center; gap: 6px; width: 100%; }
+  :root[data-ui="paper"].sidebar-collapsed .brand-mark svg {
+    width: 30px;
+    height: 30px;
+  }
+  :root[data-ui="paper"].sidebar-collapsed .brand-name {
+    display: none;
+  }
+  :root[data-ui="paper"].sidebar-collapsed .topnav {
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+  }
   /* Every item becomes a 44px square holding its icon. */
   :root[data-ui="paper"].sidebar-collapsed .topnav > a,
   :root[data-ui="paper"].sidebar-collapsed .topnav .nav-dropdown > summary,
@@ -291,9 +424,13 @@
     justify-content: center;
     align-self: center;
   }
-  :root[data-ui="paper"].sidebar-collapsed .topnav .nav-dropdown { align-self: center; }
+  :root[data-ui="paper"].sidebar-collapsed .topnav .nav-dropdown {
+    align-self: center;
+  }
   :root[data-ui="paper"].sidebar-collapsed .topnav > a .ph,
-  :root[data-ui="paper"].sidebar-collapsed .topnav .nav-dropdown > summary .ph { font-size: 20px; }
+  :root[data-ui="paper"].sidebar-collapsed .topnav .nav-dropdown > summary .ph {
+    font-size: 20px;
+  }
   :root[data-ui="paper"].sidebar-collapsed .topnav > a > span,
   :root[data-ui="paper"].sidebar-collapsed .topnav .nav-dropdown > summary > span,
   :root[data-ui="paper"].sidebar-collapsed .topnav .nav-dropdown .caret-soft,
@@ -312,7 +449,12 @@
     white-space: nowrap;
   }
   /* The update badges keep their dot on the icon's corner. */
-  :root[data-ui="paper"].sidebar-collapsed .topnav > a.topbar-update .topbar-update-dot { position: absolute; top: 9px; right: 9px; margin: 0; }
+  :root[data-ui="paper"].sidebar-collapsed .topnav > a.topbar-update .topbar-update-dot {
+    position: absolute;
+    top: 9px;
+    right: 9px;
+    margin: 0;
+  }
   /* The widget-updates count rides the Widgets icon's corner when the
      rail is folded, like an app badge on a home screen. */
   :root[data-ui="paper"].sidebar-collapsed .topnav .nav-dropdown > summary > .nav-count {
@@ -339,12 +481,23 @@
     line-height: 16px;
   }
   /* The design switch is just its track. */
-  :root[data-ui="paper"].sidebar-collapsed .topnav .ui-switch--nav { border-radius: 0; }
-  :root[data-ui="paper"].sidebar-collapsed .topnav .theme-toggle--drawer { margin-top: auto; }
+  :root[data-ui="paper"].sidebar-collapsed .topnav .ui-switch--nav {
+    border-radius: 0;
+  }
+  :root[data-ui="paper"].sidebar-collapsed .topnav .theme-toggle--drawer {
+    margin-top: auto;
+  }
   /* Restart: a tinted square centred on the rail, a dot on its corner. */
-  :root[data-ui="paper"].sidebar-collapsed .topbar > .topbar-restart-form { align-self: center; margin: 4px 0; }
-  :root[data-ui="paper"].sidebar-collapsed .topbar-restart-form .topbar-restart { border-left: 0; }
-  :root[data-ui="paper"].sidebar-collapsed .topbar-restart-sub { display: none; }
+  :root[data-ui="paper"].sidebar-collapsed .topbar > .topbar-restart-form {
+    align-self: center;
+    margin: 4px 0;
+  }
+  :root[data-ui="paper"].sidebar-collapsed .topbar-restart-form .topbar-restart {
+    border-left: 0;
+  }
+  :root[data-ui="paper"].sidebar-collapsed .topbar-restart-sub {
+    display: none;
+  }
   :root[data-ui="paper"].sidebar-collapsed .topbar-restart-form .topbar-restart::after {
     content: "";
     position: absolute;
@@ -356,11 +509,25 @@
     background: var(--t-warn);
   }
   /* The opt-in prompt becomes two icon buttons, one under the other. */
-  :root[data-ui="paper"].sidebar-collapsed .topbar-optin { width: 44px; align-self: center; align-items: center; }
-  :root[data-ui="paper"].sidebar-collapsed .topbar-optin button { width: 44px; height: 44px; padding: 0; justify-content: center; }
-  :root[data-ui="paper"].sidebar-collapsed .topbar-optin-no > .ph { display: inline-block; font-size: 18px; }
+  :root[data-ui="paper"].sidebar-collapsed .topbar-optin {
+    width: 44px;
+    align-self: center;
+    align-items: center;
+  }
+  :root[data-ui="paper"].sidebar-collapsed .topbar-optin button {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    justify-content: center;
+  }
+  :root[data-ui="paper"].sidebar-collapsed .topbar-optin-no > .ph {
+    display: inline-block;
+    font-size: 18px;
+  }
   /* The fold toggle flips to point back out. */
-  :root[data-ui="paper"].sidebar-collapsed .sidebar-toggle-icon { transform: scaleX(-1); }
+  :root[data-ui="paper"].sidebar-collapsed .sidebar-toggle-icon {
+    transform: scaleX(-1);
+  }
 
   /* Dropdowns fly out to the right of the rail. */
   :root[data-ui="paper"].sidebar-collapsed .topnav .nav-dropdown-panel {
@@ -378,7 +545,9 @@
     background: var(--t-surface);
     box-shadow: none;
   }
-  :root[data-ui="paper"].sidebar-collapsed .topnav .nav-dropdown-link { padding: 9px 10px; }
+  :root[data-ui="paper"].sidebar-collapsed .topnav .nav-dropdown-link {
+    padding: 9px 10px;
+  }
 
   /* The tooltip: a small ink label to the right of the rail. */
   :root[data-ui="paper"] .rail-tip {
@@ -395,11 +564,15 @@
     white-space: nowrap;
     pointer-events: none;
   }
-  :root[data-ui="paper"] .rail-tip[hidden] { display: none; }
+  :root[data-ui="paper"] .rail-tip[hidden] {
+    display: none;
+  }
 }
 @media (min-width: 901px) and (prefers-reduced-motion: reduce) {
   :root[data-ui="paper"].sidebar-sliding body.admin,
-  :root[data-ui="paper"].sidebar-sliding .topbar { transition: none; }
+  :root[data-ui="paper"].sidebar-sliding .topbar {
+    transition: none;
+  }
 }
 
 /* ----- Shell: phones and small tablets ------------------------------- */
@@ -412,8 +585,14 @@
     min-height: 56px;
     box-sizing: border-box;
   }
-  :root[data-ui="paper"] .topbar::before { content: none; }
-  :root[data-ui="paper"] .nav-toggle { border: 0; width: 44px; height: 44px; }
+  :root[data-ui="paper"] .topbar::before {
+    content: none;
+  }
+  :root[data-ui="paper"] .nav-toggle {
+    border: 0;
+    width: 44px;
+    height: 44px;
+  }
   /* The drawer comes in from the left, like the sidebar it stands in for. */
   :root[data-ui="paper"] .topnav {
     left: 0;
@@ -423,17 +602,39 @@
     transform: translateX(-100%);
     transition: transform 240ms var(--p-ease);
   }
-  :root[data-ui="paper"] body.nav-open .topnav { transform: translateX(0); }
+  :root[data-ui="paper"] body.nav-open .topnav {
+    transform: translateX(0);
+  }
   :root[data-ui="paper"] .topnav a,
-  :root[data-ui="paper"] .topnav .nav-dropdown summary { min-height: 44px; border-radius: 0; }
-  :root[data-ui="paper"] .topnav a.is-active { background: var(--p-selected); color: var(--t-fg); font-weight: 600; }
-  :root[data-ui="paper"] .topnav .nav-dropdown-panel { border-left-width: 1px; }
-  :root[data-ui="paper"] .nav-scrim { background: rgba(28, 27, 25, 0.45); }
+  :root[data-ui="paper"] .topnav .nav-dropdown summary {
+    min-height: 44px;
+    border-radius: 0;
+  }
+  :root[data-ui="paper"] .topnav a.is-active {
+    background: var(--p-selected);
+    color: var(--t-fg);
+    font-weight: 600;
+  }
+  :root[data-ui="paper"] .topnav .nav-dropdown-panel {
+    border-left-width: 1px;
+  }
+  :root[data-ui="paper"] .nav-scrim {
+    background: rgba(28, 27, 25, 0.45);
+  }
   /* The batteries pill sits in the bar beside the menu button, so the
      drawer drops its own copy of the list. */
-  :root[data-ui="paper"] .topbar > .topbar-batteries--topbar { display: block; order: 1; margin-left: auto; }
-  :root[data-ui="paper"] .topbar > .nav-toggle { order: 2; margin-left: 4px; }
-  :root[data-ui="paper"] .topnav .topbar-batteries--drawer { display: none; }
+  :root[data-ui="paper"] .topbar > .topbar-batteries--topbar {
+    display: block;
+    order: 1;
+    margin-left: auto;
+  }
+  :root[data-ui="paper"] .topbar > .nav-toggle {
+    order: 2;
+    margin-left: 4px;
+  }
+  :root[data-ui="paper"] .topnav .topbar-batteries--drawer {
+    display: none;
+  }
 }
 
 /* ----- Shell: phones get a tab bar, a More sheet and a page bar ------- */
@@ -455,7 +656,9 @@
   :root[data-ui="paper"] .nav-toggle,
   :root[data-ui="paper"] .topbar > .topbar-batteries--topbar,
   :root[data-ui="paper"] .topbar > .topbar-restart-form,
-  :root[data-ui="paper"] .topbar > .topbar-optin { display: none; }
+  :root[data-ui="paper"] .topbar > .topbar-optin {
+    display: none;
+  }
 
   /* Tab bar. */
   :root[data-ui="paper"] .tabbar {
@@ -497,11 +700,20 @@
   :root[data-ui="paper"] .tabbar > a .ph,
   :root[data-ui="paper"] .tabbar > a .ph-fill,
   :root[data-ui="paper"] .tabbar > button .ph,
-  :root[data-ui="paper"] .tabbar > button .ph-fill { font-size: 22px; line-height: 1; }
+  :root[data-ui="paper"] .tabbar > button .ph-fill {
+    font-size: 22px;
+    line-height: 1;
+  }
   :root[data-ui="paper"] .tabbar > .is-active,
-  :root[data-ui="paper"] .tabbar > [aria-expanded="true"] { color: var(--t-fg); font-weight: 600; }
+  :root[data-ui="paper"] .tabbar > [aria-expanded="true"] {
+    color: var(--t-fg);
+    font-weight: 600;
+  }
   :root[data-ui="paper"] .tabbar > a:focus-visible,
-  :root[data-ui="paper"] .tabbar > button:focus-visible { outline: 0; box-shadow: inset var(--t-ring); }
+  :root[data-ui="paper"] .tabbar > button:focus-visible {
+    outline: 0;
+    box-shadow: inset var(--t-ring);
+  }
 
   /* More: the drawer rises as a sheet, stopping above the tab bar. */
   :root[data-ui="paper"] .topnav {
@@ -519,19 +731,42 @@
     transform: translateY(100%);
     transition: transform 240ms var(--p-ease);
   }
-  :root[data-ui="paper"] body.nav-open .topnav { transform: translateY(0); }
+  :root[data-ui="paper"] body.nav-open .topnav {
+    transform: translateY(0);
+  }
   /* The four tabbed places are not repeated in the sheet. */
-  :root[data-ui="paper"] .topnav > a[data-tab] { display: none; }
+  :root[data-ui="paper"] .topnav > a[data-tab] {
+    display: none;
+  }
   :root[data-ui="paper"] .topnav > a,
-  :root[data-ui="paper"] .topnav .nav-dropdown > summary { min-height: 48px; font-size: 15px; }
-  :root[data-ui="paper"] .topnav .topbar-batteries--drawer { display: block; }
-  :root[data-ui="paper"] .topnav .theme-toggle--drawer { min-height: 48px; margin-top: 4px; }
+  :root[data-ui="paper"] .topnav .nav-dropdown > summary {
+    min-height: 48px;
+    font-size: 15px;
+  }
+  :root[data-ui="paper"] .topnav .topbar-batteries--drawer {
+    display: block;
+  }
+  :root[data-ui="paper"] .topnav .theme-toggle--drawer {
+    min-height: 48px;
+    margin-top: 4px;
+  }
 
   /* Page bar: the top bar once the title has scrolled under it. */
-  :root[data-ui="paper"] .topbar { gap: 10px; }
-  :root[data-ui="paper"] body.page-scrolled .brand-name { display: none; }
-  :root[data-ui="paper"] body.page-scrolled .topbar-page { display: flex; }
-  :root[data-ui="paper"] .topbar-page { flex: 1; align-items: center; gap: 8px; min-width: 0; }
+  :root[data-ui="paper"] .topbar {
+    gap: 10px;
+  }
+  :root[data-ui="paper"] body.page-scrolled .brand-name {
+    display: none;
+  }
+  :root[data-ui="paper"] body.page-scrolled .topbar-page {
+    display: flex;
+  }
+  :root[data-ui="paper"] .topbar-page {
+    flex: 1;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
   :root[data-ui="paper"] .topbar-page-title {
     flex: 1;
     min-width: 0;
@@ -542,7 +777,11 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  :root[data-ui="paper"] .topbar-page-chips { display: flex; gap: 6px; flex: none; }
+  :root[data-ui="paper"] .topbar-page-chips {
+    display: flex;
+    gap: 6px;
+    flex: none;
+  }
   :root[data-ui="paper"] .topbar-chip {
     display: inline-flex;
     align-items: center;
@@ -561,13 +800,26 @@
     white-space: nowrap;
     cursor: pointer;
   }
-  :root[data-ui="paper"] .topbar-chip .ph-bold { font-size: 14px; }
-  :root[data-ui="paper"] .topbar-chip--warn { background: var(--t-warn-bg); }
-  :root[data-ui="paper"] .topbar-chip--low { color: var(--t-warn); }
-  :root[data-ui="paper"] .topbar-chip--critical { color: var(--t-danger); }
+  :root[data-ui="paper"] .topbar-chip .ph-bold {
+    font-size: 14px;
+  }
+  :root[data-ui="paper"] .topbar-chip--warn {
+    background: var(--t-warn-bg);
+  }
+  :root[data-ui="paper"] .topbar-chip--low {
+    color: var(--t-warn);
+  }
+  :root[data-ui="paper"] .topbar-chip--critical {
+    color: var(--t-danger);
+  }
 
   /* Notices: a band at the top of the page. */
-  :root[data-ui="paper"] .shell-notices { display: flex; flex-direction: column; gap: 8px; margin: 0 0 16px; }
+  :root[data-ui="paper"] .shell-notices {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0 0 16px;
+  }
   :root[data-ui="paper"] .shell-notice {
     display: flex;
     align-items: center;
@@ -581,27 +833,52 @@
     font-size: 13px;
     text-decoration: none;
   }
-  :root[data-ui="paper"] .shell-notice--warn { background: var(--t-warn-bg); }
-  :root[data-ui="paper"] .shell-notice > .ph-bold { font-size: 18px; flex: none; }
-  :root[data-ui="paper"] .shell-notice > .ph { color: var(--t-fg-soft); flex: none; }
-  :root[data-ui="paper"] .shell-notice-text { flex: 1; min-width: 0; }
-  :root[data-ui="paper"] .shell-notice-text b { font-weight: 600; }
-  :root[data-ui="paper"] .shell-notice-text span { color: var(--t-fg-soft); }
-  :root[data-ui="paper"] .shell-notice .inline { margin: 0; }
+  :root[data-ui="paper"] .shell-notice--warn {
+    background: var(--t-warn-bg);
+  }
+  :root[data-ui="paper"] .shell-notice > .ph-bold {
+    font-size: 18px;
+    flex: none;
+  }
+  :root[data-ui="paper"] .shell-notice > .ph {
+    color: var(--t-fg-soft);
+    flex: none;
+  }
+  :root[data-ui="paper"] .shell-notice-text {
+    flex: 1;
+    min-width: 0;
+  }
+  :root[data-ui="paper"] .shell-notice-text b {
+    font-weight: 600;
+  }
+  :root[data-ui="paper"] .shell-notice-text span {
+    color: var(--t-fg-soft);
+  }
+  :root[data-ui="paper"] .shell-notice .inline {
+    margin: 0;
+  }
 
   /* Bars that stick to the bottom clear the tab bar. */
   :root[data-ui="paper"] .dxe-actionbar,
-  :root[data-ui="paper"] .lu .lu-pending { bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
-  :root[data-ui="paper"] .dx-save-bar--page { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+  :root[data-ui="paper"] .lu .lu-pending {
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+  :root[data-ui="paper"] .dx-save-bar--page {
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  }
 }
 @media (max-width: 900px) and (prefers-reduced-motion: reduce) {
-  :root[data-ui="paper"] .topnav { transition: none; }
+  :root[data-ui="paper"] .topnav {
+    transition: none;
+  }
 }
 
 /* ----- Batteries: a floating pill in the top-right corner ------------ */
 /* The worst charge as an icon and a count (or the one percentage), on
    a round pill; the popover drops below it, right-aligned. */
-:root[data-ui="paper"] .topbar > .topbar-batteries--topbar { z-index: 600; }
+:root[data-ui="paper"] .topbar > .topbar-batteries--topbar {
+  z-index: 600;
+}
 :root[data-ui="paper"] .topbar-batteries--topbar > summary,
 :root[data-ui="paper"] a.topbar-batteries--topbar {
   display: inline-flex;
@@ -621,20 +898,42 @@
   text-decoration: none;
 }
 :root[data-ui="paper"] .topbar-batteries--topbar > summary:hover,
-:root[data-ui="paper"] a.topbar-batteries--topbar:hover { background: var(--p-hover); color: var(--t-fg); }
-:root[data-ui="paper"] .topbar-batteries--topbar .ph-bold { font-size: 18px; }
-:root[data-ui="paper"] .topbar-batteries--topbar .tg-count { background: transparent; padding: 0; color: inherit; }
+:root[data-ui="paper"] a.topbar-batteries--topbar:hover {
+  background: var(--p-hover);
+  color: var(--t-fg);
+}
+:root[data-ui="paper"] .topbar-batteries--topbar .ph-bold {
+  font-size: 18px;
+}
+:root[data-ui="paper"] .topbar-batteries--topbar .tg-count {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
 :root[data-ui="paper"] .topbar-batteries--topbar.is-tone-critical > summary,
-:root[data-ui="paper"] a.topbar-batteries--topbar.is-tone-critical { color: var(--t-danger); }
+:root[data-ui="paper"] a.topbar-batteries--topbar.is-tone-critical {
+  color: var(--t-danger);
+}
 :root[data-ui="paper"] .topbar-batteries--topbar.is-tone-low > summary,
-:root[data-ui="paper"] a.topbar-batteries--topbar.is-tone-low { color: var(--t-warn); }
+:root[data-ui="paper"] a.topbar-batteries--topbar.is-tone-low {
+  color: var(--t-warn);
+}
 /* The pill morphs into the panel: the panel shares the pill's top-right
    corner and starts clipped to exactly the pill's shape, then the clip
    grows out to the whole panel (and back on close). The pill's icon and
    count stay on top, so they read as the panel's own corner. The base
    script keeps the <details> open in Paper and toggles .is-open. */
-:root[data-ui="paper"] .topbar-batteries--topbar > summary { position: relative; z-index: 2; transition: background-color 180ms ease-out, border-color 180ms ease-out; }
-:root[data-ui="paper"] .topbar-batteries--topbar.is-open > summary { background: transparent; border-color: transparent; }
+:root[data-ui="paper"] .topbar-batteries--topbar > summary {
+  position: relative;
+  z-index: 2;
+  transition:
+    background-color 180ms ease-out,
+    border-color 180ms ease-out;
+}
+:root[data-ui="paper"] .topbar-batteries--topbar.is-open > summary {
+  background: transparent;
+  border-color: transparent;
+}
 :root[data-ui="paper"] .topbar-batteries--topbar .topbar-batteries-popover {
   display: block;
   top: 0;
@@ -657,10 +956,18 @@
   clip-path: inset(0 round 2px);
   visibility: visible;
   pointer-events: auto;
-  transition: clip-path 300ms var(--p-ease), visibility 0s;
+  transition:
+    clip-path 300ms var(--p-ease),
+    visibility 0s;
 }
-:root[data-ui="paper"] .topbar-batteries--topbar .topbar-batteries-popover > * { opacity: 0; transition: opacity 90ms ease-out; }
-:root[data-ui="paper"] .topbar-batteries--topbar.is-open .topbar-batteries-popover > * { opacity: 1; transition: opacity 180ms ease-out 120ms; }
+:root[data-ui="paper"] .topbar-batteries--topbar .topbar-batteries-popover > * {
+  opacity: 0;
+  transition: opacity 90ms ease-out;
+}
+:root[data-ui="paper"] .topbar-batteries--topbar.is-open .topbar-batteries-popover > * {
+  opacity: 1;
+  transition: opacity 180ms ease-out 120ms;
+}
 :root[data-ui="paper"] .topbar-batteries--topbar .topbar-batteries-head {
   display: flex;
   align-items: center;
@@ -673,13 +980,22 @@
 @media (prefers-reduced-motion: reduce) {
   :root[data-ui="paper"] .topbar-batteries--topbar .topbar-batteries-popover,
   :root[data-ui="paper"] .topbar-batteries--topbar.is-open .topbar-batteries-popover,
-  :root[data-ui="paper"] .topbar-batteries--topbar .topbar-batteries-popover > * { transition: none; }
+  :root[data-ui="paper"] .topbar-batteries--topbar .topbar-batteries-popover > * {
+    transition: none;
+  }
 }
-:root[data-ui="paper"] .topbar-batteries-popover .topbar-batteries-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root[data-ui="paper"] .topbar-batteries-popover .topbar-batteries-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* ----- The design switch --------------------------------------------- */
 
-.ui-switch-form { display: contents; }
+.ui-switch-form {
+  display: contents;
+}
 .ui-switch {
   display: inline-flex;
   align-items: center;
@@ -695,8 +1011,13 @@
   cursor: pointer;
   white-space: nowrap;
 }
-.ui-switch:hover { color: var(--t-fg); background: var(--t-surface-sunk); }
-.ui-switch .ph { font-size: 15px; }
+.ui-switch:hover {
+  color: var(--t-fg);
+  background: var(--t-surface-sunk);
+}
+.ui-switch .ph {
+  font-size: 15px;
+}
 .ui-switch-track {
   position: relative;
   width: 34px;
@@ -717,11 +1038,17 @@
   background: var(--t-surface);
   transition: transform 180ms var(--t-ease-snappy);
 }
-.ui-switch[aria-checked="true"] .ui-switch-track { background: var(--t-accent); }
-.ui-switch[aria-checked="true"] .ui-switch-track::after { transform: translateX(14px); }
+.ui-switch[aria-checked="true"] .ui-switch-track {
+  background: var(--t-accent);
+}
+.ui-switch[aria-checked="true"] .ui-switch-track::after {
+  transform: translateX(14px);
+}
 /* Drawer / sidebar variant is a full-width row; the classic desktop top
    bar gets the compact pill. */
-.ui-switch--nav { display: none; }
+.ui-switch--nav {
+  display: none;
+}
 .topnav .ui-switch--nav {
   width: 100%;
   justify-content: space-between;
@@ -731,32 +1058,62 @@
   min-height: 40px;
 }
 @media (max-width: 900px) {
-  .ui-switch--topbar { display: none; }
-  .topnav .ui-switch--nav { display: inline-flex; min-height: 44px; }
+  .ui-switch--topbar {
+    display: none;
+  }
+  .topnav .ui-switch--nav {
+    display: inline-flex;
+    min-height: 44px;
+  }
 }
 @media (min-width: 901px) {
-  :root[data-ui="paper"] .ui-switch--topbar { display: none; }
-  :root[data-ui="paper"] .topnav .ui-switch--nav { display: inline-flex; }
+  :root[data-ui="paper"] .ui-switch--topbar {
+    display: none;
+  }
+  :root[data-ui="paper"] .topnav .ui-switch--nav {
+    display: inline-flex;
+  }
 }
 /* Classic top bar: the pill takes over the right-alignment the theme
    toggle had, unless an earlier right-hand item already claimed it. */
-.ui-switch--topbar { margin-left: auto; }
+.ui-switch--topbar {
+  margin-left: auto;
+}
 .topbar-discovered--topbar ~ .ui-switch-form .ui-switch--topbar,
 .topbar-batteries--topbar ~ .ui-switch-form .ui-switch--topbar,
 .topbar-optin ~ .ui-switch-form .ui-switch--topbar,
-.topbar-restart-form ~ .ui-switch-form .ui-switch--topbar { margin-left: 4px; }
-.ui-switch-form + .theme-toggle--topbar { margin-left: 4px; }
+.topbar-restart-form ~ .ui-switch-form .ui-switch--topbar {
+  margin-left: 4px;
+}
+.ui-switch-form + .theme-toggle--topbar {
+  margin-left: 4px;
+}
 
 /* ----- Components ---------------------------------------------------- */
 
 :root[data-ui="paper"] .page-head h1,
-:root[data-ui="paper"] .card-head h1 { font-weight: 800; letter-spacing: -0.03em; }
-:root[data-ui="paper"] .page-head h1 > .ph:first-child { display: none; }  /* titles carry no icon in the mockups */
-:root[data-ui="paper"] h2, :root[data-ui="paper"] h3 { letter-spacing: -0.015em; }
+:root[data-ui="paper"] .card-head h1 {
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+:root[data-ui="paper"] .page-head h1 > .ph:first-child {
+  display: none;
+} /* titles carry no icon in the mockups */
+:root[data-ui="paper"] h2,
+:root[data-ui="paper"] h3 {
+  letter-spacing: -0.015em;
+}
 
-:root[data-ui="paper"] .btn { font-weight: 600; border-color: var(--t-border-strong); }
-:root[data-ui="paper"] .btn:hover { background: var(--p-hover); }
-:root[data-ui="paper"] .btn:active { transform: none; }
+:root[data-ui="paper"] .btn {
+  font-weight: 600;
+  border-color: var(--t-border-strong);
+}
+:root[data-ui="paper"] .btn:hover {
+  background: var(--p-hover);
+}
+:root[data-ui="paper"] .btn:active {
+  transform: none;
+}
 /* Primary buttons were a gradient with a gloss highlight; Paper paints
    them flat red, with no lift on hover. */
 :root[data-ui="paper"] button.primary,
@@ -774,16 +1131,28 @@
   transform: none;
 }
 :root[data-ui="paper"] button.primary:focus-visible,
-:root[data-ui="paper"] .btn-primary:focus-visible { box-shadow: none; }
-:root[data-ui="paper"] .dow-chip:has(input:checked) { box-shadow: none; }
-:root[data-ui="paper"] .rotation-countdown-fill { background: var(--t-accent); }
+:root[data-ui="paper"] .btn-primary:focus-visible {
+  box-shadow: none;
+}
+:root[data-ui="paper"] .dow-chip:has(input:checked) {
+  box-shadow: none;
+}
+:root[data-ui="paper"] .rotation-countdown-fill {
+  background: var(--t-accent);
+}
 
 /* Icon boxes and section icons go monochrome: colour lives in panel
    previews and status, not in decoration. */
 :root[data-ui="paper"] .icon-box,
 :root[data-ui="paper"] .dx-section-icon,
-:root[data-ui="paper"] .dx-section-card .dx-section-icon { background: var(--t-surface-sunk); color: var(--t-fg); }
-:root[data-ui="paper"] .tg--teal { background: var(--t-surface-sunk); color: var(--t-fg); }
+:root[data-ui="paper"] .dx-section-card .dx-section-icon {
+  background: var(--t-surface-sunk);
+  color: var(--t-fg);
+}
+:root[data-ui="paper"] .tg--teal {
+  background: var(--t-surface-sunk);
+  color: var(--t-fg);
+}
 
 /* Selected states drew 2px inset rings; Paper keeps hairlines. */
 :root[data-ui="paper"] .tile.is-on,
@@ -792,17 +1161,29 @@
   color: var(--t-accent-ink);
   box-shadow: inset 0 0 0 1px var(--t-accent);
 }
-:root[data-ui="paper"] .multiselect-opt.is-dragging { box-shadow: inset 0 0 0 1px var(--t-accent); }
+:root[data-ui="paper"] .multiselect-opt.is-dragging {
+  box-shadow: inset 0 0 0 1px var(--t-accent);
+}
 :root[data-ui="paper"] .dxe-pcard.is-selected::after,
-:root[data-ui="paper"] .dx-thumb { border-width: 1px; }
+:root[data-ui="paper"] .dx-thumb {
+  border-width: 1px;
+}
 :root[data-ui="paper"] .dx-sponsor-card,
-:root[data-ui="paper"] .rooms-notice--dep { border-left-width: 1px; }
+:root[data-ui="paper"] .rooms-notice--dep {
+  border-left-width: 1px;
+}
 :root[data-ui="paper"] .topnav .nav-dropdown-panel,
-:root[data-ui="paper"] .topbar-batteries-drawer-list li { border-left-width: 1px; }
-:root[data-ui="paper"] .tab { border-bottom-width: 1px; }
+:root[data-ui="paper"] .topbar-batteries-drawer-list li {
+  border-left-width: 1px;
+}
+:root[data-ui="paper"] .tab {
+  border-bottom-width: 1px;
+}
 
 /* Flashes read as ink notes rather than coloured cards. */
-:root[data-ui="paper"] .flash { border-radius: var(--t-radius); }
+:root[data-ui="paper"] .flash {
+  border-radius: var(--t-radius);
+}
 
 /* ----- Settings: in the sidebar ------------------------------------ */
 /* The settings areas are a dropdown in the main sidebar (_base.html,
@@ -811,7 +1192,9 @@
    tab strip (settings_tabs macro) is not drawn; a phone, whose sidebar is
    a drawer, keeps it as a quick switch. */
 @media (min-width: 901px) {
-  :root[data-ui="paper"] .settings-nav { display: none; }
+  :root[data-ui="paper"] .settings-nav {
+    display: none;
+  }
 }
 
 /* ----- Raised sheets --------------------------------------------- */
@@ -829,18 +1212,30 @@
   box-shadow: none;
 }
 :root[data-ui="paper"] .dx-section-card + .dx-section-card,
-:root[data-ui="paper"] .card + .card { margin-top: 16px; }
+:root[data-ui="paper"] .card + .card {
+  margin-top: 16px;
+}
 /* Side-by-side sections (Stats, Send) align their tops instead. */
 :root[data-ui="paper"] .dx-stats-columns > .dx-section-card,
-:root[data-ui="paper"] .send-pair > .dx-section-card { margin-top: 0; }
-:root[data-ui="paper"] .dx-devtable { padding: 0; }
+:root[data-ui="paper"] .send-pair > .dx-section-card {
+  margin-top: 0;
+}
+:root[data-ui="paper"] .dx-devtable {
+  padding: 0;
+}
 /* Section heads lose their decorative icon tile; a small square in the
    theme's accent colour, the one splash of colour, marks every section title instead. */
 :root[data-ui="paper"] .dx-section-card .dx-section-icon,
 :root[data-ui="paper"] .card-head > .icon-box,
-:root[data-ui="paper"] .card-head h2 > .icon-box { display: none; }
+:root[data-ui="paper"] .card-head h2 > .icon-box {
+  display: none;
+}
 :root[data-ui="paper"] .dx-section-title,
-:root[data-ui="paper"] .card-head h2 { font-size: 20px; font-weight: 700; letter-spacing: -0.015em; }
+:root[data-ui="paper"] .card-head h2 {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
 :root[data-ui="paper"] .dx-section-title::before,
 :root[data-ui="paper"] .card-head h2::before {
   content: "";
@@ -868,7 +1263,9 @@
   border-radius: 0;
   padding: 14px 0;
 }
-:root[data-ui="paper"] .dx-inset-row:hover { background: var(--p-hover); }
+:root[data-ui="paper"] .dx-inset-row:hover {
+  background: var(--p-hover);
+}
 /* Dashboards table: the sheet holds the toolbar, an 11px mono head and
    hairline rows; an opened row is a shade down, its figures sunk blocks. */
 :root[data-ui="paper"] .dx-dashtable {
@@ -876,16 +1273,41 @@
   --dx-border-soft: var(--t-border);
   --dx-teal-soft: var(--t-surface-sunk);
 }
-:root[data-ui="paper"] .dx-dashtable-head { font-size: 11px; font-weight: 500; color: var(--t-fg-soft); }
-:root[data-ui="paper"] .dx-dashrow:hover { background: var(--p-hover); }
-:root[data-ui="paper"] .dx-dashrow.is-open { background: var(--t-surface-sunk); }
-:root[data-ui="paper"] .dx-dash-name { font-size: 15px; font-weight: 700; }
-:root[data-ui="paper"] .dx-dashrow .dx-dash-mono { font-size: 12px; }
+:root[data-ui="paper"] .dx-dashtable-head {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--t-fg-soft);
+}
+:root[data-ui="paper"] .dx-dashrow:hover {
+  background: var(--p-hover);
+}
+:root[data-ui="paper"] .dx-dashrow.is-open {
+  background: var(--t-surface-sunk);
+}
+:root[data-ui="paper"] .dx-dash-name {
+  font-size: 15px;
+  font-weight: 700;
+}
+:root[data-ui="paper"] .dx-dashrow .dx-dash-mono {
+  font-size: 12px;
+}
 :root[data-ui="paper"] .dx-dash-thumb,
-:root[data-ui="paper"] .dx-dashquick-preview { border-radius: 2px; }
-:root[data-ui="paper"] .dx-dashtable .dx-dashquick { background: var(--t-surface-soft); border-bottom: 1px solid var(--t-border); }
-:root[data-ui="paper"] .dx-dashquick-preview { height: 160px; max-height: none; min-height: 0; aspect-ratio: auto; }
-:root[data-ui="paper"] .dx-dashquick-preview.is-portrait[style*="aspect-ratio"] { height: 240px; }
+:root[data-ui="paper"] .dx-dashquick-preview {
+  border-radius: 2px;
+}
+:root[data-ui="paper"] .dx-dashtable .dx-dashquick {
+  background: var(--t-surface-soft);
+  border-bottom: 1px solid var(--t-border);
+}
+:root[data-ui="paper"] .dx-dashquick-preview {
+  height: 160px;
+  max-height: none;
+  min-height: 0;
+  aspect-ratio: auto;
+}
+:root[data-ui="paper"] .dx-dashquick-preview.is-portrait[style*="aspect-ratio"] {
+  height: 240px;
+}
 :root[data-ui="paper"] .dx-dashtable .dx-qtile {
   background: var(--t-surface-sunk);
   border: 0;
@@ -893,24 +1315,64 @@
   padding: 14px 16px;
   gap: 6px;
 }
-:root[data-ui="paper"] .dx-dashtable .dx-qtile-label { font-size: 11px; color: var(--t-fg-soft); }
-:root[data-ui="paper"] .dx-dashtable .dx-qtile-value { font-size: 22px; letter-spacing: -0.02em; }
-:root[data-ui="paper"] .dx-dashtable .dx-qtile-sub { font-family: var(--t-font); font-size: 12px; color: var(--t-fg-soft); }
-:root[data-ui="paper"] .dx-dash-chev { color: var(--t-fg); }
+:root[data-ui="paper"] .dx-dashtable .dx-qtile-label {
+  font-size: 11px;
+  color: var(--t-fg-soft);
+}
+:root[data-ui="paper"] .dx-dashtable .dx-qtile-value {
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+:root[data-ui="paper"] .dx-dashtable .dx-qtile-sub {
+  font-family: var(--t-font);
+  font-size: 12px;
+  color: var(--t-fg-soft);
+}
+:root[data-ui="paper"] .dx-dash-chev {
+  color: var(--t-fg);
+}
 /* Display groups: a shaded band with the name in the sheet's ink. */
-:root[data-ui="paper"] .dx-dashgroup-head { background: var(--t-surface-soft); border-bottom-color: var(--t-border); }
-:root[data-ui="paper"] .dx-dashgroup-head:hover { background: var(--p-hover); }
-:root[data-ui="paper"] .dx-dashgroup-name { font-size: 15px; letter-spacing: -0.01em; }
+:root[data-ui="paper"] .dx-dashgroup-head {
+  background: var(--t-surface-soft);
+  border-bottom-color: var(--t-border);
+}
+:root[data-ui="paper"] .dx-dashgroup-head:hover {
+  background: var(--p-hover);
+}
+:root[data-ui="paper"] .dx-dashgroup-name {
+  font-size: 15px;
+  letter-spacing: -0.01em;
+}
 :root[data-ui="paper"] .dx-dashgroup-fold,
-:root[data-ui="paper"] .dx-dashgroup-link { color: var(--t-fg); }
-:root[data-ui="paper"] .dx-dashgroup-meta { color: var(--t-fg-soft); }
-:root[data-ui="paper"] .dx-refresh { border-radius: 2px; }
+:root[data-ui="paper"] .dx-dashgroup-link {
+  color: var(--t-fg);
+}
+:root[data-ui="paper"] .dx-dashgroup-meta {
+  color: var(--t-fg-soft);
+}
+:root[data-ui="paper"] .dx-refresh {
+  border-radius: 2px;
+}
 :root[data-ui="paper"] .dx-refresh select,
-:root[data-ui="paper"] .dx-refresh input[type="number"] { border-color: var(--t-border-strong); background: var(--t-surface); }
+:root[data-ui="paper"] .dx-refresh input[type="number"] {
+  border-color: var(--t-border-strong);
+  background: var(--t-surface);
+}
 @container dashtable (max-width: 720px) {
-  :root[data-ui="paper"] .dx-dashquick-preview { height: auto; aspect-ratio: 5 / 3; max-height: 220px; }
-  :root[data-ui="paper"] .dx-dashquick-preview[style*="aspect-ratio"] { height: 160px; max-height: none; width: auto; max-width: 100%; }
-  :root[data-ui="paper"] .dx-dashquick-preview.is-portrait[style*="aspect-ratio"] { height: 220px; }
+  :root[data-ui="paper"] .dx-dashquick-preview {
+    height: auto;
+    aspect-ratio: 5 / 3;
+    max-height: 220px;
+  }
+  :root[data-ui="paper"] .dx-dashquick-preview[style*="aspect-ratio"] {
+    height: 160px;
+    max-height: none;
+    width: auto;
+    max-width: 100%;
+  }
+  :root[data-ui="paper"] .dx-dashquick-preview.is-portrait[style*="aspect-ratio"] {
+    height: 220px;
+  }
 }
 /* Stats: one sheet holding a strip of figures with hairline dividers. */
 :root[data-ui="paper"] .dx-stat-tiles {
@@ -926,9 +1388,14 @@
   border-radius: 0;
   padding: 4px 16px;
 }
-:root[data-ui="paper"] .dx-stat-tile:first-child { border-left: 0; }
+:root[data-ui="paper"] .dx-stat-tile:first-child {
+  border-left: 0;
+}
 /* Empty states are a quiet sheet; drop zones keep a single dashed hairline. */
-:root[data-ui="paper"] .send-box { border-width: 1px; background: var(--t-surface); }
+:root[data-ui="paper"] .send-box {
+  border-width: 1px;
+  background: var(--t-surface);
+}
 
 /* Settings fields: label on the left, control on the right, as in the
    mockups (toggle rows already read that way). Wide screens only; below
@@ -945,59 +1412,126 @@
     grid-row: 1 / span 4;
     padding-top: 10px;
   }
-  :root[data-ui="paper"] .dx-section-body > .field:not(.field--slider):not(.field--days) > :not(label) { grid-column: 2; }
+  :root[data-ui="paper"]
+    .dx-section-body
+    > .field:not(.field--slider):not(.field--days)
+    > :not(label) {
+    grid-column: 2;
+  }
 }
 
 /* ----- Corners: 2px everywhere, square in the sidebars --------------- */
 /* The dx-* surfaces hard-code their own radii (8-16px) rather than using
    the radius tokens, so cap every element here (2px). Round things stay
    round: switches, radios, status dots, avatars and slider knobs. */
-:root[data-ui="paper"] :where(body *:not(svg, svg *):not([class*="dot"]):not([class*="switch"]):not([class*="toggle"]):not([class*="avatar"]):not([class*="knob"]):not([class*="thumb"]):not([role="switch"]):not([role="switch"] *):not(input[type="radio"]):not(input[type="range"])) {
+:root[data-ui="paper"]
+  :where(
+    body
+      *:not(svg, svg *):not([class*="dot"]):not([class*="switch"]):not([class*="toggle"]):not(
+        [class*="avatar"]
+      ):not([class*="knob"]):not([class*="thumb"]):not([role="switch"]):not([role="switch"] *):not(
+        input[type="radio"]
+      ):not(input[type="range"])
+  ) {
   /* :where keeps this at the specificity of :root[data-ui] alone, so the
      square-cornered rules in this file (sections, sidebar) still win. */
   border-radius: 2px;
 }
 :root[data-ui="paper"] .topbar,
-:root[data-ui="paper"] .topnav { border-radius: 0; }
+:root[data-ui="paper"] .topnav {
+  border-radius: 0;
+}
 /* Form controls carry two-class radius rules in the settings sheets. */
-:root[data-ui="paper"] :is(input, select, textarea, button):not([type="radio"]):not([type="checkbox"]):not([type="range"]):not([role="switch"]):not([class*="switch"]):not([class*="toggle"]),
+:root[data-ui="paper"]
+  :is(input, select, textarea, button):not([type="radio"]):not([type="checkbox"]):not(
+    [type="range"]
+  ):not([role="switch"]):not([class*="switch"]):not([class*="toggle"]),
 :root[data-ui="paper"] .seg,
-:root[data-ui="paper"] .dx-status-bar-toggle { border-radius: 2px; }
+:root[data-ui="paper"] .dx-status-bar-toggle {
+  border-radius: 2px;
+}
 :root[data-ui="paper"] .topnav a,
 :root[data-ui="paper"] .topnav .nav-dropdown-link,
-:root[data-ui="paper"] .settings-nav .tab { border-radius: 0; }
-:root[data-ui="paper"] .nav-count { border-radius: 9px; box-shadow: 0 0 0 2px var(--t-surface); }
+:root[data-ui="paper"] .settings-nav .tab {
+  border-radius: 0;
+}
+:root[data-ui="paper"] .nav-count {
+  border-radius: 9px;
+  box-shadow: 0 0 0 2px var(--t-surface);
+}
 :root[data-ui="paper"] .tg,
 :root[data-ui="paper"] .tg-count,
-:root[data-ui="paper"] [class*="pill"]:not([class*="switch"]) { border-radius: 2px; }
+:root[data-ui="paper"] [class*="pill"]:not([class*="switch"]) {
+  border-radius: 2px;
+}
 
 /* ----- Control heights --------------------------------------------- */
 /* Paper sets display on controls below; the hidden attribute must still win. */
-:root[data-ui="paper"] [hidden] { display: none !important; }
+:root[data-ui="paper"] [hidden] {
+  display: none !important;
+}
 /* One height for every form control so fields line up: 40px standard
    (44px on touch-width screens), 32px for the compact controls that sit
    inside list rows. The classic sheets size these piecemeal (22-47px). */
-:root[data-ui="paper"] :is(
-  input:is([type="text"], [type="password"], [type="number"], [type="email"], [type="url"],
-           [type="search"], [type="tel"], [type="time"], [type="date"], [type="datetime-local"], :not([type])),
-  select,
-  button.primary, button.ghost, button.button, .btn, .dx-btn, .dx-btn-primary,
-  .icon-picker-trigger, .dx-devtb-search, input[type="color"]
-):not(.dx-devtb-search input):not([type="hidden"]):not(:is(.dx-inset-row, .dx-updates-ctl) :is(select, button)) {
+:root[data-ui="paper"]
+  :is(
+    input:is(
+      [type="text"],
+      [type="password"],
+      [type="number"],
+      [type="email"],
+      [type="url"],
+      [type="search"],
+      [type="tel"],
+      [type="time"],
+      [type="date"],
+      [type="datetime-local"],
+      :not([type])
+    ),
+    select,
+    button.primary,
+    button.ghost,
+    button.button,
+    .btn,
+    .dx-btn,
+    .dx-btn-primary,
+    .icon-picker-trigger,
+    .dx-devtb-search,
+    input[type="color"]
+  ):not(.dx-devtb-search input):not([type="hidden"]):not(
+    :is(.dx-inset-row, .dx-updates-ctl) :is(select, button)
+  ) {
   box-sizing: border-box;
   height: 40px;
   min-height: 40px;
   padding-block: 0;
   font-size: 14px;
 }
-:root[data-ui="paper"] :is(button.primary, button.ghost, button.button, .btn, .dx-btn, .dx-btn-primary, .icon-picker-trigger) {
+:root[data-ui="paper"]
+  :is(
+    button.primary,
+    button.ghost,
+    button.button,
+    .btn,
+    .dx-btn,
+    .dx-btn-primary,
+    .icon-picker-trigger
+  ) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 /* The devices search is a bordered label holding a bare input. */
-:root[data-ui="paper"] .dx-devtb-search { display: inline-flex; align-items: center; }
-:root[data-ui="paper"] .dx-devtb-search input { height: 100%; min-height: 0; border: 0; background: transparent; }
+:root[data-ui="paper"] .dx-devtb-search {
+  display: inline-flex;
+  align-items: center;
+}
+:root[data-ui="paper"] .dx-devtb-search input {
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+}
 /* Segmented controls: a 40px track holding the segments. */
 :root[data-ui="paper"] :is(.seg, .preview-modes) {
   box-sizing: border-box;
@@ -1005,7 +1539,11 @@
   padding: 3px;
   align-items: stretch;
 }
-:root[data-ui="paper"] :is(.seg-item, .preview-mode) { height: auto; display: inline-flex; align-items: center; }
+:root[data-ui="paper"] :is(.seg-item, .preview-mode) {
+  height: auto;
+  display: inline-flex;
+  align-items: center;
+}
 /* Compact: controls inside list rows. */
 :root[data-ui="paper"] :is(.dx-inset-row, .dx-updates-ctl) :is(select, button),
 :root[data-ui="paper"] :is(.dx-btn-ghost-sm, .dx-btn-icon-only) {
@@ -1015,16 +1553,45 @@
   padding-block: 0;
   font-size: 13px;
 }
-:root[data-ui="paper"] .dx-btn-icon-only { width: 32px; padding-inline: 0; }
-:root[data-ui="paper"] :is(.dx-btn-ghost-sm, .dx-btn-icon-only) { display: inline-flex; align-items: center; justify-content: center; }
+:root[data-ui="paper"] .dx-btn-icon-only {
+  width: 32px;
+  padding-inline: 0;
+}
+:root[data-ui="paper"] :is(.dx-btn-ghost-sm, .dx-btn-icon-only) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
 @media (max-width: 900px) {
-  :root[data-ui="paper"] :is(
-    input:is([type="text"], [type="password"], [type="number"], [type="email"], [type="url"],
-             [type="search"], [type="tel"], [type="time"], [type="date"], [type="datetime-local"], :not([type])),
-    select,
-    button.primary, button.ghost, button.button, .btn, .dx-btn, .dx-btn-primary,
-    .icon-picker-trigger, .dx-devtb-search, .seg, .preview-modes
-  ):not(.dx-devtb-search input):not([type="hidden"]):not(:is(.dx-inset-row, .dx-updates-ctl) :is(select, button)) {
+  :root[data-ui="paper"]
+    :is(
+      input:is(
+        [type="text"],
+        [type="password"],
+        [type="number"],
+        [type="email"],
+        [type="url"],
+        [type="search"],
+        [type="tel"],
+        [type="time"],
+        [type="date"],
+        [type="datetime-local"],
+        :not([type])
+      ),
+      select,
+      button.primary,
+      button.ghost,
+      button.button,
+      .btn,
+      .dx-btn,
+      .dx-btn-primary,
+      .icon-picker-trigger,
+      .dx-devtb-search,
+      .seg,
+      .preview-modes
+    ):not(.dx-devtb-search input):not([type="hidden"]):not(
+      :is(.dx-inset-row, .dx-updates-ctl) :is(select, button)
+    ) {
     height: 44px;
     min-height: 44px;
   }
@@ -1036,11 +1603,17 @@
    whole page on every navigation changed glyph rasterization at fractional
    pixels even when the fonts were already cached. */
 :root[data-ui="paper"] .card,
-:root[data-ui="paper"] .dx-dashboard-card { transition: transform 220ms var(--p-ease), border-color 180ms ease-out; }
+:root[data-ui="paper"] .dx-dashboard-card {
+  transition:
+    transform 220ms var(--p-ease),
+    border-color 180ms ease-out;
+}
 
 @media (prefers-reduced-motion: reduce) {
   :root[data-ui="paper"] .topnav,
   :root[data-ui="paper"] .brand-mark,
   .ui-switch-track,
-  .ui-switch-track::after { transition: none; }
+  .ui-switch-track::after {
+    transition: none;
+  }
 }

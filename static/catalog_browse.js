@@ -595,7 +595,8 @@
     }
     if (item.kind === "template") return "View & install";
     if (item.tooNew && !item.installed) return "Needs Tesserae " + item.tesseraeMin;
-    if (item.tooNew && item.updateAvailable) return "v" + item.version + " needs Tesserae " + item.tesseraeMin;
+    if (item.tooNew && item.updateAvailable)
+      return "v" + item.version + " needs Tesserae " + item.tesseraeMin;
     if (item.updateAvailable) return "Update to v" + item.version;
     return item.installed ? "Uninstall" : "Install";
   }
@@ -799,7 +800,10 @@
       type: "button",
       class: actionClass(item),
       text: actionLabel(item),
-      disabled: state.pending[item.id] || (item.tooNew && (!item.installed || item.updateAvailable)) ? "disabled" : null,
+      disabled:
+        state.pending[item.id] || (item.tooNew && (!item.installed || item.updateAvailable))
+          ? "disabled"
+          : null,
     });
     btn.addEventListener("click", function (ev) {
       ev.stopPropagation();
@@ -1089,7 +1093,10 @@
       type: "button",
       class: actionClass(item) + " cat-btn--wide",
       text: actionLabel(item),
-      disabled: state.pending[item.id] || (item.tooNew && (!item.installed || item.updateAvailable)) ? "disabled" : null,
+      disabled:
+        state.pending[item.id] || (item.tooNew && (!item.installed || item.updateAvailable))
+          ? "disabled"
+          : null,
     });
     primary.addEventListener("click", function () {
       runAction(item, primary);

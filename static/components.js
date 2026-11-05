@@ -78,7 +78,10 @@
     const frames = root.querySelectorAll("[data-fit-preview]:not([data-fit-bound])");
     if (!frames.length) return;
     if (typeof ResizeObserver === "undefined") {
-      frames.forEach((f) => { f.dataset.fitBound = "1"; fitPreview(f); });
+      frames.forEach((f) => {
+        f.dataset.fitBound = "1";
+        fitPreview(f);
+      });
       window.addEventListener("resize", () => frames.forEach(fitPreview));
       return;
     }
@@ -296,12 +299,10 @@
     // not hidden. Hiding it leaves its fields in the form, still submitted.
     scope.querySelectorAll("[data-opt-more]").forEach((more) => {
       const body = more.querySelector(".opt-more-body") || more;
-      const visible = Array.from(body.querySelectorAll("input, select, textarea")).some(
-        (el) => {
-          const wrap = el.closest("[data-show-if]");
-          return !wrap || !more.contains(wrap) || !wrap.hidden;
-        },
-      );
+      const visible = Array.from(body.querySelectorAll("input, select, textarea")).some((el) => {
+        const wrap = el.closest("[data-show-if]");
+        return !wrap || !more.contains(wrap) || !wrap.hidden;
+      });
       more.hidden = !visible;
     });
   }
@@ -412,7 +413,7 @@
       let pointerDrag = null;
 
       const inputFor = (row) => row && row.querySelector('input[type="checkbox"]');
-      const rows = () => list ? Array.from(list.querySelectorAll(".multiselect-opt")) : [];
+      const rows = () => (list ? Array.from(list.querySelectorAll(".multiselect-opt")) : []);
       const selectedRows = () => rows().filter((row) => inputFor(row)?.checked);
       const selectedValues = () => selectedRows().map((row) => inputFor(row).value);
       const sameOrder = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
@@ -530,7 +531,7 @@
         // Keep filter keystrokes local, don't dirty the form or trigger
         // a preview POST (the filter isn't part of the saved value).
         ["input", "change", "keyup", "keydown"].forEach((evt) =>
-          filter.addEventListener(evt, (e) => e.stopPropagation()),
+          filter.addEventListener(evt, (e) => e.stopPropagation())
         );
         filter.addEventListener("input", applyFilter);
       }
@@ -791,9 +792,7 @@
           _escapeHtml(parts.join(", ")) +
           "</span>" +
           (coords
-            ? '<span class="location-search-pill-coords">' +
-              _escapeHtml(coords) +
-              "</span>"
+            ? '<span class="location-search-pill-coords">' + _escapeHtml(coords) + "</span>"
             : "") +
           "</div>";
         field.appendChild(pill);
@@ -832,9 +831,7 @@
         // to-explain shape than tracking a per-input "user has
         // edited" flag.
         const form = field.closest("form");
-        const labelInput = form
-          ? form.querySelector('[name="opt_label"]')
-          : null;
+        const labelInput = form ? form.querySelector('[name="opt_label"]') : null;
         if (labelInput && "value" in labelInput) {
           labelInput.value = loc.name || "";
         }
@@ -916,8 +913,7 @@
       // ``_icon`` presentation overrides, which selection strips.
       function renderResults(list) {
         if (!list.length) {
-          results.innerHTML =
-            '<li class="location-search-empty">No matches.</li>';
+          results.innerHTML = '<li class="location-search-empty">No matches.</li>';
           results.hidden = false;
           return;
         }
@@ -1027,9 +1023,7 @@
   // synthetic search result named after its own coordinates; null for
   // anything else so the caller falls through to the name search.
   function _coordsResult(text) {
-    const m = /^\s*([+-]?\d+(?:\.\d+)?)\s*(?:,|\s)\s*([+-]?\d+(?:\.\d+)?)\s*$/.exec(
-      text || ""
-    );
+    const m = /^\s*([+-]?\d+(?:\.\d+)?)\s*(?:,|\s)\s*([+-]?\d+(?:\.\d+)?)\s*$/.exec(text || "");
     if (!m) return null;
     const lat = parseFloat(m[1]);
     const lon = parseFloat(m[2]);
@@ -1082,7 +1076,7 @@
       const sidebar = getComputedStyle(bar).position === "fixed";
       document.documentElement.style.setProperty(
         "--t-topbar-h",
-        sidebar ? "0px" : Math.round(bar.getBoundingClientRect().height) + "px",
+        sidebar ? "0px" : Math.round(bar.getBoundingClientRect().height) + "px"
       );
     };
     publish();
@@ -1110,7 +1104,8 @@
     const pop = (f) => f.querySelector("[data-pic-pop]");
     const trigger = (f) => f.querySelector("[data-pic-trigger]");
     const boxOf = (o) => o.closest(".pic-cell") || o;
-    const visibleOpts = (f) => Array.from(f.querySelectorAll(".pic-opt")).filter((o) => !boxOf(o).hidden);
+    const visibleOpts = (f) =>
+      Array.from(f.querySelectorAll(".pic-opt")).filter((o) => !boxOf(o).hidden);
 
     function sync(f) {
       const sel = native(f);
@@ -1289,7 +1284,8 @@
       });
     });
     document.addEventListener("input", (ev) => {
-      if (ev.target.matches && ev.target.matches("[data-pic-filter]")) filter(fieldOf(ev.target), ev.target.value);
+      if (ev.target.matches && ev.target.matches("[data-pic-filter]"))
+        filter(fieldOf(ev.target), ev.target.value);
     });
     // a value set from elsewhere (a reset, a preset) shows on the row
     document.addEventListener("change", (ev) => {
@@ -1308,7 +1304,13 @@
           // keep the focus inside the view while it is open
           const items = Array.from(view.el.querySelectorAll("button:not([disabled])"));
           const i = items.indexOf(document.activeElement);
-          const j = ev.shiftKey ? (i <= 0 ? items.length - 1 : i - 1) : i === items.length - 1 ? 0 : i + 1;
+          const j = ev.shiftKey
+            ? i <= 0
+              ? items.length - 1
+              : i - 1
+            : i === items.length - 1
+              ? 0
+              : i + 1;
           ev.preventDefault();
           items[j].focus();
         }

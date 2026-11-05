@@ -15,32 +15,32 @@
 /* ----------------------------------------------------------------------------
    1 · PRIMITIVES  (theme-independent raw values)
 ---------------------------------------------------------------------------- */
-:root{
+:root {
   /* Type scale, expressed in em so it rides the fluid container base.
      Bold/large by default: body is semibold, values & display are heavy. */
-  --fs-display: 3em;     /* hero numbers on stat tiles            */
-  --fs-jumbo:   2.5em;   /* large values                          */
-  --fs-value:   1.9em;   /* secondary values                      */
-  --fs-lead:    1.25em;  /* lead / emphasised body                */
-  --fs-body:    1em;     /* default body                          */
-  --fs-label:   0.8em;   /* uppercase section labels              */
-  --fs-caption: 0.72em;  /* smallest permissible text             */
+  --fs-display: 3em; /* hero numbers on stat tiles            */
+  --fs-jumbo: 2.5em; /* large values                          */
+  --fs-value: 1.9em; /* secondary values                      */
+  --fs-lead: 1.25em; /* lead / emphasised body                */
+  --fs-body: 1em; /* default body                          */
+  --fs-label: 0.8em; /* uppercase section labels              */
+  --fs-caption: 0.72em; /* smallest permissible text             */
 
   /* Weights, heavy baseline */
   --fw-regular: 500;
-  --fw-medium:  600;
-  --fw-semi:    700;
-  --fw-bold:    800;
-  --fw-black:   900;
+  --fw-medium: 600;
+  --fw-semi: 700;
+  --fw-bold: 800;
+  --fw-black: 900;
 
   /* Line heights */
-  --lh-tight:   1.02;
-  --lh-snug:    1.16;
-  --lh-body:    1.32;
+  --lh-tight: 1.02;
+  --lh-snug: 1.16;
+  --lh-body: 1.32;
 
   /* Letter spacing */
-  --ls-label:   0.08em;   /* tracked uppercase labels */
-  --ls-tight:  -0.01em;
+  --ls-label: 0.08em; /* tracked uppercase labels */
+  --ls-tight: -0.01em;
 
   /* Spacing scale, em-based, rides the fluid base. */
   --space-1: 0.25em;
@@ -52,14 +52,14 @@
   --space-7: 3em;
 
   /* Radii, sharp by default for crisp e-ink edges */
-  --radius-0: 0px;     /* default widget shell        */
+  --radius-0: 0px; /* default widget shell        */
   --radius-1: 2px;
   --radius-2: 4px;
 
   /* Stroke weights, detail floor. Never below 2px; bars/lines 3px+. */
-  --stroke-1: 2px;     /* outer edge minimum          */
-  --stroke-2: 3px;     /* data strokes, chart lines   */
-  --stroke-3: 4px;     /* heavy emphasis              */
+  --stroke-1: 2px; /* outer edge minimum          */
+  --stroke-2: 3px; /* data strokes, chart lines   */
+  --stroke-3: 4px; /* heavy emphasis              */
 
   /* Icon sizes (em), Phosphor BOLD weight only */
   --icon-sm: 1.1em;
@@ -73,7 +73,7 @@
 
   /* Component tokens (defaults; override per widget) */
   --titlebar-min-h: 1.5em;
-  --pad: clamp(0.9em, 9cqmin, 1.4em);  /* widget inner padding, fluid */
+  --pad: clamp(0.9em, 9cqmin, 1.4em); /* widget inner padding, fluid */
   --row-gap: var(--space-3);
 
   /* Style-tunable shape/structure tokens, styles (spectra-styles.css)
@@ -81,12 +81,12 @@
      widget renders unchanged. A style block flips these; the widget shell
      consumes them via var(--name, fallback) so we never need a style-aware
      fork in any widget rule. */
-  --edge-weight: var(--stroke-1);       /* outer shell border width            */
-  --zebra-bg: var(--surface-sunken);    /* list zebra fill (transparent = whitespace grouping) */
-  --list-pad-y: var(--space-2);         /* list row vertical padding (density) */
-  --list-gap: var(--space-1);           /* gap between list rows               */
-  --pill-radius: var(--radius-0);       /* status pill corner (stadium = 999px)*/
-  --title-marker: none;                 /* 'block' shows an accent eyebrow tick */
+  --edge-weight: var(--stroke-1); /* outer shell border width            */
+  --zebra-bg: var(--surface-sunken); /* list zebra fill (transparent = whitespace grouping) */
+  --list-pad-y: var(--space-2); /* list row vertical padding (density) */
+  --list-gap: var(--space-1); /* gap between list rows               */
+  --pill-radius: var(--radius-0); /* status pill corner (stadium = 999px)*/
+  --title-marker: none; /* 'block' shows an accent eyebrow tick */
   /* Title-marker shape (used when --title-marker: block). Defaults to a
      small rectangle in accent-4; movement styles like Bauhaus switch to
      a circle in accent-1. */
@@ -97,11 +97,11 @@
   /* Optional dividers, OFF by default. A style may switch these on when
      a rule is core to its identity (Mono console, Display masthead,
      Condensed timetable, De Stijl grid). */
-  --title-rule-w: 0px;                  /* divider under the title bar         */
+  --title-rule-w: 0px; /* divider under the title bar         */
   --title-rule-c: var(--edge);
   --title-rule-pad: 0px;
-  --row-rule-w: 0px;                    /* divider between list rows           */
-  --label-transform: uppercase;         /* labels (Editorial uses 'none') */
+  --row-rule-w: 0px; /* divider between list rows           */
+  --label-transform: uppercase; /* labels (Editorial uses 'none') */
 }
 
 /* ----------------------------------------------------------------------------
@@ -113,69 +113,87 @@
 
 /* ---- LIGHT (default), warm paper ---------------------------------------- */
 :root,
-[data-theme="light"]{
+[data-theme="light"] {
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
-  --bg:             #E7E4DC;
-  --surface:        #F7F5F0;
-  --surface-sunken: #E1DDD2;
-  --text-primary:   #1B1A16;
-  --text-secondary: #4D4A42;
-  --text-muted:     #837F73;
-  --icon:           var(--text-primary);
-  --edge:           #B6B1A4;
+  --bg: #e7e4dc;
+  --surface: #f7f5f0;
+  --surface-sunken: #e1ddd2;
+  --text-primary: #1b1a16;
+  --text-secondary: #4d4a42;
+  --text-muted: #837f73;
+  --icon: var(--text-primary);
+  --edge: #b6b1a4;
 
-  --accent-1:#A84B2A; --accent-1-soft:#E9D6CC;  /* terracotta */
-  --accent-2:#9A7414; --accent-2-soft:#EAE0C4;  /* ochre      */
-  --accent-3:#4F6F36; --accent-3-soft:#D9E2C9;  /* moss       */
-  --accent-4:#256E6B; --accent-4-soft:#CCE0DD;  /* teal       */
-  --accent-5:#3F5A88; --accent-5-soft:#D2DCEA;  /* slate-blue */
-  --accent-6:#7E4068; --accent-6-soft:#E5D2DF;  /* plum       */
-  --on-accent:#F7F5F0;
+  --accent-1: #a84b2a;
+  --accent-1-soft: #e9d6cc; /* terracotta */
+  --accent-2: #9a7414;
+  --accent-2-soft: #eae0c4; /* ochre      */
+  --accent-3: #4f6f36;
+  --accent-3-soft: #d9e2c9; /* moss       */
+  --accent-4: #256e6b;
+  --accent-4-soft: #cce0dd; /* teal       */
+  --accent-5: #3f5a88;
+  --accent-5-soft: #d2dcea; /* slate-blue */
+  --accent-6: #7e4068;
+  --accent-6-soft: #e5d2df; /* plum       */
+  --on-accent: #f7f5f0;
 }
 
 /* ---- DARK, warm charcoal ------------------------------------------------ */
-[data-theme="dark"]{
+[data-theme="dark"] {
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
-  --bg:             #141310;
-  --surface:        #232019;
-  --surface-sunken: #1B1813;
-  --text-primary:   #F1EEE4;
-  --text-secondary: #B9B4A6;
-  --text-muted:     #807C70;
-  --icon:           var(--text-primary);
-  --edge:           #3A362C;
+  --bg: #141310;
+  --surface: #232019;
+  --surface-sunken: #1b1813;
+  --text-primary: #f1eee4;
+  --text-secondary: #b9b4a6;
+  --text-muted: #807c70;
+  --icon: var(--text-primary);
+  --edge: #3a362c;
 
-  --accent-1:#DC8C63; --accent-1-soft:#3E2E22;
-  --accent-2:#D7B355; --accent-2-soft:#3A3318;
-  --accent-3:#A0BA76; --accent-3-soft:#2C3420;
-  --accent-4:#69B7B0; --accent-4-soft:#1E332F;
-  --accent-5:#88A2CD; --accent-5-soft:#232C3C;
-  --accent-6:#C389AC; --accent-6-soft:#33222E;
-  --on-accent:#141310;
+  --accent-1: #dc8c63;
+  --accent-1-soft: #3e2e22;
+  --accent-2: #d7b355;
+  --accent-2-soft: #3a3318;
+  --accent-3: #a0ba76;
+  --accent-3-soft: #2c3420;
+  --accent-4: #69b7b0;
+  --accent-4-soft: #1e332f;
+  --accent-5: #88a2cd;
+  --accent-5-soft: #232c3c;
+  --accent-6: #c389ac;
+  --accent-6-soft: #33222e;
+  --on-accent: #141310;
 }
 
 /* ---- HIGH-CONTRAST, max legibility -------------------------------------- */
-[data-theme="high-contrast"]{
+[data-theme="high-contrast"] {
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
-  --bg:             #FBFBFA;
-  --surface:        #FFFFFF;
-  --surface-sunken: #ECECEA;
-  --text-primary:   #0A0A09;
+  --bg: #fbfbfa;
+  --surface: #ffffff;
+  --surface-sunken: #ececea;
+  --text-primary: #0a0a09;
   --text-secondary: #232320;
-  --text-muted:     #4A4A45;
-  --icon:           var(--text-primary);
-  --edge:           #0A0A09;
+  --text-muted: #4a4a45;
+  --icon: var(--text-primary);
+  --edge: #0a0a09;
 
-  --accent-1:#9A2D12; --accent-1-soft:#F0D5CC;
-  --accent-2:#7C5A00; --accent-2-soft:#EFE3BE;
-  --accent-3:#2E5417; --accent-3-soft:#D2E2C4;
-  --accent-4:#0A5754; --accent-4-soft:#C2E0DD;
-  --accent-5:#1F3D72; --accent-5-soft:#CCD8EC;
-  --accent-6:#5F2049; --accent-6-soft:#E6CEDD;
-  --on-accent:#FFFFFF;
+  --accent-1: #9a2d12;
+  --accent-1-soft: #f0d5cc;
+  --accent-2: #7c5a00;
+  --accent-2-soft: #efe3be;
+  --accent-3: #2e5417;
+  --accent-3-soft: #d2e2c4;
+  --accent-4: #0a5754;
+  --accent-4-soft: #c2e0dd;
+  --accent-5: #1f3d72;
+  --accent-5-soft: #ccd8ec;
+  --accent-6: #5f2049;
+  --accent-6-soft: #e6cedd;
+  --on-accent: #ffffff;
 }
 
 /* ---- PAPER, strict 1-bit ink on white, B&W e-ink ready -----------------
@@ -185,25 +203,31 @@
    collapse to pure black; every `-soft` slot collapses to bg-white so
    tinted-fill regions disappear cleanly. Visual hierarchy comes from
    rules, type weight, and size, exactly as it would on letterpress. */
-[data-theme="paper"]{
+[data-theme="paper"] {
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
-  --bg:             #FFFFFF;
-  --surface:        #FFFFFF;
-  --surface-sunken: #FFFFFF;
-  --text-primary:   #000000;
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-sunken: #ffffff;
+  --text-primary: #000000;
   --text-secondary: #000000;
-  --text-muted:     #000000;
-  --icon:           var(--text-primary);
-  --edge:           #000000;
+  --text-muted: #000000;
+  --icon: var(--text-primary);
+  --edge: #000000;
 
-  --accent-1:#000000; --accent-1-soft:#FFFFFF;
-  --accent-2:#000000; --accent-2-soft:#FFFFFF;
-  --accent-3:#000000; --accent-3-soft:#FFFFFF;
-  --accent-4:#000000; --accent-4-soft:#FFFFFF;
-  --accent-5:#000000; --accent-5-soft:#FFFFFF;
-  --accent-6:#000000; --accent-6-soft:#FFFFFF;
-  --on-accent:#FFFFFF;
+  --accent-1: #000000;
+  --accent-1-soft: #ffffff;
+  --accent-2: #000000;
+  --accent-2-soft: #ffffff;
+  --accent-3: #000000;
+  --accent-3-soft: #ffffff;
+  --accent-4: #000000;
+  --accent-4-soft: #ffffff;
+  --accent-5: #000000;
+  --accent-5-soft: #ffffff;
+  --accent-6: #000000;
+  --accent-6-soft: #ffffff;
+  --on-accent: #ffffff;
 }
 
 /* ---- NEWSPRINT, B&W on white with greyscale hierarchy ------------------
@@ -214,91 +238,115 @@
    newsprint texture, not noise); on greyscale-capable e-ink (Spectra,
    Kaleido) they read as clean tonal steps. Pure black for headings,
    primary ink, and all accents keeps emphasis crisp. */
-[data-theme="newsprint"]{
+[data-theme="newsprint"] {
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
-  --bg:             #FFFFFF;
-  --surface:        #FFFFFF;
-  --surface-sunken: #ECECEC;
-  --text-primary:   #000000;
-  --text-secondary: #3A3A3A;
-  --text-muted:     #707070;
-  --icon:           var(--text-primary);
-  --edge:           #8C8C8C;
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-sunken: #ececec;
+  --text-primary: #000000;
+  --text-secondary: #3a3a3a;
+  --text-muted: #707070;
+  --icon: var(--text-primary);
+  --edge: #8c8c8c;
 
-  --accent-1:#000000; --accent-1-soft:#E8E8E8;
-  --accent-2:#000000; --accent-2-soft:#E8E8E8;
-  --accent-3:#000000; --accent-3-soft:#E8E8E8;
-  --accent-4:#000000; --accent-4-soft:#E8E8E8;
-  --accent-5:#000000; --accent-5-soft:#E8E8E8;
-  --accent-6:#000000; --accent-6-soft:#E8E8E8;
-  --on-accent:#FFFFFF;
+  --accent-1: #000000;
+  --accent-1-soft: #e8e8e8;
+  --accent-2: #000000;
+  --accent-2-soft: #e8e8e8;
+  --accent-3: #000000;
+  --accent-3-soft: #e8e8e8;
+  --accent-4: #000000;
+  --accent-4-soft: #e8e8e8;
+  --accent-5: #000000;
+  --accent-5-soft: #e8e8e8;
+  --accent-6: #000000;
+  --accent-6-soft: #e8e8e8;
+  --on-accent: #ffffff;
 }
 
 /* ---- SEPIA, warm book paper --------------------------------------------- */
-[data-theme="sepia"]{
+[data-theme="sepia"] {
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
-  --bg:             #E3D6BC;
-  --surface:        #F2E9D5;
-  --surface-sunken: #DBCDAF;
-  --text-primary:   #3A2C1A;
-  --text-secondary: #6A5839;
-  --text-muted:     #98855F;
-  --icon:           var(--text-primary);
-  --edge:           #C4B287;
+  --bg: #e3d6bc;
+  --surface: #f2e9d5;
+  --surface-sunken: #dbcdaf;
+  --text-primary: #3a2c1a;
+  --text-secondary: #6a5839;
+  --text-muted: #98855f;
+  --icon: var(--text-primary);
+  --edge: #c4b287;
 
-  --accent-1:#9E4423; --accent-1-soft:#E4CBB4;
-  --accent-2:#8A6410; --accent-2-soft:#E3D2A6;
-  --accent-3:#566B2C; --accent-3-soft:#D2D6AE;
-  --accent-4:#2B6862; --accent-4-soft:#C9D8C4;
-  --accent-5:#42567E; --accent-5-soft:#CFD2CE;
-  --accent-6:#7B3D5C; --accent-6-soft:#E0CBBE;
-  --on-accent:#F2E9D5;
+  --accent-1: #9e4423;
+  --accent-1-soft: #e4cbb4;
+  --accent-2: #8a6410;
+  --accent-2-soft: #e3d2a6;
+  --accent-3: #566b2c;
+  --accent-3-soft: #d2d6ae;
+  --accent-4: #2b6862;
+  --accent-4-soft: #c9d8c4;
+  --accent-5: #42567e;
+  --accent-5-soft: #cfd2ce;
+  --accent-6: #7b3d5c;
+  --accent-6-soft: #e0cbbe;
+  --on-accent: #f2e9d5;
 }
 
 /* ---- NORD, cool blue night ---------------------------------------------- */
-[data-theme="nord"]{
+[data-theme="nord"] {
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
-  --bg:             #2E3440;
-  --surface:        #3B4252;
-  --surface-sunken: #343B49;
-  --text-primary:   #ECEFF4;
-  --text-secondary: #C5CDDB;
-  --text-muted:     #8A93A6;
-  --icon:           var(--text-primary);
-  --edge:           #4A5263;
+  --bg: #2e3440;
+  --surface: #3b4252;
+  --surface-sunken: #343b49;
+  --text-primary: #eceff4;
+  --text-secondary: #c5cddb;
+  --text-muted: #8a93a6;
+  --icon: var(--text-primary);
+  --edge: #4a5263;
 
-  --accent-1:#BF616A; --accent-1-soft:#3F343C;
-  --accent-2:#EBCB8B; --accent-2-soft:#3E3B30;
-  --accent-3:#A3BE8C; --accent-3-soft:#363F33;
-  --accent-4:#88C0D0; --accent-4-soft:#2C3A40;
-  --accent-5:#81A1C1; --accent-5-soft:#2D3744;
-  --accent-6:#B48EAD; --accent-6-soft:#3A323C;
-  --on-accent:#2E3440;
+  --accent-1: #bf616a;
+  --accent-1-soft: #3f343c;
+  --accent-2: #ebcb8b;
+  --accent-2-soft: #3e3b30;
+  --accent-3: #a3be8c;
+  --accent-3-soft: #363f33;
+  --accent-4: #88c0d0;
+  --accent-4-soft: #2c3a40;
+  --accent-5: #81a1c1;
+  --accent-5-soft: #2d3744;
+  --accent-6: #b48ead;
+  --accent-6-soft: #3a323c;
+  --on-accent: #2e3440;
 }
 
 /* ---- COOL GRAY, neutral slate ------------------------------------------- */
-[data-theme="cool-gray"]{
+[data-theme="cool-gray"] {
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
-  --bg:             #E4E5E8;
-  --surface:        #F5F6F7;
-  --surface-sunken: #DBDDE1;
-  --text-primary:   #191B1E;
-  --text-secondary: #45484D;
-  --text-muted:     #797D84;
-  --icon:           var(--text-primary);
-  --edge:           #B7BAC0;
+  --bg: #e4e5e8;
+  --surface: #f5f6f7;
+  --surface-sunken: #dbdde1;
+  --text-primary: #191b1e;
+  --text-secondary: #45484d;
+  --text-muted: #797d84;
+  --icon: var(--text-primary);
+  --edge: #b7bac0;
 
-  --accent-1:#A4492C; --accent-1-soft:#E7D3CC;
-  --accent-2:#8E6C18; --accent-2-soft:#E6DDC6;
-  --accent-3:#4C6B38; --accent-3-soft:#D5DECB;
-  --accent-4:#1F6B68; --accent-4-soft:#C9DEDC;
-  --accent-5:#3C588A; --accent-5-soft:#D1D9E8;
-  --accent-6:#7A3E66; --accent-6-soft:#E3D1DD;
-  --on-accent:#F5F6F7;
+  --accent-1: #a4492c;
+  --accent-1-soft: #e7d3cc;
+  --accent-2: #8e6c18;
+  --accent-2-soft: #e6ddc6;
+  --accent-3: #4c6b38;
+  --accent-3-soft: #d5decb;
+  --accent-4: #1f6b68;
+  --accent-4-soft: #c9dedc;
+  --accent-5: #3c588a;
+  --accent-5-soft: #d1d9e8;
+  --accent-6: #7a3e66;
+  --accent-6-soft: #e3d1dd;
+  --on-accent: #f5f6f7;
 }
 
 /* ---- VIVID, saturated accents on warm canvas, surface lifts cleanly ---- */
@@ -307,25 +355,31 @@
    pop to a near-white #FBFAF6 paper (~22% L* delta vs. bg, much more
    than the 4% default Light). Accents bump saturation +15% across the
    board so chips and active selectors land with punch. */
-[data-theme="vivid-light"]{
+[data-theme="vivid-light"] {
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
-  --bg:             #D6D2C7;
-  --surface:        #FBFAF6;
-  --surface-sunken: #C6C2B5;
-  --text-primary:   #1A1714;
-  --text-secondary: #4D4A42;
-  --text-muted:     #7A7569;
-  --icon:           var(--text-primary);
-  --edge:           #9A9486;
+  --bg: #d6d2c7;
+  --surface: #fbfaf6;
+  --surface-sunken: #c6c2b5;
+  --text-primary: #1a1714;
+  --text-secondary: #4d4a42;
+  --text-muted: #7a7569;
+  --icon: var(--text-primary);
+  --edge: #9a9486;
 
-  --accent-1:#D14318; --accent-1-soft:#F4D2C5;  /* hot terracotta */
-  --accent-2:#C28A04; --accent-2-soft:#F2E2B4;  /* sunflower      */
-  --accent-3:#5E883C; --accent-3-soft:#D4E5C2;  /* spring moss    */
-  --accent-4:#048783; --accent-4-soft:#B8E3DF;  /* lagoon teal    */
-  --accent-5:#3B5FC6; --accent-5-soft:#C9D5F4;  /* cobalt         */
-  --accent-6:#9C2E7A; --accent-6-soft:#EBC8DE;  /* magenta plum   */
-  --on-accent:#FBFAF6;
+  --accent-1: #d14318;
+  --accent-1-soft: #f4d2c5; /* hot terracotta */
+  --accent-2: #c28a04;
+  --accent-2-soft: #f2e2b4; /* sunflower      */
+  --accent-3: #5e883c;
+  --accent-3-soft: #d4e5c2; /* spring moss    */
+  --accent-4: #048783;
+  --accent-4-soft: #b8e3df; /* lagoon teal    */
+  --accent-5: #3b5fc6;
+  --accent-5-soft: #c9d5f4; /* cobalt         */
+  --accent-6: #9c2e7a;
+  --accent-6-soft: #ebc8de; /* magenta plum   */
+  --on-accent: #fbfaf6;
 }
 
 /* ---- CITRUS, bright cream canvas, electric accent palette --------------- */
@@ -333,25 +387,31 @@
    tone, surface is pure paper white. Accents lean candy-bright with
    high chroma greens / blues / pinks so dashboard rings, chips, and
    selectors read at a glance against the cream. */
-[data-theme="citrus-light"]{
+[data-theme="citrus-light"] {
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
-  --bg:             #ECDFC6;
-  --surface:        #FDFBF4;
-  --surface-sunken: #DDCFB1;
-  --text-primary:   #1F1A12;
-  --text-secondary: #5A4F36;
-  --text-muted:     #8E7F60;
-  --icon:           var(--text-primary);
-  --edge:           #B49E73;
+  --bg: #ecdfc6;
+  --surface: #fdfbf4;
+  --surface-sunken: #ddcfb1;
+  --text-primary: #1f1a12;
+  --text-secondary: #5a4f36;
+  --text-muted: #8e7f60;
+  --icon: var(--text-primary);
+  --edge: #b49e73;
 
-  --accent-1:#E0451B; --accent-1-soft:#FACFC0;  /* persimmon  */
-  --accent-2:#E5A100; --accent-2-soft:#FAE5B0;  /* amber      */
-  --accent-3:#4FA336; --accent-3-soft:#D2EAC4;  /* lime       */
-  --accent-4:#1095A4; --accent-4-soft:#BCE5EB;  /* aqua       */
-  --accent-5:#3450D8; --accent-5-soft:#C9D2F7;  /* azure      */
-  --accent-6:#B81F73; --accent-6-soft:#F4C7DD;  /* fuschia    */
-  --on-accent:#FDFBF4;
+  --accent-1: #e0451b;
+  --accent-1-soft: #facfc0; /* persimmon  */
+  --accent-2: #e5a100;
+  --accent-2-soft: #fae5b0; /* amber      */
+  --accent-3: #4fa336;
+  --accent-3-soft: #d2eac4; /* lime       */
+  --accent-4: #1095a4;
+  --accent-4-soft: #bce5eb; /* aqua       */
+  --accent-5: #3450d8;
+  --accent-5-soft: #c9d2f7; /* azure      */
+  --accent-6: #b81f73;
+  --accent-6-soft: #f4c7dd; /* fuschia    */
+  --on-accent: #fdfbf4;
 }
 
 /* ---- ARCTIC, cool slate canvas, electric jewel accents ----------------- */
@@ -359,25 +419,31 @@
    surface is bright cool white. Accent palette leans jewel: ruby,
    amber, emerald, cyan, ultramarine, fuchsia, all with high chroma
    so they sing against the cool surface. */
-[data-theme="arctic-light"]{
+[data-theme="arctic-light"] {
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
-  --bg:             #CCD2DA;
-  --surface:        #FBFCFD;
-  --surface-sunken: #B8BFC9;
-  --text-primary:   #0E1117;
-  --text-secondary: #2E3540;
-  --text-muted:     #6A7280;
-  --icon:           var(--text-primary);
-  --edge:           #8C95A3;
+  --bg: #ccd2da;
+  --surface: #fbfcfd;
+  --surface-sunken: #b8bfc9;
+  --text-primary: #0e1117;
+  --text-secondary: #2e3540;
+  --text-muted: #6a7280;
+  --icon: var(--text-primary);
+  --edge: #8c95a3;
 
-  --accent-1:#D32D3C; --accent-1-soft:#F6C9CE;  /* ruby       */
-  --accent-2:#DC9100; --accent-2-soft:#F8DDA8;  /* amber      */
-  --accent-3:#208649; --accent-3-soft:#BFE3CD;  /* emerald    */
-  --accent-4:#008CB1; --accent-4-soft:#BCE3EF;  /* cyan       */
-  --accent-5:#2A40B7; --accent-5-soft:#C5CDED;  /* ultramarine*/
-  --accent-6:#A5258A; --accent-6-soft:#F0C5E4;  /* fuchsia    */
-  --on-accent:#FBFCFD;
+  --accent-1: #d32d3c;
+  --accent-1-soft: #f6c9ce; /* ruby       */
+  --accent-2: #dc9100;
+  --accent-2-soft: #f8dda8; /* amber      */
+  --accent-3: #208649;
+  --accent-3-soft: #bfe3cd; /* emerald    */
+  --accent-4: #008cb1;
+  --accent-4-soft: #bce3ef; /* cyan       */
+  --accent-5: #2a40b7;
+  --accent-5-soft: #c5cded; /* ultramarine*/
+  --accent-6: #a5258a;
+  --accent-6-soft: #f0c5e4; /* fuchsia    */
+  --on-accent: #fbfcfd;
 }
 
 /* ============================================================================
@@ -388,69 +454,87 @@
    ============================================================================ */
 
 /* ---- BAUHAUS, primary red / blue / yellow on warm cream ----------------- */
-[data-theme="bauhaus"]{
+[data-theme="bauhaus"] {
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
-  --bg:             #E7E1D2;
-  --surface:        #F4EFE3;
-  --surface-sunken: #E1D9C6;
-  --text-primary:   #1A1714;
+  --bg: #e7e1d2;
+  --surface: #f4efe3;
+  --surface-sunken: #e1d9c6;
+  --text-primary: #1a1714;
   --text-secondary: #494339;
-  --text-muted:     #857C6B;
-  --icon:           var(--text-primary);
-  --edge:           #1A1714;
+  --text-muted: #857c6b;
+  --icon: var(--text-primary);
+  --edge: #1a1714;
 
-  --accent-1:#C81E2C; --accent-1-soft:#EAD0C9;  /* red    */
-  --accent-2:#E7AE07; --accent-2-soft:#F0E3BC;  /* yellow */
-  --accent-3:#1F4E9B; --accent-3-soft:#CFD8E8;  /* blue (pill-safe) */
-  --accent-4:#1F4E9B; --accent-4-soft:#CFD8E8;  /* blue   */
-  --accent-5:#1A1714; --accent-5-soft:#D9D2C4;  /* black  */
-  --accent-6:#C81E2C; --accent-6-soft:#EAD0C9;  /* red    */
-  --on-accent:#F4EFE3;
+  --accent-1: #c81e2c;
+  --accent-1-soft: #ead0c9; /* red    */
+  --accent-2: #e7ae07;
+  --accent-2-soft: #f0e3bc; /* yellow */
+  --accent-3: #1f4e9b;
+  --accent-3-soft: #cfd8e8; /* blue (pill-safe) */
+  --accent-4: #1f4e9b;
+  --accent-4-soft: #cfd8e8; /* blue   */
+  --accent-5: #1a1714;
+  --accent-5-soft: #d9d2c4; /* black  */
+  --accent-6: #c81e2c;
+  --accent-6-soft: #ead0c9; /* red    */
+  --on-accent: #f4efe3;
 }
 
 /* ---- DE STIJL, primaries + ink on white (Mondrian) ---------------------- */
-[data-theme="destijl"]{
+[data-theme="destijl"] {
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
-  --bg:             #F3F2EC;
-  --surface:        #FBFBF8;
-  --surface-sunken: #E3E2DC;
-  --text-primary:   #111111;
-  --text-secondary: #2E2E2E;
-  --text-muted:     #565656;
-  --icon:           var(--text-primary);
-  --edge:           #111111;
+  --bg: #f3f2ec;
+  --surface: #fbfbf8;
+  --surface-sunken: #e3e2dc;
+  --text-primary: #111111;
+  --text-secondary: #2e2e2e;
+  --text-muted: #565656;
+  --icon: var(--text-primary);
+  --edge: #111111;
 
-  --accent-1:#D42B1E; --accent-1-soft:#F1D2CD;  /* red    */
-  --accent-2:#F2C200; --accent-2-soft:#F5E6AE;  /* yellow */
-  --accent-3:#15469F; --accent-3-soft:#CCD7EC;  /* blue   */
-  --accent-4:#15469F; --accent-4-soft:#CCD7EC;
-  --accent-5:#111111; --accent-5-soft:#DBDBD3;  /* ink    */
-  --accent-6:#D42B1E; --accent-6-soft:#F1D2CD;
-  --on-accent:#FBFBF8;
+  --accent-1: #d42b1e;
+  --accent-1-soft: #f1d2cd; /* red    */
+  --accent-2: #f2c200;
+  --accent-2-soft: #f5e6ae; /* yellow */
+  --accent-3: #15469f;
+  --accent-3-soft: #ccd7ec; /* blue   */
+  --accent-4: #15469f;
+  --accent-4-soft: #ccd7ec;
+  --accent-5: #111111;
+  --accent-5-soft: #dbdbd3; /* ink    */
+  --accent-6: #d42b1e;
+  --accent-6-soft: #f1d2cd;
+  --on-accent: #fbfbf8;
 }
 
 /* ---- BRUTALIST, concrete, ink, hazard orange --------------------------- */
-[data-theme="brutalist"]{
+[data-theme="brutalist"] {
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
-  --bg:             #C6C4BC;
-  --surface:        #D9D7CE;
-  --surface-sunken: #B3B1A9;
-  --text-primary:   #16160E;
-  --text-secondary: #39392F;
-  --text-muted:     #5E5E51;
-  --icon:           var(--text-primary);
-  --edge:           #16160E;
+  --bg: #c6c4bc;
+  --surface: #d9d7ce;
+  --surface-sunken: #b3b1a9;
+  --text-primary: #16160e;
+  --text-secondary: #39392f;
+  --text-muted: #5e5e51;
+  --icon: var(--text-primary);
+  --edge: #16160e;
 
-  --accent-1:#D8431A; --accent-1-soft:#E6C8B9;  /* hazard orange   */
-  --accent-2:#9E6A12; --accent-2-soft:#D7C6A6;
-  --accent-3:#3A6B2E; --accent-3-soft:#C7D5BD;  /* pill-safe green */
-  --accent-4:#2C5D5A; --accent-4-soft:#BFD1CE;
-  --accent-5:#16160E; --accent-5-soft:#CECCC1;  /* ink             */
-  --accent-6:#7A3A2A; --accent-6-soft:#DBC7BD;
-  --on-accent:#D9D7CE;
+  --accent-1: #d8431a;
+  --accent-1-soft: #e6c8b9; /* hazard orange   */
+  --accent-2: #9e6a12;
+  --accent-2-soft: #d7c6a6;
+  --accent-3: #3a6b2e;
+  --accent-3-soft: #c7d5bd; /* pill-safe green */
+  --accent-4: #2c5d5a;
+  --accent-4-soft: #bfd1ce;
+  --accent-5: #16160e;
+  --accent-5-soft: #ceccc1; /* ink             */
+  --accent-6: #7a3a2a;
+  --accent-6-soft: #dbc7bd;
+  --on-accent: #d9d7ce;
 }
 
 /* ============================================================================
@@ -488,4 +572,3 @@
    sit in a narrow hue band so the result reads as a soft luminance
    ramp on each card. All light-leaning, dark text throughout.
    ============================================================================ */
-
