@@ -370,6 +370,32 @@ def test_a_reconnect_on_other_firmware_is_reported_as_a_mismatch(h: Harness) -> 
         after.close()
 
 
+def _reboots(sign: FakeSign) -> int:
+    return sum(int.from_bytes(f.payload[:4], "little") == 1 for f in sign.commands())
+
+
+def test_a_frame_that_reconnects_without_restarting_gets_the_reboot_again(h: Harness) -> None:
+    # A frame can stop reading a connection and only notice when it reconnects,
+    # so the first reboot never reached it.
+    first = connect(h)
+    start_flash(h, first)
+    tries = visionect_flash.REBOOT_TRIES
+    for n in range(2, tries + 2):
+        again = FakeSign(h.svc.port)
+        try:
+            again.status(tags())
+            got = again.wait_for(lambda s: _reboots(s) == 1, timeout=1.5)
+            assert job(h).phase == visionect_flash.PENDING
+            if n <= tries:
+                assert got, n
+                assert job(h).reboots == n
+            else:
+                assert not got  # enough: the pending timeout decides from here
+                assert job(h).reboots == tries
+        finally:
+            again.close()
+
+
 def test_a_hello_for_other_hardware_is_refused_and_nothing_is_sent(h: Harness) -> None:
     sign = connect(h)
     start_flash(h, sign)

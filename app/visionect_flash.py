@@ -40,6 +40,10 @@ logger = logging.getLogger(__name__)
 
 # From the reboot command to the bootloader's call (observed: about 12 s).
 PENDING_TIMEOUT_S = 180.0
+# A frame can stop reading its connection and only find out when it reconnects,
+# so the reboot goes out again on each new connection, as the Suite does, this
+# many times at most.
+REBOOT_TRIES = 4
 # How far past that a pending job counts as expired even if its timer never ran.
 PENDING_GRACE_S = 60.0
 # From the last ack to the frame's reconnect on the new firmware (about 10 s).
@@ -77,6 +81,8 @@ class FlashJob:
     from_version: str
     from_checksum: int | None
     requested_at: float = field(default_factory=time.time)
+    reboot_at: float = 0.0  # when the reboot last went out
+    reboots: int = 0
     phase: str = PENDING
     blocks_done: int = 0
     blocks_total: int = 0

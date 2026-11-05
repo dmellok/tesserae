@@ -2309,7 +2309,7 @@ class VisionectService:
         and it holds nothing up."""
         return (
             job.phase == visionect_flash.PENDING
-            and time.time() - job.requested_at
+            and time.time() - (job.reboot_at or job.requested_at)
             > visionect_flash.PENDING_TIMEOUT_S + visionect_flash.PENDING_GRACE_S
         )
 
@@ -2600,6 +2600,11 @@ class VisionectService:
         if (sign.inflight is not None or sign.param_out) and waited < FLASH_REBOOT_WAIT_S:
             asyncio.get_running_loop().call_later(1.0, self._flash_begin, job)
             return
+        self._flash_send_reboot(job, sign)
+
+    def _flash_send_reboot(self, job: visionect_flash.FlashJob, sign: _Sign) -> None:
+        """Send the reboot on the frame's current connection and wait for its
+        bootloader."""
         try:
             sign.conn.reboot()
         except Exception as exc:
@@ -2607,6 +2612,8 @@ class VisionectService:
             self._flash_end(job, False, f"Couldn't send the reboot command: {exc}")
             return
         job.peer_ip = job.peer_ip or sign.remote
+        job.reboots += 1
+        job.reboot_at = time.time()
         self._spawn(self._write(sign.conn, sign.writer))
         sign.inflight = None
         self._flash_arm(job, visionect_flash.PENDING_TIMEOUT_S)
@@ -2719,6 +2726,13 @@ class VisionectService:
                     False,
                     "The frame restarted without calling its bootloader, so nothing was flashed.",
                 )
+            elif (
+                job.phase == visionect_flash.PENDING
+                and job.reboots
+                and job.reboots < visionect_flash.REBOOT_TRIES
+            ):
+                # It came back without restarting, so it never got the reboot.
+                self._flash_send_reboot(job, sign)
         except Exception:
             logger.exception("visionect: checking a flashed frame failed")
 
