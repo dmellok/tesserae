@@ -3,3 +3,7 @@ static/icons/
 site/
 node_modules/
 *.min.js
+# Parsed at runtime by app/state/theme_registry.py, which hands its values to
+# the theme editor verbatim. Prettier lowercases hex colours, which would change
+# what users see there, so this file keeps its hand formatting.
+static/style/spectra-tokens.css

@@ -32,7 +32,7 @@ def test_author_js_runs_in_its_own_scope() -> None:
     with origin null", blanking the element. Same for name/status/length/
     self/parent/closed. Inside a function they are ordinary locals."""
     js = DECORATE_JS.read_text(encoding="utf-8")
-    assert '"<script>try{(function(){" + (el.js || "")' in js, (
+    assert '"<script>try{(function(){" + (el.js || "")' in " ".join(js.split()), (
         "author JS must be wrapped in a function, not bare inside try{}"
     )
 
