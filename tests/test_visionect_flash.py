@@ -902,7 +902,7 @@ def test_a_pending_job_past_its_time_is_never_claimed_even_with_no_timer(h: Harn
     assert h.svc._flash_wants("127.0.0.1")
     j.timer.cancel()
     j.timer = None
-    j.requested_at -= visionect_flash.PENDING_TIMEOUT_S + visionect_flash.PENDING_GRACE_S + 1
+    j.reboot_at -= visionect_flash.PENDING_TIMEOUT_S + visionect_flash.PENDING_GRACE_S + 1
     assert not h.svc._flash_wants("127.0.0.1")
     assert not h.svc._flash_active(UUID)
     assert not h.svc._flash_any_active()
