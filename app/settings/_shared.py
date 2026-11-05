@@ -142,7 +142,21 @@ def device_status() -> dict[str, dict[str, Any]]:
 def render_sync_sig(device_id: str) -> str:
     """``<newest digest>|<last fetched digest>`` for a device: changes when a
     push lands or the frame fetches, which is when its thumbnail and Queued
-    line go out of date. Empty before any render."""
+    line go out of date. Empty before any render. A Visionect sign's firmware
+    flash (or a new firmware list) appends ``|fw:<token>``, so the page also
+    refreshes its firmware block while one runs."""
+    return _render_sig(device_id) + _firmware_sig(device_id)
+
+
+def _firmware_sig(device_id: str) -> str:
+    from app import visionect
+
+    token_fn = getattr(visionect.service(), "firmware_token", None)
+    token = token_fn(device_id) if callable(token_fn) else ""
+    return f"|fw:{token}" if token else ""
+
+
+def _render_sig(device_id: str) -> str:
     push_mgr = current_app.config.get("PUSH_MANAGER")
     if push_mgr is None:
         return ""

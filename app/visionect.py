@@ -52,7 +52,7 @@ import threading
 import time
 from collections import deque
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from itertools import pairwise
 from pathlib import Path
@@ -60,8 +60,15 @@ from typing import Any
 
 from flask import Flask
 
-from app import background_loops, device_service
+from app import background_loops, device_service, online, visionect_flash
 from app.device_loader import Device, DeviceRegistry
+from app.visionect_bootloader import BootloaderError, parse_hello
+from app.visionect_firmware import (
+    Build,
+    FirmwareRepository,
+    RepositoryError,
+    compatible,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -137,18 +144,177 @@ AUTO_BIND_KEY = "uuid_armed_at"
 MAX_UNKNOWN_SIGNS = 16
 MAX_DISCOVERED = 8
 MAX_WARNED_UNBOUND = 64
-# The sign's own settings (TCLV parameters), read on every connection and
-# shown on the device page. Writing the check-in interval (minutes) and the
-# sleep-mode switch, then saving them to the sign's flash, is implemented
-# (``desired_params``, ``_sync_params``) but NOT offered in the UI: it has not
-# been tried on hardware, and a bad flash-save write persists on the sign.
-# Nothing sets ``heartbeat_min`` / ``frame_sleep`` in a device's config, so
-# nothing is written. Only these two (and the flash save) are ever written.
+# A firmware update is refused below this battery level (an interrupted flash
+# is not something anyone has seen recover).
+FLASH_MIN_BATTERY_PCT = 30
+# Where the firmware builds someone chose to ignore are kept (app settings).
+FIRMWARE_IGNORED_KEY = "visionect_firmware_ignored"
+# Longest to wait for a bootloader's complete hello once it has connected.
+HELLO_READ_S = 10.0
+# How long a reboot for a flash waits for an unanswered packet to be answered.
+FLASH_REBOOT_WAIT_S = 45.0
+# The sign's own settings (TCLV parameters), shown on the device page and set
+# from it. This follows what Visionect's own Software Suite does on the wire:
+# at most five ids to a packet, and never a second settings packet until the
+# frame has answered the first (``_pump_params``). The Suite never reads
+# settings just because a frame connected, so neither do we, beyond the first
+# connection, a reboot, and every SETTINGS_REREAD_S to catch USB console changes.
+# READ_PARAMS is its "Basic" set, which it reads in one packet, less the
+# connection type and plus the SSID. Only these (and the flash save) are ever
+# read or written. A wider read once came just before a real 32" (firmware 6.17)
+# stopped taking anything from the server until it was restarted; that read sent
+# two packets back to back and asked for ids the Suite has no entry for.
 PARAM_HEARTBEAT = 29
+PARAM_SCREENS = 49
+PARAM_TOUCH = 50
 PARAM_SLEEP_DISABLE = 52
 PARAM_FLASH_SAVE = 53
 PARAM_WIFI_SSID = 65
-READ_PARAMS = (PARAM_HEARTBEAT, PARAM_SLEEP_DISABLE, PARAM_WIFI_SSID)
+PARAM_WIFI_PSK = 67
+READ_PARAMS = (PARAM_HEARTBEAT, PARAM_SCREENS, PARAM_TOUCH, PARAM_SLEEP_DISABLE, PARAM_WIFI_SSID)
+READ_CHUNK = 5  # ids per settings packet: the Suite's MaxIssuedCommands
+SETTINGS_REREAD_S = 6 * 3600.0
+# Read only when asked from the device page, as the Suite reads them when its
+# Device configuration page opens. Text as the frame sends it: "172.16.3.1".
+NETWORK_INFO: dict[int, str] = {
+    2: "Connection",
+    13: "IP address",
+    14: "Netmask",
+    15: "Gateway",
+    16: "DNS server",
+    17: "IP mode",
+    18: "Server",
+    19: "Server port",
+    30: "Network retry",
+    36: "Battery cut-off",
+}
+# The Suite's Global.DeviceStatePolling: how often the server asks a frame for a
+# status. A frame only sends its own heartbeat after that long without hearing
+# from the server, so this is what sets the real check-in cadence unless the
+# heartbeat is shorter.
+STATUS_POLL_DEFAULT_MINUTES = 15
+# A frame reconnecting this often with no picture taken is stuck, not just having
+# one of the short bursts that clear themselves within a few minutes.
+STUCK_CONNECTIONS = 10
+STUCK_WINDOW_S = 15 * 60.0
+STUCK_RECENT_S = 3 * 60.0
+HEALTH_WINDOW_S = 24 * 3600.0
+# The settings offered under "Advanced", worded and valued as the Suite words
+# them. Config name -> (TCLV id, ((config value, wire value, label), ...)). One
+# the sign answers with a read error (no touch panel) is never offered.
+SIGN_SETTINGS: dict[str, tuple[int, tuple[tuple[str, int, str], ...]]] = {
+    "frame_sleep": (
+        PARAM_SLEEP_DISABLE,
+        (
+            ("sleep", 0, "CLI wake on accelerometer"),
+            ("awake", 1, "CLI and CPU always on"),
+            ("cli_off", 2, "CLI disabled while asleep"),
+        ),
+    ),
+    "touch_mode": (PARAM_TOUCH, (("0", 0, "Off"), ("1", 1, "On"), ("3", 3, "On + Beep"))),
+    "system_screens": (
+        PARAM_SCREENS,
+        (
+            ("0", 0, "Disabled"),
+            ("1", 1, "Battery"),
+            ("2", 2, "Not connected"),
+            ("3", 3, "Battery + Not connected"),
+        ),
+    ),
+}
+# Free-text settings: config name -> (TCLV id written, TCLV id whose answer
+# shows the frame has it). The password can't be read back. The Suite marks these
+# as not writable over the network, so a frame may refuse them.
+TEXT_SETTINGS: dict[str, tuple[int, int]] = {
+    "wifi_ssid": (PARAM_WIFI_SSID, PARAM_WIFI_SSID),
+    "wifi_psk": (PARAM_WIFI_PSK, PARAM_WIFI_SSID),
+}
+# Settings the device page puts behind the USB-cable warning.
+NETWORK_SETTINGS = ("wifi_ssid", "wifi_psk")
+TEXT_PARAMS = frozenset({PARAM_WIFI_SSID})
+# Written ids that can't be read back, and the id whose answer lets them be offered.
+WRITE_GATE = {PARAM_WIFI_PSK: PARAM_WIFI_SSID}
+WRITE_ONLY = frozenset(WRITE_GATE)
+
+
+def text_setting_value(name: str, raw: Any) -> str | None:
+    """A free-text setting's config value if it is one the sign could take
+    (SSID 1-32 characters, password 8-64), else None."""
+    text = str(raw or "")
+    if not text.strip() or not text.isascii() or not text.isprintable():
+        return None
+    if name == "wifi_ssid":
+        return text if len(text) <= 32 else None
+    return text if 8 <= len(text) <= 64 else None
+
+
+def network_info_value(pid: int, raw: bytes) -> str:
+    """A NETWORK_INFO setting as the page shows it."""
+    if pid in (13, 14, 15, 16, 18):
+        return _text_value(raw)
+    number = int.from_bytes(raw, "little")
+    if pid == 2:
+        return {6: "Wi-Fi"}.get(number, str(number))
+    if pid == 17:
+        return {0: "Static", 1: "DHCP"}.get(number, str(number))
+    if pid == 30:
+        return f"{number} min"
+    if pid == 36:
+        return f"{number} mV"
+    return str(number)
+
+
+def status_poll_minutes(cfg: dict[str, Any]) -> int:
+    """How often to ask this frame for a status, from its device config."""
+    try:
+        minutes = int(str(cfg.get("status_poll_min") or "").strip())
+    except ValueError:
+        return STATUS_POLL_DEFAULT_MINUTES
+    return minutes if 5 <= minutes <= HEARTBEAT_MAX_MINUTES else STATUS_POLL_DEFAULT_MINUTES
+
+
+def connection_health(
+    connections: Sequence[tuple[float, str]], pictures: Sequence[float], now: float
+) -> dict[str, Any]:
+    """The last 24 hours of a frame's connections and pictures, and whether it
+    looks stuck: reconnecting again and again, still at it now, with no picture
+    taken in that time. Short bursts stop by themselves and don't count."""
+    day = [(at, reason) for at, reason in connections if now - at <= HEALTH_WINDOW_S]
+    recent = [at for at, _reason in day if now - at <= STUCK_WINDOW_S]
+    stuck = (
+        len(recent) >= STUCK_CONNECTIONS
+        and now - recent[-1] <= STUCK_RECENT_S
+        and not any(at >= recent[0] for at in pictures)
+    )
+    return {
+        "connections": len(day),
+        "protocol_errors": sum(reason == "protocol error" for _at, reason in day),
+        "connection_errors": sum(reason == "connection error" for _at, reason in day),
+        "reboots": sum(reason == "reboot" for _at, reason in day),
+        "pictures": sum(now - at <= HEALTH_WINDOW_S for at in pictures),
+        "stuck": len(recent) if stuck else 0,
+    }
+
+
+def _text_value(raw: bytes) -> str:
+    return raw.split(b"\0")[0].decode("ascii", "replace")
+
+
+def sign_setting_labels(known: dict[int, Any]) -> dict[str, str]:
+    """The settings the sign has answered, config name -> what it is set to
+    (empty when it can't be read back, like the Wi-Fi password)."""
+    out: dict[str, str] = {}
+    for name, (pid, choices) in SIGN_SETTINGS.items():
+        if pid not in known:
+            continue
+        label = next((lab for _cv, wire, lab in choices if wire == known[pid]), None)
+        out[name] = label or f"{known[pid]}"
+    for name, (_write_pid, gate) in TEXT_SETTINGS.items():
+        if gate in known:
+            out[name] = str(known[PARAM_WIFI_SSID]) if name == "wifi_ssid" else ""
+    return out
+
+
 HEARTBEAT_MAX_MINUTES = 24 * 60
 # Gaps between consecutive statuses that count as a check-in cadence (see
 # ``observed_status_gap_s``), and how many status times are kept to measure it.
@@ -164,12 +330,14 @@ PARAM_NAMES = {
     PARAM_SLEEP_DISABLE: "sleep mode",
     PARAM_FLASH_SAVE: "flash save",
 }
+PARAM_NAMES.update({pid: name.replace("_", " ") for name, (pid, _c) in SIGN_SETTINGS.items()})
+PARAM_NAMES.update({pid: name.replace("_", " ") for name, (pid, _g) in TEXT_SETTINGS.items()})
 # pyvisionect.devices.enums.ParamControl.
 PARAM_READ = 0
 PARAM_READ_ERROR = 2
 PARAM_WRITE_ERROR = 3
 # What the device page can ask a connected sign to do (request_action).
-ACTIONS = ("status", "reboot", "refresh")
+ACTIONS = ("status", "reboot", "refresh", "network")
 # pyvisionect.imaging.constants Encoding.FOUR_BIT and Dithering.NONE. The
 # renderer has already dithered onto the 16-grey ramp, and NONE keeps n*17
 # levels exact.
@@ -280,22 +448,27 @@ def observed_status_gap_s(times: Sequence[float]) -> float | None:
     return usable[mid] if len(usable) % 2 else (usable[mid - 1] + usable[mid]) / 2
 
 
-def desired_params(cfg: dict[str, Any]) -> dict[int, int]:
+def desired_params(cfg: dict[str, Any]) -> dict[int, int | str]:
     """The sign settings a device's config asks for, as TCLV id to value:
-    ``heartbeat_min`` (minutes between check-ins) and ``frame_sleep``
-    ("sleep" or "awake"). Blank, absent or junk leaves the sign's own
-    setting, which is what every device does: the device kind has no such
-    config fields, because writing them is untested on hardware."""
-    out: dict[int, int] = {}
+    ``heartbeat_min`` (minutes between check-ins) and the ``SIGN_SETTINGS``
+    choices (``frame_sleep`` is "sleep", "awake" or "cli_off"). Blank, absent or junk
+    leaves the sign's own setting."""
+    out: dict[int, int | str] = {}
     try:
         minutes = int(str(cfg.get("heartbeat_min") or "").strip())
     except ValueError:
         minutes = 0
     if 1 <= minutes <= HEARTBEAT_MAX_MINUTES:
         out[PARAM_HEARTBEAT] = minutes
-    mode = str(cfg.get("frame_sleep") or "").strip()
-    if mode in ("sleep", "awake"):
-        out[PARAM_SLEEP_DISABLE] = 1 if mode == "awake" else 0
+    for name, (pid, choices) in SIGN_SETTINGS.items():
+        chosen = str(cfg.get(name) or "").strip()
+        for config_value, wire, _label in choices:
+            if chosen == config_value:
+                out[pid] = wire
+    for name, (pid, _gate) in TEXT_SETTINGS.items():
+        text = text_setting_value(name, cfg.get(name))
+        if text is not None:
+            out[pid] = text
     return out
 
 
@@ -322,12 +495,58 @@ def status_summary(status: Any) -> dict[str, Any]:
         value = fields.get(name)
         if isinstance(value, int) and not isinstance(value, bool):
             out[key] = value
+    for key, name in (("hardware", "Hardware"), ("bootloader", "Bootloader")):
+        version = fields.get(name)
+        if isinstance(version, dict):
+            parts = [
+                str(version[k])
+                for k in ("major", "minor", "revision")
+                if version.get(k) is not None
+            ]
+            if parts:
+                out[key] = ".".join(parts)
+    used = fields.get("ConnectivityUsed")
+    if isinstance(used, dict):
+        used = used.get("name")
+    if used:
+        out["connectivity"] = str(used)
     charging = fields.get("ChargingStatus")
     if isinstance(charging, dict):
         charging = charging.get("name")
     if charging:
         out["charging"] = f"charger {charging}"
     return out
+
+
+def firmware_identity(status: Any) -> dict[str, Any]:
+    """What a status packet says about the sign's firmware and hardware: the
+    fields firmware is matched on. Anything the sign didn't report is None."""
+    if status is None:
+        return {}
+    try:
+        fields = status.fields()
+    except Exception:
+        return {}
+
+    def _num(value: Any) -> int | None:
+        if isinstance(value, bool) or not isinstance(value, int) or value == 0xFFFFFFFF:
+            return None
+        return value
+
+    def _triple(name: str) -> tuple[int, int, int] | None:
+        raw = fields.get(name)
+        if not isinstance(raw, dict):
+            return None
+        nums = [_num(raw.get(k)) for k in ("major", "minor", "revision")]
+        return (nums[0], nums[1], nums[2]) if all(n is not None for n in nums) else None  # type: ignore[return-value]
+
+    return {
+        "firmware": _triple("Firmware"),
+        "hardware": _triple("Hardware"),
+        "hw_name_id": _num(fields.get("HardwareNameID")),
+        "display_id": _num(fields.get("DisplayType")),
+        "checksum": _num(fields.get("FirmwareID")),
+    }
 
 
 def status_line(status: Any) -> str:
@@ -355,9 +574,8 @@ def params_line(packet: Any) -> str:
         name = names.get(pid, f"TCLV {pid}")
         if control in (PARAM_READ_ERROR, PARAM_WRITE_ERROR):
             parts.append(f"{name}: {'read' if control == PARAM_READ_ERROR else 'write'} refused")
-        elif pid == PARAM_WIFI_SSID:
-            ssid = item.value.split(b"\0")[0].decode("ascii", "replace")
-            parts.append(f"{name} {ssid}")
+        elif pid in TEXT_PARAMS:
+            parts.append(f"{name} {_text_value(item.value)}")
         elif item.value:
             parts.append(f"{name} {int.from_bytes(item.value, 'little')}")
         else:
@@ -407,6 +625,10 @@ class _Context:
     latest_render_fn: Callable[[str], dict[str, Any] | None]
     # PushManager.render_in_progress: a push for this device is under way.
     render_busy_fn: Callable[[str], bool] = lambda _device_id: False
+    # PushManager.record_frame_served: the sign took this render. Blocking
+    # (it takes the manager's lock and may write latest_renders.json), so it
+    # runs on an executor thread, never on the loop.
+    record_served_fn: Callable[[str, dict[str, Any]], None] = lambda _device_id, _render: None
 
 
 @dataclass
@@ -418,6 +640,7 @@ class _Inflight:
     conn: Any  # the DeviceConnection it went out on
     writer: Any
     digest: str = ""
+    render: dict[str, Any] = field(default_factory=dict)  # the latest-render entry behind digest
     checksum: int = 0
     minutes: int = 0
     deadline: float = math.inf  # monotonic; set once the write has finished
@@ -445,6 +668,7 @@ class _Sign:
     trusted_at: float = 0.0  # wall clock of that acknowledgement
     frame: Any = None  # EncodedFrame for frame_digest
     frame_digest: str = ""
+    frame_render: dict[str, Any] = field(default_factory=dict)  # the render entry frame came from
     failed_digest: str = ""  # a latest render that couldn't be read or encoded
     failed_stamp: Any = None  # that render's publication timestamp
     failed_retry_at: float = 0.0  # monotonic; when to try it again
@@ -455,6 +679,10 @@ class _Sign:
     shown_digest: str = ""  # acked by the sign during this run
     shown_checksum: int | None = None  # its state checksum (status tag 9)
     shown_at: float = 0.0  # wall clock of that ACK
+    # (device id, render entry) of the newest ACK not yet handed to the push
+    # manager, and the task draining it: latest wins, one executor job at a time.
+    pending_served: tuple[str, dict[str, Any]] | None = None
+    served_task: asyncio.Task[None] | None = None
     crc_corrected: bool = False  # one corrective resend per mismatch
     corrected_digest: str = ""  # the frame that corrective resend was for
     inflight: _Inflight | None = None  # at most one frame or sleep at a time
@@ -471,6 +699,27 @@ class _Sign:
     # recorded with the sign's own cadence.
     known_interval_min: int | None = None
     known_sleep_disabled: bool | None = None
+    # Every setting the sign has answered (id -> value), and the ids it
+    # refused to read. Both outlive the connection so the device page keeps
+    # offering what the frame supports while it sleeps.
+    known_params: dict[int, Any] = field(default_factory=dict)
+    params_unsupported: set[int] = field(default_factory=set)
+    known_written: dict[int, Any] = field(default_factory=dict)  # write-only settings sent
+    # Settings packets waiting to go, one at a time (``_pump_params``): the one
+    # out now, and when the sign's settings were last read.
+    param_queue: deque[tuple[str, Any]] = field(default_factory=deque)
+    # Connections (when, why) and pictures taken over the last day, and the
+    # network details last read. In memory: they start over with Tesserae.
+    connections: deque[tuple[float, str]] = field(default_factory=lambda: deque(maxlen=4000))
+    pictures: deque[float] = field(default_factory=lambda: deque(maxlen=4000))
+    network: dict[int, str] = field(default_factory=dict)
+    stuck_warned: bool = False
+    param_out: str = ""
+    param_out_values: dict[int, Any] = field(default_factory=dict)  # the write that is out
+    # Writes the frame never answered, as id -> (value, when). Kept across its
+    # connections, so a frame that reconnects often isn't sent them each time.
+    unanswered: dict[int, tuple[Any, float]] = field(default_factory=dict)
+    settings_read_at: float = 0.0
     # Wall clock times of the sign's recent statuses, newest last. The gap
     # between them is its real check-in cadence, which the configured interval
     # (TCLV 29) is not: a 32" set to 30 min reports about every 15.
@@ -490,7 +739,7 @@ class _Sign:
     params: dict[int, Any] = field(default_factory=dict)
     params_asked: bool = False
     params_wait_until: float = 0.0  # monotonic; pictures wait for a settings answer till then
-    params_written: tuple[tuple[int, int], ...] = ()
+    params_written: tuple[tuple[int, int | str], ...] = ()
     param_error: str = ""
     force_refresh: bool = False  # Full refresh asked from the device page
     # What went to and came from the frame, newest last: (wall time,
@@ -539,6 +788,12 @@ class VisionectService:
         self._warned_unbound: dict[str, None] = {}  # insertion-ordered, capped
         self._discovered: dict[str, None] = {}  # discovery ids we listed, oldest first
         self._retry_timer: threading.Timer | None = None
+        # Firmware flashes, one job per UUID (the newest; a finished one stays
+        # for the device page). Guarded by _flash_lock: request threads create
+        # jobs, the loop thread runs them.
+        self._flash_lock = threading.Lock()
+        self._flash_jobs: dict[str, visionect_flash.FlashJob] = {}
+        self.firmware_repo: FirmwareRepository | None = None
         # Read by Flask request threads; written on the loop thread.
         self._snapshot_lock = threading.Lock()
         self._snapshot: dict[str, dict[str, Any]] = {}
@@ -716,6 +971,8 @@ class VisionectService:
         )
         server.keep_identity = self._keeps_identity
         server.trusted_peer = self._trusted_peer
+        server.bootloader_wants = self._flash_wants
+        server.bootloader_handler = self._flash_connection
         self._stop_event, self._store, self._server = stop_event, store, server
         await server.start()
         logger.info("visionect: listening for signs on %s:%d", self.host, self.port)
@@ -735,6 +992,7 @@ class VisionectService:
         A sign holds its socket open, and on Python < 3.13 asyncio.Server has
         no close_clients()/abort_clients(), so wait_closed() would wait for
         it forever: abort the transports ourselves first."""
+        self._flash_stop_all()
         writers = getattr(server, "_writers", None)
         owned = [sign.writer for sign in list(self._signs.values()) if sign.writer is not None]
         if isinstance(writers, dict):
@@ -1069,6 +1327,8 @@ class VisionectService:
         if ctx is None or device is None or self._server is None:
             return
         loop = asyncio.get_running_loop()
+        if self._flash_active(sign.uuid):
+            return  # no pictures to a frame that is being flashed
         self._expire(sign)
         status = sign.status  # from the sign's own connection only
         panel = sign_panel(status) if status is not None else None
@@ -1143,6 +1403,7 @@ class VisionectService:
                     sign.dirty = True
                     return
                 sign.frame, sign.frame_digest = frame, digest
+                sign.frame_render = dict(latest)
                 sign.failed_digest = sign.failed_logged = ""
                 sign.failed_tries = 0
                 sign.repaint_until = 0.0
@@ -1159,8 +1420,10 @@ class VisionectService:
                     sign.shown_digest = digest
                     sign.shown_checksum = int(reported)
                     sign.shown_at = time.time()
+                    self._served(sign, device.id, sign.frame_render)
 
-        if not self._alive(sign) or sign.inflight is not None:
+        # A flash may have been asked for during the encode.
+        if not self._alive(sign) or sign.inflight is not None or self._flash_active(sign.uuid):
             return
         conn, writer = sign.conn, sign.writer
 
@@ -1202,6 +1465,7 @@ class VisionectService:
                 conn=conn,
                 writer=writer,
                 digest=sign.frame_digest,
+                render=sign.frame_render,
                 checksum=checksum,
                 resend_stamp=resend,
             )
@@ -1357,68 +1621,139 @@ class VisionectService:
 
     # -- the sign's own settings and actions ---------------------------------
 
-    async def _sync_params(self, sign: _Sign, device: Device) -> bool:
-        """Read the sign's settings once per connection; once they're in,
-        write the ones the device's config sets differently, save them to
-        flash and read them back. A set of writes goes out at most once per
-        connection, so a sign that refuses one doesn't get it every pass.
-        True when it sent something (the caller waits for the answer)."""
-        conn, writer = sign.conn, sign.writer
-        if not sign.params_asked:
-            sign.params_asked = True
-            try:
-                conn.read_params(list(READ_PARAMS))
-            except Exception:
-                logger.debug("visionect: reading %s's settings failed", sign.uuid, exc_info=True)
-                return False
-            self._note(sign, "out", "read settings")
-            self._await_params(sign)
-            await self._write(conn, writer)
-            return True
-        want = desired_params(self._device_cfg(device.id))
-        if any(pid not in sign.params for pid in want):
-            return False  # not read yet (or this firmware doesn't have it)
-        change = tuple(sorted((pid, v) for pid, v in want.items() if sign.params[pid] != v))
-        if not change or change == sign.params_written:
-            return False
-        sign.params_written = change
-        try:
-            conn.write_params(dict(change))
-            conn.write_params({PARAM_FLASH_SAVE: 1})
-            conn.read_params(list(READ_PARAMS))
-        except Exception as exc:
-            sign.param_error = f"Tesserae couldn't write the frame's settings: {exc}"
-            logger.warning("visionect: writing %s's settings failed: %s", sign.uuid, exc)
-            return False
+    def _queue_read(self, sign: _Sign, ids: Sequence[int]) -> None:
+        for start in range(0, len(ids), READ_CHUNK):
+            sign.param_queue.append(("read", list(ids[start : start + READ_CHUNK])))
+
+    def _apply_status_poll(self, sign: _Sign, device: Device) -> None:
+        """Keep this connection's status poll at what the device page asks for
+        (the library's connections otherwise share one setting)."""
+        conn = sign.conn
+        config = getattr(conn, "config", None)
+        minutes = status_poll_minutes(self._device_cfg(device.id))
+        if config is None or config.device_state_polling_minutes == minutes:
+            return
+        conn.config = replace(config, device_state_polling_minutes=minutes)
         logger.info(
-            "visionect %s: setting sign %s %s",
-            device.id,
-            sign.uuid,
-            ", ".join(f"{PARAM_NAMES.get(pid, pid)}={v}" for pid, v in change),
+            "visionect %s: asking sign %s for a status every %d min", device.id, sign.uuid, minutes
         )
-        self._note(
-            sign,
-            "out",
-            "write "
-            + ", ".join(f"{PARAM_NAMES.get(pid, pid)} = {v}" for pid, v in change)
-            + ", save to flash, read back",
-        )
+
+    async def _pump_params(self, sign: _Sign) -> bool:
+        """Send the next settings packet once the last has been answered, the
+        way the Suite does. True while one is out (the caller waits for it). A
+        frame that doesn't answer gets nothing more: above all no flash save
+        after a write it may not have taken. The save itself may have no answer
+        to wait for, so running out of time on that one is not a fault."""
+        conn, writer = sign.conn, sign.writer
+        if sign.param_out:
+            if time.monotonic() < sign.params_wait_until:
+                return True
+            if sign.param_out != "save":
+                sign.param_queue.clear()
+                sign.param_error = "The frame didn't answer a settings request; Tesserae stopped."
+                logger.warning("visionect: sign %s didn't answer %s", sign.uuid, sign.param_out)
+            if sign.param_out == "write":
+                # Whether it took them is unknown: read them next time it connects,
+                # and don't send them again meanwhile.
+                now = time.time()
+                sign.unanswered.update({pid: (v, now) for pid, v in sign.param_out_values.items()})
+                sign.settings_read_at = 0.0
+            sign.param_out = ""
+        if not sign.param_queue:
+            return False
+        kind, value = sign.param_queue.popleft()
+        try:
+            if kind == "read":
+                conn.read_params(value)
+            elif kind == "write":
+                # The Wi-Fi ids are ones the Suite won't write over the network;
+                # the library only guards them, and only ids from the tables
+                # above ever get here.
+                conn.write_params(value, allow_read_only=True)
+            else:
+                conn.write_params({PARAM_FLASH_SAVE: 1})
+        except Exception as exc:
+            sign.param_queue.clear()
+            sign.param_error = f"Tesserae couldn't send the frame's settings: {exc}"
+            logger.warning("visionect: settings for %s failed: %s", sign.uuid, exc)
+            return False
+        sign.param_out = kind
+        sign.param_out_values = dict(value) if kind == "write" else {}
         self._await_params(sign)
         await self._write(conn, writer)
         return True
+
+    async def _sync_params(self, sign: _Sign, device: Device) -> bool:
+        """Read the sign's settings when they're due; once they're in, write
+        the ones the device's config sets differently, save them to flash and
+        read them back, one packet at a time. A set of writes goes out at most
+        once per connection, so a sign that refuses one doesn't get it every
+        pass. True when it sent something (the caller waits for the answer)."""
+        self._apply_status_poll(sign, device)
+        if await self._pump_params(sign):
+            return True
+        if not sign.params_asked:
+            sign.params_asked = True
+            self._note(sign, "out", "read settings")
+            self._queue_read(sign, READ_PARAMS)
+            return await self._pump_params(sign)
+        # Only settings this sign has answered are written (the password by the
+        # setting that shows the frame has it): one it doesn't have is skipped,
+        # not allowed to hold up the rest.
+        change = []
+        for pid, v in desired_params(self._device_cfg(device.id)).items():
+            if WRITE_GATE.get(pid, pid) not in sign.params:
+                continue
+            if sign.params.get(pid) == v or (pid, v) in sign.params_written:
+                continue
+            if pid in WRITE_ONLY and sign.known_written.get(pid) == v:
+                continue  # can't be read back: written once, not on every connection
+            tried = sign.unanswered.get(pid)
+            if tried and tried[0] == v and time.time() - tried[1] < SETTINGS_REREAD_S:
+                sign.param_error = (
+                    f"The frame didn't answer when Tesserae set "
+                    f"{PARAM_NAMES.get(pid, f'setting {pid}')}, so it may not have taken it. "
+                    "Tesserae tries again in a few hours, or when you change it."
+                )
+                continue
+            change.append((pid, v))
+        # A (setting, value) pair goes out once per connection, so a stale
+        # value still showing while a read back is in flight isn't rewritten.
+        change = sorted(change, key=lambda item: item[0])
+        if not change:
+            return False
+        sign.params_written = tuple(sorted({*sign.params_written, *change}, key=lambda i: i[0]))
+        for pid, v in change:
+            if pid in WRITE_ONLY:
+                sign.known_written[pid] = v
+        shown = ", ".join(
+            f"{PARAM_NAMES.get(pid, pid)}={'(hidden)' if pid == PARAM_WIFI_PSK else v}"
+            for pid, v in change
+        )
+        for start in range(0, len(change), READ_CHUNK):
+            sign.param_queue.append(("write", dict(change[start : start + READ_CHUNK])))
+        sign.param_queue.append(("save", None))
+        self._queue_read(sign, READ_PARAMS)
+        logger.info("visionect %s: setting sign %s %s", device.id, sign.uuid, shown)
+        self._note(sign, "out", f"write {shown}, save to flash, read back")
+        return await self._pump_params(sign)
 
     def _await_params(self, sign: _Sign) -> None:
         sign.params_wait_until = time.monotonic() + PARAM_WAIT_S
         self._schedule(sign.uuid, delay=PARAM_WAIT_S + 0.05)
 
     def _params_received(self, sign: _Sign, packet: Any) -> None:
-        """The sign's answer to a settings read or write. A read answer ends
-        the wait for it (a write is followed by a read back)."""
-        if any(
-            int(i.control) in (PARAM_READ, PARAM_READ_ERROR) for i in getattr(packet, "items", ())
-        ):
+        """The sign's answer to a settings packet, which ends the wait for it.
+        A write it refused entirely isn't saved to flash."""
+        items = list(getattr(packet, "items", ()))
+        if items:
+            if sign.param_out == "write" and all(
+                int(i.control) == PARAM_WRITE_ERROR for i in items
+            ):
+                sign.param_queue = deque(q for q in sign.param_queue if q[0] != "save")
+            sign.param_out = ""
             sign.params_wait_until = 0.0
-        for item in getattr(packet, "items", ()):
+        for item in items:
             pid, control = int(item.id), int(item.control)
             if control == PARAM_WRITE_ERROR:
                 sign.param_error = (
@@ -1427,16 +1762,32 @@ class VisionectService:
                 )
                 logger.warning("visionect: sign %s refused a write to TCLV %d", sign.uuid, pid)
                 continue
+            if pid in NETWORK_INFO and pid not in READ_PARAMS:
+                if control == PARAM_READ and item.value:
+                    sign.network[pid] = network_info_value(pid, item.value)
+                continue
+            if control == PARAM_READ_ERROR and pid in READ_PARAMS:
+                sign.params_unsupported.add(pid)  # this firmware or frame doesn't have it
+                sign.known_params.pop(pid, None)
+                sign.params.pop(pid, None)
+                continue
             if control != PARAM_READ or pid not in READ_PARAMS or not item.value:
                 continue  # a write's echo, an error, or nothing to read
-            if pid == PARAM_WIFI_SSID:
-                sign.params[pid] = item.value.split(b"\0")[0].decode("ascii", "replace")
+            sign.params_unsupported.discard(pid)
+            sign.settings_read_at = time.time()
+            if pid in TEXT_PARAMS:
+                sign.params[pid] = _text_value(item.value)
             else:
                 sign.params[pid] = int.from_bytes(item.value, "little")
                 if pid == PARAM_HEARTBEAT:
                     sign.known_interval_min = sign.params[pid]
                 elif pid == PARAM_SLEEP_DISABLE:
-                    sign.known_sleep_disabled = bool(sign.params[pid])
+                    # 0 and 2 both sleep; only 1 keeps the CPU awake.
+                    sign.known_sleep_disabled = sign.params[pid] == 1
+            sign.known_params[pid] = sign.params[pid]
+            # It holds what an unanswered write asked for: that write did take.
+            if sign.unanswered.get(pid, (None,))[0] == sign.params[pid]:
+                del sign.unanswered[pid]
 
     def request_action(self, device_id: str, action: str) -> str | None:
         """Ask the device's sign, from a request thread, to report its status
@@ -1461,6 +1812,10 @@ class VisionectService:
             return
         if action == "refresh":
             sign.force_refresh = True
+            self._schedule(uuid)
+        elif action == "network":
+            self._queue_read(sign, tuple(NETWORK_INFO))
+            self._note(sign, "out", "read network details")
             self._schedule(uuid)
         else:
             try:
@@ -1569,6 +1924,9 @@ class VisionectService:
                     sign.shown_digest = inflight.digest
                     sign.shown_checksum = inflight.checksum
                     sign.shown_at = time.time()
+                    device = self._device_for_uuid(uuid)
+                    if device is not None:
+                        self._served(sign, device.id, inflight.render)
                     if inflight.digest != sign.corrected_digest:
                         # A new desired frame gets its own corrective resend;
                         # the ACK of that resend itself doesn't re-arm it.
@@ -1579,6 +1937,7 @@ class VisionectService:
                     if inflight.resend_stamp:
                         sign.resend_stamp = inflight.resend_stamp
                         self._consume_resend(uuid)
+                    sign.pictures.append(time.time())
                     logger.info("visionect: sign %s acked frame %s", uuid, inflight.digest[:12])
                 else:
                     sign.asleep_until = time.time() + inflight.minutes * 60
@@ -1671,12 +2030,23 @@ class VisionectService:
         sign.asleep_until = 0.0
         sign.connected_at = time.time()
         sign.connect_reason = str(getattr(status, "connect_reason_name", "") or "")
+        sign.connections.append((time.time(), sign.connect_reason))
         self._note(
             sign, "in", f"connected from {remote or '?'} ({sign.connect_reason or 'no reason'})"
         )
-        # Read the sign's settings afresh on every connection (a reboot or a
-        # USB console may have changed them); a new connection may write again.
-        sign.params, sign.params_asked, sign.params_wait_until = {}, False, 0.0
+        self._flash_reconnected(sign, status)
+        # What was read earlier still stands unless the frame rebooted or it's
+        # been a while (a USB console may have changed it). A new connection may
+        # write again, and anything queued on the old one is gone.
+        fresh = (
+            bool(sign.known_params)
+            and sign.connect_reason != "reboot"
+            and time.time() - sign.settings_read_at < SETTINGS_REREAD_S
+        )
+        sign.params = dict(sign.known_params) if fresh else {}
+        sign.params_asked, sign.params_wait_until = fresh, 0.0
+        sign.param_queue.clear()
+        sign.param_out = ""
         sign.params_written, sign.param_error = (), ""
         device = device or self._bind(uuid)
         self._check_glass(sign, status)
@@ -1758,6 +2128,35 @@ class VisionectService:
             sign.shown_checksum,
         )
         sign.shown_digest = ""
+
+    def _served(self, sign: _Sign, device_id: str, render: dict[str, Any]) -> None:
+        """Tell the push manager the sign holds ``render`` (it ACKed the
+        picture, or its CRC says it already shows it), so the Lineups and
+        device pages show what is on the glass and call a newer render queued
+        until the sign takes it. Persisted by the manager next to the latest
+        render, so a restart before the next ACK still knows. Latest wins, one
+        executor job per sign at a time, in ACK order."""
+        if not render.get("digest"):
+            return
+        sign.pending_served = (device_id, dict(render))
+        if sign.served_task is None or sign.served_task.done():
+            task = asyncio.get_running_loop().create_task(self._drain_served(sign))
+            sign.served_task = task
+            self._tasks.add(task)
+            task.add_done_callback(self._tasks.discard)
+
+    async def _drain_served(self, sign: _Sign) -> None:
+        loop = asyncio.get_running_loop()
+        while sign.pending_served is not None:
+            ctx = self._ctx
+            device_id, render = sign.pending_served
+            sign.pending_served = None
+            if ctx is None:
+                return
+            try:
+                await loop.run_in_executor(None, ctx.record_served_fn, device_id, render)
+            except Exception:
+                logger.exception("visionect: recording %s's shown frame failed", device_id)
 
     def _consume_resend(self, uuid: str) -> None:
         """Clear the latest render's one-shot resend flag once the sign has
@@ -1844,6 +2243,16 @@ class VisionectService:
 
     def _publish(self, sign: _Sign) -> None:
         inflight = sign.inflight
+        health = connection_health(sign.connections, sign.pictures, time.time())
+        if health["stuck"] and not sign.stuck_warned:
+            logger.warning(
+                "visionect: sign %s looks stuck: %d connections in %d min and no picture taken",
+                sign.uuid,
+                health["stuck"],
+                STUCK_WINDOW_S // 60,
+            )
+            self._note(sign, "note", "looks stuck: reconnecting and taking no pictures")
+        sign.stuck_warned = bool(health["stuck"])
         view = {
             "uuid": sign.uuid,
             "connected": self._alive(sign),
@@ -1857,14 +2266,18 @@ class VisionectService:
             "refused": dict(sign.refused) if sign.refused else None,
             "connect_reason": sign.connect_reason,
             "status": status_summary(sign.status),
-            "heartbeat_min": sign.params.get(PARAM_HEARTBEAT),
+            "heartbeat_min": sign.params.get(PARAM_HEARTBEAT, sign.known_interval_min),
             "checkin_gap_s": observed_status_gap_s(sign.status_times)
             or (sign.known_interval_min * 60 if sign.known_interval_min else None),
             "sleep_disabled": sign.params.get(PARAM_SLEEP_DISABLE),
+            "settings": sign_setting_labels(sign.known_params),
+            "health": health,
+            "network": {NETWORK_INFO[pid]: v for pid, v in sign.network.items()},
             "wifi": sign.params.get(PARAM_WIFI_SSID),
             "param_error": sign.param_error,
             "action": dict(sign.action) if sign.action else None,
             "exchanges": list(sign.exchanges),
+            "identity": firmware_identity(sign.status),
         }
         with self._snapshot_lock:
             self._snapshot[sign.uuid] = view
@@ -1873,6 +2286,472 @@ class VisionectService:
         with self._snapshot_lock:
             view = self._snapshot.get(normalise_uuid(uuid))
             return dict(view) if view is not None else None
+
+    # -- firmware flashing -------------------------------------------------
+    #
+    # Only ever on an explicit request (request_firmware_update). The frame is
+    # told to reboot; its bootloader then dials this listener on a new
+    # connection and opens with a hello (app.visionect_bootloader). The
+    # listener hands that connection here only while a flash is pending for
+    # the address, and only a hello from the frame the flash is for, on
+    # matching hardware, is answered. Everything else is as it always was.
+
+    def _repo(self) -> FirmwareRepository | None:
+        if self.firmware_repo is None:
+            ctx = self._ctx
+            root = ctx.app.config.get("DATA_ROOT") if ctx is not None else None
+            if root:
+                self.firmware_repo = FirmwareRepository(Path(root) / "visionect_firmware")
+        return self.firmware_repo
+
+    @staticmethod
+    def _flash_expired(job: visionect_flash.FlashJob) -> bool:
+        """A pending job past its timeout, whether or not its timer ran (a
+        listener restart or a dropped callback leaves none). Never claimed,
+        and it holds nothing up."""
+        return (
+            job.phase == visionect_flash.PENDING
+            and time.time() - (job.reboot_at or job.requested_at)
+            > visionect_flash.PENDING_TIMEOUT_S + visionect_flash.PENDING_GRACE_S
+        )
+
+    def _flash_active(self, uuid: str) -> bool:
+        job = self._flash_jobs.get(uuid)
+        return job is not None and job.active and not self._flash_expired(job)
+
+    def _flash_any_active(self) -> bool:
+        return any(
+            job.active and not self._flash_expired(job) for job in list(self._flash_jobs.values())
+        )
+
+    def firmware_update_running(self) -> bool:
+        """Whether a frame is being flashed, or about to be. Stopping the listener
+        now would cut the flash off."""
+        return self._flash_any_active()
+
+    def _flash_stop_all(self) -> None:
+        """The listener is stopping: no active job survives it, since its timer
+        and the frame's connection go too. A running flash is ended by its own
+        task being cancelled."""
+        for job in list(self._flash_jobs.values()):
+            if job.timer is not None:
+                job.timer.cancel()
+                job.timer = None
+            if job.phase in (visionect_flash.PENDING, visionect_flash.VERIFYING):
+                job.message = (
+                    "Tesserae stopped before the frame called its bootloader, so nothing was "
+                    "flashed."
+                    if job.phase == visionect_flash.PENDING
+                    else "Tesserae stopped before the frame came back from its flash. Check that "
+                    "it reconnects on the new firmware."
+                )
+                job.phase = visionect_flash.FAILED
+                job.finished_at = time.time()
+                job.touch()
+
+    def flash_job(self, device_id: str) -> visionect_flash.FlashJob | None:
+        uuid = self.device_uuid(device_id)
+        return self._flash_jobs.get(uuid) if uuid else None
+
+    def firmware_token(self, device_id: str) -> str:
+        """Changes whenever what the page shows about firmware does (a flash
+        step, a new list); empty when there is nothing to show. The device
+        page polls it with its other live regions."""
+        uuid = self.device_uuid(device_id)
+        if not uuid:
+            return ""
+        job = self._flash_jobs.get(uuid)
+        repo = self.firmware_repo
+        parts = []
+        if job is not None:
+            parts.append(f"{job.phase}{job.version}")
+        if repo is not None and repo.generation:
+            parts.append(f"g{repo.generation}")
+        return ".".join(parts)
+
+    def _flash_blocked(self, view: dict[str, Any] | None) -> str:
+        """Why a flash can't start now (plain words), or ""."""
+        if not self.running:
+            return "Tesserae isn't listening for Visionect frames right now."
+        if view is None or not view.get("connected"):
+            return "The frame isn't connected right now (asleep, or between connections)."
+        if self._flash_any_active():
+            return "A firmware update is already running."
+        battery = (view.get("status") or {}).get("battery_pct")
+        if not isinstance(battery, int):
+            return "The frame hasn't reported its battery level, so it isn't safe to update."
+        if battery < FLASH_MIN_BATTERY_PCT:
+            return (
+                f"The frame's battery is at {battery}%. Charge it above "
+                f"{FLASH_MIN_BATTERY_PCT}% before updating its firmware."
+            )
+        return ""
+
+    def _firmware_ignored(self) -> set[int]:
+        """Checksums of the builds someone chose to ignore. An ignored build is
+        no longer offered as an update, and can still be picked by hand."""
+        ctx = self._ctx
+        settings = ctx.app.config.get("SETTINGS_STORE") if ctx is not None else None
+        raw = settings.get_section("app").get(FIRMWARE_IGNORED_KEY) if settings is not None else ()
+        out: set[int] = set()
+        for text in raw if isinstance(raw, list) else ():
+            with contextlib.suppress(TypeError, ValueError):
+                out.add(int(str(text), 16))
+        return out
+
+    def _compatible_builds(self, view: dict[str, Any] | None) -> list[Build] | None:
+        """Builds for exactly this frame's hardware and display, newest first,
+        from the cached list; None when the list or what the frame reports
+        doesn't allow telling."""
+        repo = self._repo()
+        ident = (view or {}).get("identity") or {}
+        if repo is None:
+            return None
+        builds = repo.builds()
+        hardware, name_id, display = (
+            ident.get("hardware"),
+            ident.get("hw_name_id"),
+            ident.get("display_id"),
+        )
+        if builds is None or hardware is None or name_id is None or display is None:
+            return None
+        return compatible(builds, hardware=hardware, hardware_name_id=name_id, display_id=display)
+
+    def firmware_view(self, device_id: str) -> dict[str, Any] | None:
+        """What the device page shows about the sign's firmware, from the
+        cache and the last status only (never the network: a stale list
+        triggers a background refresh). None for a device with no sign."""
+        uuid = self.device_uuid(device_id)
+        if not uuid:
+            return None
+        view = self.sign_view(uuid)
+        job = self._flash_jobs.get(uuid)
+        repo = self._repo()
+        ctx = self._ctx
+        settings = ctx.app.config.get("SETTINGS_STORE") if ctx is not None else None
+        # Looking for builds is optional traffic, so the app's online switch
+        # covers it. Downloading a chosen build is always something asked for.
+        if repo is not None and online.online_enabled(settings):
+            repo.refresh_in_background()
+            repo.refresh_notes_in_background()
+        ident = (view or {}).get("identity") or {}
+        installed = ident.get("firmware")
+        checksum = ident.get("checksum")
+        builds = self._compatible_builds(view)
+        ignored = self._firmware_ignored()
+        latest = next((b for b in builds or [] if b.checksum not in ignored), None)
+        rows: list[dict[str, Any]] = []
+        for b in builds or []:
+            is_installed = (
+                b.checksum == checksum if checksum is not None else b.version == installed
+            )
+            rows.append(
+                {
+                    "checksum": b.checksum_hex,
+                    "version": b.version_text,
+                    "installed": is_installed,
+                    "newest": b is latest,
+                    "ignored": b.checksum in ignored,
+                    "downgrade": installed is not None and b.version < installed,
+                    "notes": repo.notes_for(b.version_text) if repo is not None else [],
+                }
+            )
+        update = bool(
+            latest is not None
+            and installed is not None
+            and latest.version > installed
+            and (checksum is None or latest.checksum != checksum)
+        )
+        return {
+            "installed": ".".join(map(str, installed)) if installed else "",
+            "latest": latest.version_text if latest is not None else "",
+            "latest_checksum": latest.checksum_hex if latest is not None else "",
+            "update_available": update,
+            "builds": rows,
+            "blocked": self._flash_blocked(view),
+            "flash": job.view() if job is not None else None,
+            "list_known": builds is not None,
+            "unknown_because": self._firmware_unknown_because(view, builds, repo),
+            "min_battery": FLASH_MIN_BATTERY_PCT,
+        }
+
+    @staticmethod
+    def _firmware_unknown_because(
+        view: dict[str, Any] | None, builds: list[Build] | None, repo: Any
+    ) -> str:
+        """Why the page has no latest version to show, in plain words."""
+        if builds:
+            return ""
+        if builds is not None:
+            return "Visionect lists no firmware for this frame's hardware and display"
+        if repo is not None and repo.builds() is None:
+            return "Visionect's firmware list hasn't been fetched yet, or can't be reached (it needs online features on)"
+        if (view or {}).get("identity"):
+            return "Waiting for the frame to report its hardware and display"
+        return "Waiting for the frame's next check-in"
+
+    def request_firmware_update(self, device_id: str, checksum_hex: str) -> str | None:
+        """Flash the chosen build onto the device's sign, from a request
+        thread. Returns why it can't, or None once the reboot is queued.
+
+        Order: validate, download (a file that doesn't walk cleanly is never
+        used), re-check that the frame is connected, charged and not already
+        being flashed, mark the flash pending, then reboot the frame."""
+        uuid = self.device_uuid(device_id)
+        if not uuid:
+            return "No frame is bound to this device yet."
+        view = self.sign_view(uuid)
+        blocked = self._flash_blocked(view)
+        if blocked:
+            return blocked
+        text = str(checksum_hex or "").strip().lower()
+        try:
+            wanted = int(text, 16)
+        except ValueError:
+            return "Unknown firmware build."
+        builds = self._compatible_builds(view)
+        if builds is None:
+            return "The list of firmware builds for this frame isn't available."
+        chosen = next((b for b in builds if b.checksum == wanted), None)
+        if chosen is None:
+            return "That build isn't for this frame's hardware and display."
+        ident = (view or {}).get("identity") or {}
+        if ident.get("checksum") == chosen.checksum or ident.get("firmware") == chosen.version:
+            return "The frame already runs that firmware."
+        repo = self._repo()
+        assert repo is not None
+        try:
+            data = repo.fetch(chosen)
+        except RepositoryError as exc:
+            return str(exc)
+        view = self.sign_view(uuid)
+        job = visionect_flash.FlashJob(
+            uuid=uuid,
+            device_id=device_id,
+            build=chosen,
+            data=data,
+            peer_ip=str((view or {}).get("remote") or ""),
+            from_version=".".join(map(str, ident.get("firmware") or ())),
+            from_checksum=ident.get("checksum"),
+        )
+        with self._flash_lock:
+            blocked = self._flash_blocked(view)
+            if blocked:
+                return blocked
+            self._flash_jobs[uuid] = job
+        logger.info(
+            "visionect: firmware %s (%s) requested for sign %s, now %s",
+            chosen.version_text,
+            chosen.checksum_hex,
+            uuid,
+            job.from_version or "unknown",
+        )
+        self._call_soon(functools.partial(self._flash_begin, job))
+        return None
+
+    def _flash_note(self, job: visionect_flash.FlashJob, text: str, way: str = "note") -> None:
+        logger.info("visionect: firmware flash of sign %s: %s", job.uuid, text)
+        sign = self._signs.get(job.uuid)
+        if sign is not None:
+            self._note(sign, way, f"firmware: {text}")
+            self._publish(sign)
+
+    def _flash_end(self, job: visionect_flash.FlashJob, ok: bool, message: str) -> None:
+        """Record how a flash ended, and let pictures resume."""
+        if job.timer is not None:
+            job.timer.cancel()
+            job.timer = None
+        job.phase = visionect_flash.DONE if ok else visionect_flash.FAILED
+        job.message = message
+        job.finished_at = time.time()
+        job.touch()
+        if ok:
+            self._flash_note(job, message)
+        else:
+            logger.warning("visionect: firmware flash of sign %s failed: %s", job.uuid, message)
+            sign = self._signs.get(job.uuid)
+            if sign is not None:
+                self._note(sign, "note", f"firmware: {message}")
+                self._publish(sign)
+        self._schedule(job.uuid)
+
+    def _flash_arm(self, job: visionect_flash.FlashJob, seconds: float) -> None:
+        if job.timer is not None:
+            job.timer.cancel()
+        loop = asyncio.get_running_loop()
+        job.timer = loop.call_later(seconds, self._flash_timeout, job, job.phase)
+
+    def _flash_timeout(self, job: visionect_flash.FlashJob, phase: str) -> None:
+        job.timer = None
+        if job.phase != phase or not job.active:
+            return
+        if phase == visionect_flash.PENDING:
+            self._flash_end(
+                job,
+                False,
+                "The frame didn't contact its bootloader within "
+                f"{visionect_flash.PENDING_TIMEOUT_S / 60:.0f} minutes of the reboot, so nothing "
+                "was flashed. It may still be restarting; check it, then try again.",
+            )
+        elif phase == visionect_flash.VERIFYING:
+            self._flash_end(
+                job,
+                False,
+                "The flash finished but the frame hasn't reconnected within "
+                f"{visionect_flash.VERIFY_TIMEOUT_S / 60:.0f} minutes. Power-cycle it. "
+                + visionect_flash.USB_HINT,
+            )
+
+    def _flash_begin(self, job: visionect_flash.FlashJob) -> None:
+        """On the loop: send the reboot and wait for the bootloader."""
+        if job.phase != visionect_flash.PENDING:
+            return
+        sign = self._signs.get(job.uuid)
+        if sign is None or not self._alive(sign) or self._flash_jobs.get(job.uuid) is not job:
+            self._flash_end(job, False, "The frame disconnected before it could be rebooted.")
+            return
+        # Never on top of an unanswered picture or settings packet: that is what
+        # made this frame drop connections before. Nothing new goes out now, so
+        # one being answered is a matter of seconds; past the wait, it never will be.
+        waited = time.time() - job.requested_at
+        if (sign.inflight is not None or sign.param_out) and waited < FLASH_REBOOT_WAIT_S:
+            asyncio.get_running_loop().call_later(1.0, self._flash_begin, job)
+            return
+        self._flash_send_reboot(job, sign)
+
+    def _flash_send_reboot(self, job: visionect_flash.FlashJob, sign: _Sign) -> None:
+        """Send the reboot on the frame's current connection and wait for its
+        bootloader."""
+        try:
+            sign.conn.reboot()
+        except Exception as exc:
+            logger.warning("visionect: reboot for a firmware flash failed", exc_info=True)
+            self._flash_end(job, False, f"Couldn't send the reboot command: {exc}")
+            return
+        job.peer_ip = job.peer_ip or sign.remote
+        job.reboots += 1
+        job.reboot_at = time.time()
+        self._spawn(self._write(sign.conn, sign.writer))
+        sign.inflight = None
+        self._flash_arm(job, visionect_flash.PENDING_TIMEOUT_S)
+        self._flash_note(
+            job, f"reboot sent; waiting for the bootloader to offer {job.build.version_text}", "out"
+        )
+
+    def _flash_wants(self, ip: str) -> bool:
+        """Listener hook: a flash is waiting for a bootloader from ``ip``."""
+        return any(
+            job.phase == visionect_flash.PENDING
+            and not self._flash_expired(job)
+            and (not job.peer_ip or job.peer_ip == ip)
+            for job in list(self._flash_jobs.values())
+        )
+
+    async def _flash_connection(
+        self, reader: Any, writer: Any, head: bytes, on_claim: Callable[[], None]
+    ) -> bytes | None:
+        """Listener hook: a connection opened like a bootloader hello. Take it
+        over when it is the pending frame's; otherwise give the bytes back."""
+        from app.visionect_listener import abort, peer_ip
+
+        ip = peer_ip(writer)
+        data = await visionect_flash.read_hello(reader, head, timeout=HELLO_READ_S)
+        try:
+            hello = parse_hello(data)
+        except BootloaderError:
+            logger.info("visionect: %s opened like a bootloader but sent no valid hello", ip or "?")
+            return data
+        uuid = normalise_uuid(hello.device_id.hex())
+        job = self._flash_jobs.get(uuid)
+        if (
+            job is None
+            or job.phase != visionect_flash.PENDING
+            or self._flash_expired(job)
+            or (job.peer_ip and job.peer_ip != ip)
+        ):
+            logger.info(
+                "visionect: bootloader hello from %s (%s), no flash pending for it; "
+                "handled as before",
+                ip or "?",
+                uuid,
+            )
+            return data
+        on_claim()
+        job.phase = visionect_flash.RUNNING
+        job.touch()
+        if job.timer is not None:
+            job.timer.cancel()
+            job.timer = None
+        loop = asyncio.get_running_loop()
+        try:
+            await visionect_flash.run_session(
+                reader,
+                writer,
+                data,
+                job,
+                on_change=lambda text: self._flash_note(job, text, "in"),
+                abort=abort,
+                clock=loop.time,
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # never leave a job stuck running
+            logger.exception("visionect: the firmware flash crashed")
+            abort(writer)
+            job.wrote_records = job.wrote_records or job.blocks_done > 0
+            self._flash_end(
+                job, False, visionect_flash.failure_message(str(exc), job.wrote_records)
+            )
+            return None
+        if job.phase == visionect_flash.VERIFYING:
+            self._flash_arm(job, visionect_flash.VERIFY_TIMEOUT_S)
+            self._flash_note(
+                job, "all blocks written; waiting for the frame to restart on the new firmware"
+            )
+        else:
+            self._flash_end(job, False, job.message)
+        return None
+
+    def _flash_reconnected(self, sign: _Sign, status: Any) -> None:
+        """A sign connected normally: it is either the flashed frame back on
+        its new firmware, or one that rebooted without calling the bootloader."""
+        job = self._flash_jobs.get(sign.uuid)
+        if job is None or not job.active:
+            return
+        reason = sign.connect_reason
+        try:
+            if job.phase == visionect_flash.VERIFYING:
+                reported = firmware_identity(status).get("firmware")
+                shown = ".".join(map(str, reported)) if reported else "no version"
+                if reported == job.build.version:
+                    self._flash_end(
+                        job,
+                        True,
+                        f"The frame restarted ({reason or 'no reason'}) on firmware {shown}, "
+                        "as requested.",
+                    )
+                else:
+                    self._flash_end(
+                        job,
+                        False,
+                        f"The frame came back reporting firmware {shown}, not the "
+                        f"{job.build.version_text} that was flashed.",
+                    )
+            elif job.phase == visionect_flash.PENDING and reason == "reboot":
+                self._flash_end(
+                    job,
+                    False,
+                    "The frame restarted without calling its bootloader, so nothing was flashed.",
+                )
+            elif (
+                job.phase == visionect_flash.PENDING
+                and job.reboots
+                and job.reboots < visionect_flash.REBOOT_TRIES
+            ):
+                # It came back without restarting, so it never got the reboot.
+                self._flash_send_reboot(job, sign)
+        except Exception:
+            logger.exception("visionect: checking a flashed frame failed")
 
 
 def is_visionect_device(device: Any) -> bool:
@@ -2219,6 +3098,9 @@ def register(app: Flask) -> None:
                 renders_dir=Path(renders_dir),
                 latest_render_fn=push_mgr.latest_render_for,
                 render_busy_fn=getattr(push_mgr, "render_in_progress", lambda _d: False),
+                record_served_fn=getattr(
+                    push_mgr, "record_frame_served", lambda _device_id, _render: None
+                ),
             )
         )
         push_mgr.add_listener(svc.on_push)

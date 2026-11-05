@@ -1489,7 +1489,7 @@ def _page_name(page_id: str) -> str:
 
 
 def _queued_note(pending: dict[str, Any]) -> dict[str, Any]:
-    """The "Queued" line for a pull device with a newer image waiting: when
+    """The "Queued" line for a display with a newer image waiting: when
     it was queued and when the frame will take it, in the same words the
     Next update tile uses."""
     at = _clock_hhmm(pending.get("queued_at"))
@@ -1627,11 +1627,12 @@ def _battery_card_or_none(device_id: str) -> dict[str, Any] | None:
 def _device_overview(device: Device, section: dict[str, Any]) -> dict[str, Any]:
     """The four headline tiles (showing / battery / firmware / next wake)
     shared by the Devices table's quick panel and the device page's
-    Overview section, plus the thumbnail(s) and, for a pull device with a
-    newer image waiting, the queued note.
+    Overview section, plus the thumbnail(s) and, for a display that reports
+    what it holds, with a newer image waiting, the queued note.
 
-    A pull (REST) frame fetches its picture at its own check-in, so what the
-    server holds newest and what is on the glass differ after a push. The
+    A pull (REST) frame fetches its picture at its own check-in, and a
+    Visionect sign takes it when it wakes, so what the server holds newest
+    and what is on the glass differ after a push. The
     thumbnail then shows the glass (the last frame the device fetched) and a
     second, smaller one the queued image; ``showing`` describes the glass."""
     push_mgr = current_app.config.get("PUSH_MANAGER")
@@ -1666,12 +1667,15 @@ def _device_overview(device: Device, section: dict[str, Any]) -> dict[str, Any]:
             glass_url = url_for("renders", filename=f"{comp}.png", w=480)
     thumb_url = glass_url or newest_url
     newest_is_artifact = bool(latest and not latest.get("composition_digest"))
+    # What the frame does to take a picture: a pull display fetches it, a
+    # Visionect sign is shown it (and ACKs).
+    taken_verb = "fetched" if device.transport == "rest" else "shown"
     showing: dict[str, Any] = {"value": "Nothing yet", "sub": "no frame pushed", "muted": True}
     if latest and queued:
         served_at = (live_entry or {}).get("last_served_at")
         if served_digest:
             name = _page_name(str((live_entry or {}).get("last_served_page_id") or ""))
-            sub = f"fetched {_clock_hhmm(served_at)}" if _clock_hhmm(served_at) else ""
+            sub = f"{taken_verb} {_clock_hhmm(served_at)}" if _clock_hhmm(served_at) else ""
             showing = {"value": name or "Last image", "sub": sub, "muted": False}
         else:
             showing = {"value": "Nothing yet", "sub": "frame has not fetched one", "muted": True}
@@ -1681,7 +1685,7 @@ def _device_overview(device: Device, section: dict[str, Any]) -> dict[str, Any]:
         stamp = served_at if isinstance(served_at, (int, float)) else latest.get("timestamp")
         sub = ""
         if isinstance(stamp, (int, float)) and stamp > 0:
-            verb = "fetched" if isinstance(served_at, (int, float)) else "rendered"
+            verb = taken_verb if isinstance(served_at, (int, float)) else "rendered"
             sub = f"{verb} {_clock_hhmm(stamp)}"
         showing = {"value": name or "Latest render", "sub": sub, "muted": False}
     # What a refresh script compares to know the thumbnail is out of date.
@@ -1698,7 +1702,16 @@ def _device_overview(device: Device, section: dict[str, Any]) -> dict[str, Any]:
     fw_value = str(fw_current) if fw_current else "Unknown"
     if fw_value[:1].isdigit():
         fw_value = f"v{fw_value}"
-    if fw.get("state") == "outdated" and fw.get("latest"):
+    # A Visionect sign's firmware comes from Visionect's own repository, not
+    # Tesserae's: its "update available" is the newest build for its hardware.
+    vs_fw = ((section.get("visionect_setup") or {}).get("firmware")) or {}
+    fw_update = bool(vs_fw.get("update_available"))
+    if vs_fw.get("installed") and not fw_current:
+        fw_value = f"v{vs_fw['installed']}"
+        fw_current = vs_fw["installed"]
+    if fw_update:
+        fw_sub = f"v{vs_fw['latest']} available"
+    elif fw.get("state") == "outdated" and fw.get("latest"):
         fw_sub = f"v{fw['latest']} available"
     elif fw.get("state") == "current":
         fw_sub = "up to date"
@@ -1729,6 +1742,7 @@ def _device_overview(device: Device, section: dict[str, Any]) -> dict[str, Any]:
         "queued_thumb_url": newest_url if (queued and glass_url) else None,
         "queued": _queued_note(pending) if queued else None,
         "queued_is_only_thumb": bool(queued and not glass_url),
+        "taken_verb": taken_verb,
         "sync_sig": sync_sig,
         # /preview serves composition PNGs, except legacy entries without one:
         # those fall back to the renderer artifact and must not be quantised
@@ -1742,7 +1756,12 @@ def _device_overview(device: Device, section: dict[str, Any]) -> dict[str, Any]:
             "low": battery_low,
             "muted": power.get("label") == "Mains",
         },
-        "firmware": {"value": fw_value, "sub": fw_sub, "muted": not fw_current},
+        "firmware": {
+            "value": fw_value,
+            "sub": fw_sub,
+            "muted": not fw_current,
+            "has_update": fw_update,
+        },
         "next_wake": next_wake,
     }
 

@@ -68,7 +68,7 @@ from app.lineups_view import (
     window_label,
     window_overlaps_pause,
 )
-from app.next_update import DeviceTiming, reach_for_device
+from app.next_update import DeviceTiming, reach_for_device, tracks_held_frame
 from app.state.deck_model import Deck, DeckPage
 from app.state.deck_store import DeckStore
 from app.state.page_store import PageStore
@@ -326,8 +326,9 @@ def _frame_state(device: Any) -> tuple[FrameInput | None, bool]:
     """``(frame, nothing_sent)`` for a display no dashboard explains.
 
     The frame is the composition actually on the glass: what a REST display
-    last fetched (its latest render when it never fetched), the latest push
-    for every other transport. It is resolved to a composition digest so the
+    last fetched (its latest render when it never fetched) or a Visionect
+    sign last ACKed, the latest push for every other transport (and for a
+    sign that has not ACKed anything the server remembers). It is resolved to a composition digest so the
     thumbnail is the same immutable one every card uses; a served frame whose
     composition can no longer be named falls back to its device preview.
     ``nothing_sent`` is true only when no render exists at all."""
@@ -341,7 +342,7 @@ def _frame_state(device: Any) -> tuple[FrameInput | None, bool]:
     at = latest.get("timestamp")
     digest = latest.get("composition_digest")
     preview = latest.get("preview_digest")
-    if getattr(device, "transport", "mqtt") == "rest":
+    if tracks_held_frame(push, device):
         served_fn = getattr(push, "last_served_render_for", None)
         served = served_fn(device.id) if callable(served_fn) else None
         if isinstance(served, dict):
@@ -350,7 +351,9 @@ def _frame_state(device: Any) -> tuple[FrameInput | None, bool]:
                 preview = served.get("preview_digest") or preview
             else:
                 resolve = getattr(push, "composition_for_digest", None)
-                digest = resolve(device.id, served["digest"]) if callable(resolve) else None
+                digest = served.get("composition_digest") or (
+                    resolve(device.id, served["digest"]) if callable(resolve) else None
+                )
                 preview = served.get("preview_digest")
     thumb_url = sent_thumb_url(digest) or sent_thumb_url(preview)
     label = _FRAME_BY_HAND
@@ -373,11 +376,12 @@ def _frame_state(device: Any) -> tuple[FrameInput | None, bool]:
 
 
 def _frame_pending(device: Any) -> bool:
-    """True when a REST display has a render it has not fetched yet: its
-    latest digest differs from the last one served (or none was served)."""
-    if getattr(device, "transport", "mqtt") != "rest":
-        return False
+    """True when a display that reports what it holds has a render it has
+    not taken yet: its latest digest differs from the last one served (or
+    none was served). A REST display fetches it, a Visionect sign ACKs it."""
     push = current_app.config.get("PUSH_MANAGER")
+    if not tracks_held_frame(push, device):
+        return False
     latest_fn = getattr(push, "latest_render_for", None)
     latest = latest_fn(device.id) if callable(latest_fn) else None
     if not isinstance(latest, dict) or not latest.get("digest"):
@@ -422,11 +426,14 @@ def _panel_states(devices: list[Any]) -> dict[str, dict[str, Any]]:
 
     A REST display fetches frames itself, so the frame on its glass is the
     one it last served (``last_served_render_for``), stamped when the served
-    digest changed: ``verb`` is ``fetched``. When the latest render has not
-    been fetched yet the panel still holds the previous one, whose page is
-    known only while the grace copy survives; otherwise the page is
-    ``None`` and no claim is made. Every other transport has no handover to
-    observe, so the current render's publish moment stands in: ``sent``.
+    digest changed: ``verb`` is ``fetched``. A Visionect sign that has ACKed
+    a frame is the same, with ``verb`` ``shown``. When the latest render has
+    not been taken yet the panel still holds the served one, whose page is
+    the one recorded with it, else the previous render's while its grace copy
+    survives; otherwise the page is ``None`` and no claim is made. Every
+    other transport (a sign that has ACKed nothing included) has no handover
+    to observe, so the current render's publish moment stands in: ``sent``.
+    ``reports`` is true when the glass is known this way.
 
     ``next_wake`` is the telemetry prediction for the display's next
     check-in when one exists and is still ahead; there is no guess
@@ -436,7 +443,12 @@ def _panel_states(devices: list[Any]) -> dict[str, dict[str, Any]]:
     now_ts = time.time()
     out: dict[str, dict[str, Any]] = {}
     for d in devices:
-        pull = getattr(d, "transport", "mqtt") == "rest"
+        pull = tracks_held_frame(push, d)
+        verb = (
+            ("fetched" if getattr(d, "transport", "mqtt") == "rest" else "shown")
+            if pull
+            else "sent"
+        )
         page_id: Any = None
         at: Any = None
         latest_fn = getattr(push, "latest_render_for", None)
@@ -450,10 +462,11 @@ def _panel_states(devices: list[Any]) -> dict[str, dict[str, Any]]:
                     if served.get("digest") == latest.get("digest"):
                         page_id = latest.get("page_id")
                     else:
+                        page_id = served.get("page_id")
                         prev_fn = getattr(push, "previous_render_for", None)
                         prev = prev_fn(d.id, max_age_s=math.inf) if callable(prev_fn) else None
                         if isinstance(prev, dict) and prev.get("digest") == served.get("digest"):
-                            page_id = prev.get("page_id")
+                            page_id = prev.get("page_id") or page_id
             else:
                 page_id = latest.get("page_id")
                 at = latest.get("timestamp")
@@ -474,7 +487,8 @@ def _panel_states(devices: list[Any]) -> dict[str, dict[str, Any]]:
         out[d.id] = {
             "page_id": page_id if isinstance(page_id, str) and page_id else None,
             "at": float(at) if isinstance(at, (int, float)) else None,
-            "verb": "fetched" if pull else "sent",
+            "verb": verb,
+            "reports": pull,
             "next_wake": next_wake,
             "connected": connected,
         }
@@ -728,8 +742,8 @@ def _design_cards(
         ]
         out["on_panel"] = on_panel
         out["panel_empty_label"] = (
-            "not fetched yet"
-            if state is not None and state["verb"] == "fetched"
+            f"not {state['verb']} yet"
+            if state is not None and state["reports"]
             else "nothing sent yet"
         )
         out["waiting"] = waiting
@@ -1508,11 +1522,11 @@ def _build_lineups_view(
         state = panel_states.get(d.id) or {}
         on_screen = None
         on_pid: str | None = state.get("page_id")
-        # A display that fetches its frames holds what it last fetched; when
+        # A display that reports its frames holds what it last fetched or ACKed; when
         # that can't be named the glass is unknown, and the nav record or the
         # latest render (what the server *meant* it to show) must not stand
         # in for it, or a queued step would read as already delivered.
-        if not on_pid and state.get("verb") != "fetched":
+        if not on_pid and not state.get("reports"):
             rec = live.get(d.id)
             on_pid = rec[1] if rec else None
         if on_pid:

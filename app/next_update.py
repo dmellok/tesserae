@@ -516,15 +516,50 @@ def pickup_label(
     return ("~" if reach.mode == MODE_SLEEPS else "") + label
 
 
-def pending_delivery(device: Any, *, now: float | None = None) -> dict[str, Any]:
-    """Whether a newer image is queued for a pull device, and when it lands.
+def reports_held_frame(device: Any) -> bool:
+    """Whether this kind of display tells the server which frame it holds.
 
-    A REST frame fetches its picture at its own check-in, so after a push
-    the server holds a render the frame has not fetched yet. That is
-    ``queued``: the newest render (the parked one while a patch divert holds
-    the live slot) differs from the frame the device last fetched. Devices
-    that are not REST pull devices (MQTT, push, relay) are never queued here;
-    they receive a push on publish and record no fetch to compare against.
+    True for a pull (REST) display, which records every frame it fetches, and
+    for a Visionect sign, which ACKs every picture it takes (the driver hands
+    that to :meth:`PushManager.record_frame_served`). Every other transport
+    (MQTT, push-through-Home-Assistant, relay) has no handover to observe, so
+    the newest render stands in for "on the glass". The question this answers
+    is "may the page compare the newest render to the last served one to tell
+    queued from delivered"; it says nothing about how frames travel (the
+    ETag, ``/frame`` and patch paths stay REST-only)."""
+    from app import visionect
+
+    return getattr(device, "transport", "mqtt") == "rest" or visionect.is_visionect_device(device)
+
+
+def tracks_held_frame(push_mgr: Any, device: Any) -> bool:
+    """:func:`reports_held_frame` and there is a served record to read.
+
+    A REST display always qualifies: with nothing fetched yet the glass is
+    unknown, and the pages say so. A Visionect sign qualifies once it has
+    ACKed a frame (this run, or an earlier one that
+    ``latest_renders.json`` remembers); before that the server knows nothing
+    more than the old assumption, that the newest render went to the glass, so
+    it keeps making it rather than claiming nothing."""
+    if not reports_held_frame(device):
+        return False
+    if getattr(device, "transport", "mqtt") == "rest":
+        return True
+    served_fn = getattr(push_mgr, "last_served_render_for", None)
+    return callable(served_fn) and isinstance(served_fn(device.id), dict)
+
+
+def pending_delivery(device: Any, *, now: float | None = None) -> dict[str, Any]:
+    """Whether a newer image is queued for a display, and when it lands.
+
+    A REST frame fetches its picture at its own check-in, and a Visionect
+    sign takes it when it wakes, so after a push the server holds a render
+    the display has not taken yet. That is ``queued``: the newest render (the
+    parked one while a patch divert holds the live slot) differs from the
+    frame the device last fetched or ACKed (:func:`reports_held_frame`).
+    Other devices (MQTT, relay, a push-through-Home-Assistant kind) are never
+    queued here; they receive a push on publish and record nothing to compare
+    against.
 
     Returns ``{queued, queued_at, expected_at, expected_when, live, mode}``:
 
@@ -550,7 +585,7 @@ def pending_delivery(device: Any, *, now: float | None = None) -> dict[str, Any]
         "mode": MODE_UNKNOWN,
     }
     push_mgr = current_app.config.get("PUSH_MANAGER")
-    if push_mgr is None or getattr(device, "transport", "") != "rest":
+    if push_mgr is None or not reports_held_frame(device):
         return idle
     live_entry = push_mgr.latest_render_for(device.id)
     held_fn = getattr(push_mgr, "held_render_for", None)
@@ -558,9 +593,10 @@ def pending_delivery(device: Any, *, now: float | None = None) -> dict[str, Any]
     if not newest or not newest.get("digest"):
         return idle
     served = (live_entry or {}).get("last_served_digest")
-    # No /frame fetch on record means nothing to compare against: the device
+    # No fetch or ACK on record means nothing to compare against: the device
     # may pull /frame.bmp (CrossPoint readers) or a deck or album route,
-    # none of which record one, so it would read as queued for ever.
+    # none of which record one, so it would read as queued for ever. (A sign
+    # that has not ACKed since this server first ran is in the same case.)
     if not served or newest.get("digest") == served:
         return idle
     stamp = newest.get("timestamp")

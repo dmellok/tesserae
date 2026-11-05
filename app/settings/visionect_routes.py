@@ -9,6 +9,7 @@ hooks). Only the page builders in ``index_routes`` call into this module."""
 from __future__ import annotations
 
 import os
+import re
 import socket
 import time
 from typing import Any
@@ -19,6 +20,7 @@ from werkzeug.wrappers import Response
 from app import visionect
 from app.clock_text import clock_of
 from app.device_loader import Device
+from app.visionect_firmware import NOTES_PAGE
 
 from ._shared import bp, device_kinds, devices, settings_store
 
@@ -65,7 +67,110 @@ def setup_band(device: Device) -> dict[str, Any] | None:
     uuid = svc.device_uuid(device.id)
     if uuid:
         band["sign"] = _visionect_sign(svc.sign_view(uuid) or {})
+        band["firmware"] = _visionect_firmware(svc, device)
     return band
+
+
+def _health_text(health: Any) -> str:
+    """The last day of a frame's connections in a line; only what happened."""
+    if not isinstance(health, dict) or not health.get("connections"):
+        return ""
+
+    def count(n: int, name: str) -> str:
+        return f"{n} {name}{'' if n == 1 else 's'}"
+
+    parts = [count(health["connections"], "connection")]
+    for key, name in (
+        ("protocol_errors", "protocol error"),
+        ("connection_errors", "connection error"),
+        ("reboots", "reboot"),
+    ):
+        if health.get(key):
+            parts.append(count(health[key], name))
+    parts.append(count(health.get("pictures", 0), "picture"))
+    return ", ".join(parts)
+
+
+_FLASH_PHASE_TEXT = {
+    "pending": "Waiting for the frame to restart into its bootloader.",
+    "verifying": "Firmware written. Waiting for the frame to restart on it.",
+}
+
+
+def _visionect_firmware(svc: Any, device: Device) -> dict[str, Any] | None:
+    """The sign's firmware for the device page: installed and latest versions,
+    the builds it could be flashed with (newest first; downgrades labelled),
+    and the state of a flash that is running or just ended. Built from the
+    cache only, so a repository that can't be reached just means no builds."""
+    try:
+        fv = svc.firmware_view(device.id)
+    except Exception:  # never break the page over firmware
+        current_app.logger.debug("visionect: firmware view failed", exc_info=True)
+        return None
+    if fv is None:
+        return None
+    options = []
+    for b in fv["builds"]:
+        tags = [
+            t
+            for t, on in (
+                ("installed", b["installed"]),
+                ("newest", b["newest"]),
+                ("ignored", b.get("ignored")),
+            )
+            if on
+        ]
+        if b["downgrade"]:
+            tags.append("downgrade")
+        label = b["version"] + (f" ({', '.join(tags)})" if tags else "")
+        options.append(
+            {
+                "value": b["checksum"],
+                "label": label,
+                "version": b["version"],
+                "installed": b["installed"],
+                "downgrade": b["downgrade"],
+                "ignored": bool(b.get("ignored")),
+                "notes": b.get("notes") or [],
+            }
+        )
+    flash = fv["flash"]
+    flash_view = None
+    if flash:
+        phase = flash["phase"]
+        if phase == "running":
+            text = (
+                f"Block {flash['blocks_done']} of {flash['blocks_total']} ({flash['percent']}%)"
+                if flash["blocks_total"]
+                else "Starting the transfer."
+            )
+        else:
+            text = flash["message"] or _FLASH_PHASE_TEXT.get(phase, "")
+        flash_view = {
+            "active": flash["active"],
+            "phase": phase,
+            "ok": flash["ok"],
+            "failed": phase == "failed",
+            "percent": flash["percent"],
+            "text": text,
+            "target": flash["target"],
+        }
+    return {
+        "installed": fv["installed"],
+        "latest": fv["latest"],
+        "latest_checksum": fv.get("latest_checksum", ""),
+        "update_available": fv["update_available"],
+        "options": options,
+        "can_flash": not fv["blocked"] and any(not o["installed"] for o in options),
+        "blocked": fv["blocked"],
+        "flash": flash_view,
+        "list_known": fv["list_known"],
+        "unknown_because": fv.get("unknown_because", ""),
+        "min_battery": fv["min_battery"],
+        "endpoint": url_for("auth.devices_visionect_firmware", instance_id=device.id),
+        "ignore_endpoint": url_for("auth.visionect_firmware_ignore"),
+        "notes_page": NOTES_PAGE,
+    }
 
 
 def _visionect_sign(view: dict[str, Any]) -> dict[str, Any]:
@@ -96,6 +201,12 @@ def _visionect_sign(view: dict[str, Any]) -> dict[str, Any]:
         battery.append(str(st["charging"]))
     if battery:
         rows.append(("Battery", " · ".join(battery)))
+    if st.get("hardware"):
+        rows.append(("Hardware", str(st["hardware"])))
+    if st.get("bootloader"):
+        rows.append(("Bootloader", str(st["bootloader"])))
+    if st.get("connectivity"):
+        rows.append(("Radio", str(st["connectivity"])))
     wifi = [str(view["wifi"])] if view.get("wifi") else []
     if "rssi" in st:
         wifi.append(f"{st['rssi']} dBm")
@@ -114,7 +225,9 @@ def _visionect_sign(view: dict[str, Any]) -> dict[str, Any]:
         rows.append(("Next check-in", f"in {st['next_status_min']} min"))
     sleep_off = view.get("sleep_disabled")
     if isinstance(sleep_off, int):
-        rows.append(("Sleep between check-ins", "Off (stays awake)" if sleep_off else "On"))
+        choices = visionect.SIGN_SETTINGS["frame_sleep"][1]
+        label = next((lab for _cv, wire, lab in choices if wire == sleep_off), str(sleep_off))
+        rows.append(("Power saving mode", label))
     if view.get("connect_reason") and view.get("connected"):
         since = clock(view.get("connected_at"))
         rows.append(
@@ -127,10 +240,13 @@ def _visionect_sign(view: dict[str, Any]) -> dict[str, Any]:
         )
     note = ""
     action = view.get("action") or {}
-    if action.get("kind") in ("status", "reboot", "refresh"):
-        what = {"status": "Report in", "reboot": "Reboot", "refresh": "Full refresh"}[
-            action["kind"]
-        ]
+    if action.get("kind") in ("status", "reboot", "refresh", "network"):
+        what = {
+            "status": "Report in",
+            "reboot": "Reboot",
+            "refresh": "Full refresh",
+            "network": "Network details",
+        }[action["kind"]]
         note = f"{what} asked {clock(action.get('at'))}."
     arrows = {"out": "→", "in": "←"}
     log = []
@@ -144,6 +260,11 @@ def _visionect_sign(view: dict[str, Any]) -> dict[str, Any]:
         "rows": rows,
         "log": log,
         "connected": bool(view.get("connected")),
+        "heartbeat_min": heartbeat if isinstance(heartbeat, int) else st.get("next_status_min"),
+        "settings": dict(view.get("settings") or {}),
+        "health": _health_text(view.get("health")),
+        "stuck": int((view.get("health") or {}).get("stuck") or 0),
+        "network": dict(view.get("network") or {}),
         "note": note,
         "error": str(view.get("param_error") or ""),
     }
@@ -260,6 +381,8 @@ def visionect_port_save() -> Response:
     try:
         port = visionect.validate_port(request.form.get("port", ""))
         svc = visionect.service()
+        if svc is not None and svc.firmware_update_running():
+            raise ValueError("A firmware update is running; change the port after it ends.")
         # An unchanged, live listener already owns this socket. Otherwise
         # probe before saving, so an occupied port leaves settings untouched.
         if svc is None or not svc.running or svc.port != port:
@@ -295,6 +418,7 @@ _VISIONECT_ACTION_DONE = {
     "status": "Asked {name} to report in; its status shows here once it does.",
     "reboot": "Sent {name} a reboot. It reconnects in a minute or two and gets the latest picture.",
     "refresh": "{name} repaints its picture from scratch now.",
+    "network": "Asked {name} for its network details. Reload in a few seconds to see them.",
 }
 
 
@@ -317,4 +441,53 @@ def devices_visionect_action(instance_id: str, action: str) -> Response:
         flash(problem, "error")
     else:
         flash(_VISIONECT_ACTION_DONE[action].format(name=device.name), "ok")
+    return redirect_to
+
+
+@bp.post("/settings/firmware/visionect-ignore")
+def visionect_firmware_ignore() -> Response:
+    """Ignore a firmware build, or stop ignoring it. An ignored build stops being
+    offered as an update on any page; it can still be chosen by hand."""
+    redirect_to = redirect(url_for("auth.firmware_index"))
+    ignore = request.form.get("ignore", "").strip().lower()
+    restore = request.form.get("restore", "").strip().lower()
+    text = ignore or restore
+    if not re.fullmatch(r"[0-9a-f]{1,8}", text):
+        flash("Unknown firmware build.", "error")
+        return redirect_to
+    store = settings_store()
+    raw = store.get_section("app").get(visionect.FIRMWARE_IGNORED_KEY)
+    current = [str(x) for x in raw] if isinstance(raw, list) else []
+    wanted = int(text, 16)
+    kept = [x for x in current if int(x, 16) != wanted]
+    store.patch_section(
+        "app", {visionect.FIRMWARE_IGNORED_KEY: [*kept, f"{wanted:08x}"] if ignore else kept}
+    )
+    return redirect_to
+
+
+@bp.post("/settings/devices/<instance_id>/visionect-firmware")
+def devices_visionect_firmware(instance_id: str) -> Response:
+    """Flash a chosen firmware build onto a Visionect sign (from the Firmware
+    page). Explicit only: the build is validated and downloaded, then the sign is
+    rebooted into its bootloader."""
+    redirect_to = redirect(url_for("auth.firmware_index"))
+    device = devices().get(instance_id)
+    if device is None or not visionect.is_visionect_device(device):
+        flash(f"Unknown Visionect device {instance_id!r}.", "error")
+        return redirect_to
+    svc = visionect.service()
+    problem = (
+        svc.request_firmware_update(device.id, request.form.get("checksum", ""))
+        if svc is not None
+        else "Tesserae isn't listening for Visionect frames right now."
+    )
+    if problem:
+        flash(problem, "error")
+    else:
+        flash(
+            f"Updating {device.name}: it restarts into its bootloader and takes the new "
+            "firmware, about a minute in all. Progress shows in its row; don't power it off.",
+            "ok",
+        )
     return redirect_to

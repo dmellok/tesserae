@@ -99,6 +99,7 @@ from app.image_upload import (
 )
 from app.lineup_authoring import build_lineup
 from app.net_guard import BlockedURLError, assert_public_url
+from app.next_update import tracks_held_frame
 from app.panel import device_panel, resolve_settings_panel
 from app.quiet_hours import device_is_quiet, resolve_quiet_hours
 from app.state.companion_token_store import COMPANION_SCOPES, CompanionTokenStore
@@ -944,7 +945,7 @@ def _device_view(
     fw = parsed.get("fw_version") if isinstance(parsed, dict) else None
     has_pending_render = False
     pending_render: dict[str, Any] | None = None
-    if device.transport == "rest" and push_manager is not None:
+    if push_manager is not None and tracks_held_frame(push_manager, device):
         pending_lookup = getattr(push_manager, "has_pending_render", None)
         if callable(pending_lookup):
             has_pending_render = bool(pending_lookup(device.id))
@@ -1141,9 +1142,11 @@ def _scheduler() -> Any:
 def _current_frame_at(device: Device) -> str | None:
     """When the frame now on this display was handed over, or ``None``.
 
-    For a REST display that's the delivery-side handover the push manager
-    persists next to the served digest. For every other transport there is no
-    handover to observe, so it's when the current frame was published. Neither
+    For a display that reports what it holds (a REST display, or a Visionect
+    sign that has ACKed a frame) that's the delivery-side handover the push
+    manager persists next to the served digest. For every other transport
+    there is no handover to observe, so it's when the current frame was
+    published. Neither
     is a claim that the panel finished repainting, and a display the server
     can't establish a baseline for gets ``None`` rather than a guess, which
     the client reads as "show the next update, no progress bar".
@@ -1151,7 +1154,7 @@ def _current_frame_at(device: Device) -> str | None:
     manager = _push_manager()
     if manager is None:
         return None
-    if device.transport == "rest":
+    if tracks_held_frame(manager, device):
         lookup = getattr(manager, "last_served_render_for", None)
         served = lookup(device.id) if callable(lookup) else None
         at = served.get("served_at") if isinstance(served, dict) else None
@@ -2490,8 +2493,8 @@ def device_preview(device_id: str) -> Any:
     """Logical full-frame PNG for a display.
 
     Without ``revision``, REST polling devices use the frame most recently
-    returned by ``/frame``; transports without a reliable served signal fall
-    back to server-latest. A ``revision`` advertised by ``pending_render``
+    returned by ``/frame`` and a Visionect sign the one it last ACKed;
+    transports without a reliable served signal fall back to server-latest. A ``revision`` advertised by ``pending_render``
     selects that exact server-latest render, including during the normal
     superseded-render grace window.
 
@@ -2516,7 +2519,7 @@ def device_preview(device_id: str) -> Any:
                 previous = previous_lookup(device_id) if callable(previous_lookup) else None
                 if isinstance(previous, dict) and previous.get("digest") == revision:
                     render = previous
-        elif device.transport == "rest":
+        elif tracks_held_frame(manager, device):
             served_lookup = getattr(manager, "last_served_render_for", None)
             if callable(served_lookup):
                 render = served_lookup(device_id)

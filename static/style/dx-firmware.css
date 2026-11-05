@@ -174,3 +174,87 @@
     align-self: center;
   }
 }
+
+/* Visionect frames: progress in the row, and the version chooser. */
+.fw-vs-gear {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-left: 4px;
+  padding: 0;
+  vertical-align: middle;
+  color: var(--t-fg-soft);
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.fw-vs-gear:hover,
+.fw-vs-gear:focus-visible {
+  color: var(--t-fg);
+  background: color-mix(in oklab, var(--t-fg) 10%, transparent);
+}
+.fw-progress {
+  display: block;
+  width: 100%;
+  max-width: 220px;
+  height: 8px;
+  margin: 4px 0;
+  accent-color: var(--t-accent);
+}
+.fw-vs-message {
+  display: block;
+  margin-top: 4px;
+  max-width: 46ch;
+}
+.fw-vs-dialog {
+  width: min(620px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  padding: var(--t-space-4);
+  color: inherit;
+  background: var(--t-surface, var(--t-bg));
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius, 6px);
+}
+.fw-vs-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+.fw-vs-dialog h2 {
+  margin: 0 0 var(--t-space-2);
+}
+.fw-vs-source {
+  display: flex;
+  gap: var(--t-space-2);
+  margin: 0 0 var(--t-space-3);
+}
+.fw-vs-field {
+  display: block;
+  margin-bottom: 4px;
+  font-size: var(--t-size-sm);
+  color: var(--t-fg-soft);
+}
+.fw-vs-dialog select {
+  width: 100%;
+}
+.fw-vs-notes {
+  margin-top: var(--t-space-3);
+  font-size: var(--t-size-sm);
+}
+.fw-vs-notes h3,
+.fw-vs-notes h4 {
+  margin: var(--t-space-2) 0 4px;
+  font-size: inherit;
+}
+.fw-vs-notes ul {
+  margin: 0;
+  padding-left: 1.2em;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.fw-vs-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--t-space-2);
+  margin-top: var(--t-space-3);
+}

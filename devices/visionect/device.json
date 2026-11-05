@@ -4,7 +4,9 @@
   "icon": "frame-corners",
   "version": "0.1.0",
   "description": "A Visionect e-paper frame (Place & Play 32\", Joan, the 13\" boards) driven directly, with no Visionect Software Suite. The frame dials the server address in its flash on TCP 11113; Tesserae listens there, renders a 16-level grey picture and pushes it over the frame's own protocol (pyvisionect). Point the frame at this host: run Tesserae where the old Visionect server ran, or set the address over the frame's USB console. The protocol has no authentication, so keep port 11113 on your LAN. Leave the UUID blank to bind the first unknown frame that connects within an hour. Quiet hours with sleep-through put the frame into deep sleep until the window ends.",
-  "renderers": ["trmnl_png_gray16"],
+  "renderers": [
+    "trmnl_png_gray16"
+  ],
   "transport": "push",
   "panel": {
     "w": 1440,
@@ -21,6 +23,168 @@
       "label": "Frame UUID",
       "default": "",
       "help": "The frame's UUID, e.g. 36002000-1247-3830-3933-303600000000 (on the label, or in the old Visionect server's device list). Leave blank and the first unknown frame that connects within an hour of adding the device (or clearing this field) is bound to it; later ones are listed as discovered devices."
+    },
+    "heartbeat_min": {
+      "type": "int",
+      "label": "Heart beat interval",
+      "min": 1,
+      "max": 1440,
+      "presets": [
+        {
+          "value": 5,
+          "label": "5 minutes"
+        },
+        {
+          "value": 15,
+          "label": "15 minutes"
+        },
+        {
+          "value": 30,
+          "label": "30 minutes"
+        },
+        {
+          "value": 60,
+          "label": "1 hour"
+        },
+        {
+          "value": 120,
+          "label": "2 hours"
+        },
+        {
+          "value": 360,
+          "label": "6 hours"
+        },
+        {
+          "value": 720,
+          "label": "12 hours"
+        },
+        {
+          "value": 1440,
+          "label": "1 day"
+        }
+      ],
+      "help": "How long the frame waits before sending a status after it last heard from the server, in minutes (Visionect's wording). It only takes effect when it is shorter than the Status check interval. Saved to the frame's flash at its next connection."
+    },
+    "status_poll_min": {
+      "type": "int",
+      "label": "Status check interval",
+      "default": 15,
+      "min": 5,
+      "max": 1440,
+      "presets": [
+        {
+          "value": 15,
+          "label": "15 minutes (Visionect's default)"
+        },
+        {
+          "value": 30,
+          "label": "30 minutes"
+        },
+        {
+          "value": 60,
+          "label": "1 hour"
+        },
+        {
+          "value": 120,
+          "label": "2 hours"
+        },
+        {
+          "value": 240,
+          "label": "4 hours"
+        }
+      ],
+      "help": "How often Tesserae asks the frame for a status. Each check resets the frame's own Heart beat timer, so make this longer than the Heart beat interval for that to set the pace. Longer may save battery, but the page's battery and signal update less often. Custom value is in minutes."
+    },
+    "frame_sleep": {
+      "type": "select",
+      "group": "sign",
+      "label": "Power saving mode",
+      "choices": [
+        {
+          "value": "",
+          "label": "Leave as the frame has it"
+        },
+        {
+          "value": "sleep",
+          "label": "CLI wake on accelerometer"
+        },
+        {
+          "value": "awake",
+          "label": "CLI and CPU always on"
+        },
+        {
+          "value": "cli_off",
+          "label": "CLI disabled while asleep"
+        }
+      ],
+      "help": "What stays awake between check-ins. Wake on accelerometer is the usual setting. Always on keeps the CPU running and drains the battery, so use it only on mains power. (CLI is the frame's USB console.)"
+    },
+    "touch_mode": {
+      "type": "select",
+      "group": "sign",
+      "label": "Touch mode",
+      "choices": [
+        {
+          "value": "",
+          "label": "Leave as the frame has it"
+        },
+        {
+          "value": "0",
+          "label": "Off"
+        },
+        {
+          "value": "1",
+          "label": "On"
+        },
+        {
+          "value": "3",
+          "label": "On + Beep"
+        }
+      ],
+      "help": "How the touch panel behaves. Frames without one don't show this."
+    },
+    "system_screens": {
+      "type": "select",
+      "group": "sign",
+      "label": "System screens",
+      "choices": [
+        {
+          "value": "",
+          "label": "Leave as the frame has it"
+        },
+        {
+          "value": "0",
+          "label": "Disabled"
+        },
+        {
+          "value": "1",
+          "label": "Battery"
+        },
+        {
+          "value": "2",
+          "label": "Not connected"
+        },
+        {
+          "value": "3",
+          "label": "Battery + Not connected"
+        }
+      ],
+      "help": "Which built-in screens the frame may draw itself: low battery, not connected, both, or neither."
+    },
+    "wifi_ssid": {
+      "type": "string",
+      "group": "sign_net",
+      "label": "Wi-Fi network",
+      "placeholder": "Leave blank to keep the frame's",
+      "help": "The network name the frame joins. A wrong name leaves it offline until it is fixed over USB."
+    },
+    "wifi_psk": {
+      "type": "string",
+      "group": "sign_net",
+      "label": "Wi-Fi password",
+      "secret": true,
+      "placeholder": "Leave blank to keep the frame's",
+      "help": "8 to 64 characters. The frame never reports it back, so Tesserae sends it once for each value you save."
     }
   }
 }

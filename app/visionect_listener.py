@@ -32,6 +32,14 @@ callback, and ``_run_timers``); ``tests/test_visionect.py`` pins their
 signatures so a pyvisionect upgrade that moves them fails loudly. All of this
 belongs upstream in pyvisionect; it lives here until it is there.
 
+A frame that has been asked to flash firmware reboots into its bootloader, which
+dials the same port on a new connection and opens with a different message (see
+``app.visionect_bootloader``). ``GuardedServer`` looks at the first bytes of a
+connection only while a flash is pending for that connection's address
+(``bootloader_wants``); a hello the flash service claims is handed to it
+(``bootloader_handler``), and anything else is replayed to the library exactly as
+if it had not been looked at. With no flash pending nothing is peeked at all.
+
 Plaintext only: Tesserae never gives the server an ``ssl_context``. A TLS
 ClientHello is handed to the library untouched, which closes it and logs that
 the sign has TLS switched on.
@@ -42,7 +50,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from pyvisionect.io import VisionectServer
@@ -57,9 +65,14 @@ from pyvisionect.wire import (
     ProtocolHeader,
 )
 
+from app.visionect_bootloader import is_bootloader_hello
+
 logger = logging.getLogger("app.visionect")
 
 READ_CHUNK = 65536
+# Bytes looked at to tell a bootloader hello from a normal frame (magic and
+# message kind: see is_bootloader_hello).
+SNIFF_BYTES = 8
 # The largest frame a sign is allowed to send, and what a compressed one may
 # declare it inflates to. Both are far above anything a sign sends.
 MAX_INBOUND_FRAME = 64 * 1024
@@ -124,6 +137,13 @@ class InboundGuard:
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._reader, name)
+
+    def prime(self, head: bytes) -> None:
+        """Bytes already taken off the socket, handed back as if just read."""
+        self._buf += head
+        problem = self._check()
+        if problem:
+            self._reject(problem)
 
     async def read(self, n: int = -1) -> bytes:
         while not self._out and not self._eof:
@@ -202,6 +222,16 @@ class GuardedServer(VisionectServer):
         # A bound sign's own address, exempt from MAX_CONNECTIONS (never from
         # the per-address cap), so a few busy addresses can't lock it out.
         self.trusted_peer: Callable[[str], bool] = lambda _ip: False
+        # A firmware flash is pending for a connection from this address: look
+        # at its first bytes. Called for every new connection, so cheap.
+        self.bootloader_wants: Callable[[str], bool] = lambda _ip: False
+        # ``await handler(reader, writer, head, on_claim)``: given a connection
+        # that opens like a bootloader hello. It returns None when it took the
+        # connection over (it calls ``on_claim`` first) or the bytes it read,
+        # which are then handled as if never looked at.
+        self.bootloader_handler: (
+            Callable[[Any, Any, bytes, Callable[[], None]], Awaitable[bytes | None]] | None
+        ) = None
 
     def mark_identified(self, writer: Any) -> None:
         """The socket behind ``writer`` identified as a sign Tesserae keeps."""
@@ -235,6 +265,12 @@ class GuardedServer(VisionectServer):
             IDENTIFY_TIMEOUT_S, self._identify_deadline, writer
         )
         try:
+            if (
+                self.bootloader_handler is not None
+                and self.bootloader_wants(ip)
+                and await self._bootloader_sniff(reader, writer, guard, deadline)
+            ):
+                return
             # Duck-typed: the library only ever calls read() on its reader.
             await super()._handle_client(guard, writer)  # type: ignore[arg-type]
         finally:
@@ -245,6 +281,37 @@ class GuardedServer(VisionectServer):
             if self._per_peer[ip] <= 0:
                 del self._per_peer[ip]
             self.prune_identities()
+
+    async def _bootloader_sniff(
+        self, reader: Any, writer: Any, guard: InboundGuard, deadline: asyncio.TimerHandle
+    ) -> bool:
+        """Look at the first bytes of a connection while a flash is pending.
+        True when the flash service took the connection over. Otherwise the
+        bytes read are given back to ``guard``, so the library sees the stream
+        as it would have without this look."""
+        head = b""
+        try:
+            while len(head) < SNIFF_BYTES:
+                chunk = await reader.read(SNIFF_BYTES - len(head))
+                if not chunk:
+                    break
+                head += chunk
+        except (ConnectionError, OSError):
+            pass
+        handler = self.bootloader_handler
+        if handler is not None and is_bootloader_hello(head):
+            try:
+                rest = await handler(reader, writer, head, deadline.cancel)
+            except Exception:
+                logger.exception("visionect: the firmware flash handler failed")
+                abort(writer)
+                return True
+            if rest is None:
+                return True
+            head = rest
+        if head:
+            guard.prime(head)
+        return False
 
     def prune_identities(self) -> None:
         """Forget the per-UUID state the library keeps (its device store,

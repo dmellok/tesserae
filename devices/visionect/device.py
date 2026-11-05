@@ -66,6 +66,26 @@ def validate_config(payload: dict[str, Any]) -> tuple[bool, str | None]:
     """The UUID is optional (blank binds the first unknown sign within an
     hour), but when set it must be a 32-hex-digit UUID, with or without
     dashes."""
+    minutes = payload.get("heartbeat_min")
+    if minutes not in (None, "") and (
+        isinstance(minutes, bool) or not isinstance(minutes, int) or not 1 <= minutes <= 1440
+    ):
+        return False, "heart beat interval must be 1 to 1440 minutes"
+    poll = payload.get("status_poll_min")
+    if poll not in (None, "") and (
+        isinstance(poll, bool) or not isinstance(poll, int) or not 5 <= poll <= 1440
+    ):
+        return False, "status check interval must be 5 to 1440 minutes"
+    for key, label, low, high in (
+        ("wifi_ssid", "Wi-Fi network name", 1, 32),
+        ("wifi_psk", "Wi-Fi password", 8, 64),
+    ):
+        text = payload.get(key)
+        if text not in (None, ""):
+            if not isinstance(text, str) or not text.isascii() or not text.isprintable():
+                return False, f"{label} must be plain ASCII text"
+            if not low <= len(text) <= high:
+                return False, f"{label} must be {low} to {high} characters"
     raw = payload.get("uuid")
     if raw is None or raw == "":
         return True, None

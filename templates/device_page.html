@@ -160,7 +160,7 @@
               <input class="dx-in dx-mono" type="text" id="{{ section.id }}-device-id" name="device_id_readonly"
                      value="{{ section.device_id }}" readonly>
             {% endcall %}
-            {% for field in id_fields %}{{ config_field(section, field, _form) }}{% endfor %}
+            {% for field in id_fields if not field.get('group') %}{{ config_field(section, field, _form) }}{% endfor %}
           </div>
         </div>
 
@@ -270,7 +270,7 @@
             {% endcall %}
             {% endif %}
             {% endif %}
-            {% for field in (section.fields or []) if field.type == 'select' %}{{ config_field(section, field, _form) }}{% endfor %}
+            {% for field in (section.fields or []) if field.type == 'select' and not field.get('group') %}{{ config_field(section, field, _form) }}{% endfor %}
             {% for pq in section.picture_quality %}
             {% for field in pq.fields %}
               {% set fid = section.id ~ '-pq-' ~ pq.base_id ~ '-' ~ field.name %}
@@ -286,6 +286,41 @@
             {% endfor %}
           </div>
         </div>
+
+        {#- The frame's own settings (Visionect): only the ones this frame
+            answered when it last connected are offered. Network settings sit
+            apart, behind a warning. -#}
+        {% set _sign_fields = (section.fields or [])|selectattr('group', 'equalto', 'sign')|list %}
+        {% set _net_fields = (section.fields or [])|selectattr('group', 'equalto', 'sign_net')|list %}
+        {% if sign and _sign_fields %}
+        {% set _offered = _sign_fields|selectattr('name', 'in', sign.settings.keys()|list)|list %}
+        <details class="dx-adv" id="frame-settings">
+          <summary><i class="ph ph-caret-right" aria-hidden="true"></i><span>Advanced: frame settings</span></summary>
+          <div class="dx-fg dx-adv-body">
+            {% for field in _offered %}{{ config_field(section, dict(field, help=(field.help ~ (' The frame is set to ' ~ sign.settings[field.name] ~ '.' if sign.settings[field.name] else ''))), _form) }}{% else %}
+            <p class="dx-help">Shown once the frame has connected and told Tesserae which of its settings it has.</p>
+            {% endfor %}
+          </div>
+        </details>
+        {% endif %}
+        {% if sign and _net_fields %}
+        {% set _net_offered = _net_fields|selectattr('name', 'in', sign.settings.keys()|list)|list %}
+        <details class="dx-adv" id="frame-network">
+          <summary><i class="ph ph-caret-right" aria-hidden="true"></i><span>Advanced: network</span></summary>
+          <div class="dx-band is-warn">
+            <i class="ph ph-warning" aria-hidden="true"></i>
+            <div class="dx-band-text">
+              <p class="dx-band-title">A wrong value here can cut the frame off</p>
+              <p class="dx-help">If the frame can no longer reach Tesserae, the only fix is its USB cable and Visionect's configurator. <a href="https://docs.visionect.com/PlaceAndPlay/DeviceConfiguration/DownloadConfigurator.html" target="_blank" rel="noopener noreferrer">Download the configurator</a>. Visionect's own server marks these settings as not changeable over the network, so a frame may simply refuse them.</p>
+            </div>
+          </div>
+          <div class="dx-fg dx-adv-body">
+            {% for field in _net_offered %}{{ config_field(section, dict(field, help=(field.help ~ (' The frame is set to ' ~ sign.settings[field.name] ~ '.' if sign.settings[field.name] else ''))), _form) }}{% else %}
+            <p class="dx-help">Shown once the frame has connected and told Tesserae which of its settings it has.</p>
+            {% endfor %}
+          </div>
+        </details>
+        {% endif %}
       </div>
     </section>
 
@@ -308,9 +343,12 @@
             {#- One control per setting: a Visionect sign sets its own check-in
                 interval, read here; every other kind picks it below. -#}
             {% set _sign_interval = (sign.rows|selectattr(0, 'in', ['Check-in interval', 'Next check-in'])|first) if sign else none %}
-            {% if _sign_interval and not t_fields %}
-            {% call fld(section.id ~ '-sleep-ro', 'Heart beat interval', help='This frame sleeps between check-ins on its own interval, set on the frame and read at each check-in.', w='md', label_for=False) %}
-              <p class="dx-f-value" aria-labelledby="{{ section.id }}-sleep-ro-label">{{ _sign_interval[1] }} <span class="dx-help">· set on the frame</span></p>
+            {% set _hb = t_fields|selectattr('name', 'equalto', 'heartbeat_min')|first %}
+            {% set _hb_now = (section.state.get('heartbeat_min') or sign.heartbeat_min) if _hb else none %}
+            {% if _hb and _hb_now %}{{ config_field(section, dict(_hb, default=_hb_now), _form) }}
+            {% elif _sign_interval %}
+            {% call fld(section.id ~ '-sleep-ro', 'Heart beat interval', help='Shown once the frame has connected and told Tesserae its interval; then you can change it here.' if _hb else 'This frame sleeps between check-ins on its own interval, set on the frame and read at each check-in.', w='md', label_for=False) %}
+              <p class="dx-f-value" aria-labelledby="{{ section.id }}-sleep-ro-label">{{ _sign_interval[1] }}{% if not _hb %} <span class="dx-help">· set on the frame</span>{% endif %}</p>
             {% endcall %}
             {% endif %}
             {% for field in t_fields if field.name in ('sleep_interval_s', 'refresh_rate_s') %}{{ config_field(section, field, _form) }}{% endfor %}
@@ -320,7 +358,7 @@
               {{ dx_select(section.id ~ '-refresh-mode', 'refresh_mode', section.refresh_mode, [{'value': 'full', 'label': 'Always full refresh'}], blank_label='Auto (partial)', form=_form) }}
             {% endcall %}
             {% endif %}
-            {% for field in t_fields if field.name not in ('sleep_interval_s', 'refresh_rate_s', 'always_on') and not (field.name == 'awake_poll_s' and has_always_on) %}{{ config_field(section, field, _form) }}{% endfor %}
+            {% for field in t_fields if field.name not in ('sleep_interval_s', 'refresh_rate_s', 'always_on', 'heartbeat_min') and not (field.name == 'awake_poll_s' and has_always_on) %}{{ config_field(section, field, _form) }}{% endfor %}
             {% for field in t_fields if field.name == 'always_on' %}{{ config_field(section, field, _form, awake=awake_spec) }}{% endfor %}
           </div>
 
@@ -563,7 +601,7 @@
           {#- The sign's report, minus what is shown once elsewhere: the
               interval (Timing), and firmware / battery / temperature when the
               rail's vitals already carry them. -#}
-          {% set _dup = (['Check-in interval', 'Next check-in'] if not t_fields else [])
+          {% set _dup = ['Check-in interval', 'Next check-in']
               + ([] if section.overview.firmware.muted else ['Firmware'])
               + ([] if section.overview.battery.muted else ['Battery'])
               + (['Temperature'] if section.status.tiles.environment else []) %}
@@ -584,6 +622,43 @@
           {% if sign.error %}
           <div class="dx-band is-warn"><i class="ph ph-warning" aria-hidden="true"></i><div class="dx-band-text"><p>{{ sign.error }}</p></div></div>
           {% endif %}
+          {% if sign.stuck %}
+          <div class="dx-band is-warn" data-frame-stuck><i class="ph ph-warning" aria-hidden="true"></i><div class="dx-band-text"><p class="dx-band-title">This frame looks stuck</p><p class="dx-help">It has reconnected {{ sign.stuck }} times in 15 minutes without taking a picture. Try Reboot. If it doesn't restart, reboot it over USB with Visionect's Configurator.</p></div></div>
+          {% endif %}
+          {% if sign.health or sign.network %}
+          <dl class="dx-kv">
+            {% if sign.health %}<div><dt>Last 24 hours</dt><dd>{{ sign.health }}</dd></div>{% endif %}
+            {% for label, value in sign.network.items() %}<div><dt>{{ label }}</dt><dd>{{ value }}</dd></div>{% endfor %}
+          </dl>
+          {% endif %}
+          {% endif %}
+
+          {#- The sign's firmware (Visionect only: visionect_setup.firmware):
+              installed and latest, what it could be flashed with, and the
+              progress of a flash. Live: render-sync.js swaps this block while
+              a flash runs. -#}
+          {% set _fwv = vs.firmware if vs and vs.firmware else none %}
+          {% if sign and _fwv %}
+          {% set _fl = _fwv.flash %}
+          <div class="dx-fw" id="firmware" data-render-sync="firmware:{{ section.device_id }}">
+            <dl class="dx-kv">
+              <div><dt>Installed firmware</dt><dd>{{ _fwv.installed or 'Unknown' }}</dd></div>
+              <div><dt>Latest available</dt><dd>
+                {%- if _fwv.latest %}{{ _fwv.latest }}{% if _fwv.update_available %} <a class="tg tg--warn" href="{{ url_for('auth.firmware_index') }}" title="Open the Firmware page">Update available</a>{% endif %}
+                {%- else %}<span class="dx-help">{{ _fwv.unknown_because or 'Not known right now' }}</span>{% endif -%}
+              </dd></div>
+            </dl>
+            {% if _fl %}
+            <div class="dx-band{% if _fl.failed %} is-warn{% endif %}" role="status" data-firmware-flash="{{ _fl.phase }}">
+              <i class="ph ph-{{ 'warning' if _fl.failed else ('check-circle' if _fl.ok else 'cpu') }}" aria-hidden="true"></i>
+              <div class="dx-band-text">
+                <p class="dx-band-title">{% if _fl.active %}Updating firmware to {{ _fl.target }}{% elif _fl.ok %}Firmware updated to {{ _fl.target }}{% else %}Firmware update to {{ _fl.target }} failed{% endif %}</p>
+                {% if _fl.active %}<progress class="dx-progress" max="100" value="{{ _fl.percent }}" aria-label="Firmware update progress"></progress>{% endif %}
+                <p class="dx-help">{{ _fl.text }}</p>
+              </div>
+            </div>
+            {% endif %}
+          </div>
           {% endif %}
 
           {% if _token_rows or section.set_transport_endpoint or section.regenerate_token_endpoint %}
@@ -790,6 +865,7 @@
                title="Firmware versions and rollouts for every display"><i class="ph ph-cpu" aria-hidden="true"></i><span>Firmware page</span></a>
             {% if sign %}
               {% for action, icon, label, title in [
+                  ('network', 'wifi-high', 'Network details', 'Read the frame\'s IP settings and server now'),
                   ('refresh', 'arrows-clockwise', 'Full refresh', 'Repaint the picture it shows from scratch, to clear ghosting'),
                   ('reboot', 'power', 'Reboot', 'Restart the frame; it reconnects in a minute or two'),
                   ('status', 'heartbeat', 'Report in', 'Ask the frame for its battery, signal and state now')] %}

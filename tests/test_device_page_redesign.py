@@ -215,9 +215,11 @@ def test_one_control_per_setting(seeded: Any) -> None:
         # Switch to grey buttons; the Colour depth and Renderer controls both
         # post renderer_id, but a device gets one of them, never both.)
         assert not repeated, (dev, repeated)
-    # A sign's sleep interval is set on the frame: read-only, no editor.
+    # A sign's sleep interval is an editor (minutes), seeded from what the
+    # frame reports, with no read-only copy beside it.
     frame = _main(_page(client, "frame"))
-    assert "Every 30 min" in frame and "set on the frame" in frame
+    assert 'name="heartbeat_min"' in frame and 'value="30"' in frame
+    assert "set on the frame" not in frame and "Every 30 min" not in frame
     assert 'name="sleep_interval_s"' not in frame
     # Everyone else picks it, with no read-only copy beside it.
     pico = _main(_page(client, "kitchen"))
