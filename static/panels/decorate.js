@@ -15,7 +15,7 @@
 
   function px(v, fallback) {
     var n = Number(v);
-    return (isFinite(n) ? n : fallback);
+    return isFinite(n) ? n : fallback;
   }
 
   // Resolve a dotted path against a nested object/array. Grammar:
@@ -26,7 +26,9 @@
   //                e.g. "series.*.total" over [{date,total},…] -> [t1,t2,…].
   function resolvePath(obj, path) {
     if (obj == null || !path) return undefined;
-    var norm = String(path).replace(/\[(\d+)\]/g, ".$1").replace(/\[\s*\*?\s*\]/g, ".*");
+    var norm = String(path)
+      .replace(/\[(\d+)\]/g, ".$1")
+      .replace(/\[\s*\*?\s*\]/g, ".*");
     return _walk(obj, norm.split("."), 0);
   }
   function _walk(cur, parts, i) {
@@ -36,7 +38,9 @@
     if (k === "") return _walk(cur, parts, i + 1);
     if (k === "*") {
       if (!Array.isArray(cur)) return undefined;
-      return cur.map(function (item) { return _walk(item, parts, i + 1); });
+      return cur.map(function (item) {
+        return _walk(item, parts, i + 1);
+      });
     }
     var next = Array.isArray(cur) && /^\d+$/.test(k) ? cur[Number(k)] : cur[k];
     return _walk(next, parts, i + 1);
@@ -56,8 +60,13 @@
     // behind it, and so must the painted control, or the two disagree about
     // what a primitive placed over other elements looks like.
     var wrap = document.createElement("div");
-    var base = "position:relative;box-sizing:border-box;width:100%;height:100%;overflow:hidden;" +
-      "background:" + paper + ";color:" + ink + ";font-family:var(--font-family, inherit)";
+    var base =
+      "position:relative;box-sizing:border-box;width:100%;height:100%;overflow:hidden;" +
+      "background:" +
+      paper +
+      ";color:" +
+      ink +
+      ";font-family:var(--font-family, inherit)";
     function span(text, css) {
       var s = document.createElement("span");
       s.textContent = text;
@@ -70,15 +79,21 @@
       // entity is on: ink frame + fill, paper content. Same geometry either
       // way, so the on-device draw and this preview stay aligned.
       var lit = !!e.value_key && e.state === "on";
-      wrap.style.cssText = base + ";border:2px solid " + ink + ";border-radius:12px;" +
+      wrap.style.cssText =
+        base +
+        ";border:2px solid " +
+        ink +
+        ";border-radius:12px;" +
         "display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700" +
         (lit ? ";background:" + ink + ";color:" + paper : "");
       if (e.icon) {
         var weight = e.weight || "bold";
         if (!/^(thin|light|regular|bold|fill|duotone)$/.test(weight)) weight = "bold";
         var ic = document.createElement("i");
-        ic.className = (weight === "regular" ? "ph" : "ph-" + weight) +
-          " ph-" + String(e.icon).replace(/^ph-/, "");
+        ic.className =
+          (weight === "regular" ? "ph" : "ph-" + weight) +
+          " ph-" +
+          String(e.icon).replace(/^ph-/, "");
         ic.style.fontSize = "22px";
         wrap.appendChild(ic);
       }
@@ -90,15 +105,28 @@
       wrap.style.cssText = base;
       var on = e.state === "on";
       var track = document.createElement("div");
-      track.style.cssText = "position:absolute;right:4px;top:50%;transform:translateY(-50%);width:64px;" +
-        "height:36px;border:2px solid " + ink + ";border-radius:999px;background:" + (on ? soft : paper);
+      track.style.cssText =
+        "position:absolute;right:4px;top:50%;transform:translateY(-50%);width:64px;" +
+        "height:36px;border:2px solid " +
+        ink +
+        ";border-radius:999px;background:" +
+        (on ? soft : paper);
       var thumb = document.createElement("div");
-      thumb.style.cssText = "position:absolute;top:50%;transform:translateY(-50%);width:26px;height:26px;" +
-        "border-radius:50%;background:" + ink + ";" + (on ? "right:5px" : "left:5px");
+      thumb.style.cssText =
+        "position:absolute;top:50%;transform:translateY(-50%);width:26px;height:26px;" +
+        "border-radius:50%;background:" +
+        ink +
+        ";" +
+        (on ? "right:5px" : "left:5px");
       track.appendChild(thumb);
       wrap.appendChild(track);
-      if (e.label) wrap.appendChild(span(e.label,
-        "position:absolute;left:4px;top:50%;transform:translateY(-50%);font-weight:700"));
+      if (e.label)
+        wrap.appendChild(
+          span(
+            e.label,
+            "position:absolute;left:4px;top:50%;transform:translateY(-50%);font-weight:700"
+          )
+        );
       return wrap;
     }
 
@@ -107,28 +135,46 @@
       var range = Math.max(1, Number(e.value_max) - Number(e.value_min));
       var t = Math.max(0, Math.min(1, (Number(e.value_now) - Number(e.value_min)) / range || 0));
       var trk = document.createElement("div");
-      trk.style.cssText = "position:absolute;left:20px;right:20px;top:50%;transform:translateY(-50%);" +
-        "height:8px;border-radius:4px;background:" + soft;
+      trk.style.cssText =
+        "position:absolute;left:20px;right:20px;top:50%;transform:translateY(-50%);" +
+        "height:8px;border-radius:4px;background:" +
+        soft;
       var fill = document.createElement("div");
-      fill.style.cssText = "position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:" + ink +
-        ";width:" + (t * 100) + "%";
+      fill.style.cssText =
+        "position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:" +
+        ink +
+        ";width:" +
+        t * 100 +
+        "%";
       trk.appendChild(fill);
       var th = document.createElement("div");
-      th.style.cssText = "position:absolute;top:50%;transform:translate(-50%,-50%);width:32px;height:32px;" +
-        "border:2px solid " + ink + ";border-radius:50%;background:" + paper +
-        ";left:calc(20px + " + t + " * (100% - 40px))";
+      th.style.cssText =
+        "position:absolute;top:50%;transform:translate(-50%,-50%);width:32px;height:32px;" +
+        "border:2px solid " +
+        ink +
+        ";border-radius:50%;background:" +
+        paper +
+        ";left:calc(20px + " +
+        t +
+        " * (100% - 40px))";
       wrap.appendChild(trk);
       wrap.appendChild(th);
       return wrap;
     }
 
     // stepper: [ - | value | + ]
-    wrap.style.cssText = base + ";border:2px solid " + ink + ";border-radius:12px;" +
+    wrap.style.cssText =
+      base +
+      ";border:2px solid " +
+      ink +
+      ";border-radius:12px;" +
       "display:flex;align-items:stretch";
-    var cell = "flex:1;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:22px";
+    var cell =
+      "flex:1;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:22px";
     wrap.appendChild(span("−", cell + ";border-right:2px solid " + soft));
-    wrap.appendChild(span(String(e.value_now == null ? 0 : e.value_now),
-      cell + ";border-right:2px solid " + soft));
+    wrap.appendChild(
+      span(String(e.value_now == null ? 0 : e.value_now), cell + ";border-right:2px solid " + soft)
+    );
     wrap.appendChild(span("+", cell));
     return wrap;
   }
@@ -178,36 +224,54 @@
       var iname = String(el.icon || "star").replace(/^ph-/, "");
       i.className = wcls + " ph-" + iname;
       var size = Math.max(8, Math.round(Math.min(px(el.w, 64), px(el.h, 64)) * 0.82));
-      i.style.cssText = "display:flex;align-items:center;justify-content:center;" +
-        "width:100%;height:100%;line-height:1;color:" + color + ";font-size:" + size + "px";
+      i.style.cssText =
+        "display:flex;align-items:center;justify-content:center;" +
+        "width:100%;height:100%;line-height:1;color:" +
+        color +
+        ";font-size:" +
+        size +
+        "px";
       return i;
     }
 
     if (kind === "text") {
       var t = document.createElement("div");
-      var size = el.size && el.size > 0 ? el.size : Math.max(10, Math.round(px(el.h, 40) * 0.5));
+      let size = el.size && el.size > 0 ? el.size : Math.max(10, Math.round(px(el.h, 40) * 0.5));
       var wmap = { thin: 300, light: 300, regular: 400, bold: 700, fill: 800, duotone: 700 };
       var fw = wmap[el.weight] || 700;
       var align = el.align || "left";
       var justify = align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start";
-      t.style.cssText = "width:100%;height:100%;display:flex;align-items:center;justify-content:" + justify +
-        ";color:" + color + ";font-size:" + size + "px;font-weight:" + fw + ";line-height:1.15;" +
-        "text-align:" + align + ";overflow:hidden;font-family:var(--font-family, inherit)";
+      t.style.cssText =
+        "width:100%;height:100%;display:flex;align-items:center;justify-content:" +
+        justify +
+        ";color:" +
+        color +
+        ";font-size:" +
+        size +
+        "px;font-weight:" +
+        fw +
+        ";line-height:1.15;" +
+        "text-align:" +
+        align +
+        ";overflow:hidden;font-family:var(--font-family, inherit)";
       t.textContent = el.text != null && el.text !== "" ? el.text : "Text";
       return t;
     }
 
     if (kind === "line") {
       var wrap = document.createElement("div");
-      wrap.style.cssText = "width:100%;height:100%;display:flex;align-items:center;justify-content:center";
+      wrap.style.cssText =
+        "width:100%;height:100%;display:flex;align-items:center;justify-content:center";
       var bar = document.createElement("div");
-      var t = Math.max(1, px(el.stroke, 2));
+      let t = Math.max(1, px(el.stroke, 2));
       // Draw along the box's longer axis: wide box = horizontal rule, tall box
       // = vertical rule.
       if (px(el.w, 0) >= px(el.h, 0)) {
-        bar.style.cssText = "width:100%;height:" + t + "px;background:" + color + ";border-radius:" + (t / 2) + "px";
+        bar.style.cssText =
+          "width:100%;height:" + t + "px;background:" + color + ";border-radius:" + t / 2 + "px";
       } else {
-        bar.style.cssText = "height:100%;width:" + t + "px;background:" + color + ";border-radius:" + (t / 2) + "px";
+        bar.style.cssText =
+          "height:100%;width:" + t + "px;background:" + color + ";border-radius:" + t / 2 + "px";
       }
       wrap.appendChild(bar);
       return wrap;
@@ -215,10 +279,15 @@
 
     // rect / ellipse
     var d = document.createElement("div");
-    var radius = kind === "ellipse" ? "50%" : (Math.max(0, px(el.radius, 0)) + "px");
+    var radius = kind === "ellipse" ? "50%" : Math.max(0, px(el.radius, 0)) + "px";
     var css = "width:100%;height:100%;box-sizing:border-box;border-radius:" + radius + ";";
     if (el.fill === false) {
-      css += "border:" + Math.max(1, px(el.stroke, 2)) + "px solid " + color + ";background:transparent;";
+      css +=
+        "border:" +
+        Math.max(1, px(el.stroke, 2)) +
+        "px solid " +
+        color +
+        ";background:transparent;";
     } else {
       css += "background:" + color + ";";
     }
@@ -243,7 +312,11 @@
       (svg ? "svg{width:100%;height:100%;display:block}" : "");
     f.srcdoc =
       "<!doctype html><html><head><meta charset='utf-8'><style>" +
-      reset + (el.css || "") + "</style></head><body>" + (el.html || "") + "</body></html>";
+      reset +
+      (el.css || "") +
+      "</style></head><body>" +
+      (el.html || "") +
+      "</body></html>";
     return f;
   }
 
@@ -284,13 +357,28 @@
   //   kind       -> "js" (inline <script>) or "css" (inline <style>)
   //   init       -> optional JS run right after the lib loads (register/config)
   var SANDBOX_LIBS = [
-    { name: "Chart.js", files: ["chart"], test: /\bChart\b/, kind: "js",
-      init: "try{Chart.defaults.animation=false;Chart.defaults.plugins.legend.display=false;}catch(e){}" },
-    { name: "chartjs-datalabels", files: ["datalabels"], test: /ChartDataLabels/, kind: "js",
-      init: "try{Chart.register(ChartDataLabels);}catch(e){}" },
+    {
+      name: "Chart.js",
+      files: ["chart"],
+      test: /\bChart\b/,
+      kind: "js",
+      init: "try{Chart.defaults.animation=false;Chart.defaults.plugins.legend.display=false;}catch(e){}",
+    },
+    {
+      name: "chartjs-datalabels",
+      files: ["datalabels"],
+      test: /ChartDataLabels/,
+      kind: "js",
+      init: "try{Chart.register(ChartDataLabels);}catch(e){}",
+    },
     { name: "canvas-gauges", files: ["gauge"], test: /RadialGauge|LinearGauge/, kind: "js" },
-    { name: "day.js", files: ["dayjs", "dayjs_utc", "dayjs_tz"], test: /\bdayjs\b/, kind: "js",
-      init: "try{dayjs.extend(window.dayjs_plugin_utc);dayjs.extend(window.dayjs_plugin_timezone);}catch(e){}" },
+    {
+      name: "day.js",
+      files: ["dayjs", "dayjs_utc", "dayjs_tz"],
+      test: /\bdayjs\b/,
+      kind: "js",
+      init: "try{dayjs.extend(window.dayjs_plugin_utc);dayjs.extend(window.dayjs_plugin_timezone);}catch(e){}",
+    },
     { name: "qrcode", files: ["qrcode"], test: /\bqrcode\b/, kind: "js" },
     { name: "marked", files: ["marked"], test: /\bmarked\b/, kind: "js" },
     { name: "chroma", files: ["chroma"], test: /\bchroma\b/, kind: "js" },
@@ -302,10 +390,14 @@
     // defines it paired with an icon class (``.ph.ph-heart``), so require BOTH
     // halves to be present. Matching a lone "ph" token pulled the whole icon
     // font into any element that merely mentioned ph in passing.
-    { name: "ph-regular", files: ["phosphor_regular"], kind: "css",
+    {
+      name: "ph-regular",
+      files: ["phosphor_regular"],
+      kind: "css",
       test: function (s) {
         return /(^|[^\w-])ph(?![\w-])/.test(s) && /(^|[^\w-])ph-[a-z0-9]/.test(s) ? "ph" : null;
-      } },
+      },
+    },
     { name: "ph-thin", files: ["phosphor_thin"], test: /\bph-thin\b/, kind: "css" },
     { name: "ph-light", files: ["phosphor_light"], test: /\bph-light\b/, kind: "css" },
     { name: "ph-bold", files: ["phosphor"], test: /\bph-bold\b/, kind: "css" },
@@ -331,7 +423,9 @@
       xhr.open("GET", url, false); // sync: one-time, same-origin, cached
       xhr.send();
       if (xhr.status >= 200 && xhr.status < 300) src = xhr.responseText;
-    } catch (e) { src = null; }
+    } catch {
+      src = null;
+    }
     _libCache[url] = src;
     return src;
   }
@@ -400,11 +494,7 @@
       // The parser rewrites what it keeps (``:before`` comes back as
       // ``::before``), so compare on a shape both spellings collapse to.
       var norm = function (s) {
-        return String(s)
-          .replace(/\s+/g, "")
-          .replace(/['"]/g, "")
-          .replace(/::/g, ":")
-          .toLowerCase();
+        return String(s).replace(/\s+/g, "").replace(/['"]/g, "").replace(/::/g, ":").toLowerCase();
       };
       var preludes = function (text) {
         var out = [];
@@ -453,11 +543,10 @@
           if (findings.length >= 20) break;
         }
       }
-      parent.postMessage(
-        { type: "tesserae-css-report", counts: counts, dropped: findings },
-        "*",
-      );
-    } catch { /* diagnostics only: never break the render */ }
+      parent.postMessage({ type: "tesserae-css-report", counts: counts, dropped: findings }, "*");
+    } catch {
+      /* diagnostics only: never break the render */
+    }
   }
   var CSS_CHECK_JS = "(" + cssSelfCheck.toString() + ")();";
 
@@ -474,7 +563,7 @@
       "overflow:hidden;font-family:var(--font-family,-apple-system,'Segoe UI',Roboto,sans-serif);" +
       "color:#1B1A16}";
     var ctx = {
-      data: data != null ? data : (el.data != null ? el.data : null),
+      data: data != null ? data : el.data != null ? el.data : null,
       options: el.options || {},
       field: el.field || "",
       w: px(el.w, 0),
@@ -513,8 +602,12 @@
     //   true             -> the regular weight
     //   ["bold","fill"]  -> exactly those weights
     var ICON_LIBS = {
-      "ph-regular": "regular", "ph-thin": "thin", "ph-light": "light",
-      "ph-bold": "bold", "ph-fill": "fill", "ph-duotone": "duotone",
+      "ph-regular": "regular",
+      "ph-thin": "thin",
+      "ph-light": "light",
+      "ph-bold": "bold",
+      "ph-fill": "fill",
+      "ph-duotone": "duotone",
     };
     function iconChoice(libName) {
       var want = el.icons;
@@ -537,16 +630,36 @@
     // the script, the fonts that look sets and the icon weights it draws with. Those last two live
     // in Mosaic's CSS, not the element's code, so the scans below read the look's CSS as well.
     var mosaic = null;
-    var mosaicHit = autolibs ? (probeLibs.match(/\bMosaic\.|data-look\s*=|["'\s]m-page\b/) || [])[0] : null;
+    var mosaicHit = autolibs
+      ? (probeLibs.match(/\bMosaic\.|data-look\s*=|["'\s]m-page\b/) || [])[0]
+      : null;
     if (mosaicHit) {
       var mMeta = null;
-      try { mMeta = JSON.parse(libSource(urls.mosaic_json) || "null"); } catch (e) { mMeta = null; }
+      try {
+        mMeta = JSON.parse(libSource(urls.mosaic_json) || "null");
+      } catch {
+        mMeta = null;
+      }
       var mLook = (probe.match(/data-look\s*=\s*["']?([a-z0-9_-]+)/) || [])[1] || "";
       if (!(mMeta && mMeta.looks && mMeta.looks[mLook])) mLook = "";
-      var mCss = (libSource(urls.mosaic_core) || "") + "\n" + (mLook ? libSource(urls.mosaic_looks + mLook + ".css") || "" : "");
+      var mCss =
+        (libSource(urls.mosaic_core) || "") +
+        "\n" +
+        (mLook ? libSource(urls.mosaic_looks + mLook + ".css") || "" : "");
       var mJs = libSource(urls.mosaic_js);
-      mosaic = { look: mLook, css: mCss, js: mJs, icons: mLook ? mMeta.looks[mLook].icons : ["bold"] };
-      libReport.libs.push({ name: "mosaic" + (mLook ? ":" + mLook : ""), injected: !!(mJs && mCss.trim()), kind: "js+css", inferred: true, matched: mosaicHit });
+      mosaic = {
+        look: mLook,
+        css: mCss,
+        js: mJs,
+        icons: mLook ? mMeta.looks[mLook].icons : ["bold"],
+      };
+      libReport.libs.push({
+        name: "mosaic" + (mLook ? ":" + mLook : ""),
+        injected: !!(mJs && mCss.trim()),
+        kind: "js+css",
+        inferred: true,
+        matched: mosaicHit,
+      });
       if (mCss.trim()) headCss += mCss + "\n";
     }
     for (var i = 0; autolibs && i < SANDBOX_LIBS.length; i++) {
@@ -559,7 +672,13 @@
       } else {
         hit = libMatch(lib, probeLibs);
         // Mosaic.icon builds its classes at run time, so the weights come from the look.
-        if (!hit && mosaic && ICON_LIBS[lib.name] && mosaic.icons.indexOf(ICON_LIBS[lib.name]) !== -1) hit = "mosaic:" + (mosaic.look || "core");
+        if (
+          !hit &&
+          mosaic &&
+          ICON_LIBS[lib.name] &&
+          mosaic.icons.indexOf(ICON_LIBS[lib.name]) !== -1
+        )
+          hit = "mosaic:" + (mosaic.look || "core");
       }
       if (!hit) continue;
       var joined = "";
@@ -573,13 +692,20 @@
       }
       if (!joined) {
         libReport.libs.push({
-          name: lib.name, injected: false, inferred: choice !== true, matched: hit,
+          name: lib.name,
+          injected: false,
+          inferred: choice !== true,
+          matched: hit,
           reason: "source fetch failed",
         });
         continue;
       }
       libReport.libs.push({
-        name: lib.name, injected: true, kind: lib.kind, inferred: choice !== true, matched: hit,
+        name: lib.name,
+        injected: true,
+        kind: lib.kind,
+        inferred: choice !== true,
+        matched: hit,
       });
       if (lib.kind === "css") {
         headCss += joined;
@@ -601,10 +727,16 @@
       var fnt = fonts[k];
       if (!fnt || !fnt.name || fontProbe.indexOf(fnt.name) === -1) continue;
       var fcss = libSource(fnt.url);
-      if (fcss) { headCss += fcss + "\n"; needFont = true; }
+      if (fcss) {
+        headCss += fcss + "\n";
+        needFont = true;
+      }
       var fontEntry = {
-        name: "font:" + fnt.name, injected: !!fcss, kind: "css",
-        inferred: true, matched: fnt.name,
+        name: "font:" + fnt.name,
+        injected: !!fcss,
+        kind: "css",
+        inferred: true,
+        matched: fnt.name,
       };
       if (!fcss) fontEntry.reason = "font css fetch failed";
       libReport.libs.push(fontEntry);
@@ -630,14 +762,17 @@
     // Same "<" escape as ctxJson so an id can't close the inline script tag.
     var tag = JSON.stringify("[code-el " + String(el.id || "?") + "]").replace(/</g, "\\u003c");
     var diagHooks =
-      "<script>(function(){var t=" + tag + ";" +
+      "<script>(function(){var t=" +
+      tag +
+      ";" +
       "window.addEventListener('error',function(ev){" +
       "console.error(t+' uncaught: '+(ev.message||ev.error)+(ev.lineno?' (line '+ev.lineno+')':''));});" +
       "window.addEventListener('unhandledrejection',function(ev){" +
       "console.error(t+' unhandled rejection: '+String(ev.reason&&ev.reason.message||ev.reason));});" +
       "document.addEventListener('securitypolicyviolation',function(ev){" +
       "console.error(t+' csp blocked '+ev.violatedDirective+': '+(ev.blockedURI||'inline'));});" +
-      "})();</" + "script>";
+      "})();</" +
+      "script>";
 
     // Three separate <style> blocks, never one concatenated string. A
     // stylesheet's parse errors stop at its own element, so a malformed
@@ -647,18 +782,28 @@
     // :root block, taking every variable it declared with it). Author CSS still
     // comes last in document order, so it keeps winning ties against the libs.
     var styleBlocks =
-      "<style>" + reset + "</style>" +
+      "<style>" +
+      reset +
+      "</style>" +
       (headCss ? "<style data-tesserae-lib>" + headCss + "</style>" : "") +
-      "<style data-tesserae-css>" + (el.css || "") + "</style>";
+      "<style data-tesserae-css>" +
+      (el.css || "") +
+      "</style>";
 
     f.srcdoc =
       "<!doctype html><html><head><meta charset='utf-8'>" +
-      "<meta http-equiv='Content-Security-Policy' content=\"" + csp + "\">" +
+      "<meta http-equiv='Content-Security-Policy' content=\"" +
+      csp +
+      '">' +
       diagHooks +
-      styleBlocks + "</head><body>" +
+      styleBlocks +
+      "</head><body>" +
       (el.html || "") +
       libScripts +
-      "<script>window.ctx=" + ctxJson + ";</" + "script>" +
+      "<script>window.ctx=" +
+      ctxJson +
+      ";</" +
+      "script>" +
       // Author JS runs inside a function, not at global scope. At global scope
       // a plain ``var top = ...`` cannot overwrite the read-only ``window.top``:
       // the assignment silently fails, ``top`` stays a cross-origin Window, and
@@ -668,12 +813,23 @@
       // The cost is that a top-level ``function foo(){}`` is no longer reachable
       // from an inline ``onclick``; the frame is pointer-events:none and taps go
       // through touch regions, so nothing in a panel can call one anyway.
-      "<script>try{(function(){" + (el.js || "") + "\n}).call(window);}catch(e){" +
-      "console.error(" + tag + "+' script threw: '+String(e&&e.stack||e));" +
+      "<script>try{(function(){" +
+      (el.js || "") +
+      "\n}).call(window);}catch(e){" +
+      "console.error(" +
+      tag +
+      "+' script threw: '+String(e&&e.stack||e));" +
       "document.body.innerHTML='<pre style=\"color:#900;font:12px monospace;white-space:pre-wrap\">'" +
-      "+String(e&&e.message||e)+'</pre>';}</" + "script>" +
-      "<script>" + CSS_CHECK_JS + "</" + "script>" +
-      "<script>" + TOUCH_COLLECT_JS + "</" + "script>" +
+      "+String(e&&e.message||e)+'</pre>';}</" +
+      "script>" +
+      "<script>" +
+      CSS_CHECK_JS +
+      "</" +
+      "script>" +
+      "<script>" +
+      TOUCH_COLLECT_JS +
+      "</" +
+      "script>" +
       "</body></html>";
 
     // Pending counter lets the extraction script wait until every code
@@ -713,8 +869,16 @@
         if (!r || (!r.tap && !r.swipe && !r.slide)) return;
         var m = document.createElement("div");
         m.className = "touch-mirror";
-        m.style.cssText = "position:absolute;pointer-events:none;left:" + (r.x | 0) + "px;top:" +
-          (r.y | 0) + "px;width:" + (r.w | 0) + "px;height:" + (r.h | 0) + "px";
+        m.style.cssText =
+          "position:absolute;pointer-events:none;left:" +
+          (r.x | 0) +
+          "px;top:" +
+          (r.y | 0) +
+          "px;width:" +
+          (r.w | 0) +
+          "px;height:" +
+          (r.h | 0) +
+          "px";
         if (r.tap) m.setAttribute("data-on-tap", r.tap);
         if (r.swipe) m.setAttribute("data-on-swipe", r.swipe);
         if (r.slide) m.setAttribute("data-on-slide", r.slide);
@@ -730,10 +894,23 @@
         if (!s || !s.key) return;
         var m = document.createElement("div");
         m.className = "overlay-mirror";
-        m.style.cssText = "position:absolute;pointer-events:none;left:" + (s.x | 0) + "px;top:" +
-          (s.y | 0) + "px;width:" + (s.w | 0) + "px;height:" + (s.h | 0) + "px;" +
-          "font-size:" + (s.px | 0) + "px;font-weight:" + (s.weight | 0) + ";" +
-          "text-align:" + (s.align || "left");
+        m.style.cssText =
+          "position:absolute;pointer-events:none;left:" +
+          (s.x | 0) +
+          "px;top:" +
+          (s.y | 0) +
+          "px;width:" +
+          (s.w | 0) +
+          "px;height:" +
+          (s.h | 0) +
+          "px;" +
+          "font-size:" +
+          (s.px | 0) +
+          "px;font-weight:" +
+          (s.weight | 0) +
+          ";" +
+          "text-align:" +
+          (s.align || "left");
         m.setAttribute("data-overlay-key", s.key);
         if (s.suffix) m.setAttribute("data-overlay-suffix", s.suffix);
         if (s.map) m.setAttribute("data-overlay-map", s.map);
@@ -761,14 +938,20 @@
     var box = document.createElement("div");
     box.style.cssText =
       "width:100%;height:100%;display:flex;flex-direction:column;justify-content:center;overflow:hidden;" +
-      "font-family:var(--font-family, inherit);color:" + color + ";align-items:" +
+      "font-family:var(--font-family, inherit);color:" +
+      color +
+      ";align-items:" +
       (align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start");
-    var size = el.size && el.size > 0
-      ? el.size
-      : Math.max(10, Math.round(px(el.h, 40) * (el.label ? 0.42 : 0.58)));
+    var size =
+      el.size && el.size > 0
+        ? el.size
+        : Math.max(10, Math.round(px(el.h, 40) * (el.label ? 0.42 : 0.58)));
     var main = document.createElement("div");
     main.style.cssText =
-      "font-size:" + size + "px;font-weight:700;line-height:1.05;white-space:nowrap;text-align:" + align;
+      "font-size:" +
+      size +
+      "px;font-weight:700;line-height:1.05;white-space:nowrap;text-align:" +
+      align;
     var text;
     if (value == null || (Array.isArray(value) && !value.length)) {
       text = "—";
@@ -786,8 +969,11 @@
     if (el.label) {
       var lab = document.createElement("div");
       lab.style.cssText =
-        "font-size:" + Math.max(8, Math.round(size * 0.32)) + "px;font-weight:600;opacity:.68;" +
-        "margin-top:2px;white-space:nowrap;text-align:" + align;
+        "font-size:" +
+        Math.max(8, Math.round(size * 0.32)) +
+        "px;font-weight:600;opacity:.68;" +
+        "margin-top:2px;white-space:nowrap;text-align:" +
+        align;
       lab.textContent = el.label;
       box.appendChild(lab);
     }
@@ -802,11 +988,25 @@
 
   // ---- value formatting (data primitives) -------------------------------
   var _MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  var _MONF = ["January", "February", "March", "April", "May", "June", "July", "August",
-    "September", "October", "November", "December"];
+  var _MONF = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
   var _DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   var _DOWF = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-  function _pad(n) { return (n < 10 ? "0" : "") + n; }
+  function _pad(n) {
+    return (n < 10 ? "0" : "") + n;
+  }
   function toDate(v) {
     if (v == null || v === "") return null;
     var d = typeof v === "number" ? new Date(v < 1e12 ? v * 1000 : v) : new Date(v);
@@ -816,31 +1016,53 @@
     var h12 = d.getHours() % 12 || 12;
     return fmt.replace(/yyyy|MMMM|MMM|MM|dddd|ddd|dd|HH|hh|mm|ss|a|d|H|h|M/g, function (t) {
       switch (t) {
-        case "yyyy": return String(d.getFullYear());
-        case "MMMM": return _MONF[d.getMonth()];
-        case "MMM": return _MON[d.getMonth()];
-        case "MM": return _pad(d.getMonth() + 1);
-        case "M": return String(d.getMonth() + 1);
-        case "dddd": return _DOWF[d.getDay()];
-        case "ddd": return _DOW[d.getDay()];
-        case "dd": return _pad(d.getDate());
-        case "d": return String(d.getDate());
-        case "HH": return _pad(d.getHours());
-        case "H": return String(d.getHours());
-        case "hh": return _pad(h12);
-        case "h": return String(h12);
-        case "mm": return _pad(d.getMinutes());
-        case "ss": return _pad(d.getSeconds());
-        case "a": return d.getHours() < 12 ? "am" : "pm";
-        default: return t;
+        case "yyyy":
+          return String(d.getFullYear());
+        case "MMMM":
+          return _MONF[d.getMonth()];
+        case "MMM":
+          return _MON[d.getMonth()];
+        case "MM":
+          return _pad(d.getMonth() + 1);
+        case "M":
+          return String(d.getMonth() + 1);
+        case "dddd":
+          return _DOWF[d.getDay()];
+        case "ddd":
+          return _DOW[d.getDay()];
+        case "dd":
+          return _pad(d.getDate());
+        case "d":
+          return String(d.getDate());
+        case "HH":
+          return _pad(d.getHours());
+        case "H":
+          return String(d.getHours());
+        case "hh":
+          return _pad(h12);
+        case "h":
+          return String(h12);
+        case "mm":
+          return _pad(d.getMinutes());
+        case "ss":
+          return _pad(d.getSeconds());
+        case "a":
+          return d.getHours() < 12 ? "am" : "pm";
+        default:
+          return t;
       }
     });
   }
   function relTime(v) {
     var d = toDate(v);
     if (!d) return null;
-    var s = (d.getTime() - Date.now()) / 1000, abs = Math.abs(s), fut = s > 0;
-    function u(n, w) { n = Math.round(n); return fut ? "in " + n + w : n + w + " ago"; }
+    var s = (d.getTime() - Date.now()) / 1000,
+      abs = Math.abs(s),
+      fut = s > 0;
+    function u(n, w) {
+      n = Math.round(n);
+      return fut ? "in " + n + w : n + w + " ago";
+    }
     if (abs < 60) return "now";
     if (abs < 3600) return u(abs / 60, "m");
     if (abs < 86400) return u(abs / 3600, "h");
@@ -868,7 +1090,9 @@
     var wrap = document.createElement("div");
     wrap.style.cssText = "width:100%;height:100%;position:relative";
     var values = Array.isArray(value)
-      ? value.map(Number).filter(function (n) { return isFinite(n); })
+      ? value.map(Number).filter(function (n) {
+          return isFinite(n);
+        })
       : [];
     if (!window.Chart || !values.length) {
       wrap.style.cssText +=
@@ -887,16 +1111,20 @@
     new window.Chart(cv, {
       type: display === "bar" ? "bar" : "line",
       data: {
-        labels: values.map(function (_, i) { return i; }),
-        datasets: [{
-          data: values,
-          borderColor: ink,
-          backgroundColor: spark ? "color-mix(in srgb, " + ink + " 20%, transparent)" : ink,
-          borderWidth: 2,
-          pointRadius: 0,
-          fill: spark,
-          tension: spark ? 0.35 : 0.2,
-        }],
+        labels: values.map(function (_, i) {
+          return i;
+        }),
+        datasets: [
+          {
+            data: values,
+            borderColor: ink,
+            backgroundColor: spark ? "color-mix(in srgb, " + ink + " 20%, transparent)" : ink,
+            borderWidth: 2,
+            pointRadius: 0,
+            fill: spark,
+            tension: spark ? 0.35 : 0.2,
+          },
+        ],
       },
       options: {
         responsive: false,
@@ -905,8 +1133,16 @@
         layout: { padding: spark ? 1 : 2 },
         plugins: { legend: { display: false }, tooltip: { enabled: false } },
         scales: {
-          x: { display: !spark, grid: { display: false }, ticks: { color: ink, font: { size: 9 } } },
-          y: { display: !spark, grid: { display: false }, ticks: { color: ink, font: { size: 9 } } },
+          x: {
+            display: !spark,
+            grid: { display: false },
+            ticks: { color: ink, font: { size: 9 } },
+          },
+          y: {
+            display: !spark,
+            grid: { display: false },
+            ticks: { color: ink, font: { size: 9 } },
+          },
         },
       },
     });

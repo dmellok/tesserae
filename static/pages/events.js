@@ -46,15 +46,9 @@
     if (!live) return;
     live.dataset.state = state;
     const label =
-      state === "connected"
-        ? "LIVE"
-        : state === "connecting"
-          ? "Connecting…"
-          : "Offline";
+      state === "connected" ? "LIVE" : state === "connecting" ? "Connecting…" : "Offline";
     live.innerHTML =
-      '<span class="dx-listening-dot"></span><span class="dx-listening-label">' +
-      label +
-      "</span>";
+      '<span class="dx-listening-dot"></span><span class="dx-listening-label">' + label + "</span>";
   }
 
   function escapeHtml(s) {
@@ -67,7 +61,7 @@
           ">": "&gt;",
           '"': "&quot;",
           "'": "&#39;",
-        })[c],
+        })[c]
     );
   }
 
@@ -102,9 +96,7 @@
     // user refreshes the page and the server re-renders with extras.
     const icon = TYPE_ICONS[ev.type] || "circle";
     const durationBit = ev.duration_s
-      ? '<span class="muted">·</span><span>' +
-        ev.duration_s.toFixed(3) +
-        " s</span>"
+      ? '<span class="muted">·</span><span>' + ev.duration_s.toFixed(3) + " s</span>"
       : "";
     const digestBit = ev.digest
       ? '<span class="muted">·</span><code class="dx-event-digest">' +
@@ -112,9 +104,7 @@
         "</code>"
       : "";
     const errorBit = ev.error
-      ? '<span class="muted">·</span><span class="dx-event-err">' +
-        escapeHtml(ev.error) +
-        "</span>"
+      ? '<span class="muted">·</span><span class="dx-event-err">' + escapeHtml(ev.error) + "</span>"
       : "";
     return (
       '<button type="button" class="dx-event-summary" data-event-toggle aria-expanded="false">' +
@@ -189,7 +179,9 @@
     li.setAttribute("data-lf-item", "");
     li.setAttribute(
       "data-lf-text",
-      [ev.type, ev.status, ev.source, ev.target, ev.error || "", ev.digest || ""].join(" ").toLowerCase(),
+      [ev.type, ev.status, ev.source, ev.target, ev.error || "", ev.digest || ""]
+        .join(" ")
+        .toLowerCase()
     );
     li.setAttribute(
       "data-lf-level",
@@ -197,7 +189,7 @@
         ? "ok"
         : ev.status === "busy" || ev.status === "denied"
           ? "warn"
-          : "error",
+          : "error"
     );
     li.setAttribute("data-sort-time", String(ev.timestamp || ""));
     li.setAttribute("data-sort-dur", String(ev.duration_s || 0));

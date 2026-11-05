@@ -49,11 +49,15 @@
   color: var(--t-fg);
   font-size: 12.5px;
 }
-.dx-hist-clear-btn { color: var(--t-danger); }
+.dx-hist-clear-btn {
+  color: var(--t-danger);
+}
 /* With rows ticked the button deletes the selection, so the cutoff select
    and its label step aside until the selection clears. */
 .dx-hist-clear.is-selection label,
-.dx-hist-clear.is-selection .dx-hist-clear-age { display: none; }
+.dx-hist-clear.is-selection .dx-hist-clear-age {
+  display: none;
+}
 
 /* Card + groups ------------------------------------------------ */
 .dx-hist-card {
@@ -62,7 +66,9 @@
   flex-direction: column;
   gap: 10px;
 }
-.dx-hist-card > .dx-empty { padding: 40px 22px 32px; }
+.dx-hist-card > .dx-empty {
+  padding: 40px 22px 32px;
+}
 .dx-hist-group-head {
   display: flex;
   align-items: baseline;
@@ -114,7 +120,9 @@
   padding: 10px 10px;
   border-bottom: 1px solid color-mix(in oklab, var(--t-border) 70%, transparent);
 }
-.dx-hist-row:last-child { border-bottom: 0; }
+.dx-hist-row:last-child {
+  border-bottom: 0;
+}
 .dx-hist-row--failed {
   background: var(--t-pill-danger-bg);
   border-radius: 8px;
@@ -129,12 +137,16 @@
   background: var(--t-accent);
   box-shadow: 0 0 0 3px var(--t-surface);
 }
-.dx-hist-dot.is-bad { background: var(--t-danger); }
+.dx-hist-dot.is-bad {
+  background: var(--t-danger);
+}
 
 /* Follow-ups: the page sent again once a widget's pending work landed.
    They sit under the send they finish as small dots on the same rail,
    then one line says when the finished page reached the panel. */
-.dx-hist-row { --dx-hist-pad: 10px; }
+.dx-hist-row {
+  --dx-hist-pad: 10px;
+}
 .dx-hist-fu {
   grid-column: 1 / -1;
   list-style: none;
@@ -166,14 +178,36 @@
   box-shadow: 0 0 0 3px var(--t-surface);
   z-index: 2;
 }
-.dx-hist-fu-row.is-ok::before { background: var(--t-accent); }
-.dx-hist-fu-row.is-bad::before { background: var(--t-danger); }
-.dx-hist-fu-row .dx-hist-time { width: auto; min-width: 0; font-size: 12.5px; }
-.dx-hist-fu-row .dx-hist-dur { width: auto; font-size: 12px; }
-.dx-hist-fu-row .tg { font-size: 11.5px; padding: 2px 6px; }
-.dx-hist-fu-sum { color: var(--t-fg-soft); }
-.dx-hist-fu-sum strong { color: var(--t-fg); font-weight: 600; font-variant-numeric: tabular-nums; }
-.dx-hist-row--failed .dx-hist-dot { box-shadow: 0 0 0 3px var(--t-pill-danger-bg); }
+.dx-hist-fu-row.is-ok::before {
+  background: var(--t-accent);
+}
+.dx-hist-fu-row.is-bad::before {
+  background: var(--t-danger);
+}
+.dx-hist-fu-row .dx-hist-time {
+  width: auto;
+  min-width: 0;
+  font-size: 12.5px;
+}
+.dx-hist-fu-row .dx-hist-dur {
+  width: auto;
+  font-size: 12px;
+}
+.dx-hist-fu-row .tg {
+  font-size: 11.5px;
+  padding: 2px 6px;
+}
+.dx-hist-fu-sum {
+  color: var(--t-fg-soft);
+}
+.dx-hist-fu-sum strong {
+  color: var(--t-fg);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.dx-hist-row--failed .dx-hist-dot {
+  box-shadow: 0 0 0 3px var(--t-pill-danger-bg);
+}
 .dx-hist-select {
   width: 16px;
   height: 16px;
@@ -191,7 +225,9 @@
   text-decoration: none;
   white-space: nowrap;
 }
-a.dx-hist-time[href]:hover { color: var(--t-accent); }
+a.dx-hist-time[href]:hover {
+  color: var(--t-accent);
+}
 
 /* 64x48 thumbnail of the rendered frame; failures without a render get
    a mono "no frame" placeholder with a faint red edge. */
@@ -217,7 +253,9 @@ a.dx-hist-time[href]:hover { color: var(--t-accent); }
   font-size: 10px;
   color: var(--t-muted);
 }
-.dx-hist-thumb--empty.is-bad { border-color: var(--t-pill-danger-border); }
+.dx-hist-thumb--empty.is-bad {
+  border-color: var(--t-pill-danger-border);
+}
 
 .dx-hist-mid {
   display: flex;
@@ -232,7 +270,9 @@ a.dx-hist-time[href]:hover { color: var(--t-accent); }
   gap: 6px;
   flex: none;
 }
-.dx-hist-break { display: none; }
+.dx-hist-break {
+  display: none;
+}
 .dx-hist-target {
   flex: 0 1 auto;
   min-width: 0;
@@ -277,10 +317,15 @@ a.dx-hist-time[href]:hover { color: var(--t-accent); }
   align-items: center;
   gap: 4px;
 }
-.dx-hist-actions .form { margin: 0; }
+.dx-hist-actions .form {
+  margin: 0;
+}
 
 /* Overflow menu (delete lives here). Same shape as the Lineups cards. */
-.dx-hist-more { position: relative; display: inline-flex; }
+.dx-hist-more {
+  position: relative;
+  display: inline-flex;
+}
 .dx-hist-more > summary {
   list-style: none;
   display: grid;
@@ -291,7 +336,9 @@ a.dx-hist-time[href]:hover { color: var(--t-accent); }
   color: color-mix(in oklab, var(--t-fg) 55%, transparent);
   cursor: pointer;
 }
-.dx-hist-more > summary::-webkit-details-marker { display: none; }
+.dx-hist-more > summary::-webkit-details-marker {
+  display: none;
+}
 .dx-hist-more > summary:hover,
 .dx-hist-more[open] > summary {
   background: color-mix(in oklab, var(--t-fg) 6%, var(--t-surface));
@@ -311,7 +358,9 @@ a.dx-hist-time[href]:hover { color: var(--t-accent); }
   border-radius: 10px;
   box-shadow: 0 8px 24px color-mix(in oklab, var(--t-fg) 12%, transparent);
 }
-.dx-hist-more-menu .form { margin: 0; }
+.dx-hist-more-menu .form {
+  margin: 0;
+}
 .dx-hist-more-item {
   display: block;
   background: none;
@@ -327,8 +376,12 @@ a.dx-hist-time[href]:hover { color: var(--t-accent); }
   text-decoration: none;
   cursor: pointer;
 }
-.dx-hist-more-item:hover { background: color-mix(in oklab, var(--t-fg) 6%, var(--t-surface)); }
-.dx-hist-more-item.is-danger { color: var(--t-danger); }
+.dx-hist-more-item:hover {
+  background: color-mix(in oklab, var(--t-fg) 6%, var(--t-surface));
+}
+.dx-hist-more-item.is-danger {
+  color: var(--t-danger);
+}
 
 /* Bulk bar ----------------------------------------------------- */
 #dx-hist-bulk-bar {
@@ -344,12 +397,24 @@ a.dx-hist-time[href]:hover { color: var(--t-accent); }
   border: 1px solid var(--t-border);
   border-radius: 12px;
   background: var(--t-surface);
-  box-shadow: 0 12px 34px rgba(0, 0, 0, .24);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.24);
 }
-#dx-hist-bulk-bar[hidden] { display: none; }
-#dx-hist-bulk-bar .dx-bulk-count { font-size: 13px; font-weight: 600; white-space: nowrap; }
-#dx-hist-bulk-bar .dx-bulk-actions { display: flex; align-items: center; gap: 8px; }
-#dx-hist-bulk-bar .form { margin: 0; }
+#dx-hist-bulk-bar[hidden] {
+  display: none;
+}
+#dx-hist-bulk-bar .dx-bulk-count {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+#dx-hist-bulk-bar .dx-bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#dx-hist-bulk-bar .form {
+  margin: 0;
+}
 
 /* Phones ------------------------------------------------------- */
 @media (max-width: 640px) {
@@ -361,11 +426,21 @@ a.dx-hist-time[href]:hover { color: var(--t-accent); }
     scrollbar-width: thin;
     padding-bottom: 2px;
   }
-  .dx-hist-filter-row > .seg { flex: none; flex-wrap: nowrap; }
-  .dx-hist-clear { margin-left: 0; flex: none; }
+  .dx-hist-filter-row > .seg {
+    flex: none;
+    flex-wrap: nowrap;
+  }
+  .dx-hist-clear {
+    margin-left: 0;
+    flex: none;
+  }
 
-  .dx-hist-card { padding: 6px 12px 10px; }
-  .dx-hist-rows { --dx-hist-rail: 12px; }
+  .dx-hist-card {
+    padding: 6px 12px 10px;
+  }
+  .dx-hist-rows {
+    --dx-hist-rail: 12px;
+  }
 
   /* Two lines: dot + tick + time + tags, then thumb + dashboard +
      status + duration + actions. The mid wrapper dissolves so its
@@ -378,23 +453,79 @@ a.dx-hist-time[href]:hover { color: var(--t-accent); }
     gap: 6px 8px;
     padding: 10px 6px 10px 28px;
   }
-  .dx-hist-fu { order: 99; flex-basis: 100%; padding-left: calc(var(--dx-hist-rail) - 28px + 22px); }
-  .dx-hist-fu-row > .dx-hist-time, .dx-hist-fu-row > .dx-hist-dur, .dx-hist-fu-row > .tg { order: 0; }
-  .dx-hist-dot { position: absolute; left: 8px; top: 19px; }
-  .dx-hist-mid { display: contents; }
-  .dx-hist-select { order: 1; }
-  .dx-hist-time { order: 2; }
-  .dx-hist-tags { order: 3; flex-wrap: wrap; }
-  .dx-hist-break { order: 4; display: block; flex-basis: 100%; height: 0; }
-  .dx-hist-thumb { order: 5; width: 48px; height: 36px; }
-  .dx-hist-target { order: 6; flex: 1 1 0; min-width: 60px; font-size: 13.5px; }
-  .dx-hist-statuses { order: 7; }
-  .dx-hist-dur { order: 8; }
-  .dx-hist-actions { order: 9; }
-  .dx-hist-err { order: 10; flex-basis: 100%; min-width: 0; }
-  .dx-hist-detail { order: 11; }
+  .dx-hist-fu {
+    order: 99;
+    flex-basis: 100%;
+    padding-left: calc(var(--dx-hist-rail) - 28px + 22px);
+  }
+  .dx-hist-fu-row > .dx-hist-time,
+  .dx-hist-fu-row > .dx-hist-dur,
+  .dx-hist-fu-row > .tg {
+    order: 0;
+  }
+  .dx-hist-dot {
+    position: absolute;
+    left: 8px;
+    top: 19px;
+  }
+  .dx-hist-mid {
+    display: contents;
+  }
+  .dx-hist-select {
+    order: 1;
+  }
+  .dx-hist-time {
+    order: 2;
+  }
+  .dx-hist-tags {
+    order: 3;
+    flex-wrap: wrap;
+  }
+  .dx-hist-break {
+    order: 4;
+    display: block;
+    flex-basis: 100%;
+    height: 0;
+  }
+  .dx-hist-thumb {
+    order: 5;
+    width: 48px;
+    height: 36px;
+  }
+  .dx-hist-target {
+    order: 6;
+    flex: 1 1 0;
+    min-width: 60px;
+    font-size: 13.5px;
+  }
+  .dx-hist-statuses {
+    order: 7;
+  }
+  .dx-hist-dur {
+    order: 8;
+  }
+  .dx-hist-actions {
+    order: 9;
+  }
+  .dx-hist-err {
+    order: 10;
+    flex-basis: 100%;
+    min-width: 0;
+  }
+  .dx-hist-detail {
+    order: 11;
+  }
 }
 
 /* A send that waited for the page's paintings before it went out. */
-.dx-hist-waited { margin: 2px 0 0; font-size: 12px; color: var(--t-fg-soft); display: flex; gap: 5px; align-items: center; }
-.dx-hist-waited i { color: var(--t-muted); }
+.dx-hist-waited {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--t-fg-soft);
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.dx-hist-waited i {
+  color: var(--t-muted);
+}

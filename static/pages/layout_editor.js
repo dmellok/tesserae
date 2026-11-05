@@ -33,8 +33,8 @@
     try {
       if (sessionStorage.getItem(storageKey) === "1") details.open = true;
     } catch {
-        /* best effort */
-      }
+      /* best effort */
+    }
     details.addEventListener("toggle", () => {
       try {
         sessionStorage.setItem(storageKey, details.open ? "1" : "0");
@@ -144,10 +144,13 @@
   function buildEdgeFor(cell, side) {
     const isVertical = side === "left" || side === "right";
     const coord =
-      side === "top" ? cell.y :
-      side === "right" ? cell.x + cell.w :
-      side === "bottom" ? cell.y + cell.h :
-      cell.x;
+      side === "top"
+        ? cell.y
+        : side === "right"
+          ? cell.x + cell.w
+          : side === "bottom"
+            ? cell.y + cell.h
+            : cell.x;
     // The dragged cell's perpendicular range, neighbours must match
     // it EXACTLY to be moved by the drag. Loose "any overlap" caught
     // too many cells in irregular layouts: a cell that extends a bit
@@ -170,7 +173,8 @@
       touchSide = cells.filter((c) => c.id !== cell.id && c.x + c.w === coord && matchesPerp(c));
     } else if (side === "bottom") {
       touchSide = cells.filter((c) => c.id !== cell.id && c.y === coord && matchesPerp(c));
-    } else { // top
+    } else {
+      // top
       touchSide = cells.filter((c) => c.id !== cell.id && c.y + c.h === coord && matchesPerp(c));
     }
     // Assemble into the edge.axis === "v" {left, right} / "h" {above,
@@ -272,10 +276,7 @@
       sides.forEach((side) => {
         const isV = side === "left" || side === "right";
         const coord =
-          side === "top" ? c.y :
-          side === "right" ? c.x + c.w :
-          side === "bottom" ? c.y + c.h :
-          c.x;
+          side === "top" ? c.y : side === "right" ? c.x + c.w : side === "bottom" ? c.y + c.h : c.x;
         const pStart = isV ? c.y : c.x;
         const pEnd = isV ? c.y + c.h : c.x + c.w;
         const key = `${isV ? "v" : "h"}:${coord}:${pStart}:${pEnd}`;
@@ -295,14 +296,13 @@
           handle.style.left = pxToPct(c.x, panelW) + "%";
           handle.style.top = pxToPct(c.y, panelH) + "%";
           handle.style.height = pxToPct(c.h, panelH) + "%";
-        } else { // right
+        } else {
+          // right
           handle.style.left = pxToPct(c.x + c.w, panelW) + "%";
           handle.style.top = pxToPct(c.y, panelH) + "%";
           handle.style.height = pxToPct(c.h, panelH) + "%";
         }
-        handle.addEventListener("pointerdown", (e) =>
-          beginEdgeDrag(e, buildEdgeFor(c, side)),
-        );
+        handle.addEventListener("pointerdown", (e) => beginEdgeDrag(e, buildEdgeFor(c, side)));
         board.appendChild(handle);
       });
     });
@@ -322,7 +322,12 @@
     const body = await res.json();
     if (body.cells) {
       cells = body.cells.map((c) => ({
-        id: c.id, x: c.x, y: c.y, w: c.w, h: c.h, plugin: c.plugin || null,
+        id: c.id,
+        x: c.x,
+        y: c.y,
+        w: c.w,
+        h: c.h,
+        plugin: c.plugin || null,
       }));
     }
     if (opts.reload) {
@@ -403,7 +408,9 @@
     // is the handle itself (the pointerdown target).
     const handleEl = evDown.currentTarget;
     if (handleEl && handleEl.setPointerCapture) {
-      try { handleEl.setPointerCapture(evDown.pointerId); } catch {
+      try {
+        handleEl.setPointerCapture(evDown.pointerId);
+      } catch {
         /* best effort */
       }
     }
@@ -526,7 +533,8 @@
   }
 
   function collectChanges(edge) {
-    const affected = edge.axis === "h" ? [...edge.above, ...edge.below] : [...edge.left, ...edge.right];
+    const affected =
+      edge.axis === "h" ? [...edge.above, ...edge.below] : [...edge.left, ...edge.right];
     return affected.map((c) => {
       const live = cells.find((x) => x.id === c.id);
       return { id: live.id, x: live.x, y: live.y, w: live.w, h: live.h };
@@ -645,7 +653,7 @@
       alert(
         "Can't delete this cell, no neighbour can absorb the gap.\n\n" +
           "Resize or delete one of the adjacent cells first so a single " +
-          "row or column lines up with this one's edge.",
+          "row or column lines up with this one's edge."
       );
       return;
     }
@@ -770,11 +778,11 @@
           enabled: snapState.enabled,
           cols: snapState.cols,
           rows: snapState.rows,
-        }),
+        })
       );
     } catch {
-        /* best effort */
-      }
+      /* best effort */
+    }
   }
 
   function restoreSnap() {
@@ -786,8 +794,8 @@
       if (Number.isFinite(saved.cols)) snapState.cols = saved.cols;
       if (Number.isFinite(saved.rows)) snapState.rows = saved.rows;
     } catch {
-        /* best effort */
-      }
+      /* best effort */
+    }
   }
 
   restoreSnap();

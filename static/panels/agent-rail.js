@@ -37,9 +37,20 @@ window.PanelsAgentRail = (function () {
   // know what the model is doing -- the object line underneath carries the one
   // fact we have, which is how long it has been quiet.
   var THINKING = [
-    "Thinking", "Pondering", "Mulling it over", "Working it out", "Deliberating",
-    "Musing", "Considering", "Weighing it up", "Ruminating", "Puzzling it out",
-    "Percolating", "Chewing on it", "Turning it over", "Composing",
+    "Thinking",
+    "Pondering",
+    "Mulling it over",
+    "Working it out",
+    "Deliberating",
+    "Musing",
+    "Considering",
+    "Weighing it up",
+    "Ruminating",
+    "Puzzling it out",
+    "Percolating",
+    "Chewing on it",
+    "Turning it over",
+    "Composing",
   ];
   // Ticks kept in the DOM. Nobody scrolls back past this in a 340px column,
   // and the sub-line keeps the true count.
@@ -48,20 +59,27 @@ window.PanelsAgentRail = (function () {
   // tokens); above it, it's worth knowing which call is eating the budget.
   var CTX_FLOOR = 150;
 
-  var cfg = null, hooks = null;
-  var card = null, ticksEl = null, nowEl = null, pill = null;
+  var cfg = null,
+    hooks = null;
+  var card = null,
+    ticksEl = null,
+    nowEl = null,
+    pill = null;
   var es = null;
   var run = null;
-  var total = 0;      // every step this run, including ones that never showed
+  var total = 0; // every step this run, including ones that never showed
   var startedAt = 0;
   var quietSince = 0; // when the last step landed, for the thinking block's clock
   var lastWord = "";
-  var thinkT = null, doneT = null, wordT = null, tickT = null;
+  var thinkT = null,
+    doneT = null,
+    wordT = null,
+    tickT = null;
   var current = null; // the step the "now" block is showing
   var movedTo = null;
   var settled = true; // the run has gone quiet; the next step revives the chrome
-  var ctxTotal = 0;   // estimated tokens this run has cost the agent's context
-  var lastSeq = 0;    // highest step seq seen; EventSource reconnects replay
+  var ctxTotal = 0; // estimated tokens this run has cost the agent's context
+  var lastSeq = 0; // highest step seq seen; EventSource reconnects replay
 
   function el(tag, cls, html) {
     var n = document.createElement(tag);
@@ -78,7 +96,9 @@ window.PanelsAgentRail = (function () {
     if (ms == null) return "";
     return ms >= 1000 ? (ms / 1000).toFixed(1) + "s" : ms + "ms";
   }
-  function fmtSecs(ms) { return (ms / 1000).toFixed(1) + "s"; }
+  function fmtSecs(ms) {
+    return (ms / 1000).toFixed(1) + "s";
+  }
   // Always approximate, and always says so: the server estimates from bytes on
   // the wire because nothing on this side of an MCP call sees real token usage.
   function fmtCtx(tokens) {
@@ -90,7 +110,6 @@ window.PanelsAgentRail = (function () {
     return [step.target, step.detail].filter(Boolean).map(esc).join(" &middot; ");
   }
 
-
   // ---- reply box ------------------------------------------------------
   //
   // The one way a word from the operator reaches the model: the server queues
@@ -98,7 +117,9 @@ window.PanelsAgentRail = (function () {
   // so nothing can be pushed). Shown in the open strip only when the
   // ``noteUrl`` hook is configured, so an install without the endpoint shows
   // no dead control.
-  var replyEl = null, replyInput = null, replyNote = null;
+  var replyEl = null,
+    replyInput = null,
+    replyNote = null;
 
   function buildReply() {
     replyEl = el("div", "ag-reply");
@@ -115,12 +136,15 @@ window.PanelsAgentRail = (function () {
   function wireReply() {
     replyInput = replyEl.querySelector(".ag-reply-i");
     replyNote = replyEl.querySelector(".ag-reply-n");
-    if (!cfg.noteUrl) return;          // no endpoint: no box
+    if (!cfg.noteUrl) return; // no endpoint: no box
     replyEl.hidden = false;
     replyEl.querySelector(".ag-reply-s").addEventListener("click", sendNote);
     replyInput.addEventListener("keydown", function (e) {
       // Enter sends, Shift+Enter is a newline: this is a message, not a form.
-      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendNote(); }
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendNote();
+      }
     });
   }
 
@@ -138,17 +162,26 @@ window.PanelsAgentRail = (function () {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: text }),
     })
-      .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function (r) {
+        return r.ok ? r.json() : Promise.reject(r.status);
+      })
       .then(function (data) {
-        if (!data.queued) { say("not sent, queue is full", true); return; }
+        if (!data.queued) {
+          say("not sent, queue is full", true);
+          return;
+        }
         replyInput.value = "";
         // Honest about the latency: it lands on the agent's next call, which
         // during a build is a second or two and after one is whenever it
         // next does anything.
         say(settled ? "queued for the agent's next call" : "sent", false);
-        setTimeout(function () { say("", false); }, 4000);
+        setTimeout(function () {
+          say("", false);
+        }, 4000);
       })
-      .catch(function () { say("not sent", true); });
+      .catch(function () {
+        say("not sent", true);
+      });
   }
 
   // ---- follow ---------------------------------------------------------
@@ -158,7 +191,11 @@ window.PanelsAgentRail = (function () {
   // turned off.
   var FOLLOW_KEY = "tesserae-agent-follow";
   function followOn() {
-    try { return localStorage.getItem(FOLLOW_KEY) !== "off"; } catch { return true; }
+    try {
+      return localStorage.getItem(FOLLOW_KEY) !== "off";
+    } catch {
+      return true;
+    }
   }
   function drawFollow(btn) {
     var on = followOn();
@@ -171,7 +208,9 @@ window.PanelsAgentRail = (function () {
   // ---- chrome ---------------------------------------------------------
 
   var open = false; // the strip is expanded; only ever by the operator
-  var bodyEl = null, chevEl = null, objEl = null;
+  var bodyEl = null,
+    chevEl = null,
+    objEl = null;
 
   function setOpen(on) {
     open = !!on;
@@ -193,8 +232,11 @@ window.PanelsAgentRail = (function () {
     var strip = el("div", "ag-strip");
     nowEl = el("div", "ag-now");
     strip.appendChild(nowEl);
-    chevEl = el("button", "ag-chev",
-      '<i class="ph-bold ph-caret-down" aria-hidden="true"></i><span class="sr">Steps</span>');
+    chevEl = el(
+      "button",
+      "ag-chev",
+      '<i class="ph-bold ph-caret-down" aria-hidden="true"></i><span class="sr">Steps</span>'
+    );
     chevEl.type = "button";
     chevEl.setAttribute("aria-controls", "panels-agent-body");
     strip.appendChild(chevEl);
@@ -209,11 +251,19 @@ window.PanelsAgentRail = (function () {
     bodyEl.appendChild(ticksEl);
     var foot = el("div", "ag-foot");
     foot.appendChild(buildReply());
-    var follow = el("button", "ag-follow", '<i class="ph-bold ph-eye" aria-hidden="true"></i>Follow');
+    var follow = el(
+      "button",
+      "ag-follow",
+      '<i class="ph-bold ph-eye" aria-hidden="true"></i>Follow'
+    );
     follow.type = "button";
     drawFollow(follow);
     follow.addEventListener("click", function () {
-      try { localStorage.setItem(FOLLOW_KEY, followOn() ? "off" : "on"); } catch { /* private mode */ }
+      try {
+        localStorage.setItem(FOLLOW_KEY, followOn() ? "off" : "on");
+      } catch {
+        /* private mode */
+      }
       drawFollow(follow);
     });
     foot.appendChild(follow);
@@ -232,8 +282,11 @@ window.PanelsAgentRail = (function () {
 
     // Toolbar throbber, so a build is visible with the right column hidden.
     var host = document.getElementById("panels-tright");
-    pill = el("button", "ag-pill",
-      '<span class="ag-dot" aria-hidden="true"></span><span class="ag-pill-t">Agent working</span>');
+    pill = el(
+      "button",
+      "ag-pill",
+      '<span class="ag-dot" aria-hidden="true"></span><span class="ag-pill-t">Agent working</span>'
+    );
     pill.type = "button";
     pill.hidden = true;
     pill.title = "The agent is building this dashboard. Show its steps.";
@@ -264,21 +317,29 @@ window.PanelsAgentRail = (function () {
   }
 
   function nowHtml(icon, verb, done) {
-    return '<div class="ag-ring' + (done ? " is-done" : "") + '">' +
-        (done ? "" : '<span class="ag-ring-sweep" aria-hidden="true"></span>') +
-        '<i class="ph-bold ph-' + esc(icon) + '" aria-hidden="true"></i>' +
+    return (
+      '<div class="ag-ring' +
+      (done ? " is-done" : "") +
+      '">' +
+      (done ? "" : '<span class="ag-ring-sweep" aria-hidden="true"></span>') +
+      '<i class="ph-bold ph-' +
+      esc(icon) +
+      '" aria-hidden="true"></i>' +
       "</div>" +
       '<div class="ag-txt">' +
-        '<div class="ag-verb">' + esc(verb) + "</div>" +
-        '<div class="ag-sub"></div>' +
-      "</div>";
+      '<div class="ag-verb">' +
+      esc(verb) +
+      "</div>" +
+      '<div class="ag-sub"></div>' +
+      "</div>"
+    );
   }
 
   // An indeterminate ring: the agent never says how many calls a build will
   // take, so the sweep means "working" and the sub-line carries the count.
   function renderNow(step) {
     current = step;
-    clearInterval(wordT);   // a real step outranks the thinking block
+    clearInterval(wordT); // a real step outranks the thinking block
     wordT = null;
     setPhase("live");
     nowEl.className = "ag-now is-live";
@@ -333,7 +394,10 @@ window.PanelsAgentRail = (function () {
     var steps = total + " step" + (total === 1 ? "" : "s");
     var tail;
     if (phase === "done") {
-      sub.textContent = steps + " in " + fmtSecs(Date.now() - startedAt) +
+      sub.textContent =
+        steps +
+        " in " +
+        fmtSecs(Date.now() - startedAt) +
         (ctxTotal ? " · " + fmtCtx(ctxTotal) : "");
       return;
     }
@@ -363,14 +427,16 @@ window.PanelsAgentRail = (function () {
     // Reads fold together whatever they were (the operator counts them, not
     // reads them); everything else folds only with a repeat of itself. An
     // error never folds into a success.
-    var sameAsLast = last &&
+    var sameAsLast =
+      last &&
       last.classList.contains("is-err") === (step.status === "error") &&
       (probe ? last.classList.contains("is-probe") : last.dataset.ep === step.endpoint);
     if (sameAsLast) {
       var n = Number(last.dataset.n || 1) + 1;
       last.dataset.n = String(n);
-      last.querySelector(".ag-tick-l").textContent =
-        probe ? "read " + n + " things" : step.label + " ×" + n;
+      last.querySelector(".ag-tick-l").textContent = probe
+        ? "read " + n + " things"
+        : step.label + " ×" + n;
       var t = last.querySelector(".ag-tick-t");
       if (t) t.innerHTML = objectOf(step);
       // A fold carries the SUM of what it hid, which is the whole point: the
@@ -381,23 +447,31 @@ window.PanelsAgentRail = (function () {
       ticksEl.scrollTop = ticksEl.scrollHeight;
       return;
     }
-    var tick = el("div", "ag-tick" +
-      (probe ? " is-probe" : "") +
-      (step.status === "error" ? " is-err" : "") +
-      (step.kind === "send" ? " is-send" : ""));
+    var tick = el(
+      "div",
+      "ag-tick" +
+        (probe ? " is-probe" : "") +
+        (step.status === "error" ? " is-err" : "") +
+        (step.kind === "send" ? " is-send" : "")
+    );
     tick.setAttribute("role", "listitem");
     tick.dataset.n = "1";
     tick.dataset.ep = step.endpoint || "";
     tick.dataset.tok = String(step.tokens_est || 0);
     tick.innerHTML =
       '<span class="ag-tick-m">' +
-        (step.status === "error"
-          ? '<i class="ph-bold ph-x"></i>'
-          : probe ? "" : '<i class="ph-bold ph-check"></i>') +
+      (step.status === "error"
+        ? '<i class="ph-bold ph-x"></i>'
+        : probe
+          ? ""
+          : '<i class="ph-bold ph-check"></i>') +
       "</span>" +
-      '<span class="ag-tick-l">' + esc(probe ? "read 1 thing" : step.label) + "</span>" +
+      '<span class="ag-tick-l">' +
+      esc(probe ? "read 1 thing" : step.label) +
+      "</span>" +
       (probe ? "" : '<span class="ag-tick-t">' + objectOf(step) + "</span>") +
-      '<span class="ag-tick-ms">' + tickMeta(step.duration_ms, step.tokens_est) +
+      '<span class="ag-tick-ms">' +
+      tickMeta(step.duration_ms, step.tokens_est) +
       "</span>";
     ticksEl.appendChild(tick);
     while (ticksEl.children.length > MAX_TICKS) ticksEl.removeChild(ticksEl.firstChild);
@@ -436,7 +510,7 @@ window.PanelsAgentRail = (function () {
   // only thing that changes is that the rail stops naming a step as in flight,
   // because the last one has landed and the next hasn't been made yet.
   function enterThinking() {
-    pushTick(current);   // the step it was showing is done; it's history now
+    pushTick(current); // the step it was showing is done; it's history now
     current = null;
     renderThinking();
     clearInterval(wordT);
@@ -465,7 +539,10 @@ window.PanelsAgentRail = (function () {
     quietSince = Date.now() - gap;
     clearTimeout(thinkT);
     clearTimeout(doneT);
-    if (gap >= DONE_MS) { endRun(); return; }
+    if (gap >= DONE_MS) {
+      endRun();
+      return;
+    }
     thinkT = setTimeout(enterThinking, Math.max(0, THINK_MS - gap));
     doneT = setTimeout(endRun, DONE_MS - gap);
   }
@@ -501,7 +578,7 @@ window.PanelsAgentRail = (function () {
     }
     if (step.page_id === cfg.canvasId) movedTo = null;
 
-    pushTick(current);   // the step it replaces is now history
+    pushTick(current); // the step it replaces is now history
     renderNow(step);
     renderCount();
     armQuiet();
@@ -514,12 +591,22 @@ window.PanelsAgentRail = (function () {
     hooks = callbacks || {};
     if (!cfg.streamUrl || typeof EventSource === "undefined") return;
     if (!build()) return;
-    try { es = new EventSource(cfg.streamUrl); } catch { return; }
+    try {
+      es = new EventSource(cfg.streamUrl);
+    } catch {
+      return;
+    }
     es.addEventListener("snapshot", function (ev) {
       var data;
-      try { data = JSON.parse(ev.data); } catch { return; }
+      try {
+        data = JSON.parse(ev.data);
+      } catch {
+        return;
+      }
       var got = data.steps || [];
-      got.forEach(function (s) { onStep(s, true); });
+      got.forEach(function (s) {
+        onStep(s, true);
+      });
       if (!got.length) return;
       // A snapshot is history. Backdate the clock by the span it covers (from
       // the server's own timestamps, so no clock skew creeps in) and hand the
@@ -531,11 +618,20 @@ window.PanelsAgentRail = (function () {
     });
     es.addEventListener("step", function (ev) {
       var step;
-      try { step = JSON.parse(ev.data); } catch { return; }
+      try {
+        step = JSON.parse(ev.data);
+      } catch {
+        return;
+      }
       onStep(step);
     });
   }
 
   // expand(true) opens the strip (the editor's phone Agent tab does).
-  return { init: init, expand: function (on) { if (card) setOpen(on); } };
+  return {
+    init: init,
+    expand: function (on) {
+      if (card) setOpen(on);
+    },
+  };
 })();

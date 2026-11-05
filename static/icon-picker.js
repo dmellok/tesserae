@@ -72,7 +72,7 @@
     const id = picker.dataset.iconPickerId;
     if (id) {
       const byId = document.querySelector(
-        `input[data-icon-value][data-icon-picker-id="${CSS.escape(id)}"]`,
+        `input[data-icon-value][data-icon-picker-id="${CSS.escape(id)}"]`
       );
       if (byId) return byId;
     }
@@ -116,13 +116,11 @@
       // pages that don't have that header (the queryNodeList is empty).
       const headerIcon = document.querySelector("[data-editor-name-icon]");
       if (headerIcon) {
-        headerIcon.innerHTML = name
-          ? '<i class="ph ph-' + name + '" aria-hidden="true"></i>'
-          : "";
+        headerIcon.innerHTML = name ? '<i class="ph ph-' + name + '" aria-hidden="true"></i>' : "";
       }
-      grid.querySelectorAll(".icon-pick").forEach((b) =>
-        b.classList.toggle("is-active", (b.dataset.icon || "") === (name || "")),
-      );
+      grid
+        .querySelectorAll(".icon-pick")
+        .forEach((b) => b.classList.toggle("is-active", (b.dataset.icon || "") === (name || "")));
     }
 
     function render(filter) {

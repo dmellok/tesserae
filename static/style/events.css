@@ -18,7 +18,9 @@
   border-radius: var(--t-radius-md);
   background: var(--t-surface);
   box-shadow: var(--t-shadow-xs);
-  transition: border-color var(--t-trans), box-shadow var(--t-trans);
+  transition:
+    border-color var(--t-trans),
+    box-shadow var(--t-trans);
 }
 .event-row:hover {
   border-color: var(--t-border-strong);
@@ -38,11 +40,21 @@
   align-self: start;
 }
 
-.event--push .event-type { color: var(--t-accent); }
-.event--renderer .event-type { color: var(--t-fg-soft); }
-.event--device .event-type { color: var(--t-ok); }
-.event--scheduler .event-type { color: var(--t-warn); }
-.event--auth .event-type { color: var(--t-danger); }
+.event--push .event-type {
+  color: var(--t-accent);
+}
+.event--renderer .event-type {
+  color: var(--t-fg-soft);
+}
+.event--device .event-type {
+  color: var(--t-ok);
+}
+.event--scheduler .event-type {
+  color: var(--t-warn);
+}
+.event--auth .event-type {
+  color: var(--t-danger);
+}
 
 .event-body {
   min-width: 0;
@@ -123,11 +135,25 @@
   align-items: baseline;
   margin-bottom: var(--t-space-2);
 }
-.event-conditions-head strong { font-weight: 700; }
-.event-cond-ok    { color: var(--t-ok); font-weight: 600; }
-.event-cond-warn  { color: var(--t-warn); font-weight: 600; }
-.event-cond-fail  { color: var(--t-danger); font-weight: 600; }
-.event-cond-reason { color: var(--t-muted); font-style: italic; }
+.event-conditions-head strong {
+  font-weight: 700;
+}
+.event-cond-ok {
+  color: var(--t-ok);
+  font-weight: 600;
+}
+.event-cond-warn {
+  color: var(--t-warn);
+  font-weight: 600;
+}
+.event-cond-fail {
+  color: var(--t-danger);
+  font-weight: 600;
+}
+.event-cond-reason {
+  color: var(--t-muted);
+  font-style: italic;
+}
 .event-conditions-steps {
   list-style: none;
   padding: 0;
@@ -154,8 +180,12 @@
   margin-right: var(--t-space-2);
   vertical-align: 0.1em;
 }
-.event-conditions-steps > li.is-pass::before { background: var(--t-ok); }
-.event-conditions-steps > li.is-fail::before { background: var(--t-danger); }
+.event-conditions-steps > li.is-pass::before {
+  background: var(--t-ok);
+}
+.event-conditions-steps > li.is-fail::before {
+  background: var(--t-danger);
+}
 .event-conditions-steps .step-num {
   display: inline-block;
   width: 1.5em;
@@ -180,8 +210,12 @@
   align-items: center;
   gap: 6px;
 }
-.event-conditions-list > li.is-pass .ph { color: var(--t-ok); }
-.event-conditions-list > li.is-fail .ph { color: var(--t-danger); }
+.event-conditions-list > li.is-pass .ph {
+  color: var(--t-ok);
+}
+.event-conditions-list > li.is-fail .ph {
+  color: var(--t-danger);
+}
 .event-conditions-list code {
   font-size: 0.9em;
   background: var(--t-surface-sunk);
@@ -198,16 +232,23 @@
   overflow: hidden;
   display: grid;
   place-items: center;
-  transition: transform var(--t-trans), box-shadow var(--t-trans-fast);
+  transition:
+    transform var(--t-trans),
+    box-shadow var(--t-trans-fast);
 }
-.event-thumb:hover { transform: scale(1.04); box-shadow: var(--t-shadow-sm); }
+.event-thumb:hover {
+  transform: scale(1.04);
+  box-shadow: var(--t-shadow-sm);
+}
 .event-thumb img {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
   transition: transform 280ms var(--t-ease-spring);
 }
-.event-thumb:hover img { transform: scale(1.05); }
+.event-thumb:hover img {
+  transform: scale(1.05);
+}
 
 /* Events page toolbar (live pill + type-filter chips). */
 .events-toolbar {
@@ -243,7 +284,10 @@
   font-weight: 600;
   border: 1px solid transparent;
 }
-.event-type-filter .chip .ph { font-size: 13px; opacity: 0.75; }
+.event-type-filter .chip .ph {
+  font-size: 13px;
+  opacity: 0.75;
+}
 .event-type-filter .chip .muted {
   font-size: var(--t-size-xs);
   padding: 1px 6px;
@@ -259,7 +303,9 @@
   background: var(--t-accent-soft);
   border-color: color-mix(in oklab, var(--t-accent) 35%, transparent);
 }
-.event-type-filter .chip.is-active .ph { opacity: 1; }
+.event-type-filter .chip.is-active .ph {
+  opacity: 1;
+}
 
 /* Live indicator next to the Events heading. */
 .live-dot {
@@ -277,14 +323,25 @@
   background: var(--t-surface-soft);
   color: var(--t-muted);
 }
-.live-dot .ph-fill, .live-dot [class^="ph-fill"] {
+.live-dot .ph-fill,
+.live-dot [class^="ph-fill"] {
   font-size: 8px;
   animation: live-pulse 1.6s ease-in-out infinite;
 }
 @keyframes live-pulse {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.35; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
 }
-.live-dot[data-state="connected"] { color: var(--t-ok); background: color-mix(in oklab, var(--t-ok) 15%, transparent); }
-.live-dot[data-state="offline"] { color: var(--t-danger); background: color-mix(in oklab, var(--t-danger) 15%, transparent); }
-
+.live-dot[data-state="connected"] {
+  color: var(--t-ok);
+  background: color-mix(in oklab, var(--t-ok) 15%, transparent);
+}
+.live-dot[data-state="offline"] {
+  color: var(--t-danger);
+  background: color-mix(in oklab, var(--t-danger) 15%, transparent);
+}

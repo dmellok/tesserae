@@ -15,117 +15,140 @@
  * form field that fails validation inside a collapsed section, opens it first.
  * The body is hidden with the hidden attribute, so nothing animates layout. */
 (function () {
-  'use strict';
-  var PREFIX = 'tesserae-collapsed:';
-  var page = (window.location.pathname.replace(/\/+$/, '') || '/');
+  "use strict";
+  var PREFIX = "tesserae-collapsed:";
+  var page = window.location.pathname.replace(/\/+$/, "") || "/";
 
   // A section inside ``[data-collapsible-scope="x"]`` shares its state with
   // every page using that scope (the device page: collapsing Power on one
   // display collapses it on all of them), instead of being kept per path.
   function scopeOf(sec) {
-    var holder = sec.closest('[data-collapsible-scope]');
-    return holder ? 'scope:' + holder.getAttribute('data-collapsible-scope') : page;
+    var holder = sec.closest("[data-collapsible-scope]");
+    return holder ? "scope:" + holder.getAttribute("data-collapsible-scope") : page;
   }
-  function key(sec) { return PREFIX + scopeOf(sec) + '#' + sec.id; }
+  function key(sec) {
+    return PREFIX + scopeOf(sec) + "#" + sec.id;
+  }
   // The device page kept its own keys before it moved to this component
   // (tesserae-devsec-collapsed:<section>); carry a collapsed one over once.
   function migrate(sec) {
-    var old = sec.closest('[data-device-page]') ? 'tesserae-devsec-collapsed:' + sec.id : '';
+    var old = sec.closest("[data-device-page]") ? "tesserae-devsec-collapsed:" + sec.id : "";
     if (!old) return;
     try {
-      if (window.localStorage.getItem(old) === '1') window.localStorage.setItem(key(sec), '1');
+      if (window.localStorage.getItem(old) === "1") window.localStorage.setItem(key(sec), "1");
       window.localStorage.removeItem(old);
-    } catch (e) { /* private mode */ }
+    } catch {
+      /* private mode */
+    }
   }
   function stored(sec) {
-    try { return window.localStorage.getItem(key(sec)) === '1'; } catch (e) { return false; }
+    try {
+      return window.localStorage.getItem(key(sec)) === "1";
+    } catch {
+      return false;
+    }
   }
   function store(sec, collapsed) {
     try {
-      if (collapsed) window.localStorage.setItem(key(sec), '1');
+      if (collapsed) window.localStorage.setItem(key(sec), "1");
       else window.localStorage.removeItem(key(sec));
-    } catch (e) { /* private mode: the state just isn't remembered */ }
+    } catch {
+      /* private mode: the state just isn't remembered */
+    }
   }
   function titleOf(sec) {
-    var t = sec.querySelector('[data-collapsible-title]') ||
-      sec.querySelector('.dx-section-title, h1, h2, h3');
-    return t ? t.textContent.replace(/\s+/g, ' ').trim() : '';
+    var t =
+      sec.querySelector("[data-collapsible-title]") ||
+      sec.querySelector(".dx-section-title, h1, h2, h3");
+    return t ? t.textContent.replace(/\s+/g, " ").trim() : "";
   }
   function bodyOf(sec) {
-    var btn = sec.querySelector('[data-collapsible-toggle]');
-    var id = btn && btn.getAttribute('aria-controls');
+    var btn = sec.querySelector("[data-collapsible-toggle]");
+    var id = btn && btn.getAttribute("aria-controls");
     return id ? document.getElementById(id) : null;
   }
 
   function setCollapsed(sec, collapsed, persist) {
-    var btn = sec.querySelector('[data-collapsible-toggle]');
+    var btn = sec.querySelector("[data-collapsible-toggle]");
     var body = bodyOf(sec);
     if (!btn || !body) return;
-    var was = sec.classList.contains('is-collapsed');
-    sec.classList.toggle('is-collapsed', collapsed);
+    var was = sec.classList.contains("is-collapsed");
+    sec.classList.toggle("is-collapsed", collapsed);
     body.hidden = collapsed;
-    btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-    var label = btn.querySelector('.sr-only');
+    btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    var label = btn.querySelector(".sr-only");
     var title = titleOf(sec);
-    if (label && title) label.textContent = (collapsed ? 'Expand ' : 'Collapse ') + title;
+    if (label && title) label.textContent = (collapsed ? "Expand " : "Collapse ") + title;
     if (persist && sec.id) store(sec, collapsed);
     if (was !== collapsed) {
-      sec.dispatchEvent(new CustomEvent('collapsible:toggle', { bubbles: true, detail: { collapsed: collapsed } }));
+      sec.dispatchEvent(
+        new CustomEvent("collapsible:toggle", { bubbles: true, detail: { collapsed: collapsed } })
+      );
       // Charts and other width-measuring widgets inside the body re-measure.
-      if (!collapsed) window.dispatchEvent(new Event('resize'));
+      if (!collapsed) window.dispatchEvent(new Event("resize"));
     }
   }
 
   // Open the collapsed section that holds ``el``. True when it changed something.
   function expandFor(el, persist) {
-    var sec = el && el.closest ? el.closest('[data-collapsible].is-collapsed') : null;
+    var sec = el && el.closest ? el.closest("[data-collapsible].is-collapsed") : null;
     if (!sec) return false;
     setCollapsed(sec, false, persist);
     return true;
   }
 
   function reducedMotion() {
-    return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    return window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   }
   function reveal(el, smooth) {
-    el.scrollIntoView({ behavior: smooth && !reducedMotion() ? 'smooth' : 'auto', block: 'start' });
+    el.scrollIntoView({ behavior: smooth && !reducedMotion() ? "smooth" : "auto", block: "start" });
   }
 
   function init() {
-    var secs = Array.prototype.filter.call(document.querySelectorAll('[data-collapsible]'), function (sec) {
-      return sec.id && sec.querySelector('[data-collapsible-toggle]');
-    });
+    var secs = Array.prototype.filter.call(
+      document.querySelectorAll("[data-collapsible]"),
+      function (sec) {
+        return sec.id && sec.querySelector("[data-collapsible-toggle]");
+      }
+    );
     if (!secs.length) return;
     var anyCollapsed = false;
     secs.forEach(function (sec) {
       migrate(sec);
-      if (stored(sec)) { setCollapsed(sec, true, false); anyCollapsed = true; }
-      var head = sec.querySelector('[data-collapsible-head]');
+      if (stored(sec)) {
+        setCollapsed(sec, true, false);
+        anyCollapsed = true;
+      }
+      var head = sec.querySelector("[data-collapsible-head]");
       if (!head) return;
-      head.addEventListener('click', function (ev) {
+      head.addEventListener("click", function (ev) {
         // Links and controls in the header keep their own job; only the
         // chevron button (and bare header space) toggles.
-        var inner = ev.target.closest('a, button, input, select, textarea, label, summary');
-        if (inner && !inner.hasAttribute('data-collapsible-toggle')) return;
+        var inner = ev.target.closest("a, button, input, select, textarea, label, summary");
+        if (inner && !inner.hasAttribute("data-collapsible-toggle")) return;
         // Dragging across the title to select it is not a click on the header.
         var sel = window.getSelection && window.getSelection();
         if (!inner && sel && !sel.isCollapsed && sel.toString().trim()) return;
-        setCollapsed(sec, !sec.classList.contains('is-collapsed'), true);
+        setCollapsed(sec, !sec.classList.contains("is-collapsed"), true);
       });
     });
 
     // A required field inside a collapsed section would block Save with a
     // "not focusable" error nobody can see: open its section instead.
-    document.addEventListener('invalid', function (ev) {
-      if (expandFor(ev.target, false)) reveal(ev.target, false);
-    }, true);
+    document.addEventListener(
+      "invalid",
+      function (ev) {
+        if (expandFor(ev.target, false)) reveal(ev.target, false);
+      },
+      true
+    );
 
     // A search or filter (list-filter.js) that matches something inside a
     // collapsed section would otherwise show nothing: open those sections for
     // as long as the page is filtered (not remembered).
-    document.addEventListener('lf:change', function (ev) {
-      if (!ev.target.classList || !ev.target.classList.contains('lf-is-filtered')) return;
-      ev.target.querySelectorAll('[data-lf-item]:not([data-lf-out])').forEach(function (item) {
+    document.addEventListener("lf:change", function (ev) {
+      if (!ev.target.classList || !ev.target.classList.contains("lf-is-filtered")) return;
+      ev.target.querySelectorAll("[data-lf-item]:not([data-lf-out])").forEach(function (item) {
         expandFor(item, false);
       });
     });
@@ -133,7 +156,11 @@
     function targetFromHash() {
       var raw = window.location.hash.slice(1);
       if (!raw) return null;
-      try { raw = decodeURIComponent(raw); } catch (e) { /* use as is */ }
+      try {
+        raw = decodeURIComponent(raw);
+      } catch {
+        /* use as is */
+      }
       return document.getElementById(raw);
     }
     var first = targetFromHash();
@@ -142,34 +169,49 @@
       // Late layout shifts (fonts, images) can move the target: land on it
       // again once the page settles, unless the person has scrolled.
       var moved = false;
-      var stop = function () { moved = true; };
-      ['wheel', 'touchstart', 'keydown', 'mousedown'].forEach(function (t) {
+      var stop = function () {
+        moved = true;
+      };
+      ["wheel", "touchstart", "keydown", "mousedown"].forEach(function (t) {
         window.addEventListener(t, stop, { once: true, passive: true });
       });
-      var again = function () { if (!moved) reveal(first, false); };
-      if (document.readyState === 'complete') requestAnimationFrame(again);
-      else window.addEventListener('load', function () { requestAnimationFrame(again); }, { once: true });
+      var again = function () {
+        if (!moved) reveal(first, false);
+      };
+      if (document.readyState === "complete") requestAnimationFrame(again);
+      else
+        window.addEventListener(
+          "load",
+          function () {
+            requestAnimationFrame(again);
+          },
+          { once: true }
+        );
     }
-    window.addEventListener('hashchange', function () {
+    window.addEventListener("hashchange", function () {
       var el = targetFromHash();
       if (el && expandFor(el, true)) reveal(el, true);
     });
     // Following a link whose hash is already current fires no hashchange.
-    document.addEventListener('click', function (ev) {
+    document.addEventListener("click", function (ev) {
       if (ev.defaultPrevented) return;
       var a = ev.target.closest && ev.target.closest('a[href^="#"]');
-      if (!a || a.getAttribute('href').length < 2) return;
-      var id = a.getAttribute('href').slice(1);
-      try { id = decodeURIComponent(id); } catch (e) { /* use as is */ }
+      if (!a || a.getAttribute("href").length < 2) return;
+      var id = a.getAttribute("href").slice(1);
+      try {
+        id = decodeURIComponent(id);
+      } catch {
+        /* use as is */
+      }
       var el = document.getElementById(id);
       if (!el || !expandFor(el, true)) return;
       ev.preventDefault();
       reveal(el, true);
-      history.replaceState(null, '', '#' + el.id);
+      history.replaceState(null, "", "#" + el.id);
     });
   }
 
   window.tesseraeCollapsible = { init: init, expandFor: expandFor, setCollapsed: setCollapsed };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
 })();

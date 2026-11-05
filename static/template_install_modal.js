@@ -59,7 +59,8 @@
     });
 
     function close() {
-      if (window.TesseraeMorph) window.TesseraeMorph.remove(overlay, overlay.querySelector(".tpl-modal"));
+      if (window.TesseraeMorph)
+        window.TesseraeMorph.remove(overlay, overlay.querySelector(".tpl-modal"));
       else overlay.remove();
       document.removeEventListener("keydown", onKey, true);
     }

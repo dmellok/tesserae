@@ -19,16 +19,16 @@ const HA_ENTITIES_URL = `${PREFIX}/api/conditions/ha-entities`;
 const TEST_URL = `${PREFIX}/api/conditions/test`;
 
 const SOURCE_KINDS = [
-  { value: "ha_entity",   label: "HA entity" },
+  { value: "ha_entity", label: "HA entity" },
   { value: "time_window", label: "Time window" },
-  { value: "sun",         label: "Sun" },
+  { value: "sun", label: "Sun" },
 ];
 
 const HA_OPS = [
   { value: "==", label: "is" },
   { value: "!=", label: "is not" },
-  { value: ">",  label: "greater than" },
-  { value: "<",  label: "less than" },
+  { value: ">", label: "greater than" },
+  { value: "<", label: "less than" },
   { value: ">=", label: "at least" },
   { value: "<=", label: "at most" },
   { value: "in", label: "is one of" },
@@ -37,9 +37,9 @@ const HA_OPS = [
 
 const SUN_OPS = [
   { value: "before_sunrise", label: "before sunrise" },
-  { value: "after_sunset",   label: "after sunset" },
-  { value: "is_day",         label: "during the day" },
-  { value: "is_night",       label: "during the night" },
+  { value: "after_sunset", label: "after sunset" },
+  { value: "is_day", label: "during the day" },
+  { value: "is_night", label: "during the night" },
 ];
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -119,11 +119,15 @@ function highlightJson(src) {
   // boundaries. (The previous version matched ``&quot;`` against the
   // escaped output, but the escape map didn't include " so the regex
   // hit nothing and the overlay rendered as plain colourless text.)
-  let html = String(src ?? "").replace(/[&<>]/g, (c) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-  }[c]));
+  let html = String(src ?? "").replace(
+    /[&<>]/g,
+    (c) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+      })[c]
+  );
   html = html.replace(
     /("(?:\\.|[^"\\])*"\s*:)|("(?:\\.|[^"\\])*")|\b(true|false|null)\b|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g,
     (match, key, str, kw, num) => {
@@ -136,7 +140,7 @@ function highlightJson(src) {
       if (kw) return `<span class="dx-code-kw">${match}</span>`;
       if (num) return `<span class="dx-code-num">${match}</span>`;
       return match;
-    },
+    }
   );
   return html + "\n"; // trailing newline so the overlay matches the textarea's scroll height
 }
@@ -161,7 +165,7 @@ function init(picker) {
   const errBanner = el(
     "p",
     { class: "field-help cp-error", hidden: true },
-    "Raw JSON below is invalid. Fix it to re-enable the row editor.",
+    "Raw JSON below is invalid. Fix it to re-enable the row editor."
   );
 
   const addBtn = el(
@@ -170,12 +174,11 @@ function init(picker) {
       type: "button",
       class: "ghost",
       on: {
-        click: () =>
-          editRows((rows) => [...rows, defaultCondition("ha_entity")]),
+        click: () => editRows((rows) => [...rows, defaultCondition("ha_entity")]),
       },
     },
     el("i", { class: "ph ph-plus", "aria-hidden": "true" }),
-    el("span", {}, " Add condition"),
+    el("span", {}, " Add condition")
   );
   const testBtn = el(
     "button",
@@ -185,7 +188,7 @@ function init(picker) {
       on: { click: () => runTest() },
     },
     el("i", { class: "ph ph-check", "aria-hidden": "true" }),
-    el("span", {}, " Test conditions"),
+    el("span", {}, " Test conditions")
   );
 
   const actions = el("div", { class: "cp-actions" }, addBtn, testBtn, status);
@@ -195,17 +198,12 @@ function init(picker) {
   // natively. Scroll position syncs on input so the highlight tracks
   // the cursor for long edits.
   const highlightLayer = el("pre", { class: "cp-jh", "aria-hidden": "true" });
-  const jsonEditor = el(
-    "div",
-    { class: "cp-json-editor" },
-    highlightLayer,
-    textarea,
-  );
+  const jsonEditor = el("div", { class: "cp-json-editor" }, highlightLayer, textarea);
   const advancedDetails = el(
     "details",
     { class: "cp-advanced" },
     el("summary", {}, "Edit raw JSON"),
-    jsonEditor,
+    jsonEditor
   );
 
   function refreshHighlight() {
@@ -289,9 +287,7 @@ function init(picker) {
       const passed = data.results.filter((r) => r.passed).length;
       const total = data.results.length;
       status.dataset.tone = data.all_passed ? "ok" : "warn";
-      status.textContent = data.all_passed
-        ? `All ${total} pass.`
-        : `${passed} of ${total} pass.`;
+      status.textContent = data.all_passed ? `All ${total} pass.` : `${passed} of ${total} pass.`;
       data.results.forEach((r, idx) => {
         const row = rowsHost.querySelector(`[data-row-idx="${idx}"]`);
         if (!row) return;
@@ -319,8 +315,8 @@ function init(picker) {
         el(
           "p",
           { class: "field-help" },
-          "No conditions yet — the schedule fires every time it's due.",
-        ),
+          "No conditions yet — the schedule fires every time it's due."
+        )
       );
       return;
     }
@@ -334,9 +330,7 @@ function init(picker) {
         on: {
           change: (e) => {
             const fresh = defaultCondition(e.target.value);
-            editRows((rows) =>
-              rows.map((r, i) => (i === idx ? fresh : r)),
-            );
+            editRows((rows) => rows.map((r, i) => (i === idx ? fresh : r)));
           },
         },
       },
@@ -344,9 +338,9 @@ function init(picker) {
         el(
           "option",
           { value: k.value, ...(k.value === cond.source_kind ? { selected: true } : {}) },
-          k.label,
-        ),
-      ),
+          k.label
+        )
+      )
     );
     const removeBtn = el(
       "button",
@@ -355,11 +349,10 @@ function init(picker) {
         class: "ghost",
         "aria-label": "Remove condition",
         on: {
-          click: () =>
-            editRows((rows) => rows.filter((_, i) => i !== idx)),
+          click: () => editRows((rows) => rows.filter((_, i) => i !== idx)),
         },
       },
-      el("i", { class: "ph ph-x", "aria-hidden": "true" }),
+      el("i", { class: "ph ph-x", "aria-hidden": "true" })
     );
     const body = el("div", { class: "cp-row-body" });
     const row = el(
@@ -367,7 +360,7 @@ function init(picker) {
       { class: "cp-row", "data-row-idx": String(idx) },
       kindSelect,
       body,
-      removeBtn,
+      removeBtn
     );
     if (cond.source_kind === "ha_entity") renderHaBody(body, cond, idx);
     else if (cond.source_kind === "time_window") renderTimeBody(body, cond, idx);
@@ -384,9 +377,7 @@ function init(picker) {
       on: {
         change: (e) =>
           editRows((rows) =>
-            rows.map((r, i) =>
-              i === idx ? { ...r, source_id: e.target.value.trim() } : r,
-            ),
+            rows.map((r, i) => (i === idx ? { ...r, source_id: e.target.value.trim() } : r))
           ),
       },
     });
@@ -409,7 +400,7 @@ function init(picker) {
                   next.value = next.value.join(",");
                 }
                 return next;
-              }),
+              })
             ),
         },
       },
@@ -417,13 +408,11 @@ function init(picker) {
         el(
           "option",
           { value: op.value, ...(op.value === cond.operator ? { selected: true } : {}) },
-          op.label,
-        ),
-      ),
+          op.label
+        )
+      )
     );
-    const numericOp = [">", "<", ">=", "<=", "present_within_seconds"].includes(
-      cond.operator,
-    );
+    const numericOp = [">", "<", ">=", "<=", "present_within_seconds"].includes(cond.operator);
     const valueInput = el("input", {
       type: numericOp ? "number" : "text",
       placeholder: cond.operator === "in" ? "on, home, ..." : "on",
@@ -439,14 +428,12 @@ function init(picker) {
                   .split(",")
                   .map((s) => s.trim())
                   .filter(Boolean);
-              } else if (
-                [">", "<", ">=", "<=", "present_within_seconds"].includes(r.operator)
-              ) {
+              } else if ([">", "<", ">=", "<=", "present_within_seconds"].includes(r.operator)) {
                 value = Number(e.target.value);
                 if (!Number.isFinite(value)) value = 0;
               }
               return { ...r, value };
-            }),
+            })
           ),
       },
     });
@@ -459,9 +446,7 @@ function init(picker) {
     const v = cond.value || {};
     const updateField = (field, value) =>
       editRows((rows) =>
-        rows.map((r, i) =>
-          i === idx ? { ...r, value: { ...r.value, [field]: value } } : r,
-        ),
+        rows.map((r, i) => (i === idx ? { ...r, value: { ...r.value, [field]: value } } : r))
       );
     const startInput = el("input", {
       type: "time",
@@ -490,13 +475,13 @@ function init(picker) {
                   if (days.has(dayIdx)) days.delete(dayIdx);
                   else days.add(dayIdx);
                   return { ...r, value: { ...r.value, days_of_week: [...days].sort() } };
-                }),
+                })
               );
             },
           },
         });
         return el("label", { class: "dow-chip" }, checkbox, el("span", {}, label));
-      }),
+      })
     );
     body.appendChild(el("span", { class: "cp-label" }, "between"));
     body.appendChild(startInput);
@@ -513,7 +498,7 @@ function init(picker) {
         on: {
           change: (e) =>
             editRows((rows) =>
-              rows.map((r, i) => (i === idx ? { ...r, operator: e.target.value } : r)),
+              rows.map((r, i) => (i === idx ? { ...r, operator: e.target.value } : r))
             ),
         },
       },
@@ -521,9 +506,9 @@ function init(picker) {
         el(
           "option",
           { value: op.value, ...(op.value === cond.operator ? { selected: true } : {}) },
-          op.label,
-        ),
-      ),
+          op.label
+        )
+      )
     );
     const offsetInput = el("input", {
       type: "number",
@@ -536,9 +521,7 @@ function init(picker) {
           let n = Number(e.target.value);
           if (!Number.isFinite(n)) n = 0;
           editRows((rows) =>
-            rows.map((r, i) =>
-              i === idx ? { ...r, value: { ...r.value, offset_minutes: n } } : r,
-            ),
+            rows.map((r, i) => (i === idx ? { ...r, value: { ...r.value, offset_minutes: n } } : r))
           );
         },
       },
@@ -553,9 +536,7 @@ function init(picker) {
 }
 
 function bootstrap() {
-  document
-    .querySelectorAll("[data-condition-picker]")
-    .forEach((picker) => init(picker));
+  document.querySelectorAll("[data-condition-picker]").forEach((picker) => init(picker));
 }
 
 if (document.readyState === "loading") {

@@ -30,9 +30,7 @@
     const el = document.activeElement;
     if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return true;
     return Array.prototype.some.call(
-      document.querySelectorAll(
-        "input[type=text], input[type=number], input:not([type])"
-      ),
+      document.querySelectorAll("input[type=text], input[type=number], input:not([type])"),
       (i) => i.value
     );
   }
@@ -45,7 +43,7 @@
       if (sig !== seen && !userIsTyping()) {
         location.reload();
       }
-    } catch (e) {
+    } catch {
       /* broker/transport hiccup, try again next tick */
     }
   }

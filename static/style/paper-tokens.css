@@ -8,80 +8,115 @@
 
 /* ----- Fonts (bundled with fonts_core, OFL) -------------------------- */
 
-@font-face { font-family: "Tesserae UI Archivo"; font-style: normal; font-weight: 400; font-display: optional;
-  src: url("../../plugins/fonts_core/static/archivo/400.woff2") format("woff2"); }
-@font-face { font-family: "Tesserae UI Archivo"; font-style: normal; font-weight: 500; font-display: optional;
-  src: url("../../plugins/fonts_core/static/archivo/400.woff2") format("woff2"); }
-@font-face { font-family: "Tesserae UI Archivo"; font-style: normal; font-weight: 600; font-display: optional;
-  src: url("../../plugins/fonts_core/static/archivo/700.woff2") format("woff2"); }
-@font-face { font-family: "Tesserae UI Archivo"; font-style: normal; font-weight: 700; font-display: optional;
-  src: url("../../plugins/fonts_core/static/archivo/700.woff2") format("woff2"); }
-@font-face { font-family: "Tesserae UI Archivo"; font-style: normal; font-weight: 800; font-display: optional;
-  src: url("../../plugins/fonts_core/static/archivo/800.woff2") format("woff2"); }
-@font-face { font-family: "Tesserae UI Martian Mono"; font-style: normal; font-weight: 400; font-display: optional;
-  src: url("../../plugins/fonts_core/static/martian_mono/400.woff2") format("woff2"); }
-@font-face { font-family: "Tesserae UI Martian Mono"; font-style: normal; font-weight: 700; font-display: optional;
-  src: url("../../plugins/fonts_core/static/martian_mono/700.woff2") format("woff2"); }
+@font-face {
+  font-family: "Tesserae UI Archivo";
+  font-style: normal;
+  font-weight: 400;
+  font-display: optional;
+  src: url("../../plugins/fonts_core/static/archivo/400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Tesserae UI Archivo";
+  font-style: normal;
+  font-weight: 500;
+  font-display: optional;
+  src: url("../../plugins/fonts_core/static/archivo/400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Tesserae UI Archivo";
+  font-style: normal;
+  font-weight: 600;
+  font-display: optional;
+  src: url("../../plugins/fonts_core/static/archivo/700.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Tesserae UI Archivo";
+  font-style: normal;
+  font-weight: 700;
+  font-display: optional;
+  src: url("../../plugins/fonts_core/static/archivo/700.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Tesserae UI Archivo";
+  font-style: normal;
+  font-weight: 800;
+  font-display: optional;
+  src: url("../../plugins/fonts_core/static/archivo/800.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Tesserae UI Martian Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: optional;
+  src: url("../../plugins/fonts_core/static/martian_mono/400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Tesserae UI Martian Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: optional;
+  src: url("../../plugins/fonts_core/static/martian_mono/700.woff2") format("woff2");
+}
 
 /* ----- Tokens -------------------------------------------------------- */
 
 :root[data-ui="paper"] {
   --p-sidebar-w: 248px;
-  --p-hover: #F7F3EA;
-  --p-selected: #E6E0D2;
-  --p-sheet-edge: #E2DCCF;
-  --p-sidebar: #FFFDF8;
-  --p-subnav: #F6F3EC;
-  --p-red: #B8352A;
-  --p-focus: #2B4E9B;
+  --p-hover: #f7f3ea;
+  --p-selected: #e6e0d2;
+  --p-sheet-edge: #e2dccf;
+  --p-sidebar: #fffdf8;
+  --p-subnav: #f6f3ec;
+  --p-red: #b8352a;
+  --p-focus: #2b4e9b;
   /* The server mark's --p-logo-* tokens live in base.css: they never flip. */
-  --p-ease: cubic-bezier(.2, .7, .2, 1);
+  --p-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 
-  --t-accent: #B8352A;
-  --t-accent-hover: #9E2C22;
-  --t-accent-soft: #F3DCD6;
-  --t-accent-fg: #FFFDF8;
-  --t-accent-ink: #7E231B;
-  --t-accent-tint: #F3DCD6;
+  --t-accent: #b8352a;
+  --t-accent-hover: #9e2c22;
+  --t-accent-soft: #f3dcd6;
+  --t-accent-fg: #fffdf8;
+  --t-accent-ink: #7e231b;
+  --t-accent-tint: #f3dcd6;
 
-  --t-bg: #EEEAE1;
-  --t-surface: #FFFDF8;
-  --t-surface-soft: #FAF7F0;
-  --t-surface-sunk: #F1ECE1;
-  --t-surface-raised: #FFFDF8;
-  --t-fg: #1C1B19;
-  --t-fg-soft: #55524B;
-  --t-muted: #7A766C;
-  --t-border: #E0DACD;
-  --t-border-strong: #CFC8B8;
-  --t-inset: #FAF7F0;
-  --t-inset-border: #E0DACD;
+  --t-bg: #eeeae1;
+  --t-surface: #fffdf8;
+  --t-surface-soft: #faf7f0;
+  --t-surface-sunk: #f1ece1;
+  --t-surface-raised: #fffdf8;
+  --t-fg: #1c1b19;
+  --t-fg-soft: #55524b;
+  --t-muted: #7a766c;
+  --t-border: #e0dacd;
+  --t-border-strong: #cfc8b8;
+  --t-inset: #faf7f0;
+  --t-inset-border: #e0dacd;
 
-  --t-chart-1: #2B4E9B;
-  --t-chart-2: #B8352A;
-  --t-chart-3: #C9971C;
-  --t-chart-other: #8F8A7E;
+  --t-chart-1: #2b4e9b;
+  --t-chart-2: #b8352a;
+  --t-chart-3: #c9971c;
+  --t-chart-other: #8f8a7e;
 
-  --t-danger: #B8352A;
-  --t-danger-bg: #F3DCD6;
-  --t-warn: #9A6F0C;
-  --t-warn-bg: #F2E7CC;
-  --t-ok: #3D7A3A;
-  --t-ok-bg: #E3EBDD;
-  --t-pill-ok-bg: #E3EBDD;
-  --t-pill-ok-fg: #3D7A3A;
-  --t-pill-ok-border: #E3EBDD;
-  --t-pill-warn-bg: #F2E7CC;
-  --t-pill-warn-fg: #7A570A;
-  --t-pill-warn-border: #F2E7CC;
-  --t-pill-danger-bg: #F3DCD6;
-  --t-pill-danger-fg: #9E2C22;
-  --t-pill-danger-border: #F3DCD6;
-  --t-pill-neutral-bg: #F1ECE1;
-  --t-pill-neutral-fg: #55524B;
-  --t-code-bg: #F1ECE1;
-  --t-code-border: #E0DACD;
-  --t-code-key: #2B4E9B;
+  --t-danger: #b8352a;
+  --t-danger-bg: #f3dcd6;
+  --t-warn: #9a6f0c;
+  --t-warn-bg: #f2e7cc;
+  --t-ok: #3d7a3a;
+  --t-ok-bg: #e3ebdd;
+  --t-pill-ok-bg: #e3ebdd;
+  --t-pill-ok-fg: #3d7a3a;
+  --t-pill-ok-border: #e3ebdd;
+  --t-pill-warn-bg: #f2e7cc;
+  --t-pill-warn-fg: #7a570a;
+  --t-pill-warn-border: #f2e7cc;
+  --t-pill-danger-bg: #f3dcd6;
+  --t-pill-danger-fg: #9e2c22;
+  --t-pill-danger-border: #f3dcd6;
+  --t-pill-neutral-bg: #f1ece1;
+  --t-pill-neutral-fg: #55524b;
+  --t-code-bg: #f1ece1;
+  --t-code-border: #e0dacd;
+  --t-code-key: #2b4e9b;
 
   --t-font: "Tesserae UI Archivo", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --t-font-mono: "Tesserae UI Martian Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -106,54 +141,54 @@
 
 :root[data-ui="paper"][data-theme="dark"] {
   --p-hover: #262421;
-  --p-selected: #2F2D29;
-  --p-sheet-edge: #35332E;
-  --p-sidebar: #1E1D1B;
-  --p-subnav: #1B1A18;
-  --p-red: #E06A5C;
-  --p-focus: #7C9BE0;
+  --p-selected: #2f2d29;
+  --p-sheet-edge: #35332e;
+  --p-sidebar: #1e1d1b;
+  --p-subnav: #1b1a18;
+  --p-red: #e06a5c;
+  --p-focus: #7c9be0;
 
-  --t-accent: #D0493C;
-  --t-accent-hover: #E05A4C;
-  --t-accent-soft: #3B211D;
-  --t-accent-fg: #FFFFFF;
-  --t-accent-ink: #F0A497;
-  --t-accent-tint: #3B211D;
+  --t-accent: #d0493c;
+  --t-accent-hover: #e05a4c;
+  --t-accent-soft: #3b211d;
+  --t-accent-fg: #ffffff;
+  --t-accent-ink: #f0a497;
+  --t-accent-tint: #3b211d;
 
   --t-bg: #151412;
-  --t-surface: #22211E;
+  --t-surface: #22211e;
   --t-surface-soft: #262421;
-  --t-surface-sunk: #1E1D1B;
-  --t-surface-raised: #22211E;
-  --t-fg: #EDE9DF;
-  --t-fg-soft: #A8A397;
-  --t-muted: #8A857A;
-  --t-border: #35332E;
-  --t-border-strong: #45423C;
-  --t-inset: #1E1D1B;
-  --t-inset-border: #35332E;
+  --t-surface-sunk: #1e1d1b;
+  --t-surface-raised: #22211e;
+  --t-fg: #ede9df;
+  --t-fg-soft: #a8a397;
+  --t-muted: #8a857a;
+  --t-border: #35332e;
+  --t-border-strong: #45423c;
+  --t-inset: #1e1d1b;
+  --t-inset-border: #35332e;
 
-  --t-chart-1: #7C9BE0;
-  --t-chart-2: #E06A5C;
-  --t-chart-3: #D9B45A;
+  --t-chart-1: #7c9be0;
+  --t-chart-2: #e06a5c;
+  --t-chart-3: #d9b45a;
 
-  --t-danger: #E58474;
-  --t-danger-bg: #3B211D;
-  --t-warn: #D9B45A;
-  --t-warn-bg: #3A311B;
-  --t-ok: #8DBF7F;
-  --t-ok-bg: #24301F;
-  --t-pill-ok-bg: #24301F;
-  --t-pill-ok-fg: #8DBF7F;
-  --t-pill-ok-border: #24301F;
-  --t-pill-warn-bg: #3A311B;
-  --t-pill-warn-fg: #D9B45A;
-  --t-pill-warn-border: #3A311B;
-  --t-pill-danger-bg: #3B211D;
-  --t-pill-danger-fg: #E58474;
-  --t-pill-danger-border: #3B211D;
-  --t-pill-neutral-bg: #2D2B27;
-  --t-pill-neutral-fg: #A8A397;
-  --t-code-bg: #1E1D1B;
-  --t-code-border: #35332E;
+  --t-danger: #e58474;
+  --t-danger-bg: #3b211d;
+  --t-warn: #d9b45a;
+  --t-warn-bg: #3a311b;
+  --t-ok: #8dbf7f;
+  --t-ok-bg: #24301f;
+  --t-pill-ok-bg: #24301f;
+  --t-pill-ok-fg: #8dbf7f;
+  --t-pill-ok-border: #24301f;
+  --t-pill-warn-bg: #3a311b;
+  --t-pill-warn-fg: #d9b45a;
+  --t-pill-warn-border: #3a311b;
+  --t-pill-danger-bg: #3b211d;
+  --t-pill-danger-fg: #e58474;
+  --t-pill-danger-border: #3b211d;
+  --t-pill-neutral-bg: #2d2b27;
+  --t-pill-neutral-fg: #a8a397;
+  --t-code-bg: #1e1d1b;
+  --t-code-border: #35332e;
 }

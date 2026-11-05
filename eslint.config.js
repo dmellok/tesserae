@@ -1,9 +1,7 @@
 // Flat ESLint config for the hand-rolled static/ frontend.
 //
-// The bar is intentionally low for now: this runs as an advisory CI job
-// (continue-on-error) so findings surface without blocking main while the
-// legacy files are cleaned up. Ratchet rules up and drop the advisory flag
-// once the existing warnings are worked down.
+// The bar is js.configs.recommended. static/ is clean of it, and CI's
+// frontend-lint job fails on any new error.
 import js from "@eslint/js";
 import globals from "globals";
 
@@ -27,12 +25,24 @@ export default [
       sourceType: "script",
       globals: {
         ...globals.browser,
+        // Set on window by a classic <script> the page loads first: the
+        // vendored Chart.js and CodeMirror, and our own shared modules.
+        Chart: "readonly",
+        CodeMirror: "readonly",
+        TouchInteraction: "readonly",
+        PanelsDecorate: "readonly",
+        PanelsAgentRail: "readonly",
       },
     },
   },
   {
     // Frontend modules that use import/export.
-    files: ["static/spectra-chart.js", "static/pages/json-highlight.js", "static/widget-i18n.js"],
+    files: [
+      "static/composer.js",
+      "static/spectra-chart.js",
+      "static/pages/json-highlight.js",
+      "static/widget-i18n.js",
+    ],
     languageOptions: {
       sourceType: "module",
     },

@@ -16,48 +16,51 @@
 const TOKEN_RE = new RegExp(
   [
     '("(?:\\\\.|[^"\\\\])*")(\\s*:)?', // string (possibly followed by colon -> key)
-    '\\b(true|false|null)\\b',          // keyword
-    '(-?\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)', // number
-    '([{}\\[\\],])',                    // punctuation
-  ].join('|'),
-  'g',
+    "\\b(true|false|null)\\b", // keyword
+    "(-?\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)", // number
+    "([{}\\[\\],])", // punctuation
+  ].join("|"),
+  "g"
 );
 
 function escape(text) {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 export function highlightJson(raw) {
-  if (raw == null) return '';
-  return escape(String(raw)).replace(
-    TOKEN_RE,
-    function (match, str, colon, kw, num, punct) {
-      if (str) {
-        // If followed by a colon this is a key, else a value string.
-        if (colon) return '<span class="dx-code-key">' + str + '</span><span class="dx-code-punct">' + colon + '</span>';
-        return '<span class="dx-code-str">' + str + '</span>';
-      }
-      if (kw) return '<span class="dx-code-kw">' + kw + '</span>';
-      if (num) return '<span class="dx-code-num">' + num + '</span>';
-      if (punct) return '<span class="dx-code-punct">' + punct + '</span>';
-      return match;
-    },
-  );
+  if (raw == null) return "";
+  return escape(String(raw)).replace(TOKEN_RE, function (match, str, colon, kw, num, punct) {
+    if (str) {
+      // If followed by a colon this is a key, else a value string.
+      if (colon)
+        return (
+          '<span class="dx-code-key">' +
+          str +
+          '</span><span class="dx-code-punct">' +
+          colon +
+          "</span>"
+        );
+      return '<span class="dx-code-str">' + str + "</span>";
+    }
+    if (kw) return '<span class="dx-code-kw">' + kw + "</span>";
+    if (num) return '<span class="dx-code-num">' + num + "</span>";
+    if (punct) return '<span class="dx-code-punct">' + punct + "</span>";
+    return match;
+  });
 }
 
 export function highlightAll(root) {
   const scope = root || document;
-  scope.querySelectorAll('pre.dx-code[data-json]').forEach(function (el) {
-    el.innerHTML = highlightJson(el.textContent || '');
+  scope.querySelectorAll("pre.dx-code[data-json]").forEach(function (el) {
+    el.innerHTML = highlightJson(el.textContent || "");
   });
 }
 
-if (typeof document !== 'undefined') {
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () { highlightAll(); });
+if (typeof document !== "undefined") {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function () {
+      highlightAll();
+    });
   } else {
     highlightAll();
   }

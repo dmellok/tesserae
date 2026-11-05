@@ -34,9 +34,20 @@
   // a panel: what it just did, and what it is doing now.
   var TAPE = 3;
   var THINKING = [
-    "Thinking", "Pondering", "Mulling it over", "Working it out", "Deliberating",
-    "Musing", "Considering", "Weighing it up", "Ruminating", "Puzzling it out",
-    "Percolating", "Chewing on it", "Turning it over", "Composing",
+    "Thinking",
+    "Pondering",
+    "Mulling it over",
+    "Working it out",
+    "Deliberating",
+    "Musing",
+    "Considering",
+    "Weighing it up",
+    "Ruminating",
+    "Puzzling it out",
+    "Percolating",
+    "Chewing on it",
+    "Turning it over",
+    "Composing",
   ];
 
   var seq = 0;
@@ -44,7 +55,7 @@
   var pageId = null;
   var pageName = "";
   var steps = 0;
-  var tape = [];        // the last few steps, newest last
+  var tape = []; // the last few steps, newest last
   var startedAt = 0;
   var lastStepAt = 0;
   var word = "";
@@ -54,33 +65,49 @@
   var countdown = 0;
   var navigated = false;
   var userTyped = false;
-  var primed = false;   // the first poll seeds state without acting on it
+  var primed = false; // the first poll seeds state without acting on it
 
   // Any typing on the current page vetoes auto-navigation for the rest of the
   // session: whatever the operator is filling in outranks the agent.
   ["input", "change"].forEach(function (evt) {
-    document.addEventListener(evt, function (e) {
-      var t = e.target;
-      if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) userTyped = true;
-    }, true);
+    document.addEventListener(
+      evt,
+      function (e) {
+        var t = e.target;
+        if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) userTyped = true;
+      },
+      true
+    );
   });
 
   function following() {
-    try { return localStorage.getItem(FOLLOW_KEY) !== "off"; } catch { return true; }
+    try {
+      return localStorage.getItem(FOLLOW_KEY) !== "off";
+    } catch {
+      return true;
+    }
   }
   function setFollowing(on) {
-    try { localStorage.setItem(FOLLOW_KEY, on ? "on" : "off"); } catch { /* private mode */ }
+    try {
+      localStorage.setItem(FOLLOW_KEY, on ? "on" : "off");
+    } catch {
+      /* private mode */
+    }
   }
   function onEditorFor(id) {
     return EDITOR_URL && window.location.pathname === EDITOR_URL.replace("__ID__", id);
   }
-  function editorHref(id) { return EDITOR_URL.replace("__ID__", id); }
+  function editorHref(id) {
+    return EDITOR_URL.replace("__ID__", id);
+  }
 
   // ---- toast ----------------------------------------------------------
   function show() {
     root.hidden = false;
     // Force a frame so the entry transition runs on first raise.
-    requestAnimationFrame(function () { root.classList.add("is-up"); });
+    requestAnimationFrame(function () {
+      root.classList.add("is-up");
+    });
     clearInterval(stateTimer);
     stateTimer = setInterval(tick, 1000);
   }
@@ -89,7 +116,9 @@
     countdown = 0;
     clearInterval(stateTimer);
     stateTimer = null;
-    setTimeout(function () { if (!root.classList.contains("is-up")) root.hidden = true; }, 220);
+    setTimeout(function () {
+      if (!root.classList.contains("is-up")) root.hidden = true;
+    }, 220);
   }
 
   // One second of wall time. The toast decides its own state from how long the
@@ -98,10 +127,17 @@
   // thinking, the build being over) are both just elapsed time.
   function tick() {
     var quiet = Date.now() - lastStepAt;
-    if (quiet >= HIDE_MS) { cancelCountdown(); hide(); return; }
+    if (quiet >= HIDE_MS) {
+      cancelCountdown();
+      hide();
+      return;
+    }
     if (countdown > 0) {
       countdown -= 1;
-      if (countdown <= 0) { go(); return; }
+      if (countdown <= 0) {
+        go();
+        return;
+      }
     }
     render();
   }
@@ -116,7 +152,9 @@
     return word;
   }
 
-  function fmtSecs(ms) { return (ms / 1000).toFixed(1) + "s"; }
+  function fmtSecs(ms) {
+    return (ms / 1000).toFixed(1) + "s";
+  }
 
   // What the agent touched, as the line's object.
   function objectOf(step) {
@@ -146,11 +184,20 @@
 
   function lineHtml(entry, live) {
     var text = (live ? entry.verb : entry.label) + (entry.n > 1 ? " ×" + entry.n : "");
-    return '<div class="af-l' + (entry.err ? " is-err" : "") + (live ? " is-now" : "") + '">' +
-      '<span class="af-m">' + (entry.err ? "✗" : live ? "›" : "✓") + "</span>" +
-      '<span class="af-lt">' + text + "</span>" +
+    return (
+      '<div class="af-l' +
+      (entry.err ? " is-err" : "") +
+      (live ? " is-now" : "") +
+      '">' +
+      '<span class="af-m">' +
+      (entry.err ? "✗" : live ? "›" : "✓") +
+      "</span>" +
+      '<span class="af-lt">' +
+      text +
+      "</span>" +
       (entry.obj ? '<span class="af-lo">' + entry.obj + "</span>" : "") +
-      "</div>";
+      "</div>"
+    );
   }
 
   function render() {
@@ -167,46 +214,73 @@
     if (thinking) {
       lines +=
         '<div class="af-l is-think"><span class="af-m">…</span>' +
-        '<span class="af-lt">' + esc(thinkingWord()) + "</span>" +
-        '<span class="af-lo">no calls for ' + fmtSecs(quiet) + "</span></div>";
+        '<span class="af-lt">' +
+        esc(thinkingWord()) +
+        "</span>" +
+        '<span class="af-lo">no calls for ' +
+        fmtSecs(quiet) +
+        "</span></div>";
     }
-    if (!lines) lines = '<div class="af-l is-now"><span class="af-m">›</span>' +
-      '<span class="af-lt">Starting up</span></div>';
+    if (!lines)
+      lines =
+        '<div class="af-l is-now"><span class="af-m">›</span>' +
+        '<span class="af-lt">Starting up</span></div>';
 
     root.innerHTML =
       '<div class="af-card">' +
-        '<div class="af-head">' +
-          '<span class="af-pulse' + (thinking ? " is-slow" : "") + '" aria-hidden="true"></span>' +
-          // Named after the dashboard as soon as one is known. Until then the
-          // agent may not be building anything yet (it reads before it writes),
-          // so the header doesn't claim it is.
-          '<span class="af-name">' + esc(pageName || "Agent at work") + "</span>" +
-          '<span class="af-count">' + steps + " step" + (steps === 1 ? "" : "s") +
-            (startedAt ? " · " + fmtSecs(Date.now() - startedAt) : "") + "</span>" +
-          '<button type="button" class="af-x" data-dismiss aria-label="Dismiss">&times;</button>' +
-        "</div>" +
-        '<div class="af-tape">' + lines + "</div>" +
-        '<div class="af-acts">' +
-          (countdown > 0
-            ? '<button type="button" class="af-btn" data-stay>Stay here</button>'
-            : '<button type="button" class="af-btn" data-dismiss>Dismiss</button>') +
-          (canOpen
-            ? '<button type="button" class="af-btn accent" data-open>' +
-                (countdown > 0 ? "Opening in " + countdown + "…" : "Open editor") +
-              "</button>"
-            : "") +
-          '<label class="af-follow"><input type="checkbox" ' + (following() ? "checked" : "") +
-            " data-follow> follow</label>" +
-        "</div>" +
+      '<div class="af-head">' +
+      '<span class="af-pulse' +
+      (thinking ? " is-slow" : "") +
+      '" aria-hidden="true"></span>' +
+      // Named after the dashboard as soon as one is known. Until then the
+      // agent may not be building anything yet (it reads before it writes),
+      // so the header doesn't claim it is.
+      '<span class="af-name">' +
+      esc(pageName || "Agent at work") +
+      "</span>" +
+      '<span class="af-count">' +
+      steps +
+      " step" +
+      (steps === 1 ? "" : "s") +
+      (startedAt ? " · " + fmtSecs(Date.now() - startedAt) : "") +
+      "</span>" +
+      '<button type="button" class="af-x" data-dismiss aria-label="Dismiss">&times;</button>' +
+      "</div>" +
+      '<div class="af-tape">' +
+      lines +
+      "</div>" +
+      '<div class="af-acts">' +
+      (countdown > 0
+        ? '<button type="button" class="af-btn" data-stay>Stay here</button>'
+        : '<button type="button" class="af-btn" data-dismiss>Dismiss</button>') +
+      (canOpen
+        ? '<button type="button" class="af-btn accent" data-open>' +
+          (countdown > 0 ? "Opening in " + countdown + "…" : "Open editor") +
+          "</button>"
+        : "") +
+      '<label class="af-follow"><input type="checkbox" ' +
+      (following() ? "checked" : "") +
+      " data-follow> follow</label>" +
+      "</div>" +
       "</div>";
 
     var open = root.querySelector("[data-open]");
-    if (open) open.addEventListener("click", function () { go(); });
+    if (open)
+      open.addEventListener("click", function () {
+        go();
+      });
     root.querySelectorAll("[data-dismiss]").forEach(function (b) {
-      b.addEventListener("click", function () { cancelCountdown(); hide(); });
+      b.addEventListener("click", function () {
+        cancelCountdown();
+        hide();
+      });
     });
     var stay = root.querySelector("[data-stay]");
-    if (stay) stay.addEventListener("click", function () { cancelCountdown(); render(); });
+    if (stay)
+      stay.addEventListener("click", function () {
+        cancelCountdown();
+        render();
+      });
     var f = root.querySelector("[data-follow]");
     if (f) {
       f.addEventListener("change", function () {
@@ -253,7 +327,9 @@
 
   function poll() {
     fetch(ACTIVITY_URL + "?since=" + seq, { headers: { Accept: "application/json" } })
-      .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function (r) {
+        return r.ok ? r.json() : Promise.reject(r.status);
+      })
       .then(function (data) {
         seq = data.seq || seq;
         var fresh = data.steps || [];
@@ -270,7 +346,8 @@
           }
         }
         if (fresh.length) {
-          if (data.run !== run) { // a new burst of agent work
+          if (data.run !== run) {
+            // a new burst of agent work
             run = data.run;
             steps = 0;
             tape = [];
@@ -295,7 +372,10 @@
           // yet, or has just deleted).
           fresh.forEach(function (s) {
             record(s);
-            if (s.page_id) { pageId = s.page_id; pageName = s.page_name || pageName; }
+            if (s.page_id) {
+              pageId = s.page_id;
+              pageName = s.page_name || pageName;
+            }
           });
           show();
           render();

@@ -21,7 +21,9 @@
 }
 /* Under the Settings head + tab strip now, so this is a section
    heading rather than the page title. */
-.themes-head { margin: var(--t-space-5) 0 var(--t-space-4); }
+.themes-head {
+  margin: var(--t-space-5) 0 var(--t-space-4);
+}
 .themes-head-title {
   display: flex;
   align-items: center;
@@ -31,8 +33,13 @@
   font-weight: 700;
   letter-spacing: -0.01em;
 }
-.themes-head-title .ph { color: var(--t-accent); font-size: 20px; }
-.themes-head .lede { margin: 0; }
+.themes-head-title .ph {
+  color: var(--t-accent);
+  font-size: 20px;
+}
+.themes-head .lede {
+  margin: 0;
+}
 .themes-head-actions {
   display: flex;
   gap: var(--t-space-2);
@@ -85,9 +92,13 @@
     border: 0;
     border-radius: 8px;
     cursor: pointer;
-    transition: background 120ms ease, color 120ms ease;
+    transition:
+      background 120ms ease,
+      color 120ms ease;
   }
-  .themes-mobile-tabs button .ph { font-size: 1.1em; }
+  .themes-mobile-tabs button .ph {
+    font-size: 1.1em;
+  }
   .themes-mobile-tabs button:hover {
     color: var(--t-fg);
   }
@@ -99,12 +110,18 @@
 
   /* Each tab gates its sibling grid-area to display: none. The active
      tab's content takes the full viewport row. */
-  .themes-layout[data-mobile-tab="themes"]  .themes-builder,
-  .themes-layout[data-mobile-tab="themes"]  .themes-preview { display: none; }
-  .themes-layout[data-mobile-tab="edit"]    .themes-strip,
-  .themes-layout[data-mobile-tab="edit"]    .themes-preview { display: none; }
+  .themes-layout[data-mobile-tab="themes"] .themes-builder,
+  .themes-layout[data-mobile-tab="themes"] .themes-preview {
+    display: none;
+  }
+  .themes-layout[data-mobile-tab="edit"] .themes-strip,
+  .themes-layout[data-mobile-tab="edit"] .themes-preview {
+    display: none;
+  }
   .themes-layout[data-mobile-tab="preview"] .themes-strip,
-  .themes-layout[data-mobile-tab="preview"] .themes-builder { display: none; }
+  .themes-layout[data-mobile-tab="preview"] .themes-builder {
+    display: none;
+  }
 
   /* Themes tab: drop the strip's padding-right and let it own the full
      viewport width with bigger touch targets. */
@@ -133,8 +150,7 @@
 @media (min-width: 1280px) {
   .themes-layout {
     grid-template-columns: 240px minmax(0, 1fr) 320px;
-    grid-template-areas:
-      "strip builder preview";
+    grid-template-areas: "strip builder preview";
   }
 }
 
@@ -169,7 +185,8 @@
    transparent. Stronger contrast + a track that's never fully see-
    through. */
 .themes-strip {
-  scrollbar-color: var(--t-fg-soft, #8a8f99) color-mix(in srgb, var(--t-fg-soft, #8a8f99) 18%, transparent);
+  scrollbar-color: var(--t-fg-soft, #8a8f99)
+    color-mix(in srgb, var(--t-fg-soft, #8a8f99) 18%, transparent);
 }
 .themes-strip::-webkit-scrollbar {
   width: 12px;
@@ -217,11 +234,14 @@
   gap: var(--t-space-2);
   text-decoration: none;
   font-size: var(--t-size-sm);
-  transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+  transition:
+    transform 0.12s,
+    box-shadow 0.12s,
+    border-color 0.12s;
 }
 .themes-strip-item:hover {
   transform: translateY(-1px);
-  box-shadow: 0 1px 6px rgba(16, 12, 8, 0.10);
+  box-shadow: 0 1px 6px rgba(16, 12, 8, 0.1);
 }
 .themes-strip-item.is-active {
   border-color: var(--t-accent, #0d8c7e);
@@ -237,11 +257,21 @@
   border-radius: 3px;
   border: 1px solid var(--edge);
 }
-.strip-sw--bg   { background: var(--bg); }
-.strip-sw--text { background: var(--text-primary); }
-.strip-sw--a1   { background: var(--accent-1); }
-.strip-sw--a3   { background: var(--accent-3); }
-.strip-sw--a5   { background: var(--accent-5); }
+.strip-sw--bg {
+  background: var(--bg);
+}
+.strip-sw--text {
+  background: var(--text-primary);
+}
+.strip-sw--a1 {
+  background: var(--accent-1);
+}
+.strip-sw--a3 {
+  background: var(--accent-3);
+}
+.strip-sw--a5 {
+  background: var(--accent-5);
+}
 .themes-strip-meta {
   display: inline-flex;
   flex-direction: column;
@@ -329,7 +359,7 @@
   font-size: var(--t-size-lg);
 }
 .themes-builder-head .muted {
-  color: var(--t-muted, #837F73);
+  color: var(--t-muted, #837f73);
   font-weight: 400;
   font-size: var(--t-size-sm);
 }
@@ -384,9 +414,12 @@
 }
 .theme-extract-file input[type="file"] {
   position: absolute;
-  width: 1px; height: 1px;
-  padding: 0; margin: -1px;
-  overflow: hidden; clip: rect(0, 0, 0, 0);
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
   border: 0;
 }
 .theme-extract-file-label {
@@ -399,9 +432,15 @@
   margin: var(--t-space-2) 0 0;
   font-size: var(--t-size-sm);
 }
-.theme-extract-status[data-kind="error"] { color: var(--t-danger, #c0392b); }
-.theme-extract-status[data-kind="ok"]    { color: var(--t-ok, #1f9d55); }
-.theme-extract-status[data-kind="info"]  { color: var(--t-fg-soft, #5b6470); }
+.theme-extract-status[data-kind="error"] {
+  color: var(--t-danger, #c0392b);
+}
+.theme-extract-status[data-kind="ok"] {
+  color: var(--t-ok, #1f9d55);
+}
+.theme-extract-status[data-kind="info"] {
+  color: var(--t-fg-soft, #5b6470);
+}
 
 .theme-builder-fields {
   display: grid;
@@ -580,11 +619,26 @@ input.ts-range:focus-visible::-moz-range-thumb {
   outline: 2px solid var(--t-accent, #2f7a73);
   outline-offset: 2px;
 }
-input.ts-range:active::-webkit-slider-thumb { transform: scale(1.06); cursor: grabbing; }
-input.ts-range:active::-moz-range-thumb { transform: scale(1.06); cursor: grabbing; }
-input.ts-range:disabled { opacity: 0.5; cursor: not-allowed; }
-input.ts-range:disabled::-webkit-slider-thumb { background: var(--t-fg-soft, #9aa0aa); cursor: not-allowed; }
-input.ts-range:disabled::-moz-range-thumb     { background: var(--t-fg-soft, #9aa0aa); cursor: not-allowed; }
+input.ts-range:active::-webkit-slider-thumb {
+  transform: scale(1.06);
+  cursor: grabbing;
+}
+input.ts-range:active::-moz-range-thumb {
+  transform: scale(1.06);
+  cursor: grabbing;
+}
+input.ts-range:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+input.ts-range:disabled::-webkit-slider-thumb {
+  background: var(--t-fg-soft, #9aa0aa);
+  cursor: not-allowed;
+}
+input.ts-range:disabled::-moz-range-thumb {
+  background: var(--t-fg-soft, #9aa0aa);
+  cursor: not-allowed;
+}
 
 /* When auto-soft is on, the soft inputs are read-only, surface that
    visually so the user understands the value is computed. The native
@@ -656,15 +710,33 @@ input.ts-range:disabled::-moz-range-thumb     { background: var(--t-fg-soft, #9a
   border-radius: 4px;
   border: 1px solid var(--edge);
 }
-.theme-swatch--bg        { background: var(--bg); }
-.theme-swatch--surface   { background: var(--surface-sunken); }
-.theme-swatch--text      { background: var(--text-primary); }
-.theme-swatch--accent-1  { background: var(--accent-1); }
-.theme-swatch--accent-2  { background: var(--accent-2); }
-.theme-swatch--accent-3  { background: var(--accent-3); }
-.theme-swatch--accent-4  { background: var(--accent-4); }
-.theme-swatch--accent-5  { background: var(--accent-5); }
-.theme-swatch--accent-6  { background: var(--accent-6); }
+.theme-swatch--bg {
+  background: var(--bg);
+}
+.theme-swatch--surface {
+  background: var(--surface-sunken);
+}
+.theme-swatch--text {
+  background: var(--text-primary);
+}
+.theme-swatch--accent-1 {
+  background: var(--accent-1);
+}
+.theme-swatch--accent-2 {
+  background: var(--accent-2);
+}
+.theme-swatch--accent-3 {
+  background: var(--accent-3);
+}
+.theme-swatch--accent-4 {
+  background: var(--accent-4);
+}
+.theme-swatch--accent-5 {
+  background: var(--accent-5);
+}
+.theme-swatch--accent-6 {
+  background: var(--accent-6);
+}
 
 .theme-preview {
   display: flex;
@@ -695,9 +767,21 @@ input.ts-range:disabled::-moz-range-thumb     { background: var(--t-fg-soft, #9a
   border-radius: 5px;
   color: var(--on-accent);
 }
-.theme-preview-pill--a1 { background: var(--accent-1); }
-.theme-preview-pill--a2 { background: var(--accent-2); }
-.theme-preview-pill--a3 { background: var(--accent-3); }
-.theme-preview-pill--a4 { background: var(--accent-4); }
-.theme-preview-pill--a5 { background: var(--accent-5); }
-.theme-preview-pill--a6 { background: var(--accent-6); }
+.theme-preview-pill--a1 {
+  background: var(--accent-1);
+}
+.theme-preview-pill--a2 {
+  background: var(--accent-2);
+}
+.theme-preview-pill--a3 {
+  background: var(--accent-3);
+}
+.theme-preview-pill--a4 {
+  background: var(--accent-4);
+}
+.theme-preview-pill--a5 {
+  background: var(--accent-5);
+}
+.theme-preview-pill--a6 {
+  background: var(--accent-6);
+}

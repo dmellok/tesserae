@@ -134,4 +134,4 @@ def test_base_template_loads_the_split_paper_tokens(app: Flask) -> None:
     assert body.index("style/paper-tokens.css") < body.index("style/paper.css")
     tokens = (REPO_ROOT / "static" / "style" / "paper-tokens.css").read_text(encoding="utf-8")
     assert ':root[data-ui="paper"] {' in tokens and "--p-selected" in tokens
-    assert '@font-face { font-family: "Tesserae UI Archivo"' in tokens
+    assert '@font-face { font-family: "Tesserae UI Archivo"' in " ".join(tokens.split())

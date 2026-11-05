@@ -5,7 +5,7 @@
    the server-settings section cards. No framework, no build. */
 
 (function () {
-  'use strict';
+  "use strict";
 
   // ---- Dirty tracking + sticky save bar ----------------------------------
   // v0.69.9: reverts the v0.69.6 always-visible-muted variant now
@@ -24,7 +24,7 @@
   // document rather than form-scoped bubbling, since form="..."
   // associations don't bubble events to the form element.
   function initDirtyForm(form) {
-    let bar = form.querySelector('[data-save-bar]');
+    let bar = form.querySelector("[data-save-bar]");
     if (!bar && form.id) {
       bar = document.querySelector('[data-save-bar-for="' + form.id + '"]');
     }
@@ -37,12 +37,12 @@
     function markDirty() {
       if (dirty) return;
       dirty = true;
-      form.setAttribute('data-dirty', '1');
+      form.setAttribute("data-dirty", "1");
       if (bar) bar.hidden = false;
     }
     function clearDirty() {
       dirty = false;
-      form.removeAttribute('data-dirty');
+      form.removeAttribute("data-dirty");
       if (bar) bar.hidden = true;
     }
 
@@ -55,16 +55,22 @@
       if (!sectionField || !target || !target.closest) return;
       // The sub-group (#timing, #rendering, ...) when there is one, so the
       // save lands on the part that was edited, not the top of its section.
-      const sec = target.closest('[data-devsub], [data-collapsible]');
+      const sec = target.closest("[data-devsub], [data-collapsible]");
       if (sec && sec.id) sectionField.value = sec.id;
     }
-    document.addEventListener('input', function (ev) {
-      if (ev.target && ev.target.form === form) { markDirty(); noteSection(ev.target); }
+    document.addEventListener("input", function (ev) {
+      if (ev.target && ev.target.form === form) {
+        markDirty();
+        noteSection(ev.target);
+      }
     });
-    document.addEventListener('change', function (ev) {
-      if (ev.target && ev.target.form === form) { markDirty(); noteSection(ev.target); }
+    document.addEventListener("change", function (ev) {
+      if (ev.target && ev.target.form === form) {
+        markDirty();
+        noteSection(ev.target);
+      }
     });
-    form.addEventListener('reset', function () {
+    form.addEventListener("reset", function () {
       // Reset is synchronous but the inputs aren't updated until after
       // the event fires; wait a tick before clearing dirty so a stale
       // ``input`` event from the reset doesn't re-mark us dirty.
@@ -72,7 +78,7 @@
     });
     // Once Save fires we'll be redirected by the server. Hide
     // optimistically so the bar doesn't linger after the click.
-    form.addEventListener('submit', clearDirty);
+    form.addEventListener("submit", clearDirty);
   }
 
   // ---- Save bar stacking (v0.69.12) ---------------------------------
@@ -85,30 +91,28 @@
   // whenever a bar's ``hidden`` attribute changes.
   const SAVE_BAR_GAP = 8;
   function recomputeSaveBarStack() {
-    const visibleBars = Array.from(
-      document.querySelectorAll('[data-save-bar]:not([hidden])')
-    );
+    const visibleBars = Array.from(document.querySelectorAll("[data-save-bar]:not([hidden])"));
     let cumulative = 0;
     visibleBars.forEach(function (bar) {
-      bar.style.setProperty('--dx-save-bar-offset', cumulative + 'px');
+      bar.style.setProperty("--dx-save-bar-offset", cumulative + "px");
       // Force reflow so offsetHeight reads the current layout.
       cumulative += bar.offsetHeight + SAVE_BAR_GAP;
     });
   }
 
   function initSaveBarStackObserver() {
-    const bars = document.querySelectorAll('[data-save-bar]');
+    const bars = document.querySelectorAll("[data-save-bar]");
     if (!bars.length) return;
     // MutationObserver on hidden attribute is cheap and only fires
     // when initDirtyForm toggles a bar's visibility.
     const obs = new MutationObserver(recomputeSaveBarStack);
     bars.forEach(function (bar) {
-      obs.observe(bar, { attributes: true, attributeFilter: ['hidden'] });
+      obs.observe(bar, { attributes: true, attributeFilter: ["hidden"] });
     });
     // Also recompute on window resize since bar height can change if
     // the layout reflows (viewport width change wrapping the message
     // to two lines).
-    window.addEventListener('resize', recomputeSaveBarStack);
+    window.addEventListener("resize", recomputeSaveBarStack);
     recomputeSaveBarStack();
   }
 
@@ -121,22 +125,22 @@
     // headers use it); fall back to a name match or the first checkbox
     // so the device-card quiet-hours block keeps working unchanged.
     const master =
-      group.querySelector('[data-master]') ||
+      group.querySelector("[data-master]") ||
       group.querySelector('input[type="checkbox"][name*="enabled"]') ||
       group.querySelector('input[type="checkbox"]');
     if (!master) return;
-    const targets = group.querySelectorAll('[data-dep-target]');
+    const targets = group.querySelectorAll("[data-dep-target]");
 
     // ``data-dep-hide`` (the device page's quiet hours): the dependent
     // fields are hidden while the master is off, not just dimmed, and a
     // ``data-dep-off-note`` says what applies instead.
-    const hide = group.hasAttribute('data-dep-hide');
-    const note = group.querySelector('[data-dep-off-note]');
+    const hide = group.hasAttribute("data-dep-hide");
+    const note = group.querySelector("[data-dep-off-note]");
     function sync() {
       const off = !master.checked;
-      group.toggleAttribute('data-dep-off', off);
+      group.toggleAttribute("data-dep-off", off);
       targets.forEach(function (t) {
-        t.querySelectorAll('input, select, textarea, button').forEach(function (el) {
+        t.querySelectorAll("input, select, textarea, button").forEach(function (el) {
           if (el === master) return;
           el.disabled = off;
         });
@@ -144,7 +148,7 @@
       });
       if (note) note.hidden = !off;
     }
-    master.addEventListener('change', sync);
+    master.addEventListener("change", sync);
     sync();
   }
 
@@ -153,45 +157,51 @@
   // time. ``?opened=<id>`` in the URL mirrors the open row so a POST +
   // 302 (register, add) lands with the same panel open.
   function initDevicesTable(table) {
-    const rows = Array.from(table.querySelectorAll('[data-devrow]'));
+    const rows = Array.from(table.querySelectorAll("[data-devrow]"));
     function panelFor(row) {
-      const id = row.getAttribute('aria-controls');
+      const id = row.getAttribute("aria-controls");
       return id ? document.getElementById(id) : null;
     }
     function setOpen(row, open) {
       const panel = panelFor(row);
-      row.classList.toggle('is-open', open);
-      row.setAttribute('aria-expanded', open ? 'true' : 'false');
+      row.classList.toggle("is-open", open);
+      row.setAttribute("aria-expanded", open ? "true" : "false");
       if (panel) panel.hidden = !open;
     }
     function toggle(row) {
-      const opening = !row.classList.contains('is-open');
-      rows.forEach(function (r) { if (r !== row) setOpen(r, false); });
+      const opening = !row.classList.contains("is-open");
+      rows.forEach(function (r) {
+        if (r !== row) setOpen(r, false);
+      });
       setOpen(row, opening);
       const url = new URL(window.location.href);
-      if (opening) url.searchParams.set('opened', row.getAttribute('data-device-id') || '');
-      else url.searchParams.delete('opened');
-      history.replaceState(null, '', url.pathname + url.search);
+      if (opening) url.searchParams.set("opened", row.getAttribute("data-device-id") || "");
+      else url.searchParams.delete("opened");
+      history.replaceState(null, "", url.pathname + url.search);
     }
     rows.forEach(function (row) {
-      row.addEventListener('click', function (ev) {
+      row.addEventListener("click", function (ev) {
         // Links / buttons inside the row (none today) should not toggle.
-        if (ev.target.closest('a, button, input, select, form')) return;
+        if (ev.target.closest("a, button, input, select, form")) return;
         toggle(row);
       });
-      row.addEventListener('keydown', function (ev) {
-        if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggle(row); }
+      row.addEventListener("keydown", function (ev) {
+        if (ev.key === "Enter" || ev.key === " ") {
+          ev.preventDefault();
+          toggle(row);
+        }
       });
     });
 
     // Search, filters and sorting come from the shared list helper
     // (static/list-filter.js, data-lf on the area); an open row that
     // filters out closes so its panel doesn't linger.
-    const area = table.closest('[data-lf]');
+    const area = table.closest("[data-lf]");
     if (area) {
-      area.addEventListener('lf:change', function () {
+      area.addEventListener("lf:change", function () {
         rows.forEach(function (row) {
-          if (row.hasAttribute('data-lf-out') && row.classList.contains('is-open')) setOpen(row, false);
+          if (row.hasAttribute("data-lf-out") && row.classList.contains("is-open"))
+            setOpen(row, false);
         });
       });
     }
@@ -199,17 +209,17 @@
 
   // Add device: the toolbar button reveals the (hidden by default) card.
   function initAddDeviceToggle() {
-    const panel = document.querySelector('[data-add-panel]');
+    const panel = document.querySelector("[data-add-panel]");
     if (!panel) return;
-    document.querySelectorAll('[data-add-toggle]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
+    document.querySelectorAll("[data-add-toggle]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
         const open = panel.hidden;
         panel.hidden = !open;
-        document.querySelectorAll('[data-add-toggle]').forEach(function (b) {
-          b.setAttribute('aria-expanded', open ? 'true' : 'false');
+        document.querySelectorAll("[data-add-toggle]").forEach(function (b) {
+          b.setAttribute("aria-expanded", open ? "true" : "false");
         });
         if (open) {
-          panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          panel.scrollIntoView({ behavior: "smooth", block: "start" });
           const first = panel.querySelector('input[type="text"], input:not([type="hidden"])');
           if (first) first.focus({ preventScroll: true });
         }
@@ -221,12 +231,12 @@
   // device's register row; the toolbar's "N discovered" reveals all of
   // them; "Dismiss all" posts every dismiss form then reloads.
   function initDiscoveredBanner() {
-    const banner = document.querySelector('[data-disc-banner]');
+    const banner = document.querySelector("[data-disc-banner]");
     if (!banner) return;
-    const rows = Array.from(banner.querySelectorAll('[data-disc-row]'));
+    const rows = Array.from(banner.querySelectorAll("[data-disc-row]"));
     function reveal(id) {
       rows.forEach(function (r) {
-        if (!id || r.getAttribute('data-disc-row') === id) r.hidden = false;
+        if (!id || r.getAttribute("data-disc-row") === id) r.hidden = false;
       });
       const target = id
         ? banner.querySelector('[data-disc-row="' + id.replace(/"/g, '\\"') + '"]')
@@ -234,47 +244,60 @@
       if (target) {
         const input = target.querySelector('input[name="name"]');
         if (input) input.focus({ preventScroll: true });
-        target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        target.scrollIntoView({ behavior: "smooth", block: "nearest" });
       }
     }
-    banner.querySelectorAll('[data-disc-reveal]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        reveal(btn.getAttribute('data-disc-reveal'));
+    banner.querySelectorAll("[data-disc-reveal]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        reveal(btn.getAttribute("data-disc-reveal"));
       });
     });
-    document.querySelectorAll('[data-disc-toggle]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        const anyHidden = rows.some(function (r) { return r.hidden; });
+    document.querySelectorAll("[data-disc-toggle]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const anyHidden = rows.some(function (r) {
+          return r.hidden;
+        });
         if (anyHidden) {
-          reveal('');
-          banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          reveal("");
+          banner.scrollIntoView({ behavior: "smooth", block: "nearest" });
         } else {
-          rows.forEach(function (r) { r.hidden = true; });
+          rows.forEach(function (r) {
+            r.hidden = true;
+          });
         }
       });
     });
     // Arriving from the topbar "New devices" chip: open every register
     // row and bring the banner into view.
-    if (new URLSearchParams(location.search).get('discovered')) {
-      reveal('');
-      banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (new URLSearchParams(location.search).get("discovered")) {
+      reveal("");
+      banner.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-    const dismissAll = banner.querySelector('[data-disc-dismiss-all]');
+    const dismissAll = banner.querySelector("[data-disc-dismiss-all]");
     if (dismissAll) {
-      dismissAll.addEventListener('click', async function () {
-        const forms = Array.from(banner.querySelectorAll('[data-disc-dismiss-form]'));
+      dismissAll.addEventListener("click", async function () {
+        const forms = Array.from(banner.querySelectorAll("[data-disc-dismiss-form]"));
         if (!forms.length) return;
-        if (!window.confirm('Dismiss ' + (forms.length === 1 ? 'this device' : 'all ' + forms.length + ' devices') + '? They come back if they announce again.')) return;
+        if (
+          !window.confirm(
+            "Dismiss " +
+              (forms.length === 1 ? "this device" : "all " + forms.length + " devices") +
+              "? They come back if they announce again."
+          )
+        )
+          return;
         dismissAll.disabled = true;
         for (const f of forms) {
           try {
-            await fetch(f.getAttribute('action'), {
-              method: 'POST',
-              credentials: 'same-origin',
-              redirect: 'manual',
-              headers: { 'X-Requested-With': 'fetch' },
+            await fetch(f.getAttribute("action"), {
+              method: "POST",
+              credentials: "same-origin",
+              redirect: "manual",
+              headers: { "X-Requested-With": "fetch" },
             });
-          } catch (e) { /* keep going, the reload shows what stuck */ }
+          } catch {
+            /* keep going, the reload shows what stuck */
+          }
         }
         window.location.reload();
       });
@@ -295,14 +318,16 @@
   // Highlights the section nearest the top of the viewport and smooth-
   // scrolls on click. Pure convenience: the links are plain anchors.
   function initSubnav(nav) {
-    const links = Array.from(nav.querySelectorAll('[data-subnav-link]'));
+    const links = Array.from(nav.querySelectorAll("[data-subnav-link]"));
     const sections = links
-      .map(function (l) { return document.getElementById(l.getAttribute('data-subnav-link')); })
+      .map(function (l) {
+        return document.getElementById(l.getAttribute("data-subnav-link"));
+      })
       .filter(Boolean);
     if (!sections.length) return;
     function setActive(id) {
       links.forEach(function (l) {
-        l.classList.toggle('is-active', l.getAttribute('data-subnav-link') === id);
+        l.classList.toggle("is-active", l.getAttribute("data-subnav-link") === id);
       });
     }
     let ticking = false;
@@ -320,10 +345,13 @@
         // The Paper sidebar is a fixed .topbar that clears nothing; the
         // published --t-topbar-h says what actually sits over the page.
         // A sticky section strip (this nav) adds its own height.
-        const bar = document.querySelector('.topbar');
+        const bar = document.querySelector(".topbar");
         let barH = bar ? bar.getBoundingClientRect().height : 0;
-        if (bar && getComputedStyle(bar).position === 'fixed') barH = 0;
-        if (getComputedStyle(nav).position === 'sticky' && getComputedStyle(nav).flexDirection === 'row') {
+        if (bar && getComputedStyle(bar).position === "fixed") barH = 0;
+        if (
+          getComputedStyle(nav).position === "sticky" &&
+          getComputedStyle(nav).flexDirection === "row"
+        ) {
           barH += nav.getBoundingClientRect().height;
         }
         const probe = Math.max(barH + 24, window.innerHeight * 0.25);
@@ -335,13 +363,13 @@
       });
     }
     links.forEach(function (l) {
-      l.addEventListener('click', function (ev) {
-        const target = document.getElementById(l.getAttribute('data-subnav-link'));
+      l.addEventListener("click", function (ev) {
+        const target = document.getElementById(l.getAttribute("data-subnav-link"));
         if (!target) return;
         ev.preventDefault();
         expandSectionFor(target);
-        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        history.replaceState(null, '', '#' + target.id);
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+        history.replaceState(null, "", "#" + target.id);
         setActive(target.id);
         // On the phone strip, keep the active pill in view -- but only
         // ever by scrolling the nav's OWN scrollport. ``scrollIntoView``
@@ -355,11 +383,11 @@
           const pill = l.getBoundingClientRect();
           const left =
             nav.scrollLeft + (pill.left - navBox.left) - (nav.clientWidth - pill.width) / 2;
-          nav.scrollTo({ left: Math.max(0, left), behavior: 'smooth' });
+          nav.scrollTo({ left: Math.max(0, left), behavior: "smooth" });
         }
       });
     });
-    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener("scroll", onScroll, { passive: true });
     if (window.location.hash) {
       const id = window.location.hash.slice(1);
       if (document.getElementById(id)) setActive(id);
@@ -378,92 +406,107 @@
     const w = root.querySelector('input[name="panel_w"]');
     const h = root.querySelector('input[name="panel_h"]');
     if (!orient || !w || !h) return;
-    const isPortrait = function (v) { return v.indexOf('portrait') === 0; };
+    const isPortrait = function (v) {
+      return v.indexOf("portrait") === 0;
+    };
     let last = orient.value;
     function swap() {
-      const tmp = w.value; w.value = h.value; h.value = tmp;
-      w.dispatchEvent(new Event('input', { bubbles: true }));
+      const tmp = w.value;
+      w.value = h.value;
+      h.value = tmp;
+      w.dispatchEvent(new Event("input", { bubbles: true }));
     }
-    orient.addEventListener('change', function () {
+    orient.addEventListener("change", function () {
       if (isPortrait(orient.value) !== isPortrait(last)) swap();
       last = orient.value;
     });
     // The swap button beside the size: the same swap, by hand.
-    root.querySelectorAll('[data-size-swap]').forEach(function (btn) {
-      btn.addEventListener('click', swap);
+    root.querySelectorAll("[data-size-swap]").forEach(function (btn) {
+      btn.addEventListener("click", swap);
     });
   }
 
   // ---- Device page: the small behaviours of the redesign ----------------
   function toggleList(btn, show) {
-    btn.setAttribute('aria-expanded', show ? 'true' : 'false');
-    const label = btn.querySelector('span');
-    if (label) label.textContent = btn.getAttribute(show ? 'data-less-label' : 'data-more-label') || label.textContent;
-    const icon = btn.querySelector('.ph');
-    if (icon) icon.className = 'ph ' + (show ? 'ph-caret-up' : 'ph-caret-down');
+    btn.setAttribute("aria-expanded", show ? "true" : "false");
+    const label = btn.querySelector("span");
+    if (label)
+      label.textContent =
+        btn.getAttribute(show ? "data-less-label" : "data-more-label") || label.textContent;
+    const icon = btn.querySelector(".ph");
+    if (icon) icon.className = "ph " + (show ? "ph-caret-up" : "ph-caret-down");
   }
   function initDevicePage(page) {
     // Stay awake: its poll interval appears beside the switch only when on.
-    page.querySelectorAll('[data-awake-toggle]').forEach(function (sw) {
-      const poll = sw.closest('.dx-f-ctl') && sw.closest('.dx-f-ctl').querySelector('[data-awake-poll]');
+    page.querySelectorAll("[data-awake-toggle]").forEach(function (sw) {
+      const poll =
+        sw.closest(".dx-f-ctl") && sw.closest(".dx-f-ctl").querySelector("[data-awake-poll]");
       if (!poll) return;
-      sw.addEventListener('change', function () { poll.hidden = !sw.checked; });
+      sw.addEventListener("change", function () {
+        poll.hidden = !sw.checked;
+      });
     });
     // Synchronized wake: the mode picks which of Anchor / Times shows.
-    page.querySelectorAll('[data-wake-align]').forEach(function (box) {
-      const mode = box.querySelector('[data-wa-mode]');
+    page.querySelectorAll("[data-wake-align]").forEach(function (box) {
+      const mode = box.querySelector("[data-wa-mode]");
       if (!mode) return;
       const sync = function () {
-        box.querySelectorAll('[data-wa]').forEach(function (f) { f.hidden = f.getAttribute('data-wa') !== mode.value; });
+        box.querySelectorAll("[data-wa]").forEach(function (f) {
+          f.hidden = f.getAttribute("data-wa") !== mode.value;
+        });
       };
-      mode.addEventListener('change', sync);
+      mode.addEventListener("change", sync);
       sync();
     });
     // More menu: closes on a click elsewhere and on Escape.
-    const menus = Array.from(page.querySelectorAll('[data-more-menu]'));
-    document.addEventListener('click', function (ev) {
-      menus.forEach(function (m) { if (m.open && !m.contains(ev.target)) m.open = false; });
+    const menus = Array.from(page.querySelectorAll("[data-more-menu]"));
+    document.addEventListener("click", function (ev) {
+      menus.forEach(function (m) {
+        if (m.open && !m.contains(ev.target)) m.open = false;
+      });
     });
-    document.addEventListener('keydown', function (ev) {
-      if (ev.key !== 'Escape') return;
+    document.addEventListener("keydown", function (ev) {
+      if (ev.key !== "Escape") return;
       menus.forEach(function (m) {
         if (!m.open) return;
         m.open = false;
-        const s = m.querySelector('summary');
+        const s = m.querySelector("summary");
         if (s) s.focus();
       });
     });
     // Remove: Delete opens the confirmation form under it.
-    page.querySelectorAll('[data-del-open]').forEach(function (btn) {
-      const form = document.getElementById(btn.getAttribute('aria-controls'));
+    page.querySelectorAll("[data-del-open]").forEach(function (btn) {
+      const form = document.getElementById(btn.getAttribute("aria-controls"));
       if (!form) return;
-      btn.addEventListener('click', function () {
+      btn.addEventListener("click", function () {
         form.hidden = !form.hidden;
-        btn.setAttribute('aria-expanded', form.hidden ? 'false' : 'true');
+        btn.setAttribute("aria-expanded", form.hidden ? "false" : "true");
         if (!form.hidden) {
-          const first = form.querySelector('input, button');
+          const first = form.querySelector("input, button");
           if (first) first.focus({ preventScroll: true });
         }
       });
     });
     // Logs: the newest three, then the rest on request.
-    page.querySelectorAll('[data-log-more]').forEach(function (btn) {
-      const list = page.querySelector('[data-log-list]');
+    page.querySelectorAll("[data-log-more]").forEach(function (btn) {
+      const list = page.querySelector("[data-log-list]");
       if (!list) return;
-      btn.addEventListener('click', function () {
-        const show = btn.getAttribute('aria-expanded') !== 'true';
-        list.querySelectorAll('[data-log-extra]').forEach(function (li) { li.hidden = !show; });
+      btn.addEventListener("click", function () {
+        const show = btn.getAttribute("aria-expanded") !== "true";
+        list.querySelectorAll("[data-log-extra]").forEach(function (li) {
+          li.hidden = !show;
+        });
         toggleList(btn, show);
       });
     });
     // Frame log: the last 8 lines, or all of them.
-    page.querySelectorAll('[data-flog-more]').forEach(function (btn) {
+    page.querySelectorAll("[data-flog-more]").forEach(function (btn) {
       const box = btn.parentElement;
-      const short = box.querySelector('[data-flog-short]');
-      const all = box.querySelector('[data-flog-all]');
+      const short = box.querySelector("[data-flog-short]");
+      const all = box.querySelector("[data-flog-all]");
       if (!short || !all) return;
-      btn.addEventListener('click', function () {
-        const show = btn.getAttribute('aria-expanded') !== 'true';
+      btn.addEventListener("click", function () {
+        const show = btn.getAttribute("aria-expanded") !== "true";
         short.hidden = show;
         all.hidden = !show;
         if (show) all.scrollTop = all.scrollHeight;
@@ -471,36 +514,49 @@
       });
     });
     // Copy buttons (a log, the frame log, the raw manifest).
-    page.querySelectorAll('[data-copy-target]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        const src = document.querySelector(btn.getAttribute('data-copy-target'));
+    page.querySelectorAll("[data-copy-target]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const src = document.querySelector(btn.getAttribute("data-copy-target"));
         if (!src || !navigator.clipboard) return;
-        navigator.clipboard.writeText(src.textContent || '').then(function () {
-          const label = btn.querySelector('span');
-          if (!label) return;
-          const was = label.textContent;
-          label.textContent = 'Copied';
-          setTimeout(function () { label.textContent = was; }, 1500);
-        }).catch(function () { /* nothing to undo */ });
+        navigator.clipboard
+          .writeText(src.textContent || "")
+          .then(function () {
+            const label = btn.querySelector("span");
+            if (!label) return;
+            const was = label.textContent;
+            label.textContent = "Copied";
+            setTimeout(function () {
+              label.textContent = was;
+            }, 1500);
+          })
+          .catch(function () {
+            /* nothing to undo */
+          });
       });
     });
     // The rail's name and icon follow the Identity fields as they are edited.
-    const nameIn = page.querySelector('[data-device-name-input]');
-    const nameOut = page.querySelector('[data-device-head-name]');
+    const nameIn = page.querySelector("[data-device-name-input]");
+    const nameOut = page.querySelector("[data-device-head-name]");
     if (nameIn && nameOut) {
-      nameIn.addEventListener('input', function () { nameOut.textContent = nameIn.value || page.getAttribute('data-device-id'); });
+      nameIn.addEventListener("input", function () {
+        nameOut.textContent = nameIn.value || page.getAttribute("data-device-id");
+      });
     }
-    const iconIn = page.querySelector('input[data-icon-value]') || document.querySelector('input[data-icon-value]');
-    const iconOut = page.querySelector('[data-device-head-icon]');
+    const iconIn =
+      page.querySelector("input[data-icon-value]") ||
+      document.querySelector("input[data-icon-value]");
+    const iconOut = page.querySelector("[data-device-head-icon]");
     if (iconIn && iconOut) {
-      iconIn.addEventListener('change', function () { iconOut.className = 'ph ph-' + (iconIn.value || 'device-mobile'); });
+      iconIn.addEventListener("change", function () {
+        iconOut.className = "ph ph-" + (iconIn.value || "device-mobile");
+      });
     }
   }
 
   // ---- Boot --------------------------------------------------------------
   function ready(fn) {
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', fn);
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", fn);
     } else {
       fn();
     }
@@ -512,32 +568,32 @@
   // opendisplay|visionect"]. Both branches stay in the DOM, so typed values in the
   // inactive branch are preserved across flips.
   function initSegmented(group) {
-    const card = group.closest('[data-add-device-card]') || group;
-    const buttons = group.querySelectorAll('[data-segmented-btn]');
+    const card = group.closest("[data-add-device-card]") || group;
+    const buttons = group.querySelectorAll("[data-segmented-btn]");
     if (buttons.length === 0) return;
-    const branches = card.querySelectorAll('[data-transport-branch]');
+    const branches = card.querySelectorAll("[data-transport-branch]");
     const helps = {
-      rest: card.querySelector('[data-segmented-help-rest]'),
-      mqtt: card.querySelector('[data-segmented-help-mqtt]'),
-      opendisplay: card.querySelector('[data-segmented-help-opendisplay]'),
-      visionect: card.querySelector('[data-segmented-help-visionect]'),
+      rest: card.querySelector("[data-segmented-help-rest]"),
+      mqtt: card.querySelector("[data-segmented-help-mqtt]"),
+      opendisplay: card.querySelector("[data-segmented-help-opendisplay]"),
+      visionect: card.querySelector("[data-segmented-help-visionect]"),
     };
     buttons.forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        const target = btn.getAttribute('data-segmented-btn');
+      btn.addEventListener("click", function () {
+        const target = btn.getAttribute("data-segmented-btn");
         buttons.forEach(function (b) {
           const on = b === btn;
-          b.classList.toggle('is-active', on);
-          b.setAttribute('aria-selected', on ? 'true' : 'false');
+          b.classList.toggle("is-active", on);
+          b.setAttribute("aria-selected", on ? "true" : "false");
         });
         branches.forEach(function (br) {
-          const on = br.getAttribute('data-transport-branch') === target;
+          const on = br.getAttribute("data-transport-branch") === target;
           br.hidden = !on;
         });
         Object.keys(helps).forEach(function (k) {
           if (helps[k]) helps[k].hidden = k !== target;
         });
-        card.setAttribute('data-transport', target);
+        card.setAttribute("data-transport", target);
       });
     });
   }
@@ -558,27 +614,31 @@
     if (!key) return null;
     try {
       return window.localStorage.getItem(key);
-    } catch (e) { return null; }
+    } catch {
+      return null;
+    }
   }
   function _writeLocal(key, value) {
     if (!key) return;
     try {
       window.localStorage.setItem(key, value);
-    } catch (e) { /* private mode / disabled storage: no-op */ }
+    } catch {
+      /* private mode / disabled storage: no-op */
+    }
   }
 
   function initTestPatternForm(form) {
-    const preview = form.querySelector('[data-preview-img]');
+    const preview = form.querySelector("[data-preview-img]");
     if (!preview) return;
-    const base = preview.getAttribute('data-preview-base');
+    const base = preview.getAttribute("data-preview-base");
     if (!base) return;
-    const colorGroup = form.querySelector('[data-color-picker]');
-    const colorSelect = form.querySelector('[data-color-select]');
-    const colorChip = form.querySelector('[data-color-chip]');
-    const card = form.closest('[data-device-card]');
-    const deviceId = card && card.getAttribute('data-device-id');
-    const patternKey = deviceId ? 'tesserae:cal:pattern:' + deviceId : null;
-    const colorKey = deviceId ? 'tesserae:cal:color:' + deviceId : null;
+    const colorGroup = form.querySelector("[data-color-picker]");
+    const colorSelect = form.querySelector("[data-color-select]");
+    const colorChip = form.querySelector("[data-color-chip]");
+    const card = form.closest("[data-device-card]");
+    const deviceId = card && card.getAttribute("data-device-id");
+    const patternKey = deviceId ? "tesserae:cal:pattern:" + deviceId : null;
+    const colorKey = deviceId ? "tesserae:cal:color:" + deviceId : null;
 
     // Restore the last-selected pattern + colour before wiring change
     // handlers so ``update()`` below paints the preview against the
@@ -602,14 +662,14 @@
       const checked = form.querySelector('input[name="pattern"]:checked');
       if (!checked) return;
       const pattern = checked.value;
-      const needsColor = checked.getAttribute('data-needs-color') === '1';
+      const needsColor = checked.getAttribute("data-needs-color") === "1";
       if (colorGroup) colorGroup.hidden = !needsColor;
-      let src = base + '?pattern=' + encodeURIComponent(pattern);
+      let src = base + "?pattern=" + encodeURIComponent(pattern);
       if (needsColor && colorSelect) {
-        src += '&color_index=' + encodeURIComponent(colorSelect.value);
+        src += "&color_index=" + encodeURIComponent(colorSelect.value);
         if (colorChip) {
           const opt = colorSelect.options[colorSelect.selectedIndex];
-          const hex = opt && opt.getAttribute('data-hex');
+          const hex = opt && opt.getAttribute("data-hex");
           if (hex) colorChip.style.background = hex;
         }
       }
@@ -617,22 +677,22 @@
       // slug so switching patterns doesn't drop the candidate-profile
       // preview back to the saved slug. Empty is meaningful (built-in
       // default), so we always attach the slug when the picker exists.
-      const slugSelect = card && card.querySelector('[data-palette-slug]');
-      if (slugSelect) src += '&slug=' + encodeURIComponent(slugSelect.value);
+      const slugSelect = card && card.querySelector("[data-palette-slug]");
+      if (slugSelect) src += "&slug=" + encodeURIComponent(slugSelect.value);
       // Cache-bust so a subsequent send-with-same-params still refetches
       // when the user tabs back. no-store on the response also helps.
-      src += '&_t=' + Date.now();
+      src += "&_t=" + Date.now();
       preview.src = src;
     }
 
     form.querySelectorAll('input[name="pattern"]').forEach(function (radio) {
-      radio.addEventListener('change', function () {
+      radio.addEventListener("change", function () {
         _writeLocal(patternKey, radio.value);
         update();
       });
     });
     if (colorSelect) {
-      colorSelect.addEventListener('change', function () {
+      colorSelect.addEventListener("change", function () {
         _writeLocal(colorKey, colorSelect.value);
         update();
       });
@@ -646,22 +706,25 @@
   // profile in the dropdown, refresh the attribution / notes so the
   // labels update before they've clicked Apply.
   function initPaletteApplyForm(form) {
-    const select = form.querySelector('[data-palette-slug]');
+    const select = form.querySelector("[data-palette-slug]");
     if (!select) return;
-    const card = form.closest('.dx-calib-section');
+    const card = form.closest(".dx-calib-section");
     if (!card) return;
-    const attrEl = card.querySelector('[data-palette-attribution]');
-    const notesEl = card.querySelector('[data-palette-notes]');
+    const attrEl = card.querySelector("[data-palette-attribution]");
+    const notesEl = card.querySelector("[data-palette-notes]");
     function apply() {
       const opt = select.options[select.selectedIndex];
       if (!opt) return;
-      const attribution = opt.getAttribute('data-attribution') || '';
-      const notes = opt.getAttribute('data-notes') || '';
+      const attribution = opt.getAttribute("data-attribution") || "";
+      const notes = opt.getAttribute("data-notes") || "";
       if (attrEl) {
         if (attribution) {
           attrEl.innerHTML =
-            'via <a href="' + attribution + '" target="_blank" rel="noopener">' +
-            attribution + '</a>';
+            'via <a href="' +
+            attribution +
+            '" target="_blank" rel="noopener">' +
+            attribution +
+            "</a>";
           attrEl.hidden = false;
         } else {
           attrEl.hidden = true;
@@ -672,36 +735,36 @@
         notesEl.hidden = !notes;
       }
     }
-    select.addEventListener('change', apply);
+    select.addEventListener("change", apply);
   }
 
   // ---- Kind defaults rows (issue #22) ---------------------------------
   // Whole-row click toggles the inline form. Reset button swaps the
   // actions row for an inline confirm bar; Cancel reverts.
   function initKindRow(row) {
-    const toggle = row.querySelector('[data-kind-toggle]');
-    const body = row.querySelector('[data-kind-body]');
-    const actions = row.querySelector('[data-kind-actions]');
-    const confirm = row.querySelector('[data-kind-confirm]');
-    const resetBtn = row.querySelector('[data-kind-reset]');
-    const cancelBtn = row.querySelector('[data-kind-confirm-cancel]');
+    const toggle = row.querySelector("[data-kind-toggle]");
+    const body = row.querySelector("[data-kind-body]");
+    const actions = row.querySelector("[data-kind-actions]");
+    const confirm = row.querySelector("[data-kind-confirm]");
+    const resetBtn = row.querySelector("[data-kind-reset]");
+    const cancelBtn = row.querySelector("[data-kind-confirm-cancel]");
 
     if (toggle && body) {
-      toggle.addEventListener('click', function () {
+      toggle.addEventListener("click", function () {
         const open = body.hidden;
         body.hidden = !open;
-        row.classList.toggle('is-open', open);
-        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        row.classList.toggle("is-open", open);
+        toggle.setAttribute("aria-expanded", open ? "true" : "false");
       });
     }
     if (resetBtn && actions && confirm) {
-      resetBtn.addEventListener('click', function () {
+      resetBtn.addEventListener("click", function () {
         actions.hidden = true;
         confirm.hidden = false;
       });
     }
     if (cancelBtn && actions && confirm) {
-      cancelBtn.addEventListener('click', function () {
+      cancelBtn.addEventListener("click", function () {
         confirm.hidden = true;
         actions.hidden = false;
       });
@@ -714,10 +777,10 @@
   // when the model carries a resolution, the card's panel width/height.
   // Degrades to plain manual entry when HA is unreachable.
   function initHaDevicePicker(root) {
-    const integration = root.getAttribute('data-ha-integration') || '';
-    const select = root.querySelector('[data-ha-picker-select]');
-    const value = root.querySelector('[data-ha-picker-value]');
-    const hint = root.querySelector('[data-ha-picker-hint]');
+    const integration = root.getAttribute("data-ha-integration") || "";
+    const select = root.querySelector("[data-ha-picker-select]");
+    const value = root.querySelector("[data-ha-picker-value]");
+    const hint = root.querySelector("[data-ha-picker-hint]");
     if (!integration || !select || !value) return;
 
     function showHint(text) {
@@ -730,115 +793,125 @@
       if (!dev || !dev.w || !dev.h) return;
       // Works from both the device card (config field) and the Add-device
       // card (OpenDisplay branch), whichever holds this picker + panel inputs.
-      const card = root.closest('[data-device-body], [data-device-card], [data-device-page], [data-add-device-card]');
+      const card = root.closest(
+        "[data-device-body], [data-device-card], [data-device-page], [data-add-device-card]"
+      );
       if (!card) return;
       const w = card.querySelector('input[name="panel_w"]');
       const h = card.querySelector('input[name="panel_h"]');
       if (w && h) {
         w.value = dev.w;
         h.value = dev.h;
-        w.dispatchEvent(new Event('change', { bubbles: true }));
-        h.dispatchEvent(new Event('change', { bubbles: true }));
+        w.dispatchEvent(new Event("change", { bubbles: true }));
+        h.dispatchEvent(new Event("change", { bubbles: true }));
       }
     }
 
     // Keep the <select> visible (so the field always reads as a picker)
     // but disabled with a status option when there's nothing to pick.
     function disabledWith(text) {
-      select.textContent = '';
-      const opt = document.createElement('option');
-      opt.value = '';
+      select.textContent = "";
+      const opt = document.createElement("option");
+      opt.value = "";
       opt.textContent = text;
       select.appendChild(opt);
       select.disabled = true;
     }
 
-    fetch((window.TESSERAE_URL_PREFIX || '') +
-      '/settings/devices/ha-devices.json?integration=' + encodeURIComponent(integration))
-      .then(function (r) { return r.json(); })
+    fetch(
+      (window.TESSERAE_URL_PREFIX || "") +
+        "/settings/devices/ha-devices.json?integration=" +
+        encodeURIComponent(integration)
+    )
+      .then(function (r) {
+        return r.json();
+      })
       .then(function (data) {
         const devices = (data && data.devices) || [];
         if (!devices.length) {
-          disabledWith(data && data.error ? 'Home Assistant unavailable' : 'No devices found');
+          disabledWith(data && data.error ? "Home Assistant unavailable" : "No devices found");
           showHint(
             data && data.error
-              ? 'Home Assistant unavailable (' + data.error + '); enter the device id manually.'
-              : 'No Home Assistant devices found; enter the device id manually.'
+              ? "Home Assistant unavailable (" + data.error + "); enter the device id manually."
+              : "No Home Assistant devices found; enter the device id manually."
           );
           return;
         }
         // Rebuild options: prompt, one per device, then a manual escape.
-        select.textContent = '';
+        select.textContent = "";
         const byId = {};
-        const prompt = document.createElement('option');
-        prompt.value = '';
-        prompt.textContent = '— Pick a device —';
+        const prompt = document.createElement("option");
+        prompt.value = "";
+        prompt.textContent = "— Pick a device —";
         select.appendChild(prompt);
         devices.forEach(function (dev) {
           byId[dev.device_id] = dev;
-          const opt = document.createElement('option');
+          const opt = document.createElement("option");
           opt.value = dev.device_id;
-          opt.textContent = dev.model ? dev.name + ' — ' + dev.model : dev.name;
+          opt.textContent = dev.model ? dev.name + " — " + dev.model : dev.name;
           if (dev.device_id === value.value) opt.selected = true;
           select.appendChild(opt);
         });
-        const manual = document.createElement('option');
-        manual.value = '__manual__';
-        manual.textContent = 'Enter manually…';
+        const manual = document.createElement("option");
+        manual.value = "__manual__";
+        manual.textContent = "Enter manually…";
         select.appendChild(manual);
         select.disabled = false;
         // Reflect the current stored value's model as a hint if it matches.
         if (byId[value.value] && byId[value.value].model) {
-          showHint('Home Assistant: ' + byId[value.value].model);
+          showHint("Home Assistant: " + byId[value.value].model);
         }
-        select.addEventListener('change', function () {
-          if (select.value === '__manual__') {
+        select.addEventListener("change", function () {
+          if (select.value === "__manual__") {
             value.focus();
-            select.value = value.value && byId[value.value] ? value.value : '';
+            select.value = value.value && byId[value.value] ? value.value : "";
             return;
           }
           if (!select.value) return;
           value.value = select.value;
-          value.dispatchEvent(new Event('change', { bubbles: true }));
+          value.dispatchEvent(new Event("change", { bubbles: true }));
           const dev = byId[select.value];
           fillPanel(dev);
-          showHint(dev && dev.model ? 'Home Assistant: ' + dev.model : '');
+          showHint(dev && dev.model ? "Home Assistant: " + dev.model : "");
         });
       })
       .catch(function () {
-        disabledWith('Could not reach Home Assistant');
-        showHint('Could not reach Home Assistant; enter the device id manually.');
+        disabledWith("Could not reach Home Assistant");
+        showHint("Could not reach Home Assistant; enter the device id manually.");
       });
   }
 
   ready(function () {
-    document.querySelectorAll('[data-devtable]').forEach(initDevicesTable);
+    document.querySelectorAll("[data-devtable]").forEach(initDevicesTable);
     initAddDeviceToggle();
     initDiscoveredBanner();
-    document.querySelectorAll('[data-device-page]').forEach(initDevicePage);
-    document.querySelectorAll('[data-subnav]').forEach(initSubnav);
-    document.querySelectorAll('[data-orient-swap]').forEach(initOrientSwap);
-    document.querySelectorAll('[data-ha-device-picker]').forEach(initHaDevicePicker);
-    document.querySelectorAll('[data-dirty-form]').forEach(initDirtyForm);
+    document.querySelectorAll("[data-device-page]").forEach(initDevicePage);
+    document.querySelectorAll("[data-subnav]").forEach(initSubnav);
+    document.querySelectorAll("[data-orient-swap]").forEach(initOrientSwap);
+    document.querySelectorAll("[data-ha-device-picker]").forEach(initHaDevicePicker);
+    document.querySelectorAll("[data-dirty-form]").forEach(initDirtyForm);
     initSaveBarStackObserver();
-    document.querySelectorAll('[data-dep-group]').forEach(initDepGroup);
-    document.querySelectorAll('[data-segmented-group]').forEach(initSegmented);
-    document.querySelectorAll('[data-kind-row]').forEach(initKindRow);
-    document.querySelectorAll('[data-test-pattern-form]').forEach(initTestPatternForm);
-    document.querySelectorAll('[data-palette-apply-form]').forEach(initPaletteApplyForm);
+    document.querySelectorAll("[data-dep-group]").forEach(initDepGroup);
+    document.querySelectorAll("[data-segmented-group]").forEach(initSegmented);
+    document.querySelectorAll("[data-kind-row]").forEach(initKindRow);
+    document.querySelectorAll("[data-test-pattern-form]").forEach(initTestPatternForm);
+    document.querySelectorAll("[data-palette-apply-form]").forEach(initPaletteApplyForm);
     // Delete-details cancel (v0.69.2): the Cancel button inside the
     // expanded delete confirmation closes the <details> without
     // reloading the page. Purely UX; the submit button posts as normal.
-    document.querySelectorAll('[data-delete-cancel]').forEach(function (btn) {
-      const details = btn.closest('[data-delete-details]');
+    document.querySelectorAll("[data-delete-cancel]").forEach(function (btn) {
+      const details = btn.closest("[data-delete-details]");
       if (!details) return;
-      btn.addEventListener('click', function () {
-        details.removeAttribute('open');
+      btn.addEventListener("click", function () {
+        details.removeAttribute("open");
         // The device page's Remove: a Delete button opens the form.
-        const form = details.querySelector('[data-del-form]');
-        const open = details.querySelector('[data-del-open]');
+        const form = details.querySelector("[data-del-form]");
+        const open = details.querySelector("[data-del-open]");
         if (form) form.hidden = true;
-        if (open) { open.setAttribute('aria-expanded', 'false'); open.focus(); }
+        if (open) {
+          open.setAttribute("aria-expanded", "false");
+          open.focus();
+        }
       });
     });
     // Live label for each tone slider so the user sees the exact
@@ -849,17 +922,17 @@
     // override the applied profile's stored defaults on the server
     // side (see devices_test_pattern_preview).
     function refreshTonePreview(card) {
-      const preview = card.querySelector('[data-preview-img]');
+      const preview = card.querySelector("[data-preview-img]");
       if (!preview) return;
-      const base = preview.getAttribute('data-preview-base');
+      const base = preview.getAttribute("data-preview-base");
       if (!base) return;
       const checked = card.querySelector('input[name="pattern"]:checked');
-      const pattern = checked ? checked.value : 'palette_swatches';
+      const pattern = checked ? checked.value : "palette_swatches";
       const params = new URLSearchParams();
-      params.set('pattern', pattern);
-      if (checked && checked.getAttribute('data-needs-color') === '1') {
-        const cs = card.querySelector('[data-color-select]');
-        if (cs) params.set('color_index', cs.value);
+      params.set("pattern", pattern);
+      if (checked && checked.getAttribute("data-needs-color") === "1") {
+        const cs = card.querySelector("[data-color-select]");
+        if (cs) params.set("color_index", cs.value);
       }
       // Profile slug (v0.69.14): the palette-profile picker is a
       // preview-before-apply dropdown. Piping the currently-selected
@@ -867,42 +940,42 @@
       // profile's palette + tone before hitting Apply. Empty string
       // is meaningful (built-in default); missing param would fall
       // back to the saved slug on the server.
-      const slugSelect = card.querySelector('[data-palette-slug]');
-      if (slugSelect) params.set('slug', slugSelect.value);
-      const toneForm = card.querySelector('.dx-palette-tone-form');
+      const slugSelect = card.querySelector("[data-palette-slug]");
+      if (slugSelect) params.set("slug", slugSelect.value);
+      const toneForm = card.querySelector(".dx-palette-tone-form");
       if (toneForm) {
-        ['exposure', 's_curve', 'lab_compress_min', 'lab_compress_max',
-         'smoothing_radius'].forEach(function (name) {
-          const el = toneForm.querySelector('[name="' + name + '"]');
-          if (el && el.value !== '') params.set(name, el.value);
-        });
+        ["exposure", "s_curve", "lab_compress_min", "lab_compress_max", "smoothing_radius"].forEach(
+          function (name) {
+            const el = toneForm.querySelector('[name="' + name + '"]');
+            if (el && el.value !== "") params.set(name, el.value);
+          }
+        );
       }
       // Live palette preview (v0.68): read the six / seven colour
       // swatches and pipe them through as ``#rrggbb`` query params so
       // the preview repaints with the currently-picked colours. Orange
       // is optional (only ACeP / 7-colour Inky profiles render it).
-      const paletteForm = card.querySelector('.dx-palette-colors-form');
+      const paletteForm = card.querySelector(".dx-palette-colors-form");
       if (paletteForm) {
-        ['black', 'white', 'yellow', 'red', 'blue', 'green', 'orange']
-          .forEach(function (name) {
-            const el = paletteForm.querySelector('[name="' + name + '"]');
-            if (el && el.value) params.set(name, el.value);
-          });
+        ["black", "white", "yellow", "red", "blue", "green", "orange"].forEach(function (name) {
+          const el = paletteForm.querySelector('[name="' + name + '"]');
+          if (el && el.value) params.set(name, el.value);
+        });
       }
-      params.set('_t', Date.now());
-      preview.src = base + '?' + params.toString();
+      params.set("_t", Date.now());
+      preview.src = base + "?" + params.toString();
     }
 
-    document.querySelectorAll('[data-device-card]').forEach(function (card) {
-      const inputs = card.querySelectorAll('[data-tone-input]');
+    document.querySelectorAll("[data-device-card]").forEach(function (card) {
+      const inputs = card.querySelectorAll("[data-tone-input]");
       inputs.forEach(function (input) {
-        const label = input.parentElement.querySelector('[data-tone-value]');
+        const label = input.parentElement.querySelector("[data-tone-value]");
         if (label) {
-          input.addEventListener('input', function () {
+          input.addEventListener("input", function () {
             label.textContent = input.value;
           });
         }
-        input.addEventListener('input', function () {
+        input.addEventListener("input", function () {
           refreshTonePreview(card);
         });
       });
@@ -913,16 +986,16 @@
     // visible on-card without requiring the popover to be open.
     // Also refreshes the tone preview so the swatch change paints
     // into the preview on the same tick.
-    document.querySelectorAll('[data-palette-color-input]').forEach(function (input) {
-      const readout = input.parentElement.querySelector('[data-palette-color-hex]');
+    document.querySelectorAll("[data-palette-color-input]").forEach(function (input) {
+      const readout = input.parentElement.querySelector("[data-palette-color-hex]");
       if (readout) {
-        input.addEventListener('input', function () {
+        input.addEventListener("input", function () {
           readout.textContent = input.value;
         });
       }
-      const card = input.closest('[data-device-card]');
+      const card = input.closest("[data-device-card]");
       if (card) {
-        input.addEventListener('input', function () {
+        input.addEventListener("input", function () {
           refreshTonePreview(card);
         });
       }
@@ -933,10 +1006,10 @@
     // attribution + notes strings; this second listener repaints the
     // preview so the palette + tone of the candidate profile shows up
     // before the user hits Apply.
-    document.querySelectorAll('[data-palette-slug]').forEach(function (select) {
-      const card = select.closest('[data-device-card]');
+    document.querySelectorAll("[data-palette-slug]").forEach(function (select) {
+      const card = select.closest("[data-device-card]");
       if (!card) return;
-      select.addEventListener('change', function () {
+      select.addEventListener("change", function () {
         refreshTonePreview(card);
       });
     });
@@ -948,21 +1021,25 @@
 // the result instead of the page waiting on GitHub. The server renders
 // the finished block; this only swaps it in.
 (function () {
-  'use strict';
-  const box = document.querySelector('[data-release-check]');
-  if (!box || !box.hasAttribute('data-release-check-pending')) return;
-  const url = box.getAttribute('data-release-check');
+  "use strict";
+  const box = document.querySelector("[data-release-check]");
+  if (!box || !box.hasAttribute("data-release-check-pending")) return;
+  const url = box.getAttribute("data-release-check");
   let tries = 0;
   function poll() {
     tries += 1;
-    fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
-      .then(function (r) { return r.ok ? r.json() : null; })
+    fetch(url, { headers: { Accept: "application/json" }, credentials: "same-origin" })
+      .then(function (r) {
+        return r.ok ? r.json() : null;
+      })
       .then(function (data) {
-        if (!data || typeof data.html !== 'string') return;
+        if (!data || typeof data.html !== "string") return;
         box.innerHTML = data.html;
         if (data.pending && tries < 15) setTimeout(poll, 1500);
       })
-      .catch(function () { /* keep the placeholder; the next visit asks again */ });
+      .catch(function () {
+        /* keep the placeholder; the next visit asks again */
+      });
   }
   setTimeout(poll, 1000);
 })();

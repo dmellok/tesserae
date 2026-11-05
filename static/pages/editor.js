@@ -579,7 +579,7 @@
       let value = {};
       try {
         value = JSON.parse(mount.dataset.touchValue || "{}") || {};
-      } catch (e) {
+      } catch {
         value = {};
       }
       const node = TouchInteraction.render({
@@ -670,18 +670,21 @@
     // The status bar is re-anchored separately by the server, so it doesn't
     // occupy one of the preset's slots and can never be the cell that's cut.
     const cells = Array.from(document.querySelectorAll(".cell-card:not([data-status-bar])"));
-    const losing = cells.slice(slots).map((card) => {
-      const value = card.querySelector("input[name='plugin']");
-      if (!value || !value.value) return "";
-      const shown = card.querySelector("[data-wp-input]");
-      return (shown && shown.value) || value.value;
-    }).filter(Boolean);
+    const losing = cells
+      .slice(slots)
+      .map((card) => {
+        const value = card.querySelector("input[name='plugin']");
+        if (!value || !value.value) return "";
+        const shown = card.querySelector("[data-wp-input]");
+        return (shown && shown.value) || value.value;
+      })
+      .filter(Boolean);
     if (!losing.length) return true;
     return window.confirm(
       `This layout has ${slots} cell${slots === 1 ? "" : "s"}, so ` +
-      `${losing.length} widget${losing.length === 1 ? "" : "s"} won't fit and will be ` +
-      `removed along with their settings:\n\n${losing.join("\n")}\n\n` +
-      "Move them into the cells you're keeping first if you want to keep them."
+        `${losing.length} widget${losing.length === 1 ? "" : "s"} won't fit and will be ` +
+        `removed along with their settings:\n\n${losing.join("\n")}\n\n` +
+        "Move them into the cells you're keeping first if you want to keep them."
     );
   }
 
@@ -932,14 +935,14 @@
     if (field) {
       try {
         field.focus({ preventScroll: true });
-      } catch (e) {
+      } catch {
         field.focus();
       }
     }
     previewFrames().forEach((iframe) => {
       try {
         iframe.contentWindow.postMessage({ type: "tesserae-focus-cell", cellId }, location.origin);
-      } catch (e) {
+      } catch {
         /* iframe not ready / cross-origin */
       }
     });

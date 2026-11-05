@@ -10,13 +10,23 @@
    fields line up across rows (Row 1 was thirds, Rows 2/3 were halves, so
    the edges didn't match). The active-window control spans the two right
    columns; the enabled toggle bottom-aligns with the priority input. */
-.schedule-form .field-grid { grid-template-columns: repeat(3, 1fr); }
-.schedule-form .sf-window { grid-column: span 2; }
-.schedule-form .sf-meta { align-items: end; }
+.schedule-form .field-grid {
+  grid-template-columns: repeat(3, 1fr);
+}
+.schedule-form .sf-window {
+  grid-column: span 2;
+}
+.schedule-form .sf-meta {
+  align-items: end;
+}
 
 @media (max-width: 720px) {
-  .schedule-form .field-grid { grid-template-columns: 1fr; }
-  .schedule-form .sf-window { grid-column: auto; }
+  .schedule-form .field-grid {
+    grid-template-columns: 1fr;
+  }
+  .schedule-form .sf-window {
+    grid-column: auto;
+  }
 }
 
 /* Conditions + fallback block. Lives outside the 3-column form grid so
@@ -31,7 +41,7 @@
   user-select: none;
   font-weight: 600;
   padding: var(--t-space-2) 0;
-  color: var(--t-fg, #1B1A16);
+  color: var(--t-fg, #1b1a16);
 }
 .schedule-form .sf-conditions-body {
   display: flex;
@@ -85,8 +95,11 @@
   font-size: var(--t-size-sm);
   font-weight: 500;
   user-select: none;
-  transition: background var(--t-trans-fast), color var(--t-trans-fast),
-              border-color var(--t-trans-fast), transform var(--t-trans-fast);
+  transition:
+    background var(--t-trans-fast),
+    color var(--t-trans-fast),
+    border-color var(--t-trans-fast),
+    transform var(--t-trans-fast);
 }
 .dow-chip:hover {
   border-color: var(--t-accent);
@@ -97,8 +110,9 @@
   background: var(--t-accent);
   color: var(--t-accent-fg);
   border-color: var(--t-accent);
-  box-shadow: var(--t-shadow-sm),
-              inset 0 1px 0 rgba(255,255,255,.28);
+  box-shadow:
+    var(--t-shadow-sm),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
 }
 .dow-chip input {
   appearance: none;
@@ -127,7 +141,9 @@
 /* Keep the secondary line tight under its primary in two-line cells. */
 .data-table .col-page,
 .data-table .col-last,
-.data-table .col-state { white-space: nowrap; }
+.data-table .col-state {
+  white-space: nowrap;
+}
 
 .data-table th {
   font-size: var(--t-size-xs);
@@ -138,14 +154,25 @@
   background: var(--t-surface-soft);
 }
 
-.data-table tr.is-disabled td { opacity: 0.55; }
-.data-table tr.is-stale td { background: color-mix(in oklab, var(--t-danger) 8%, transparent); }
-.data-table .muted-row { color: var(--t-muted); font-size: var(--t-size-xs); margin-top: 2px; }
+.data-table tr.is-disabled td {
+  opacity: 0.55;
+}
+.data-table tr.is-stale td {
+  background: color-mix(in oklab, var(--t-danger) 8%, transparent);
+}
+.data-table .muted-row {
+  color: var(--t-muted);
+  font-size: var(--t-size-xs);
+  margin-top: 2px;
+}
 .data-table .actions-col {
   white-space: nowrap;
   width: 1%;
 }
-.data-table .actions-col form.inline { display: inline-block; margin: 0 2px 0 0; }
+.data-table .actions-col form.inline {
+  display: inline-block;
+  margin: 0 2px 0 0;
+}
 .data-table .actions-col .ghost-link {
   display: inline-block;
   padding: var(--t-space-2) var(--t-space-3);
@@ -154,10 +181,17 @@
   text-decoration: none;
   border-radius: var(--t-radius-sm);
 }
-.data-table .actions-col .ghost-link:hover { color: var(--t-accent); }
+.data-table .actions-col .ghost-link:hover {
+  color: var(--t-accent);
+}
 
-button.ghost.danger { color: var(--t-danger); }
-button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; }
+button.ghost.danger {
+  color: var(--t-danger);
+}
+button.ghost.danger:hover {
+  color: var(--t-danger);
+  text-decoration: underline;
+}
 
 /* Schedules table, progressively drop columns as the viewport
    narrows so the table fits without horizontal scroll. The Name +
@@ -165,14 +199,20 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
    gets hidden first. */
 @media (max-width: 900px) {
   .schedules-table .col-last,
-  .schedules-table .col-state { display: none; }
+  .schedules-table .col-state {
+    display: none;
+  }
 }
 @media (max-width: 700px) {
   .schedules-table .col-page,
-  .schedules-table .col-days { display: none; }
+  .schedules-table .col-days {
+    display: none;
+  }
   /* Collapse the action button labels to icons only. */
   .schedules-table .actions-col button > span,
-  .schedules-table .actions-col a > span { display: none; }
+  .schedules-table .actions-col a > span {
+    display: none;
+  }
   .schedules-table .actions-col button,
   .schedules-table .actions-col .ghost-link {
     padding: var(--t-space-2);
@@ -181,9 +221,13 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
 }
 @media (max-width: 500px) {
   /* Tighten further on phones: smaller font, tighter cells. */
-  .data-table { font-size: var(--t-size-sm); }
+  .data-table {
+    font-size: var(--t-size-sm);
+  }
   .data-table th,
-  .data-table td { padding: var(--t-space-2); }
+  .data-table td {
+    padding: var(--t-space-2);
+  }
 }
 
 .ghost-link {
@@ -196,10 +240,17 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   font-weight: 500;
   border-radius: var(--t-radius-sm);
 }
-.ghost-link:hover { color: var(--t-accent); background: var(--t-surface-soft); }
-.ghost-link .ph { font-size: 14px; }
+.ghost-link:hover {
+  color: var(--t-accent);
+  background: var(--t-surface-soft);
+}
+.ghost-link .ph {
+  font-size: 14px;
+}
 
-.muted { color: var(--t-muted); }
+.muted {
+  color: var(--t-muted);
+}
 
 /* Small status tags are .tg from chips.css. */
 
@@ -282,7 +333,9 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   gap: var(--t-space-3);
   min-height: 30px;
 }
-.timeline-row.is-disabled { opacity: 0.45; }
+.timeline-row.is-disabled {
+  opacity: 0.45;
+}
 .timeline-label {
   display: inline-flex;
   align-items: center;
@@ -296,8 +349,14 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   padding: var(--t-space-1) var(--t-space-2);
   border-radius: var(--t-radius-sm);
 }
-.timeline-label:hover { background: var(--t-surface-sunk); color: var(--t-accent); }
-.timeline-label .ph { font-size: 13px; opacity: 0.7; }
+.timeline-label:hover {
+  background: var(--t-surface-sunk);
+  color: var(--t-accent);
+}
+.timeline-label .ph {
+  font-size: 13px;
+  opacity: 0.7;
+}
 .timeline-track {
   position: relative;
   height: 22px;
@@ -314,17 +373,22 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   background: var(--t-accent);
   transform: translateX(-50%);
 }
-.timeline-row.is-disabled .timeline-fire { background: var(--t-muted); }
+.timeline-row.is-disabled .timeline-fire {
+  background: var(--t-muted);
+}
 
 @media (max-width: 720px) {
-  .timeline-row { grid-template-columns: 120px 1fr; }
-  .timeline-axis { margin-left: 132px; }
+  .timeline-row {
+    grid-template-columns: 120px 1fr;
+  }
+  .timeline-axis {
+    margin-left: 132px;
+  }
   .timeline-now {
     left: calc(120px + var(--t-space-3));
     width: calc(100% - 120px - var(--t-space-3));
   }
 }
-
 
 /* Smart-sync indicator dot on the schedule list (issue #10).
    Three states, surfaced as colour via the `--{state}` modifier:
@@ -342,9 +406,15 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   vertical-align: middle;
   background: var(--t-muted);
 }
-.smart-sync-dot--active  { background: var(--t-ok, #4eb87d); }
-.smart-sync-dot--warming { background: var(--t-warn, #d49a3a); }
-.smart-sync-dot--blocked { background: var(--t-danger, #c34d3a); }
+.smart-sync-dot--active {
+  background: var(--t-ok, #4eb87d);
+}
+.smart-sync-dot--warming {
+  background: var(--t-warn, #d49a3a);
+}
+.smart-sync-dot--blocked {
+  background: var(--t-danger, #c34d3a);
+}
 
 /* ----- Rotations ---------------------------------------------------- */
 
@@ -385,7 +455,9 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   margin-bottom: var(--t-space-3);
 }
 
-.rotation-meta i { margin-right: 0.3em; }
+.rotation-meta i {
+  margin-right: 0.3em;
+}
 
 .rotation-steps-preview {
   list-style: none;
@@ -435,11 +507,21 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
    coherent strip rather than competing colours, and it tracks the
    active theme + dark mode automatically. Step 0 is strongest, step
    4 lightest, then it cycles. */
-.rotation-band--step-0 { background: color-mix(in oklab, var(--t-accent) 90%, var(--t-surface)); }
-.rotation-band--step-1 { background: color-mix(in oklab, var(--t-accent) 70%, var(--t-surface)); }
-.rotation-band--step-2 { background: color-mix(in oklab, var(--t-accent) 50%, var(--t-surface)); }
-.rotation-band--step-3 { background: color-mix(in oklab, var(--t-accent) 35%, var(--t-surface)); }
-.rotation-band--step-4 { background: color-mix(in oklab, var(--t-accent) 20%, var(--t-surface)); }
+.rotation-band--step-0 {
+  background: color-mix(in oklab, var(--t-accent) 90%, var(--t-surface));
+}
+.rotation-band--step-1 {
+  background: color-mix(in oklab, var(--t-accent) 70%, var(--t-surface));
+}
+.rotation-band--step-2 {
+  background: color-mix(in oklab, var(--t-accent) 50%, var(--t-surface));
+}
+.rotation-band--step-3 {
+  background: color-mix(in oklab, var(--t-accent) 35%, var(--t-surface));
+}
+.rotation-band--step-4 {
+  background: color-mix(in oklab, var(--t-accent) 20%, var(--t-surface));
+}
 /* "Held" bands appear when conditions gate every step at that moment.
    Renders as a faint diagonal stripe so the user sees "nothing will
    fire here" without a confusing solid colour. */
@@ -465,7 +547,9 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   flex-wrap: wrap;
 }
 
-.rotation-actions form { margin: 0; }
+.rotation-actions form {
+  margin: 0;
+}
 
 /* New / edit form */
 
@@ -479,11 +563,15 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
 }
 
 @media (max-width: 960px) {
-  .rotation-form .field-grid { grid-template-columns: 1fr 1fr; }
+  .rotation-form .field-grid {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 @media (max-width: 540px) {
-  .rotation-form .field-grid { grid-template-columns: 1fr; }
+  .rotation-form .field-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .rot-steps {
@@ -513,7 +601,9 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
 }
 
 @media (max-width: 540px) {
-  .rot-step { grid-template-columns: 1.5em 1fr 6ch 2ch auto auto; }
+  .rot-step {
+    grid-template-columns: 1.5em 1fr 6ch 2ch auto auto;
+  }
 }
 
 /* v0.48 step conditions: each step lives inside a .rot-step-wrap
@@ -531,8 +621,8 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   gap: var(--t-space-2);
 }
 .rot-step-cond-toggle[aria-expanded="true"] {
-  background: color-mix(in oklab, var(--t-accent, #C24F2C) 14%, transparent);
-  border-color: var(--t-accent, #C24F2C);
+  background: color-mix(in oklab, var(--t-accent, #c24f2c) 14%, transparent);
+  border-color: var(--t-accent, #c24f2c);
 }
 .rot-step-cond-panel {
   /* Full-width below the controls row. Sits inside the wrapper so it
@@ -550,24 +640,28 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
      button shares the same vertical height as the X icon button and
      the dwell input next to it. */
   padding: var(--t-space-2) var(--t-space-3);
-  border: 1px solid var(--t-border, color-mix(in oklab, var(--t-fg, #1B1A16) 18%, transparent));
+  border: 1px solid var(--t-border, color-mix(in oklab, var(--t-fg, #1b1a16) 18%, transparent));
   border-radius: var(--t-radius-sm, 6px);
   background: transparent;
-  color: var(--t-fg, #1B1A16);
+  color: var(--t-fg, #1b1a16);
   font-size: var(--t-size-md, 0.95em);
   font-weight: 500;
   line-height: 1.2;
   user-select: none;
-  transition: background-color 0.12s ease, border-color 0.12s ease;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease;
 }
-.rot-step-cond > summary::-webkit-details-marker { display: none; }
+.rot-step-cond > summary::-webkit-details-marker {
+  display: none;
+}
 .rot-step-cond > summary:hover {
-  background: color-mix(in oklab, var(--t-fg, #1B1A16) 5%, transparent);
+  background: color-mix(in oklab, var(--t-fg, #1b1a16) 5%, transparent);
 }
 .rot-step-cond[open] > summary {
-  background: color-mix(in oklab, var(--t-accent, #C24F2C) 14%, transparent);
-  border-color: var(--t-accent, #C24F2C);
-  color: var(--t-fg, #1B1A16);
+  background: color-mix(in oklab, var(--t-accent, #c24f2c) 14%, transparent);
+  border-color: var(--t-accent, #c24f2c);
+  color: var(--t-fg, #1b1a16);
 }
 
 /* v0.48 condition picker (static/condition-picker.js). Uses the
@@ -589,9 +683,9 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   align-items: center;
   gap: var(--t-space-2);
   padding: var(--t-space-2);
-  border: 1px solid var(--t-border, color-mix(in oklab, var(--t-fg, #1B1A16) 14%, transparent));
+  border: 1px solid var(--t-border, color-mix(in oklab, var(--t-fg, #1b1a16) 14%, transparent));
   border-radius: var(--t-radius-sm, 6px);
-  background: color-mix(in oklab, var(--t-fg, #1B1A16) 2%, transparent);
+  background: color-mix(in oklab, var(--t-fg, #1b1a16) 2%, transparent);
 }
 .condition-picker .cp-row-body {
   display: flex;
@@ -624,18 +718,28 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   font-size: var(--t-size-sm);
   color: var(--t-muted);
 }
-.condition-picker .cp-status[data-tone="ok"]   { color: var(--t-ok, #2E7D32); }
-.condition-picker .cp-status[data-tone="warn"] { color: var(--t-warn,    #B36A0A); }
-.condition-picker .cp-status[data-tone="fail"] { color: var(--t-danger,  #B0322A); }
+.condition-picker .cp-status[data-tone="ok"] {
+  color: var(--t-ok, #2e7d32);
+}
+.condition-picker .cp-status[data-tone="warn"] {
+  color: var(--t-warn, #b36a0a);
+}
+.condition-picker .cp-status[data-tone="fail"] {
+  color: var(--t-danger, #b0322a);
+}
 .condition-picker .cp-row-test {
   margin-left: auto;
   font-size: var(--t-size-md);
   font-weight: 700;
 }
-.condition-picker .cp-row-test[data-tone="ok"]   { color: var(--t-ok, #2E7D32); }
-.condition-picker .cp-row-test[data-tone="fail"] { color: var(--t-danger,  #B0322A); }
+.condition-picker .cp-row-test[data-tone="ok"] {
+  color: var(--t-ok, #2e7d32);
+}
+.condition-picker .cp-row-test[data-tone="fail"] {
+  color: var(--t-danger, #b0322a);
+}
 .condition-picker .cp-error {
-  color: var(--t-danger, #B0322A);
+  color: var(--t-danger, #b0322a);
 }
 .condition-picker .cp-advanced > summary {
   cursor: pointer;
@@ -653,9 +757,9 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
    typography so character positions line up exactly. */
 .cp-json-editor {
   position: relative;
-  border: 1px solid var(--t-border, color-mix(in oklab, var(--t-fg, #1B1A16) 18%, transparent));
+  border: 1px solid var(--t-border, color-mix(in oklab, var(--t-fg, #1b1a16) 18%, transparent));
   border-radius: var(--t-radius-sm, 6px);
-  background: color-mix(in oklab, var(--t-fg, #1B1A16) 3%, transparent);
+  background: color-mix(in oklab, var(--t-fg, #1b1a16) 3%, transparent);
   overflow: hidden;
 }
 .cp-json-editor .cp-jh,
@@ -676,7 +780,7 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   position: absolute;
   inset: 0;
   overflow: auto;
-  color: var(--t-fg, #1B1A16);
+  color: var(--t-fg, #1b1a16);
 }
 .cp-json-editor textarea {
   position: relative;
@@ -686,12 +790,12 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   border: 0;
   background: transparent;
   color: transparent;
-  caret-color: var(--t-fg, #1B1A16);
+  caret-color: var(--t-fg, #1b1a16);
   resize: vertical;
   outline: none;
 }
 .cp-json-editor textarea::selection {
-  background: color-mix(in oklab, var(--t-accent, #C24F2C) 30%, transparent);
+  background: color-mix(in oklab, var(--t-accent, #c24f2c) 30%, transparent);
 }
 /* v0.63.0: the per-token classes (cp-jh-key / -str / -num / -kw)
    used to live here with their own palette. The condition picker
@@ -706,7 +810,9 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
    and this selector stops matching, the .cp-json-editor rules above
    take over. */
 @media (max-width: 540px) {
-  .rot-step-cond-label { display: none; }
+  .rot-step-cond-label {
+    display: none;
+  }
 }
 
 /* Step preview cards: page name on one line, bound devices listed below. */
@@ -784,11 +890,7 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   display: block;
   height: 100%;
   width: 0%;
-  background: linear-gradient(
-    to right,
-    var(--t-accent, #0d8c7e),
-    var(--t-accent-hover, #0d8c7e)
-  );
+  background: linear-gradient(to right, var(--t-accent, #0d8c7e), var(--t-accent-hover, #0d8c7e));
   border-radius: inherit;
   transition: width 0.95s linear;
 }
@@ -817,7 +919,9 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   padding: 2px 6px;
   color: var(--t-fg-soft, var(--text-muted));
   opacity: 0.55;
-  transition: opacity 0.15s ease, color 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    color 0.15s ease;
 }
 .rotation-steps-preview li:hover .rot-step-play .btn--icon,
 .rot-step-play .btn--icon:focus-visible {

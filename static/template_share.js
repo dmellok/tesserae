@@ -19,8 +19,10 @@
   var btn = document.getElementById("panels-share");
   if (!btn) return;
   var host = document.querySelector("[data-canvas-id]");
-  var canvasId = (host && host.getAttribute("data-canvas-id")) ||
-    (location.pathname.match(/\/c\/([a-z0-9]+)/) || [])[1] || "";
+  var canvasId =
+    (host && host.getAttribute("data-canvas-id")) ||
+    (location.pathname.match(/\/c\/([a-z0-9]+)/) || [])[1] ||
+    "";
   if (!canvasId) return;
 
   var overlay = null;
@@ -32,12 +34,17 @@
       else if (k === "html") node.innerHTML = attrs[k];
       else node.setAttribute(k, attrs[k]);
     });
-    (children || []).forEach(function (c) { node.appendChild(c); });
+    (children || []).forEach(function (c) {
+      node.appendChild(c);
+    });
     return node;
   }
 
   function close() {
-    if (overlay) { overlay.remove(); overlay = null; }
+    if (overlay) {
+      overlay.remove();
+      overlay = null;
+    }
   }
 
   // POST and parse JSON, keeping a transport failure distinct from a reply
@@ -54,18 +61,29 @@
       function (resp) {
         return resp.text().then(function (text) {
           var body = null;
-          try { body = JSON.parse(text); } catch (err) { body = null; }
+          try {
+            body = JSON.parse(text);
+          } catch {
+            body = null;
+          }
           if (!body || typeof body !== "object") {
             throw new Error(
-              "the server replied " + resp.status + " " + (resp.statusText || "") +
-              " instead of JSON" +
-              (resp.redirected ? " (redirected to " + resp.url + "; the session may have expired)" : "")
+              "the server replied " +
+                resp.status +
+                " " +
+                (resp.statusText || "") +
+                " instead of JSON" +
+                (resp.redirected
+                  ? " (redirected to " + resp.url + "; the session may have expired)"
+                  : "")
             );
           }
           return { ok: resp.ok, body: body };
         });
       },
-      function () { throw new Error("couldn't reach the server"); }
+      function () {
+        throw new Error("couldn't reach the server");
+      }
     );
   }
 
@@ -80,29 +98,47 @@
       "background:var(--t-surface,#fff);color:inherit;border-radius:14px;max-width:680px;" +
       "width:100%;max-height:90vh;overflow-y:auto;padding:20px;box-shadow:0 12px 48px rgba(0,0,0,.3)";
     overlay.appendChild(card);
-    overlay.addEventListener("click", function (ev) { if (ev.target === overlay) close(); });
+    overlay.addEventListener("click", function (ev) {
+      if (ev.target === overlay) close();
+    });
 
     card.appendChild(el("h2", { text: "Share as a community template" }));
 
     if (prep.blocking && prep.blocking.length) {
       var blocks = el("div", {});
-      blocks.style.cssText = "background:rgba(178,34,34,.08);border:1px solid rgba(178,34,34,.4);" +
+      blocks.style.cssText =
+        "background:rgba(178,34,34,.08);border:1px solid rgba(178,34,34,.4);" +
         "border-radius:8px;padding:10px 12px;margin:10px 0";
       blocks.appendChild(el("strong", { text: "Can't share yet:" }));
-      prep.blocking.forEach(function (b) { blocks.appendChild(el("div", { text: "• " + b })); });
+      prep.blocking.forEach(function (b) {
+        blocks.appendChild(el("div", { text: "• " + b }));
+      });
       card.appendChild(blocks);
-      card.appendChild(el("button", { class: "pbtn", text: "Close" })).addEventListener("click", close);
+      card
+        .appendChild(el("button", { class: "pbtn", text: "Close" }))
+        .addEventListener("click", close);
       document.body.appendChild(overlay);
       return;
     }
 
     if (!prep.online) {
-      card.appendChild(el("p", { text: "Online features are disabled in Settings, so submitting is unavailable. You can review what an export would look like below." }));
+      card.appendChild(
+        el("p", {
+          text: "Online features are disabled in Settings, so submitting is unavailable. You can review what an export would look like below.",
+        })
+      );
     }
     if (prep.author && prep.author.name) {
-      card.appendChild(el("p", { html: "You'll appear as <strong>" + prep.author.name +
-        "</strong>" + (prep.author.sponsor ? " ♥" : "") +
-        " <span style='opacity:.7'>(a stable pseudonym; sponsors can pick a custom name)</span>" }));
+      card.appendChild(
+        el("p", {
+          html:
+            "You'll appear as <strong>" +
+            prep.author.name +
+            "</strong>" +
+            (prep.author.sponsor ? " ♥" : "") +
+            " <span style='opacity:.7'>(a stable pseudonym; sponsors can pick a custom name)</span>",
+        })
+      );
     }
 
     // The preview is a LIVE render of this dashboard, and it travels with the
@@ -111,24 +147,32 @@
     // showing right now (calendar entries, addresses, sensor readings) is in
     // that image, so say so plainly right next to it rather than burying it.
     var notice = el("div", {});
-    notice.style.cssText = "background:rgba(184,134,11,.10);border:1px solid rgba(184,134,11,.45);" +
+    notice.style.cssText =
+      "background:rgba(184,134,11,.10);border:1px solid rgba(184,134,11,.45);" +
       "border-radius:8px;padding:10px 12px;margin:10px 0 4px";
     notice.appendChild(el("strong", { text: "This image gets shared, exactly as you see it" }));
-    notice.appendChild(el("div", {
-      text: "It's a live render of your dashboard right now. Reviewers see it while " +
-        "your template is pending, and it becomes the public preview once approved.",
-      style: "margin-top:2px",
-    }));
-    notice.appendChild(el("div", {
-      text: "If it's showing anything you'd rather not publish (names, addresses, " +
-        "appointments, sensor readings), duplicate this dashboard, swap in " +
-        "placeholder values, and share the copy instead.",
-      style: "margin-top:6px",
-    }));
+    notice.appendChild(
+      el("div", {
+        text:
+          "It's a live render of your dashboard right now. Reviewers see it while " +
+          "your template is pending, and it becomes the public preview once approved.",
+        style: "margin-top:2px",
+      })
+    );
+    notice.appendChild(
+      el("div", {
+        text:
+          "If it's showing anything you'd rather not publish (names, addresses, " +
+          "appointments, sensor readings), duplicate this dashboard, swap in " +
+          "placeholder values, and share the copy instead.",
+        style: "margin-top:6px",
+      })
+    );
     card.appendChild(notice);
 
     var img = el("img", { alt: "Preview" });
-    img.style.cssText = "max-width:100%;border:1px solid var(--t-border,#ddd);border-radius:8px;margin:8px 0";
+    img.style.cssText =
+      "max-width:100%;border:1px solid var(--t-border,#ddd);border-radius:8px;margin:8px 0";
     img.src = PREFIX + "/pages/canvas/c/" + canvasId + "/preview.png?t=" + Date.now();
     card.appendChild(img);
 
@@ -136,26 +180,36 @@
     var q = prep.quality || {};
     var warnings = [];
     if (q.available) {
-      if ((q.overflow || []).length) warnings.push((q.overflow.length) + " element(s) overflow their box");
-      if ((q.icon_invalid || []).length) warnings.push((q.icon_invalid.length) + " icon reference(s) resolve to no glyph");
-      if ((q.tap_invalid || []).length) warnings.push((q.tap_invalid.length) + " touch region(s) would not fire");
+      if ((q.overflow || []).length)
+        warnings.push(q.overflow.length + " element(s) overflow their box");
+      if ((q.icon_invalid || []).length)
+        warnings.push(q.icon_invalid.length + " icon reference(s) resolve to no glyph");
+      if ((q.tap_invalid || []).length)
+        warnings.push(q.tap_invalid.length + " touch region(s) would not fire");
     }
-    (prep.lint && prep.lint.warnings || []).forEach(function (w) {
+    ((prep.lint && prep.lint.warnings) || []).forEach(function (w) {
       warnings.push("possible secret at " + w.where + " (" + w.rule + ")");
     });
     if (warnings.length) {
       var warn = el("div", {});
-      warn.style.cssText = "background:rgba(184,134,11,.08);border:1px solid rgba(184,134,11,.4);" +
+      warn.style.cssText =
+        "background:rgba(184,134,11,.08);border:1px solid rgba(184,134,11,.4);" +
         "border-radius:8px;padding:10px 12px;margin:8px 0";
       warn.appendChild(el("strong", { text: "Worth checking before you submit:" }));
-      warnings.forEach(function (w) { warn.appendChild(el("div", { text: "• " + w })); });
+      warnings.forEach(function (w) {
+        warn.appendChild(el("div", { text: "• " + w }));
+      });
       card.appendChild(warn);
     }
 
     if ((prep.redactions || []).length) {
       var red = el("details", {});
-      red.appendChild(el("summary", { text: "Removed before sharing (" + prep.redactions.length + ")" }));
-      prep.redactions.forEach(function (r) { red.appendChild(el("div", { text: "• " + r })); });
+      red.appendChild(
+        el("summary", { text: "Removed before sharing (" + prep.redactions.length + ")" })
+      );
+      prep.redactions.forEach(function (r) {
+        red.appendChild(el("div", { text: "• " + r }));
+      });
       red.style.cssText = "margin:8px 0;opacity:.85";
       card.appendChild(red);
     }
@@ -164,10 +218,18 @@
     form.style.cssText = "display:flex;flex-direction:column;gap:8px;margin-top:8px";
     var title = el("input", { type: "text", maxlength: "80", placeholder: "Template title" });
     title.value = (prep.template && prep.template.title) || "";
-    var desc = el("textarea", { rows: "3", maxlength: "1000", placeholder: "What is this dashboard for? What hardware does it look best on?" });
-    var tags = el("input", { type: "text", placeholder: "tags, comma separated (e.g. weather, 6-color)" });
+    var desc = el("textarea", {
+      rows: "3",
+      maxlength: "1000",
+      placeholder: "What is this dashboard for? What hardware does it look best on?",
+    });
+    var tags = el("input", {
+      type: "text",
+      placeholder: "tags, comma separated (e.g. weather, 6-color)",
+    });
     [title, desc, tags].forEach(function (i) {
-      i.style.cssText = "padding:8px 10px;border:1px solid var(--t-border,#ccc);border-radius:8px;font:inherit;background:transparent;color:inherit";
+      i.style.cssText =
+        "padding:8px 10px;border:1px solid var(--t-border,#ccc);border-radius:8px;font:inherit;background:transparent;color:inherit";
       form.appendChild(i);
     });
 
@@ -182,10 +244,17 @@
         include.checked = true;
         var label = el("input", { type: "text" });
         label.value = s.label || s.name;
-        label.style.cssText = "flex:1;padding:6px 8px;border:1px solid var(--t-border,#ccc);border-radius:6px;font:inherit;background:transparent;color:inherit";
+        label.style.cssText =
+          "flex:1;padding:6px 8px;border:1px solid var(--t-border,#ccc);border-radius:6px;font:inherit;background:transparent;color:inherit";
         row.appendChild(include);
         row.appendChild(label);
-        if (s.secret) row.appendChild(el("span", { text: "secret", title: "Installer's value is entered masked and stays on their machine" }));
+        if (s.secret)
+          row.appendChild(
+            el("span", {
+              text: "secret",
+              title: "Installer's value is entered masked and stays on their machine",
+            })
+          );
         form.appendChild(row);
         inputRows.push({ spec: s, include: include, label: label });
       });
@@ -202,25 +271,42 @@
     var status = el("div", {});
     status.style.cssText = "margin-top:8px;opacity:.85";
     submit.addEventListener("click", function () {
-      if (!window.confirm(
-        "Submit this dashboard as a community template?\n\n" +
-        "The preview image above is sent with it: reviewers see it now, and it " +
-        "becomes public once approved. Check it isn't showing anything private."
-      )) return;
+      if (
+        !window.confirm(
+          "Submit this dashboard as a community template?\n\n" +
+            "The preview image above is sent with it: reviewers see it now, and it " +
+            "becomes public once approved. Check it isn't showing anything private."
+        )
+      )
+        return;
       submit.disabled = true;
       status.textContent = "Submitting…";
-      var chosen = inputRows.filter(function (r) { return r.include.checked; }).map(function (r) {
-        var spec = r.spec;
-        return {
-          name: spec.name, label: r.label.value || spec.name, type: spec.type,
-          secret: !!spec.secret, required: !!spec.required, default: spec.default || "",
-          choices: spec.choices || [], targets: spec.targets,
-        };
-      });
+      var chosen = inputRows
+        .filter(function (r) {
+          return r.include.checked;
+        })
+        .map(function (r) {
+          var spec = r.spec;
+          return {
+            name: spec.name,
+            label: r.label.value || spec.name,
+            type: spec.type,
+            secret: !!spec.secret,
+            required: !!spec.required,
+            default: spec.default || "",
+            choices: spec.choices || [],
+            targets: spec.targets,
+          };
+        });
       postJson("/panels/c/" + canvasId + "/share/submit", {
         title: title.value,
         description: desc.value,
-        tags: tags.value.split(",").map(function (t) { return t.trim(); }).filter(Boolean),
+        tags: tags.value
+          .split(",")
+          .map(function (t) {
+            return t.trim();
+          })
+          .filter(Boolean),
         inputs: chosen,
       })
         .then(function (r) {
@@ -229,8 +315,10 @@
             submit.disabled = false;
             return;
           }
-          status.textContent = "Submitted. It's pending review and will appear in Browse → Templates once approved. You'll show as " +
-            ((r.body.author && r.body.author.name) || "your pseudonym") + ".";
+          status.textContent =
+            "Submitted. It's pending review and will appear in Browse → Templates once approved. You'll show as " +
+            ((r.body.author && r.body.author.name) || "your pseudonym") +
+            ".";
           submit.remove();
           cancel.textContent = "Done";
         })

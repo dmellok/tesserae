@@ -3,7 +3,11 @@
  * editor loads this; the canvas editor styles the same controls itself)
  * without colliding with the host's own classes. Uses the admin theme
  * tokens (--t-*), which are globally available on Tesserae pages. */
-.ti-root { display: flex; flex-direction: column; gap: 6px; }
+.ti-root {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 .ti-root .prow {
   display: flex;
   align-items: flex-start;
@@ -26,7 +30,9 @@
   font: 500 12.5px var(--t-font, system-ui);
   padding: 5px 8px;
 }
-.ti-root textarea.dinput { line-height: 1.4; }
+.ti-root textarea.dinput {
+  line-height: 1.4;
+}
 .ti-root .psel:focus,
 .ti-root .dinput:focus {
   outline: none;
@@ -45,7 +51,9 @@
   padding: 5px 8px;
   cursor: pointer;
 }
-.ti-root .minibtn:hover { background: var(--t-surface-sunk, #f0efec); }
+.ti-root .minibtn:hover {
+  background: var(--t-surface-sunk, #f0efec);
+}
 .ti-root .note {
   font: 500 11px var(--t-font, system-ui);
   line-height: 1.4;

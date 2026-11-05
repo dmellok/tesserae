@@ -7,53 +7,206 @@
    the useful question mid-build is "where has it got to", which one line can't
    answer. Older lines dim, the live line is full ink, and the whole thing is a
    fixed three-line window: what it just did, and what it is doing now. */
-#agent-follow{position:fixed;right:18px;bottom:18px;z-index:250;width:min(370px,calc(100vw - 36px));opacity:0;transform:translateY(14px);transition:opacity .2s ease,transform .22s cubic-bezier(.2,.8,.3,1);pointer-events:none}
-#agent-follow.is-up{opacity:1;transform:none;pointer-events:auto}
-#agent-follow[hidden]{display:none}
-.af-card{background:var(--t-surface);border:1px solid var(--t-border);border-radius:10px;box-shadow:var(--t-shadow-lg);overflow:hidden}
+#agent-follow {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 250;
+  width: min(370px, calc(100vw - 36px));
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 0.2s ease,
+    transform 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
+  pointer-events: none;
+}
+#agent-follow.is-up {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+#agent-follow[hidden] {
+  display: none;
+}
+.af-card {
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  border-radius: 10px;
+  box-shadow: var(--t-shadow-lg);
+  overflow: hidden;
+}
 
 /* ---- header: what is being built, and how far in ---- */
-.af-head{display:flex;align-items:center;gap:8px;padding:8px 6px 8px 12px;border-bottom:1px solid var(--t-border);background:var(--t-surface-soft)}
-.af-name{flex:1;min-width:0;font:600 12px var(--t-font);color:var(--t-fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.af-count{font:500 10px var(--t-font-mono);color:var(--t-muted);white-space:nowrap}
-.af-x{width:22px;height:22px;flex:none;display:grid;place-items:center;border:0;background:transparent;color:var(--t-muted);font-size:16px;line-height:1;cursor:pointer;border-radius:6px}
-.af-x:hover{background:var(--t-surface-sunk);color:var(--t-fg)}
+.af-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 6px 8px 12px;
+  border-bottom: 1px solid var(--t-border);
+  background: var(--t-surface-soft);
+}
+.af-name {
+  flex: 1;
+  min-width: 0;
+  font: 600 12px var(--t-font);
+  color: var(--t-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.af-count {
+  font: 500 10px var(--t-font-mono);
+  color: var(--t-muted);
+  white-space: nowrap;
+}
+.af-x {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--t-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.af-x:hover {
+  background: var(--t-surface-sunk);
+  color: var(--t-fg);
+}
 /* One dot, pulsing outward. Slows to a stall while the agent is between calls,
    so the difference between working and thinking is visible from across a room
    without reading a word of it. */
-.af-pulse{flex:none;width:6px;height:6px;border-radius:50%;background:var(--t-accent);animation:af-pulse 1.8s ease-out infinite}
-.af-pulse.is-slow{background:var(--t-border-strong);animation-duration:3.4s}
-@keyframes af-pulse{
-  0%{box-shadow:0 0 0 0 color-mix(in srgb, var(--t-accent) 55%, transparent)}
-  70%{box-shadow:0 0 0 7px transparent}
-  100%{box-shadow:0 0 0 0 transparent}
+.af-pulse {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--t-accent);
+  animation: af-pulse 1.8s ease-out infinite;
+}
+.af-pulse.is-slow {
+  background: var(--t-border-strong);
+  animation-duration: 3.4s;
+}
+@keyframes af-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--t-accent) 55%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 7px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
 }
 
 /* ---- the tape ---- */
-.af-tape{padding:7px 12px 8px;display:grid;gap:3px}
-.af-l{display:flex;align-items:baseline;gap:7px;font:500 10.5px var(--t-font-mono);color:var(--t-muted);min-width:0}
-.af-m{flex:none;width:9px;text-align:center;color:var(--t-border-strong)}
-.af-lt{white-space:nowrap;flex:none}
-.af-lo{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.85}
-.af-lo::before{content:"· ";opacity:.6}
+.af-tape {
+  padding: 7px 12px 8px;
+  display: grid;
+  gap: 3px;
+}
+.af-l {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font: 500 10.5px var(--t-font-mono);
+  color: var(--t-muted);
+  min-width: 0;
+}
+.af-m {
+  flex: none;
+  width: 9px;
+  text-align: center;
+  color: var(--t-border-strong);
+}
+.af-lt {
+  white-space: nowrap;
+  flex: none;
+}
+.af-lo {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.85;
+}
+.af-lo::before {
+  content: "· ";
+  opacity: 0.6;
+}
 /* Everything above the live line is history: present, but not competing. */
-.af-l:not(.is-now):not(.is-think):not(.is-err){opacity:.62}
-.af-l.is-now{color:var(--t-fg)}
-.af-l.is-now .af-m{color:var(--t-accent)}
-.af-l.is-think{color:var(--t-fg-soft)}
-.af-l.is-err{color:var(--t-danger)}
-.af-l.is-err .af-m{color:var(--t-danger)}
+.af-l:not(.is-now):not(.is-think):not(.is-err) {
+  opacity: 0.62;
+}
+.af-l.is-now {
+  color: var(--t-fg);
+}
+.af-l.is-now .af-m {
+  color: var(--t-accent);
+}
+.af-l.is-think {
+  color: var(--t-fg-soft);
+}
+.af-l.is-err {
+  color: var(--t-danger);
+}
+.af-l.is-err .af-m {
+  color: var(--t-danger);
+}
 
 /* ---- actions ---- */
-.af-acts{display:flex;align-items:center;gap:7px;padding:0 12px 11px}
-.af-btn{font:600 11px var(--t-font);padding:5px 11px;border-radius:999px;cursor:pointer;background:transparent;color:var(--t-muted);border:1px solid var(--t-border-strong)}
-.af-btn:hover{color:var(--t-fg);border-color:var(--t-muted)}
-.af-btn.accent{background:var(--t-accent);color:var(--t-accent-fg);border-color:transparent}
-.af-btn.accent:hover{background:var(--t-accent-hover);color:var(--t-accent-fg)}
-.af-follow{display:inline-flex;align-items:center;gap:5px;font:500 10px var(--t-font-mono);color:var(--t-muted);cursor:pointer;margin-left:auto}
-.af-follow input{margin:0;accent-color:var(--t-accent)}
+.af-acts {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px 11px;
+}
+.af-btn {
+  font: 600 11px var(--t-font);
+  padding: 5px 11px;
+  border-radius: 999px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--t-muted);
+  border: 1px solid var(--t-border-strong);
+}
+.af-btn:hover {
+  color: var(--t-fg);
+  border-color: var(--t-muted);
+}
+.af-btn.accent {
+  background: var(--t-accent);
+  color: var(--t-accent-fg);
+  border-color: transparent;
+}
+.af-btn.accent:hover {
+  background: var(--t-accent-hover);
+  color: var(--t-accent-fg);
+}
+.af-follow {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font: 500 10px var(--t-font-mono);
+  color: var(--t-muted);
+  cursor: pointer;
+  margin-left: auto;
+}
+.af-follow input {
+  margin: 0;
+  accent-color: var(--t-accent);
+}
 
-@media (prefers-reduced-motion:reduce){
-  #agent-follow{transition:none}
-  .af-pulse{animation:none}
+@media (prefers-reduced-motion: reduce) {
+  #agent-follow {
+    transition: none;
+  }
+  .af-pulse {
+    animation: none;
+  }
 }

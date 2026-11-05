@@ -131,7 +131,8 @@
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "lf-sort-btn";
-      btn.innerHTML = '<span class="lf-sort-label"></span><i class="ph ph-caret-up-down lf-caret" aria-hidden="true"></i>';
+      btn.innerHTML =
+        '<span class="lf-sort-label"></span><i class="ph ph-caret-up-down lf-caret" aria-hidden="true"></i>';
       btn.querySelector(".lf-sort-label").textContent = label;
       h.textContent = "";
       h.appendChild(btn);
@@ -157,7 +158,9 @@
       return opt ? opt.getAttribute("data-type") || "text" : null;
     }
     function typeFromHead(k) {
-      const h = heads.find(function (x) { return x.getAttribute("data-lf-sort-key") === k; });
+      const h = heads.find(function (x) {
+        return x.getAttribute("data-lf-sort-key") === k;
+      });
       return h ? h.getAttribute("data-lf-sort-type") || "text" : null;
     }
 
@@ -168,19 +171,24 @@
         h.setAttribute("aria-sort", state);
         h.classList.toggle("is-sorted", !!on);
         const caret = h.querySelector(".lf-caret");
-        if (caret) caret.className = "ph lf-caret " + (on ? (sort.dir === "asc" ? "ph-caret-up" : "ph-caret-down") : "ph-caret-up-down");
+        if (caret)
+          caret.className =
+            "ph lf-caret " +
+            (on ? (sort.dir === "asc" ? "ph-caret-up" : "ph-caret-down") : "ph-caret-up-down");
         const btn = h.querySelector(".lf-sort-btn");
         if (btn) {
           const label = (h.querySelector(".lf-sort-label") || btn).textContent;
           btn.setAttribute(
             "aria-label",
-            "Sort by " + label + (on ? (sort.dir === "asc" ? ", ascending" : ", descending") : ""),
+            "Sort by " + label + (on ? (sort.dir === "asc" ? ", ascending" : ", descending") : "")
           );
         }
       });
       if (sortMenu) {
         const want = sort ? sort.key + ":" + sort.dir : "";
-        const has = Array.prototype.some.call(sortMenu.options, function (o) { return o.value === want; });
+        const has = Array.prototype.some.call(sortMenu.options, function (o) {
+          return o.value === want;
+        });
         sortMenu.value = has ? want : "";
       }
     }
@@ -203,10 +211,15 @@
         if (parents.indexOf(it.parentNode) === -1) parents.push(it.parentNode);
       });
       parents.forEach(function (parent) {
-        const mine = all.filter(function (it) { return it.parentNode === parent; });
-        const blocks = mine.map(function (it) { return { it: it, tails: tails(it) }; });
+        const mine = all.filter(function (it) {
+          return it.parentNode === parent;
+        });
+        const blocks = mine.map(function (it) {
+          return { it: it, tails: tails(it) };
+        });
         const last = blocks[blocks.length - 1];
-        const anchor = (last.tails.length ? last.tails[last.tails.length - 1] : last.it).nextSibling;
+        const anchor = (last.tails.length ? last.tails[last.tails.length - 1] : last.it)
+          .nextSibling;
         const sorted = blocks.slice().sort(function (a, b) {
           if (sort) {
             const va = sortValue(a.it, sort);
@@ -220,11 +233,15 @@
           }
           return a.it.__lfIdx - b.it.__lfIdx;
         });
-        const same = sorted.every(function (b, i) { return b === blocks[i]; });
+        const same = sorted.every(function (b, i) {
+          return b === blocks[i];
+        });
         if (same) return;
         sorted.forEach(function (b) {
           parent.insertBefore(b.it, anchor);
-          b.tails.forEach(function (t) { parent.insertBefore(t, anchor); });
+          b.tails.forEach(function (t) {
+            parent.insertBefore(t, anchor);
+          });
         });
       });
     }
@@ -244,8 +261,13 @@
             const f = filters[i];
             const v = f.value;
             if (!v) continue;
-            const have = (it.getAttribute("data-lf-" + f.getAttribute("data-lf-filter")) || "").split(/\s+/);
-            if (have.indexOf(v) === -1) { show = false; break; }
+            const have = (
+              it.getAttribute("data-lf-" + f.getAttribute("data-lf-filter")) || ""
+            ).split(/\s+/);
+            if (have.indexOf(v) === -1) {
+              show = false;
+              break;
+            }
           }
         }
         const uid = it.getAttribute("data-lf-uid");
@@ -261,12 +283,22 @@
           }
         }
         it.toggleAttribute("data-lf-out", !show);
-        tails(it).forEach(function (t) { t.toggleAttribute("data-lf-out", !show); });
+        tails(it).forEach(function (t) {
+          t.toggleAttribute("data-lf-out", !show);
+        });
       });
-      const filtered = !!q || filters.some(function (f) { return !!f.value; });
+      const filtered =
+        !!q ||
+        filters.some(function (f) {
+          return !!f.value;
+        });
       own("[data-lf-group]").forEach(function (g) {
-        const vis = visible.filter(function (it) { return g.contains(it); }).length;
-        const has = all.filter(function (it) { return g.contains(it); }).length;
+        const vis = visible.filter(function (it) {
+          return g.contains(it);
+        }).length;
+        const has = all.filter(function (it) {
+          return g.contains(it);
+        }).length;
         g.toggleAttribute("data-lf-out", has > 0 && !vis);
         g.querySelectorAll("[data-lf-group-count]").forEach(function (c) {
           if (c.closest("[data-lf-group]") === g) c.textContent = phrase(c, vis, has, filtered);
@@ -274,12 +306,24 @@
       });
       root.classList.toggle("lf-is-filtered", filtered);
       root.classList.toggle("lf-is-searching", !!q);
-      counts.forEach(function (c) { c.textContent = phrase(c, unique, totalUnique, filtered); });
-      empties.forEach(function (e) { e.hidden = !(all.length && !visible.length); });
-      root.dispatchEvent(new CustomEvent("lf:change", {
-        bubbles: true,
-        detail: { items: all, visible: visible, unique: unique, total: totalUnique, filtered: filtered },
-      }));
+      counts.forEach(function (c) {
+        c.textContent = phrase(c, unique, totalUnique, filtered);
+      });
+      empties.forEach(function (e) {
+        e.hidden = !(all.length && !visible.length);
+      });
+      root.dispatchEvent(
+        new CustomEvent("lf:change", {
+          bubbles: true,
+          detail: {
+            items: all,
+            visible: visible,
+            unique: unique,
+            total: totalUnique,
+            filtered: filtered,
+          },
+        })
+      );
     }
 
     function apply() {
@@ -303,14 +347,26 @@
     paintSortControls();
 
     if (search) search.addEventListener("input", filterPass);
-    filters.forEach(function (f) { f.addEventListener("change", filterPass); });
+    filters.forEach(function (f) {
+      f.addEventListener("change", filterPass);
+    });
     if (sortMenu) {
       sortMenu.addEventListener("change", function () {
         const v = sortMenu.value;
-        if (!v) { setSort(null, true); return; }
+        if (!v) {
+          setSort(null, true);
+          return;
+        }
         const parts = v.split(":");
         const opt = sortMenu.options[sortMenu.selectedIndex];
-        setSort({ key: parts[0], dir: parts[1] === "desc" ? "desc" : "asc", type: (opt && opt.getAttribute("data-type")) || "text" }, true);
+        setSort(
+          {
+            key: parts[0],
+            dir: parts[1] === "desc" ? "desc" : "asc",
+            type: (opt && opt.getAttribute("data-type")) || "text",
+          },
+          true
+        );
       });
     }
 
@@ -323,8 +379,12 @@
           for (let j = 0; j < added.length; j++) {
             const n = added[j];
             if (n.nodeType !== 1) continue;
-            if ((n.matches("[data-lf-item]") && n.__lfIdx === undefined) ||
-                Array.prototype.some.call(n.querySelectorAll("[data-lf-item]"), function (x) { return x.__lfIdx === undefined; })) {
+            if (
+              (n.matches("[data-lf-item]") && n.__lfIdx === undefined) ||
+              Array.prototype.some.call(n.querySelectorAll("[data-lf-item]"), function (x) {
+                return x.__lfIdx === undefined;
+              })
+            ) {
               fresh = true;
               break;
             }
@@ -339,7 +399,14 @@
     }
 
     apply();
-    const api = { apply: apply, refresh: function () { index(items(), !sort); apply(); }, root: root };
+    const api = {
+      apply: apply,
+      refresh: function () {
+        index(items(), !sort);
+        apply();
+      },
+      root: root,
+    };
     root.__lf = api;
     return api;
   }
@@ -350,7 +417,9 @@
 
   window.TesseraeListFilter = { init: init, initAll: initAll };
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", function () { initAll(); });
+    document.addEventListener("DOMContentLoaded", function () {
+      initAll();
+    });
   } else {
     initAll();
   }

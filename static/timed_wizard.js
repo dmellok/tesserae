@@ -3,38 +3,36 @@
 // rotation endpoints via fetch (respond=json) so the dialog can stay on its
 // created screen; deck mode creates the deck and hands off to the editor.
 (function () {
-  const dialog = document.getElementById('timed-wizard');
-  const openers = Array.from(document.querySelectorAll('[data-open-timed-wizard]'));
-  if (!dialog || !openers.length || typeof dialog.showModal !== 'function') return;
+  const dialog = document.getElementById("timed-wizard");
+  const openers = Array.from(document.querySelectorAll("[data-open-timed-wizard]"));
+  if (!dialog || !openers.length || typeof dialog.showModal !== "function") return;
 
   const $ = (sel) => dialog.querySelector(sel);
   const $$ = (sel) => Array.from(dialog.querySelectorAll(sel));
 
   let DASHBOARDS = [];
   try {
-    DASHBOARDS = JSON.parse($('[data-wizard-dashboards]').textContent);
-  } catch (err) {
+    DASHBOARDS = JSON.parse($("[data-wizard-dashboards]").textContent);
+  } catch {
     DASHBOARDS = [];
   }
   const nameOf = (id) => {
     const d = DASHBOARDS.find((x) => x.id === id);
-    return d ? d.name : '';
+    return d ? d.name : "";
   };
 
   // Display scoping for the multi-pick modes: a rotation or deck plays as a
   // unit on ONE display, so only dashboards bound to the chosen display (or
   // to none yet) are offered. Without this, picks bound to different
   // displays each land on their own panel and nothing visibly rotates.
-  const deviceSel = $('[data-wizard-device]');
-  const deviceOptions = deviceSel
-    ? Array.from(deviceSel.options).filter((o) => o.value)
-    : [];
+  const deviceSel = $("[data-wizard-device]");
+  const deviceOptions = deviceSel ? Array.from(deviceSel.options).filter((o) => o.value) : [];
   const deviceName = (id) => {
     const o = deviceOptions.find((x) => x.value === id);
-    return o ? o.textContent.trim() : '';
+    return o ? o.textContent.trim() : "";
   };
-  const scoped = () => deviceOptions.length > 0
-    && (state.mode === 'cycle' || state.mode === 'deck');
+  const scoped = () =>
+    deviceOptions.length > 0 && (state.mode === "cycle" || state.mode === "deck");
   const onDisplay = (d) => {
     const bound = d.devices || [];
     return bound.length === 0 || bound.includes(state.device);
@@ -44,8 +42,8 @@
   // never only inferred from the dashboard. "Every display it's on" keeps
   // the dashboard's own bindings (the record stays unbound); a specific
   // display narrows the send to that one panel.
-  const ALL_BOUND = '__all__';
-  const single = () => state.mode === 'daily' || state.mode === 'interval';
+  const ALL_BOUND = "__all__";
+  const single = () => state.mode === "daily" || state.mode === "interval";
   const knownIds = deviceOptions.map((o) => o.value);
   const boundOf = (dashId) => {
     const d = DASHBOARDS.find((x) => x.id === dashId);
@@ -55,7 +53,7 @@
     const bound = boundOf(dashId);
     if (bound.length === 1) return bound[0];
     if (bound.length > 1) return ALL_BOUND;
-    return deviceOptions.length === 1 ? deviceOptions[0].value : '';
+    return deviceOptions.length === 1 ? deviceOptions[0].value : "";
   };
   // The "every display" option only exists in single modes, and only when
   // the dashboard is on more than one display (on one, it IS that display).
@@ -64,9 +62,9 @@
     const existing = deviceSel.querySelector('option[value="' + ALL_BOUND + '"]');
     const bound = single() ? boundOf(state.dash) : [];
     if (bound.length > 1) {
-      const opt = existing || document.createElement('option');
+      const opt = existing || document.createElement("option");
       opt.value = ALL_BOUND;
-      opt.textContent = 'Every display it\u2019s on (' + bound.length + ')';
+      opt.textContent = "Every display it\u2019s on (" + bound.length + ")";
       if (!existing) {
         const anchor = deviceSel.querySelector('option[value=""]');
         deviceSel.insertBefore(opt, anchor ? anchor.nextSibling : deviceSel.firstChild);
@@ -78,9 +76,8 @@
     deviceSel.value = state.device;
   };
   const displayOk = () => deviceOptions.length === 0 || Boolean(state.device);
-  const displayLabel = () => (state.device === ALL_BOUND
-    ? 'Every display it\u2019s on'
-    : deviceName(state.device));
+  const displayLabel = () =>
+    state.device === ALL_BOUND ? "Every display it\u2019s on" : deviceName(state.device);
 
   const URLS = {
     // One create for all four intents (#204). The per-store URLs are still
@@ -100,18 +97,18 @@
   const initial = () => ({
     step: hasSuggest ? -1 : 0, // -1 suggest · 0 behaviour · 1 details · 2 review · 3 created
     mode: null, // 'daily' | 'interval' | 'cycle' | 'deck'
-    dash: DASHBOARDS.length ? DASHBOARDS[0].id : '',
-    device: deviceSel ? deviceSel.value : '', // multi-display installs start unpicked
-    time: '07:00',
+    dash: DASHBOARDS.length ? DASHBOARDS[0].id : "",
+    device: deviceSel ? deviceSel.value : "", // multi-display installs start unpicked
+    time: "07:00",
     interval: 15,
     picks: [], // ordered dashboard ids
     mins: {}, // { id: minutes }, default 5 on add, remembered on re-add
-    query: '',
-    name: '',
+    query: "",
+    name: "",
     pending: false,
     handed: false,
     openEditor: false, // cycle escape hatch: create, then land in the editor
-    error: '',
+    error: "",
   });
   let state = initial();
   // Where "Done" / closing should land after a create, so the list behind
@@ -120,80 +117,98 @@
   let editorUrl = null;
 
   const el = {
-    progress: $('[data-wizard-progress]'),
-    stepItems: $$('[data-step-item]'),
-    views: $$('[data-wizard-view]'),
-    choices: $$('[data-wizard-mode]'),
-    configTitle: $('[data-wizard-config-title]'),
-    configSub: $('[data-wizard-config-sub]'),
-    blocks: $$('[data-wizard-block]'),
-    dash: $('[data-wizard-dash]'),
-    time: $('[data-wizard-time]'),
-    interval: $('[data-wizard-interval]'),
-    intervalHint: $('[data-wizard-interval-hint]'),
-    presets: $$('[data-interval-preset]'),
-    query: $('[data-wizard-query]'),
-    results: $('[data-wizard-results]'),
-    pickCount: $('[data-wizard-pick-count]'),
-    multiHint: $('[data-wizard-multi-hint]'),
-    durationRows: $('[data-wizard-duration-rows]'),
-    durationsEmpty: $('[data-wizard-durations-empty]'),
-    cycleHint: $('[data-wizard-cycle-hint]'),
-    reviewSub: $('[data-wizard-review-sub]'),
-    name: $('[data-wizard-name]'),
-    summary: $('[data-wizard-summary]'),
-    plain: $('[data-wizard-plain]'),
-    escape: $('[data-wizard-escape]'),
-    displayHelp: $('[data-wizard-display-help]'),
-    advanced: $('[data-wizard-advanced]'),
-    doneTitle: $('[data-wizard-done-title]'),
-    doneBody: $('[data-wizard-done-body]'),
-    back: $('[data-wizard-back]'),
-    again: $('[data-wizard-again]'),
-    forward: $('[data-wizard-forward]'),
-    forwardLabel: $('[data-wizard-forward] span'),
-    error: $('[data-wizard-error]'),
+    progress: $("[data-wizard-progress]"),
+    stepItems: $$("[data-step-item]"),
+    views: $$("[data-wizard-view]"),
+    choices: $$("[data-wizard-mode]"),
+    configTitle: $("[data-wizard-config-title]"),
+    configSub: $("[data-wizard-config-sub]"),
+    blocks: $$("[data-wizard-block]"),
+    dash: $("[data-wizard-dash]"),
+    time: $("[data-wizard-time]"),
+    interval: $("[data-wizard-interval]"),
+    intervalHint: $("[data-wizard-interval-hint]"),
+    presets: $$("[data-interval-preset]"),
+    query: $("[data-wizard-query]"),
+    results: $("[data-wizard-results]"),
+    pickCount: $("[data-wizard-pick-count]"),
+    multiHint: $("[data-wizard-multi-hint]"),
+    durationRows: $("[data-wizard-duration-rows]"),
+    durationsEmpty: $("[data-wizard-durations-empty]"),
+    cycleHint: $("[data-wizard-cycle-hint]"),
+    reviewSub: $("[data-wizard-review-sub]"),
+    name: $("[data-wizard-name]"),
+    summary: $("[data-wizard-summary]"),
+    plain: $("[data-wizard-plain]"),
+    escape: $("[data-wizard-escape]"),
+    displayHelp: $("[data-wizard-display-help]"),
+    advanced: $("[data-wizard-advanced]"),
+    doneTitle: $("[data-wizard-done-title]"),
+    doneBody: $("[data-wizard-done-body]"),
+    back: $("[data-wizard-back]"),
+    again: $("[data-wizard-again]"),
+    forward: $("[data-wizard-forward]"),
+    forwardLabel: $("[data-wizard-forward] span"),
+    error: $("[data-wizard-error]"),
   };
 
   // ----- derived values -------------------------------------------------
   const prettyTime = () => {
-    const [h, m] = (state.time || '07:00').split(':').map(Number);
+    const [h, m] = (state.time || "07:00").split(":").map(Number);
     return window.tesseraeComponents.clockTime(new Date(2000, 0, 1, h, m));
   };
 
   const loopMinutes = () => state.picks.reduce((a, id) => a + Number(state.mins[id] || 5), 0);
 
   const autoName = () => {
-    if (state.mode === 'daily') return nameOf(state.dash) + ' at ' + prettyTime();
-    if (state.mode === 'interval') return nameOf(state.dash) + ' every ' + state.interval + ' min';
-    if (state.mode === 'cycle') return state.picks.length + '-dashboard rotation';
-    return state.picks.length + '-page deck';
+    if (state.mode === "daily") return nameOf(state.dash) + " at " + prettyTime();
+    if (state.mode === "interval") return nameOf(state.dash) + " every " + state.interval + " min";
+    if (state.mode === "cycle") return state.picks.length + "-dashboard rotation";
+    return state.picks.length + "-page deck";
   };
 
   const plain = () => {
-    if (state.mode === 'daily') {
-      return 'Every day at ' + prettyTime() + ', your display renders ' + nameOf(state.dash) +
-        ' once and holds it until the next send.';
+    if (state.mode === "daily") {
+      return (
+        "Every day at " +
+        prettyTime() +
+        ", your display renders " +
+        nameOf(state.dash) +
+        " once and holds it until the next send."
+      );
     }
-    if (state.mode === 'interval') {
-      return 'Your display re-renders ' + nameOf(state.dash) + ' every ' + state.interval +
-        ' minutes, all day.';
+    if (state.mode === "interval") {
+      return (
+        "Your display re-renders " +
+        nameOf(state.dash) +
+        " every " +
+        state.interval +
+        " minutes, all day."
+      );
     }
-    if (state.mode === 'cycle') {
-      return 'Your display steps through ' + state.picks.length +
-        ' dashboards in order, then starts over; a full loop takes about ' +
-        loopMinutes() + ' minutes.';
+    if (state.mode === "cycle") {
+      return (
+        "Your display steps through " +
+        state.picks.length +
+        " dashboards in order, then starts over; a full loop takes about " +
+        loopMinutes() +
+        " minutes."
+      );
     }
-    return 'Your display holds ' + state.picks.length + ' pages, pre-rendered on the device. ' +
-      'A button press, tap or swipe moves between them instantly.';
+    return (
+      "Your display holds " +
+      state.picks.length +
+      " pages, pre-rendered on the device. " +
+      "A button press, tap or swipe moves between them instantly."
+    );
   };
 
   const valid = () => {
     if (state.pending) return false;
     if (state.step === 0) return Boolean(state.mode);
     if (state.step === 1) {
-      if (state.mode === 'daily') return Boolean(state.dash) && Boolean(state.time) && displayOk();
-      if (state.mode === 'interval') {
+      if (state.mode === "daily") return Boolean(state.dash) && Boolean(state.time) && displayOk();
+      if (state.mode === "interval") {
         return Boolean(state.dash) && Number(state.interval) >= 1 && displayOk();
       }
       return (!scoped() || Boolean(state.device)) && state.picks.length >= 1;
@@ -208,95 +223,96 @@
     const q = state.query.trim().toLowerCase();
     const pool = scoped() && state.device ? DASHBOARDS.filter(onDisplay) : DASHBOARDS;
     const matches = pool.filter((d) => !q || d.name.toLowerCase().includes(q));
-    el.results.textContent = '';
+    el.results.textContent = "";
     if (!DASHBOARDS.length) {
-      const empty = document.createElement('p');
-      empty.className = 'wizard-list-empty';
-      empty.textContent = 'No dashboards yet. Create some first, then come back.';
+      const empty = document.createElement("p");
+      empty.className = "wizard-list-empty";
+      empty.textContent = "No dashboards yet. Create some first, then come back.";
       el.results.append(empty);
       return;
     }
     if (scoped() && !state.device) {
-      const empty = document.createElement('p');
-      empty.className = 'wizard-list-empty';
-      empty.textContent = 'Choose a display above to see its dashboards.';
+      const empty = document.createElement("p");
+      empty.className = "wizard-list-empty";
+      empty.textContent = "Choose a display above to see its dashboards.";
       el.results.append(empty);
       return;
     }
     if (!matches.length && !q) {
-      const empty = document.createElement('p');
-      empty.className = 'wizard-list-empty';
-      empty.textContent = 'No dashboards on this display yet. Assign some to it, or pick another display.';
+      const empty = document.createElement("p");
+      empty.className = "wizard-list-empty";
+      empty.textContent =
+        "No dashboards on this display yet. Assign some to it, or pick another display.";
       el.results.append(empty);
       return;
     }
     if (!matches.length) {
-      const empty = document.createElement('p');
-      empty.className = 'wizard-list-empty';
-      empty.textContent = 'No dashboards match “' + state.query.trim() + '”.';
+      const empty = document.createElement("p");
+      empty.className = "wizard-list-empty";
+      empty.textContent = "No dashboards match “" + state.query.trim() + "”.";
       el.results.append(empty);
       return;
     }
     matches.forEach((d) => {
       const on = state.picks.includes(d.id);
-      const row = document.createElement('button');
-      row.type = 'button';
-      row.className = 'wizard-page-row' + (on ? ' is-picked' : '');
-      row.setAttribute('role', 'option');
-      row.setAttribute('aria-selected', on ? 'true' : 'false');
-      const box = document.createElement('span');
-      box.className = 'wizard-checkbox';
-      box.setAttribute('aria-hidden', 'true');
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "wizard-page-row" + (on ? " is-picked" : "");
+      row.setAttribute("role", "option");
+      row.setAttribute("aria-selected", on ? "true" : "false");
+      const box = document.createElement("span");
+      box.className = "wizard-checkbox";
+      box.setAttribute("aria-hidden", "true");
       if (on) {
-        const check = document.createElement('i');
-        check.className = 'ph-bold ph-check';
+        const check = document.createElement("i");
+        check.className = "ph-bold ph-check";
         box.append(check);
       }
-      const label = document.createElement('span');
-      label.className = 'wizard-page-name';
+      const label = document.createElement("span");
+      label.className = "wizard-page-name";
       label.textContent = d.name;
       row.append(box, label);
       if (on) {
-        const order = document.createElement('span');
-        order.className = 'wizard-order-badge';
-        order.textContent = '#' + (state.picks.indexOf(d.id) + 1);
+        const order = document.createElement("span");
+        order.className = "wizard-order-badge";
+        order.textContent = "#" + (state.picks.indexOf(d.id) + 1);
         row.append(order);
       }
-      row.addEventListener('click', () => togglePick(d.id));
+      row.addEventListener("click", () => togglePick(d.id));
       el.results.append(row);
     });
   };
 
   const buildDurationRows = () => {
-    el.durationRows.textContent = '';
+    el.durationRows.textContent = "";
     state.picks.forEach((id, i) => {
-      const row = document.createElement('div');
-      row.className = 'wizard-duration-row';
-      const chip = document.createElement('span');
-      chip.className = 'wizard-position-chip';
+      const row = document.createElement("div");
+      row.className = "wizard-duration-row";
+      const chip = document.createElement("span");
+      chip.className = "wizard-position-chip";
       chip.textContent = String(i + 1);
-      const label = document.createElement('span');
-      label.className = 'wizard-duration-name';
+      const label = document.createElement("span");
+      label.className = "wizard-duration-name";
       label.textContent = nameOf(id);
-      const input = document.createElement('input');
-      input.type = 'number';
-      input.min = '1';
-      input.max = '1440';
+      const input = document.createElement("input");
+      input.type = "number";
+      input.min = "1";
+      input.max = "1440";
       input.value = String(state.mins[id] || 5);
-      input.setAttribute('aria-label', 'Minutes for ' + nameOf(id));
-      input.addEventListener('change', () => {
+      input.setAttribute("aria-label", "Minutes for " + nameOf(id));
+      input.addEventListener("change", () => {
         state.mins[id] = clampMinutes(input.value);
         input.value = String(state.mins[id]);
         updateHints();
       });
-      input.addEventListener('input', () => {
+      input.addEventListener("input", () => {
         const v = Number(input.value);
         if (Number.isFinite(v) && v >= 1) state.mins[id] = Math.min(1440, v);
         updateHints();
       });
-      const unit = document.createElement('span');
-      unit.className = 'wizard-duration-unit';
-      unit.textContent = 'min';
+      const unit = document.createElement("span");
+      unit.className = "wizard-duration-unit";
+      unit.textContent = "min";
       row.append(chip, label, input, unit);
       el.durationRows.append(row);
     });
@@ -321,174 +337,193 @@
 
   const updateHints = () => {
     el.intervalHint.textContent =
-      'Renders about ' + Math.max(1, Math.round(1440 / Number(state.interval || 15))) +
-      ' times a day.';
+      "Renders about " +
+      Math.max(1, Math.round(1440 / Number(state.interval || 15))) +
+      " times a day.";
     el.presets.forEach((p) => {
-      p.classList.toggle('is-selected', Number(state.interval) === Number(p.dataset.intervalPreset));
+      p.classList.toggle(
+        "is-selected",
+        Number(state.interval) === Number(p.dataset.intervalPreset)
+      );
     });
     el.pickCount.textContent =
-      state.picks.length === 0 ? 'None picked yet' : state.picks.length + ' picked';
-    el.multiHint.textContent = state.mode === 'cycle'
-      ? 'Pick one or more. Numbers show the order they will appear in.'
-      : 'Pick one or more. Order sets the page numbers in the editor.';
-    el.cycleHint.textContent = state.picks.length > 0
-      ? 'A full loop takes about ' + loopMinutes() + ' minutes.'
-      : 'Each dashboard can stay up for a different length of time.';
+      state.picks.length === 0 ? "None picked yet" : state.picks.length + " picked";
+    el.multiHint.textContent =
+      state.mode === "cycle"
+        ? "Pick one or more. Numbers show the order they will appear in."
+        : "Pick one or more. Order sets the page numbers in the editor.";
+    el.cycleHint.textContent =
+      state.picks.length > 0
+        ? "A full loop takes about " + loopMinutes() + " minutes."
+        : "Each dashboard can stay up for a different length of time.";
   };
 
   // ----- review ----------------------------------------------------------
   const buildSummary = () => {
     const rows = [];
-    if (state.mode === 'daily') {
-      rows.push(['Behaviour', 'One dashboard, once a day']);
-      rows.push(['Dashboard', nameOf(state.dash)]);
-      if (state.device) rows.push(['Display', displayLabel()]);
-      rows.push(['When', 'Every day at ' + prettyTime()]);
-    } else if (state.mode === 'interval') {
-      rows.push(['Behaviour', 'One dashboard, kept fresh']);
-      rows.push(['Dashboard', nameOf(state.dash)]);
-      if (state.device) rows.push(['Display', displayLabel()]);
-      rows.push(['When', 'Every ' + state.interval + ' minutes']);
-    } else if (state.mode === 'cycle') {
-      rows.push(['Behaviour', 'Timed rotation']);
-      if (state.device) rows.push(['Display', deviceName(state.device)]);
-      rows.push(['Order', state.picks
-        .map((id, i) => (i + 1) + '. ' + nameOf(id) + ' · ' + (state.mins[id] || 5) + ' min')
-        .join('\n')]);
+    if (state.mode === "daily") {
+      rows.push(["Behaviour", "One dashboard, once a day"]);
+      rows.push(["Dashboard", nameOf(state.dash)]);
+      if (state.device) rows.push(["Display", displayLabel()]);
+      rows.push(["When", "Every day at " + prettyTime()]);
+    } else if (state.mode === "interval") {
+      rows.push(["Behaviour", "One dashboard, kept fresh"]);
+      rows.push(["Dashboard", nameOf(state.dash)]);
+      if (state.device) rows.push(["Display", displayLabel()]);
+      rows.push(["When", "Every " + state.interval + " minutes"]);
+    } else if (state.mode === "cycle") {
+      rows.push(["Behaviour", "Timed rotation"]);
+      if (state.device) rows.push(["Display", deviceName(state.device)]);
+      rows.push([
+        "Order",
+        state.picks
+          .map((id, i) => i + 1 + ". " + nameOf(id) + " · " + (state.mins[id] || 5) + " min")
+          .join("\n"),
+      ]);
     } else {
-      rows.push(['Behaviour', 'Manual deck']);
-      if (state.device) rows.push(['Display', deviceName(state.device)]);
-      rows.push(['Pages', state.picks.map((id, i) => (i + 1) + '. ' + nameOf(id)).join('\n')]);
-      rows.push(['Next', 'Wire the “go to page” actions in the deck editor']);
+      rows.push(["Behaviour", "Manual deck"]);
+      if (state.device) rows.push(["Display", deviceName(state.device)]);
+      rows.push(["Pages", state.picks.map((id, i) => i + 1 + ". " + nameOf(id)).join("\n")]);
+      rows.push(["Next", "Wire the “go to page” actions in the deck editor"]);
     }
-    el.summary.textContent = '';
+    el.summary.textContent = "";
     rows.forEach(([label, value]) => {
-      const row = document.createElement('div');
-      row.className = 'wizard-summary-row';
-      const dt = document.createElement('span');
-      dt.className = 'wizard-summary-label';
+      const row = document.createElement("div");
+      row.className = "wizard-summary-row";
+      const dt = document.createElement("span");
+      dt.className = "wizard-summary-label";
       dt.textContent = label;
-      const dd = document.createElement('span');
-      dd.className = 'wizard-summary-value';
+      const dd = document.createElement("span");
+      dd.className = "wizard-summary-value";
       dd.textContent = value;
       row.append(dt, dd);
       el.summary.append(row);
     });
     el.plain.textContent = plain();
 
-    el.reviewSub.textContent = state.mode === 'deck'
-      ? 'This creates the deck, then hands you to the editor to wire it up.'
-      : 'One last look, then it goes live on the display.';
+    el.reviewSub.textContent =
+      state.mode === "deck"
+        ? "This creates the deck, then hands you to the editor to wire it up."
+        : "One last look, then it goes live on the display.";
     el.name.placeholder = autoName();
 
     // Escape hatch: schedules get the prefilled full form; rotations create
     // and land in the deck editor, where per-dashboard conditions live in
     // the Page conditions fold. Deck mode already opens the editor.
-    const hasFullForm = state.mode === 'daily' || state.mode === 'interval';
-    el.escape.hidden = !(hasFullForm || state.mode === 'cycle');
+    const hasFullForm = state.mode === "daily" || state.mode === "interval";
+    el.escape.hidden = !(hasFullForm || state.mode === "cycle");
     if (hasFullForm) {
-      el.advanced.textContent = 'Open the full form';
+      el.advanced.textContent = "Open the full form";
       const params = new URLSearchParams();
-      if (state.name.trim()) params.set('wz_name', state.name.trim());
-      params.set('prefill_page', state.dash);
-      params.set('wz_type', state.mode);
-      if (state.device && state.device !== ALL_BOUND) params.set('wz_device', state.device);
-      if (state.mode === 'daily') params.set('wz_time', state.time);
-      else params.set('wz_interval', String(state.interval));
-      el.advanced.href = URLS.fullForm + '?' + params.toString() + '#timed';
-    } else if (state.mode === 'cycle') {
-      el.advanced.textContent = 'Create and open the editor';
-      el.advanced.href = '#';
+      if (state.name.trim()) params.set("wz_name", state.name.trim());
+      params.set("prefill_page", state.dash);
+      params.set("wz_type", state.mode);
+      if (state.device && state.device !== ALL_BOUND) params.set("wz_device", state.device);
+      if (state.mode === "daily") params.set("wz_time", state.time);
+      else params.set("wz_interval", String(state.interval));
+      el.advanced.href = URLS.fullForm + "?" + params.toString() + "#timed";
+    } else if (state.mode === "cycle") {
+      el.advanced.textContent = "Create and open the editor";
+      el.advanced.href = "#";
     }
   };
 
   // ----- render ------------------------------------------------------------
-  const STEP_LABELS = () => ['Behaviour', state.mode === 'deck' ? 'Pages' : 'Details', 'Review'];
+  const STEP_LABELS = () => ["Behaviour", state.mode === "deck" ? "Pages" : "Details", "Review"];
 
   const primaryLabel = () => {
-    if (state.pending) return 'Creating…';
-    if (state.step === -1) return 'Start fresh';
+    if (state.pending) return "Creating…";
+    if (state.step === -1) return "Start fresh";
     if (state.step === 2) {
-      if (state.mode === 'deck') return 'Create and open editor';
-      return state.mode === 'cycle' ? 'Create rotation' : 'Create schedule';
+      if (state.mode === "deck") return "Create and open editor";
+      return state.mode === "cycle" ? "Create rotation" : "Create schedule";
     }
     if (state.step === 3) {
-      if (state.mode === 'deck') return state.handed ? 'Opening…' : 'Open the deck editor';
-      return 'Done';
+      if (state.mode === "deck") return state.handed ? "Opening…" : "Open the deck editor";
+      return "Done";
     }
-    return 'Continue';
+    return "Continue";
   };
 
   const render = (focusHeading) => {
     const labels = STEP_LABELS();
-    if (state.step === -1) el.progress.textContent = 'Suggested for you';
-    else if (state.step === 3) el.progress.textContent = 'Created';
-    else el.progress.textContent = 'Step ' + (state.step + 1) + ' of 3 · ' + labels[state.step];
-    dialog.classList.toggle('is-suggest', state.step === -1);
+    if (state.step === -1) el.progress.textContent = "Suggested for you";
+    else if (state.step === 3) el.progress.textContent = "Created";
+    else el.progress.textContent = "Step " + (state.step + 1) + " of 3 · " + labels[state.step];
+    dialog.classList.toggle("is-suggest", state.step === -1);
 
     el.stepItems.forEach((item, i) => {
-      item.classList.toggle('is-complete', state.step > i);
-      item.classList.toggle('is-current', state.step === i);
-      item.querySelector('[data-step-label]').textContent = labels[i];
-      if (state.step === i) item.setAttribute('aria-current', 'step');
-      else item.removeAttribute('aria-current');
+      item.classList.toggle("is-complete", state.step > i);
+      item.classList.toggle("is-current", state.step === i);
+      item.querySelector("[data-step-label]").textContent = labels[i];
+      if (state.step === i) item.setAttribute("aria-current", "step");
+      else item.removeAttribute("aria-current");
     });
 
-    const viewName = state.step === -1
-      ? 'suggest'
-      : ['behaviour', 'details', 'review', 'created'][state.step];
-    el.views.forEach((v) => { v.hidden = v.dataset.wizardView !== viewName; });
+    const viewName =
+      state.step === -1 ? "suggest" : ["behaviour", "details", "review", "created"][state.step];
+    el.views.forEach((v) => {
+      v.hidden = v.dataset.wizardView !== viewName;
+    });
 
-    if (viewName === 'behaviour') {
+    if (viewName === "behaviour") {
       el.choices.forEach((c, i) => {
         const on = c.dataset.wizardMode === state.mode;
-        c.classList.toggle('is-selected', on);
-        c.setAttribute('aria-checked', on ? 'true' : 'false');
+        c.classList.toggle("is-selected", on);
+        c.setAttribute("aria-checked", on ? "true" : "false");
         c.tabIndex = on || (!state.mode && i === 0) ? 0 : -1;
       });
     }
 
-    if (viewName === 'details') {
+    if (viewName === "details") {
       const titles = {
-        daily: ['Which dashboard, and when?', 'One send a day, at the time you pick.'],
-        interval: ['Which dashboard, and how often?',
-          'Shorter cadences use more battery on radio-only displays.'],
-        cycle: ['Build the rotation',
-          'Pick one or more. They show in this order and the loop repeats all day. One dashboard just refreshes on the timer.'],
-        deck: ['Choose the pages',
-          'Pick the dashboards that belong to this deck. You will link them in the editor.'],
-      }[state.mode] || ['', ''];
+        daily: ["Which dashboard, and when?", "One send a day, at the time you pick."],
+        interval: [
+          "Which dashboard, and how often?",
+          "Shorter cadences use more battery on radio-only displays.",
+        ],
+        cycle: [
+          "Build the rotation",
+          "Pick one or more. They show in this order and the loop repeats all day. One dashboard just refreshes on the timer.",
+        ],
+        deck: [
+          "Choose the pages",
+          "Pick the dashboards that belong to this deck. You will link them in the editor.",
+        ],
+      }[state.mode] || ["", ""];
       el.configTitle.textContent = titles[0];
       el.configSub.textContent = titles[1];
       if (single()) syncDisplayOptions();
       if (el.displayHelp) {
         el.displayHelp.textContent = single()
-          ? 'Sends to this display only. \u201cEvery display\u201d keeps the dashboard\u2019s own bindings.'
-          : 'The whole set plays on this display. Dashboards not yet on any display are bound to it when you create.';
+          ? "Sends to this display only. \u201cEvery display\u201d keeps the dashboard\u2019s own bindings."
+          : "The whole set plays on this display. Dashboards not yet on any display are bound to it when you create.";
       }
       const show = {
         single: single(),
-        time: state.mode === 'daily',
-        interval: state.mode === 'interval',
+        time: state.mode === "daily",
+        interval: state.mode === "interval",
         display: deviceOptions.length > 0,
-        multi: state.mode === 'cycle' || state.mode === 'deck',
-        durations: state.mode === 'cycle',
-        deckinfo: state.mode === 'deck',
+        multi: state.mode === "cycle" || state.mode === "deck",
+        durations: state.mode === "cycle",
+        deckinfo: state.mode === "deck",
       };
-      el.blocks.forEach((b) => { b.hidden = !show[b.dataset.wizardBlock]; });
+      el.blocks.forEach((b) => {
+        b.hidden = !show[b.dataset.wizardBlock];
+      });
       buildResults();
       buildDurationRows();
       updateHints();
     }
 
-    if (viewName === 'review') buildSummary();
+    if (viewName === "review") buildSummary();
 
-    if (viewName === 'created') {
+    if (viewName === "created") {
       el.doneTitle.textContent = state.handed
-        ? 'Opening the deck editor…'
-        : (state.name.trim() || autoName()) + ' is live';
+        ? "Opening the deck editor…"
+        : (state.name.trim() || autoName()) + " is live";
       el.doneBody.textContent = state.handed
-        ? 'Your pages are saved. Add a “go to page” action to any tile to link them.'
+        ? "Your pages are saved. Add a “go to page” action to any tile to link them."
         : plain();
     }
 
@@ -510,70 +545,71 @@
   // ----- create ------------------------------------------------------------
   const submit = (bind) => {
     const body = new FormData();
-    body.set('respond', 'json');
-    body.set('name', state.name.trim() || autoName());
-    body.set('enabled', 'on');
+    body.set("respond", "json");
+    body.set("name", state.name.trim() || autoName());
+    body.set("enabled", "on");
     // Every intent posts the same shape to the same place; the server maps
     // it onto the unified model (#204). 'deck' is the wizard's older name
     // for the by-hand intent.
     const url = URLS.lineup;
-    body.set('intent', state.mode === 'deck' ? 'manual' : state.mode);
-    if (state.device && state.device !== ALL_BOUND) body.append('device_ids', state.device);
-    if (state.mode === 'cycle' || state.mode === 'deck') {
+    body.set("intent", state.mode === "deck" ? "manual" : state.mode);
+    if (state.device && state.device !== ALL_BOUND) body.append("device_ids", state.device);
+    if (state.mode === "cycle" || state.mode === "deck") {
       state.picks.forEach((id) => {
-        body.append('page_ids', id);
-        body.append('dwell_minutes', String(state.mins[id] || 5));
+        body.append("page_ids", id);
+        body.append("dwell_minutes", String(state.mins[id] || 5));
       });
-      if (state.mode === 'cycle') body.set('anchor', '00:00');
+      if (state.mode === "cycle") body.set("anchor", "00:00");
     } else {
-      body.append('page_ids', state.dash);
-      if (state.mode === 'daily') body.set('fires_at', state.time);
-      else body.set('interval_minutes', String(state.interval));
+      body.append("page_ids", state.dash);
+      if (state.mode === "daily") body.set("fires_at", state.time);
+      else body.set("interval_minutes", String(state.interval));
     }
 
     // Consent the user gave in the bind prompt on the previous attempt.
     if (bind) {
       bind.pages.forEach((p) => {
-        body.append('bind_pages', p.id);
-        if (bind.mode === 'also') body.append('bind_also', p.id);
+        body.append("bind_pages", p.id);
+        if (bind.mode === "also") body.append("bind_also", p.id);
       });
     }
 
     state.pending = true;
-    state.error = '';
+    state.error = "";
     render(false);
-    fetch(url, { method: 'POST', body, headers: { Accept: 'application/json' } })
+    fetch(url, { method: "POST", body, headers: { Accept: "application/json" } })
       .then((resp) => resp.json().then((data) => ({ ok: resp.ok, data })))
       .then(({ ok, data }) => {
         state.pending = false;
         // The picked dashboard is bound to another display: ask, then retry
         // with consent. Cancelling creates nothing.
-        if (!ok && data && data.code === 'pages_not_bound' && window.TesseraeBindPrompt) {
+        if (!ok && data && data.code === "pages_not_bound" && window.TesseraeBindPrompt) {
           render(false);
-          window.TesseraeBindPrompt.ask({ display: data.display, pages: data.unbound_pages })
-            .then((mode) => {
+          window.TesseraeBindPrompt.ask({ display: data.display, pages: data.unbound_pages }).then(
+            (mode) => {
               if (mode) {
                 submit({ mode, pages: data.unbound_pages });
               } else {
-                state.error = 'Nothing was created: the dashboard is not bound to this display.';
+                state.error = "Nothing was created: the dashboard is not bound to this display.";
                 render(false);
               }
-            });
+            }
+          );
           return;
         }
         if (!ok || !data.ok) {
-          state.error = (data && data.error) || 'Something went wrong. Please try again.';
+          state.error = (data && data.error) || "Something went wrong. Please try again.";
           render(false);
           return;
         }
         createdUrl = data.url || null;
-        if ((state.mode === 'deck' || state.mode === 'cycle') && data.id) {
-          editorUrl = URLS.editorTemplate.replace('__DECK_ID__', encodeURIComponent(data.id));
+        if ((state.mode === "deck" || state.mode === "cycle") && data.id) {
+          editorUrl = URLS.editorTemplate.replace("__DECK_ID__", encodeURIComponent(data.id));
         }
         if (state.openEditor && editorUrl) {
           state.handed = true;
           render(false);
-          window.location.assign(editorUrl + '?open=conditions');
+          window.location.assign(editorUrl + "?open=conditions");
           return;
         }
         state.step = 3;
@@ -581,7 +617,7 @@
       })
       .catch(() => {
         state.pending = false;
-        state.error = 'Could not reach the server. Please try again.';
+        state.error = "Could not reach the server. Please try again.";
         render(false);
       });
   };
@@ -598,17 +634,19 @@
   };
 
   // ----- events ------------------------------------------------------------
-  openers.forEach((opener) => opener.addEventListener('click', () => {
-    state = initial();
-    createdUrl = null;
-    editorUrl = null;
-    syncInputs();
-    render(false);
-    dialog.showModal();
-  }));
+  openers.forEach((opener) =>
+    opener.addEventListener("click", () => {
+      state = initial();
+      createdUrl = null;
+      editorUrl = null;
+      syncInputs();
+      render(false);
+      dialog.showModal();
+    })
+  );
 
-  $('[data-wizard-close]').addEventListener('click', () => dialog.close());
-  dialog.addEventListener('close', () => {
+  $("[data-wizard-close]").addEventListener("click", () => dialog.close());
+  dialog.addEventListener("close", () => {
     // Something was created behind the dialog: land on the list with the
     // new card highlighted so the page isn't stale.
     if (createdUrl && !state.handed) window.location.assign(createdUrl);
@@ -616,23 +654,23 @@
 
   const seedDisplay = () => {
     if (single()) state.device = defaultDeviceFor(state.dash);
-    else if (state.device === ALL_BOUND) state.device = '';
+    else if (state.device === ALL_BOUND) state.device = "";
   };
   el.choices.forEach((c) => {
-    c.addEventListener('click', () => {
+    c.addEventListener("click", () => {
       state.mode = c.dataset.wizardMode;
-      state.error = '';
+      state.error = "";
       seedDisplay();
       render(false);
     });
   });
   // Radiogroup arrow keys move focus and selection between behaviour cards.
-  dialog.querySelector('.wizard-choices').addEventListener('keydown', (e) => {
-    const keys = ['ArrowDown', 'ArrowRight', 'ArrowUp', 'ArrowLeft'];
+  dialog.querySelector(".wizard-choices").addEventListener("keydown", (e) => {
+    const keys = ["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft"];
     if (!keys.includes(e.key)) return;
     e.preventDefault();
     const current = el.choices.findIndex((c) => c === document.activeElement);
-    const delta = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : -1;
+    const delta = e.key === "ArrowDown" || e.key === "ArrowRight" ? 1 : -1;
     const next = ((current < 0 ? 0 : current) + delta + el.choices.length) % el.choices.length;
     state.mode = el.choices[next].dataset.wizardMode;
     seedDisplay();
@@ -640,7 +678,7 @@
     el.choices[next].focus();
   });
 
-  el.dash.addEventListener('change', () => {
+  el.dash.addEventListener("change", () => {
     state.dash = el.dash.value;
     if (single()) {
       state.device = defaultDeviceFor(state.dash);
@@ -649,7 +687,7 @@
     }
   });
   if (deviceSel) {
-    deviceSel.addEventListener('change', () => {
+    deviceSel.addEventListener("change", () => {
       state.device = deviceSel.value;
       if (single()) {
         el.forward.disabled = !valid();
@@ -667,55 +705,55 @@
       el.forward.disabled = !valid();
     });
   }
-  el.time.addEventListener('input', () => {
+  el.time.addEventListener("input", () => {
     state.time = el.time.value;
     el.forward.disabled = !valid();
   });
-  el.interval.addEventListener('input', () => {
+  el.interval.addEventListener("input", () => {
     const v = Number(el.interval.value);
     if (Number.isFinite(v) && v >= 1) state.interval = Math.min(1440, v);
     updateHints();
     el.forward.disabled = !valid();
   });
-  el.interval.addEventListener('change', () => {
+  el.interval.addEventListener("change", () => {
     state.interval = clampMinutes(el.interval.value);
     el.interval.value = String(state.interval);
     updateHints();
     el.forward.disabled = !valid();
   });
   el.presets.forEach((p) => {
-    p.addEventListener('click', () => {
+    p.addEventListener("click", () => {
       state.interval = Number(p.dataset.intervalPreset);
       el.interval.value = String(state.interval);
       updateHints();
       el.forward.disabled = !valid();
     });
   });
-  el.query.addEventListener('input', () => {
+  el.query.addEventListener("input", () => {
     state.query = el.query.value;
     buildResults();
   });
-  el.name.addEventListener('input', () => {
+  el.name.addEventListener("input", () => {
     state.name = el.name.value;
   });
 
   // Cycle-mode escape hatch: intercept the anchor (schedules keep their
   // normal navigation to the prefilled full form).
-  el.advanced.addEventListener('click', (e) => {
-    if (state.mode !== 'cycle') return;
+  el.advanced.addEventListener("click", (e) => {
+    if (state.mode !== "cycle") return;
     e.preventDefault();
     if (state.pending || !valid()) return;
     state.openEditor = true;
     submit();
   });
 
-  el.back.addEventListener('click', () => {
+  el.back.addEventListener("click", () => {
     state.step = Math.max(hasSuggest ? -1 : 0, state.step - 1);
-    state.error = '';
+    state.error = "";
     render(true);
   });
 
-  el.again.addEventListener('click', () => {
+  el.again.addEventListener("click", () => {
     // Keep createdUrl: closing later should still refresh the list behind.
     state = initial();
     editorUrl = null;
@@ -723,11 +761,11 @@
     render(true);
   });
 
-  el.forward.addEventListener('click', () => {
+  el.forward.addEventListener("click", () => {
     if (!valid()) return;
     if (state.step < 2) {
       state.step += 1;
-      state.error = '';
+      state.error = "";
       render(true);
       return;
     }
@@ -736,7 +774,7 @@
       return;
     }
     // Created screen.
-    if (state.mode === 'deck' && editorUrl) {
+    if (state.mode === "deck" && editorUrl) {
       state.handed = true;
       render(false);
       window.location.assign(editorUrl);

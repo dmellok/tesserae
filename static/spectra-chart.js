@@ -11,10 +11,17 @@
 // otherwise.
 
 const FALLBACK = {
-  accent1: "#A84B2A", accent2: "#9A7414", accent3: "#4F6F36",
-  accent4: "#256E6B", accent5: "#3F5A88", accent6: "#7E4068",
-  surface: "#F7F5F0", surfaceSunken: "#E1DDD2",
-  textPrimary: "#1B1A16", textSecondary: "#4D4A42", textMuted: "#837F73",
+  accent1: "#A84B2A",
+  accent2: "#9A7414",
+  accent3: "#4F6F36",
+  accent4: "#256E6B",
+  accent5: "#3F5A88",
+  accent6: "#7E4068",
+  surface: "#F7F5F0",
+  surfaceSunken: "#E1DDD2",
+  textPrimary: "#1B1A16",
+  textSecondary: "#4D4A42",
+  textMuted: "#837F73",
   fontFamily: "Helvetica Neue, Arial, sans-serif",
 };
 
@@ -35,8 +42,7 @@ const FALLBACK = {
 // get the actual cascaded value every time.
 function probeColor(parent, name) {
   const probe = document.createElement("span");
-  probe.style.cssText =
-    "position:absolute;visibility:hidden;width:0;height:0;pointer-events:none;";
+  probe.style.cssText = "position:absolute;visibility:hidden;width:0;height:0;pointer-events:none;";
   probe.style.color = `var(${name}, transparent)`;
   parent.appendChild(probe);
   const v = getComputedStyle(probe).color || "";
@@ -50,8 +56,7 @@ function probeColor(parent, name) {
 function probeFontFamily(parent, name) {
   const SENTINEL = "__spectra_missing_family__";
   const probe = document.createElement("span");
-  probe.style.cssText =
-    "position:absolute;visibility:hidden;width:0;height:0;pointer-events:none;";
+  probe.style.cssText = "position:absolute;visibility:hidden;width:0;height:0;pointer-events:none;";
   probe.style.fontFamily = `var(${name}, ${SENTINEL})`;
   parent.appendChild(probe);
   const v = getComputedStyle(probe).fontFamily || "";
@@ -103,7 +108,7 @@ export function tokens(host) {
   if (missing.length) {
     console.warn(
       `[spectra-chart] Spectra tokens didn't resolve via cascade: ${missing.join(", ")}` +
-      ", falling back to light-theme defaults. Check that spectra-tokens.css is linked from the page."
+        ", falling back to light-theme defaults. Check that spectra-tokens.css is linked from the page."
     );
   }
   // Opt-in diagnostic. Two ways to enable:
@@ -120,8 +125,12 @@ export function tokens(host) {
     (typeof location !== "undefined" && /[?&]chartdebug=1\b/.test(location.search));
   if (debug) {
     const bodyTheme =
-      (typeof document !== "undefined" && document.body && document.body.getAttribute("data-theme")) || "(none)";
-    const probeParent = parent.tagName + (parent.className ? "." + parent.className.replace(/\s+/g, ".") : "");
+      (typeof document !== "undefined" &&
+        document.body &&
+        document.body.getAttribute("data-theme")) ||
+      "(none)";
+    const probeParent =
+      parent.tagName + (parent.className ? "." + parent.className.replace(/\s+/g, ".") : "");
     console.log("[spectra-chart] tokens resolved", {
       bodyDataTheme: bodyTheme,
       probedUnder: probeParent,
@@ -137,7 +146,11 @@ function ensureChart(canvas) {
   // Clean up any previous instance bound to this canvas so widgets
   // can re-render without leaking the old chart's resize observer.
   if (canvas._chart) {
-    try { canvas._chart.destroy(); } catch { /* ignore */ }
+    try {
+      canvas._chart.destroy();
+    } catch {
+      /* ignore */
+    }
     canvas._chart = null;
   }
   return true;
@@ -183,21 +196,24 @@ function withAlpha(color, alpha) {
 export function sparkline(canvas, values, colorOrOpts) {
   if (!ensureChart(canvas) || !Array.isArray(values) || values.length < 2) return null;
   // Tolerate both `sparkline(c, v, "#hex")` and `sparkline(c, v, {color, overlay})`.
-  const opts = (colorOrOpts && typeof colorOrOpts === "object" && !Array.isArray(colorOrOpts))
-    ? colorOrOpts
-    : { color: colorOrOpts };
+  const opts =
+    colorOrOpts && typeof colorOrOpts === "object" && !Array.isArray(colorOrOpts)
+      ? colorOrOpts
+      : { color: colorOrOpts };
   const color = opts.color;
 
-  const datasets = [{
-    data: values,
-    borderColor: color,
-    backgroundColor: withAlpha(color, 0.18),
-    borderWidth: 3,
-    tension: 0.3,
-    pointRadius: 0,
-    fill: "origin",
-    order: 1,
-  }];
+  const datasets = [
+    {
+      data: values,
+      borderColor: color,
+      backgroundColor: withAlpha(color, 0.18),
+      borderWidth: 3,
+      tension: 0.3,
+      pointRadius: 0,
+      fill: "origin",
+      order: 1,
+    },
+  ];
   if (opts.overlay && Array.isArray(opts.overlay.values) && opts.overlay.values.length >= 2) {
     datasets.push({
       data: opts.overlay.values,
@@ -245,7 +261,8 @@ export function sparkline(canvas, values, colorOrOpts) {
 // ``highlightIdx`` lets the caller bump one bar to a different colour
 // (e.g. the current hour in weather_hourly).
 export function barChart(canvas, opts) {
-  if (!ensureChart(canvas) || !opts || !Array.isArray(opts.values) || !opts.values.length) return null;
+  if (!ensureChart(canvas) || !opts || !Array.isArray(opts.values) || !opts.values.length)
+    return null;
   const t = opts.tokens || FALLBACK;
   const labels = opts.labels || opts.values.map((_, i) => i);
   const baseColor = opts.color || t.accent5;
@@ -257,14 +274,16 @@ export function barChart(canvas, opts) {
     type: "bar",
     data: {
       labels,
-      datasets: [{
-        data: opts.values,
-        backgroundColor: colors,
-        borderWidth: 0,
-        borderRadius: 0,
-        categoryPercentage: 0.85,
-        barPercentage: 0.95,
-      }],
+      datasets: [
+        {
+          data: opts.values,
+          backgroundColor: colors,
+          borderWidth: 0,
+          borderRadius: 0,
+          categoryPercentage: 0.85,
+          barPercentage: 0.95,
+        },
+      ],
     },
     options: {
       animation: false,
@@ -275,7 +294,8 @@ export function barChart(canvas, opts) {
           ticks: {
             color: t.textMuted,
             font: { family: t.fontFamily, weight: 700, size: 10 },
-            autoSkip: true, maxRotation: 0,
+            autoSkip: true,
+            maxRotation: 0,
           },
           grid: { display: false },
           border: { display: false },
@@ -309,7 +329,8 @@ export function barChart(canvas, opts) {
 //   overlay: { values, color, label }, secondary series rendered behind
 //     the main line as a thin dashed ghost
 export function lineChart(canvas, opts) {
-  if (!ensureChart(canvas) || !opts || !Array.isArray(opts.values) || opts.values.length < 2) return null;
+  if (!ensureChart(canvas) || !opts || !Array.isArray(opts.values) || opts.values.length < 2)
+    return null;
   const t = opts.tokens || FALLBACK;
   const labels = opts.labels || opts.values.map((_, i) => i);
   const color = opts.color || t.accent4;
@@ -328,19 +349,21 @@ export function lineChart(canvas, opts) {
     }
   }
 
-  const datasets = [{
-    data: opts.values,
-    borderColor: color,
-    backgroundColor: wantsFill ? withAlpha(color, 0.18) : "transparent",
-    borderWidth: 3,
-    tension: 0.25,
-    pointRadius: pointRadiusArr,
-    pointBackgroundColor: pointBgArr,
-    pointBorderColor: pointBorderArr,
-    pointBorderWidth: 2,
-    fill: wantsFill ? "origin" : false,
-    order: 1,
-  }];
+  const datasets = [
+    {
+      data: opts.values,
+      borderColor: color,
+      backgroundColor: wantsFill ? withAlpha(color, 0.18) : "transparent",
+      borderWidth: 3,
+      tension: 0.25,
+      pointRadius: pointRadiusArr,
+      pointBackgroundColor: pointBgArr,
+      pointBorderColor: pointBorderArr,
+      pointBorderWidth: 2,
+      fill: wantsFill ? "origin" : false,
+      order: 1,
+    },
+  ];
 
   // Secondary "overlay" series, e.g. an hourly-profile ghost on top
   // of a multi-day window. Always thin + dashed + muted so it reads
@@ -361,39 +384,42 @@ export function lineChart(canvas, opts) {
   // Threshold-line plugin, draws a dashed horizontal line + a value
   // label at the threshold's y-coordinate. Defined inline because it
   // needs access to the per-call opts.
-  const thresholdPlugin = opts.threshold && Number.isFinite(opts.threshold.value) ? {
-    id: "tess_threshold",
-    afterDatasetsDraw(chart) {
-      const { ctx, chartArea, scales } = chart;
-      const yScale = scales.y;
-      if (!yScale) return;
-      const y = yScale.getPixelForValue(opts.threshold.value);
-      if (y < chartArea.top || y > chartArea.bottom) return;
-      ctx.save();
-      ctx.strokeStyle = opts.threshold.color || t.accent1;
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([5, 4]);
-      ctx.beginPath();
-      ctx.moveTo(chartArea.left, y);
-      ctx.lineTo(chartArea.right, y);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      // Label pill, top-right of the line.
-      const label = String(opts.threshold.label ?? opts.threshold.value);
-      ctx.font = `700 11px ${t.fontFamily}`;
-      const pad = 4;
-      const tw = ctx.measureText(label).width + pad * 2;
-      const th = 14;
-      const tx = chartArea.right - tw - 2;
-      const ty = y - th - 2;
-      ctx.fillStyle = opts.threshold.color || t.accent1;
-      ctx.fillRect(tx, ty, tw, th);
-      ctx.fillStyle = t.surface;
-      ctx.textBaseline = "middle";
-      ctx.fillText(label, tx + pad, ty + th / 2 + 0.5);
-      ctx.restore();
-    },
-  } : null;
+  const thresholdPlugin =
+    opts.threshold && Number.isFinite(opts.threshold.value)
+      ? {
+          id: "tess_threshold",
+          afterDatasetsDraw(chart) {
+            const { ctx, chartArea, scales } = chart;
+            const yScale = scales.y;
+            if (!yScale) return;
+            const y = yScale.getPixelForValue(opts.threshold.value);
+            if (y < chartArea.top || y > chartArea.bottom) return;
+            ctx.save();
+            ctx.strokeStyle = opts.threshold.color || t.accent1;
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([5, 4]);
+            ctx.beginPath();
+            ctx.moveTo(chartArea.left, y);
+            ctx.lineTo(chartArea.right, y);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            // Label pill, top-right of the line.
+            const label = String(opts.threshold.label ?? opts.threshold.value);
+            ctx.font = `700 11px ${t.fontFamily}`;
+            const pad = 4;
+            const tw = ctx.measureText(label).width + pad * 2;
+            const th = 14;
+            const tx = chartArea.right - tw - 2;
+            const ty = y - th - 2;
+            ctx.fillStyle = opts.threshold.color || t.accent1;
+            ctx.fillRect(tx, ty, tw, th);
+            ctx.fillStyle = t.surface;
+            ctx.textBaseline = "middle";
+            ctx.fillText(label, tx + pad, ty + th / 2 + 0.5);
+            ctx.restore();
+          },
+        }
+      : null;
 
   // Marker-label plugin, draws a small label next to each marker
   // (e.g. "12.5" beside the min point). Labels are kept inside the
@@ -404,43 +430,46 @@ export function lineChart(canvas, opts) {
   const MARKER_LABEL_H = 14;
   const MARKER_LABEL_GAP = 8;
   const hasAboveMarker = markers.some((m) => m.position === "above" && m.label);
-  const markerLabelPlugin = markers.length > 0 ? {
-    id: "tess_markers",
-    afterDatasetsDraw(chart) {
-      const { ctx, scales } = chart;
-      const yScale = scales.y;
-      const xScale = scales.x;
-      if (!yScale || !xScale) return;
-      const cw = chart.width || canvas.clientWidth || 0;
-      const chh = chart.height || canvas.clientHeight || 0;
-      ctx.save();
-      ctx.font = `800 11px ${t.fontFamily}`;
-      ctx.textBaseline = "middle";
-      for (const m of markers) {
-        if (!Number.isFinite(m.index) || !m.label) continue;
-        const x = xScale.getPixelForValue(m.index);
-        const y = yScale.getPixelForValue(opts.values[m.index]);
-        const placeAbove = m.position === "above";
-        const label = String(m.label);
-        const pad = 4;
-        const tw = ctx.measureText(label).width + pad * 2;
-        const th = MARKER_LABEL_H;
-        const above = y - th - MARKER_LABEL_GAP;
-        const below = y + MARKER_LABEL_GAP + 2;
-        let by = placeAbove ? above : below;
-        if (placeAbove && by < 0 && below + th <= chh) by = below;
-        else if (!placeAbove && chh > 0 && by + th > chh && above >= 0) by = above;
-        by = Math.max(0, chh > 0 ? Math.min(by, chh - th) : by);
-        let bx = x - tw / 2;
-        if (cw > 0) bx = Math.max(0, Math.min(bx, cw - tw));
-        ctx.fillStyle = m.color || color;
-        ctx.fillRect(bx, by, tw, th);
-        ctx.fillStyle = t.surface;
-        ctx.fillText(label, bx + pad, by + th / 2 + 0.5);
-      }
-      ctx.restore();
-    },
-  } : null;
+  const markerLabelPlugin =
+    markers.length > 0
+      ? {
+          id: "tess_markers",
+          afterDatasetsDraw(chart) {
+            const { ctx, scales } = chart;
+            const yScale = scales.y;
+            const xScale = scales.x;
+            if (!yScale || !xScale) return;
+            const cw = chart.width || canvas.clientWidth || 0;
+            const chh = chart.height || canvas.clientHeight || 0;
+            ctx.save();
+            ctx.font = `800 11px ${t.fontFamily}`;
+            ctx.textBaseline = "middle";
+            for (const m of markers) {
+              if (!Number.isFinite(m.index) || !m.label) continue;
+              const x = xScale.getPixelForValue(m.index);
+              const y = yScale.getPixelForValue(opts.values[m.index]);
+              const placeAbove = m.position === "above";
+              const label = String(m.label);
+              const pad = 4;
+              const tw = ctx.measureText(label).width + pad * 2;
+              const th = MARKER_LABEL_H;
+              const above = y - th - MARKER_LABEL_GAP;
+              const below = y + MARKER_LABEL_GAP + 2;
+              let by = placeAbove ? above : below;
+              if (placeAbove && by < 0 && below + th <= chh) by = below;
+              else if (!placeAbove && chh > 0 && by + th > chh && above >= 0) by = above;
+              by = Math.max(0, chh > 0 ? Math.min(by, chh - th) : by);
+              let bx = x - tw / 2;
+              if (cw > 0) bx = Math.max(0, Math.min(bx, cw - tw));
+              ctx.fillStyle = m.color || color;
+              ctx.fillRect(bx, by, tw, th);
+              ctx.fillStyle = t.surface;
+              ctx.fillText(label, bx + pad, by + th / 2 + 0.5);
+            }
+            ctx.restore();
+          },
+        }
+      : null;
 
   const plugins = [];
   if (thresholdPlugin) plugins.push(thresholdPlugin);
@@ -467,7 +496,8 @@ export function lineChart(canvas, opts) {
             // labels show, sized to the width on offer. Leaving it on
             // meant two thinning passes fighting each other, and a wide
             // label (a date) came out of both with two ticks left.
-            autoSkip: false, maxRotation: 0,
+            autoSkip: false,
+            maxRotation: 0,
             callback(value, index) {
               const lbl = this.getLabelForValue(value);
               const total = opts.values.length;
@@ -477,7 +507,7 @@ export function lineChart(canvas, opts) {
               // for the width on offer. Chart.js's own autoSkip measures
               // only non-empty ticks, and every tick this callback hides
               // is empty, so the spacing has to be decided here.
-              const area = (this.chart && this.chart.chartArea || {}).width || 0;
+              const area = ((this.chart && this.chart.chartArea) || {}).width || 0;
               const approxPx = String(lbl).length * 6 + 12;
               const fit = area > 0 ? Math.floor(area / approxPx) : 6;
               const stride = Math.max(1, Math.ceil(total / Math.max(2, Math.min(6, fit))));
@@ -524,29 +554,36 @@ export function lineChart(canvas, opts) {
 // the rails out automatically, heights ∝ summed flow through each
 // node. `colors` keys must match the rail names exactly.
 export function sankey(canvas, opts) {
-  if (!ensureChart(canvas) || !opts || !Array.isArray(opts.flows) || !opts.flows.length) return null;
+  if (!ensureChart(canvas) || !opts || !Array.isArray(opts.flows) || !opts.flows.length)
+    return null;
   const t = opts.tokens || FALLBACK;
   const colors = opts.colors || {};
-  const data = opts.flows.map((f) => ({ from: String(f.from), to: String(f.to), flow: Number(f.flow) || 0 }));
+  const data = opts.flows.map((f) => ({
+    from: String(f.from),
+    to: String(f.to),
+    flow: Number(f.flow) || 0,
+  }));
 
   const chart = new window.Chart(canvas, {
     type: "sankey",
     data: {
-      datasets: [{
-        data,
-        colorFrom: (c) => colors[c.dataset.data[c.dataIndex].from] || t.accent4,
-        colorTo: (c) => colors[c.dataset.data[c.dataIndex].to] || t.accent4,
-        colorMode: opts.colorMode || "gradient",
-        labels: opts.labels || undefined,
-        size: opts.sizeMode || "max",
-        // Padding around each rail's stack of bands.
-        nodePadding: opts.nodePadding ?? 8,
-        borderWidth: 0,
-        // Override font for rail labels so they pick up the cell's
-        // theme tokens.
-        font: { family: t.fontFamily, weight: 800, size: opts.labelSize ?? 12 },
-        color: t.textSecondary,
-      }],
+      datasets: [
+        {
+          data,
+          colorFrom: (c) => colors[c.dataset.data[c.dataIndex].from] || t.accent4,
+          colorTo: (c) => colors[c.dataset.data[c.dataIndex].to] || t.accent4,
+          colorMode: opts.colorMode || "gradient",
+          labels: opts.labels || undefined,
+          size: opts.sizeMode || "max",
+          // Padding around each rail's stack of bands.
+          nodePadding: opts.nodePadding ?? 8,
+          borderWidth: 0,
+          // Override font for rail labels so they pick up the cell's
+          // theme tokens.
+          font: { family: t.fontFamily, weight: 800, size: opts.labelSize ?? 12 },
+          color: t.textSecondary,
+        },
+      ],
     },
     options: {
       animation: false,
@@ -572,14 +609,16 @@ export function hbar(canvas, opts) {
     type: "bar",
     data: {
       labels,
-      datasets: [{
-        data: opts.values,
-        backgroundColor: color,
-        borderWidth: 0,
-        borderRadius: 0,
-        categoryPercentage: 0.8,
-        barPercentage: 0.9,
-      }],
+      datasets: [
+        {
+          data: opts.values,
+          backgroundColor: color,
+          borderWidth: 0,
+          borderRadius: 0,
+          categoryPercentage: 0.8,
+          barPercentage: 0.9,
+        },
+      ],
     },
     options: {
       animation: false,
@@ -593,7 +632,8 @@ export function hbar(canvas, opts) {
             color: t.textMuted,
             font: { family: t.fontFamily, weight: 700, size: 10 },
           },
-          grid: { display: false }, border: { display: false },
+          grid: { display: false },
+          border: { display: false },
         },
       },
       plugins: { legend: { display: false }, tooltip: { enabled: false } },

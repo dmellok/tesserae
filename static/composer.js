@@ -62,9 +62,15 @@ function applyParts(shadow, cell) {
   const existing = shadow.querySelector("style#tesserae-parts");
   if (existing) existing.remove();
   let parts = [];
-  try { parts = JSON.parse(cell.dataset.parts || "[]"); } catch { parts = []; }
+  try {
+    parts = JSON.parse(cell.dataset.parts || "[]");
+  } catch {
+    parts = [];
+  }
   let rootScale = null;
-  (Array.isArray(parts) ? parts : []).forEach((p) => { if (p && p.sel === ".w" && p.scale != null) rootScale = p.scale; });
+  (Array.isArray(parts) ? parts : []).forEach((p) => {
+    if (p && p.sel === ".w" && p.scale != null) rootScale = p.scale;
+  });
   const out = [];
   // Root fill engaged only when the widget was scaled (a ``.w`` part, kept at
   // 100), so untouched widgets render exactly as before.
@@ -127,7 +133,6 @@ function reportError(cell, shadow, pluginId, err) {
   cell.dataset.error = err.message || String(err);
   shadow.innerHTML = `<div>${pluginId}: ${err.message || err}</div>`;
   cell.dataset.rendered = "true";
-  // eslint-disable-next-line no-console
   console.error(`[composer] plugin ${pluginId} failed:`, err);
 }
 
@@ -154,7 +159,11 @@ function buildCtx(cell, options, pluginData, fontFamily) {
   // unchanged from before this existed.
   const locale = cell.dataset.locale || "en";
   let strings = {};
-  try { strings = JSON.parse(cell.dataset.strings || "{}"); } catch { strings = {}; }
+  try {
+    strings = JSON.parse(cell.dataset.strings || "{}");
+  } catch {
+    strings = {};
+  }
   return {
     cell: {
       w: virtualW,
@@ -171,7 +180,9 @@ function buildCtx(cell, options, pluginData, fontFamily) {
     fragment,
     locale,
     strings,
-    t(key, fallback) { return strings[key] ?? fallback ?? key; },
+    t(key, fallback) {
+      return strings[key] ?? fallback ?? key;
+    },
     preview: new URLSearchParams(location.search).get("preview") === "1",
   };
 }
@@ -184,12 +195,19 @@ async function mountCell(cell) {
   }
 
   let options = {};
-  try { options = JSON.parse(cell.dataset.options || "{}"); } catch { options = {}; }
+  try {
+    options = JSON.parse(cell.dataset.options || "{}");
+  } catch {
+    options = {};
+  }
   let pluginData = null;
-  try { pluginData = JSON.parse(cell.dataset.data || "null"); } catch { pluginData = null; }
+  try {
+    pluginData = JSON.parse(cell.dataset.data || "null");
+  } catch {
+    pluginData = null;
+  }
   const fontFamily =
-    cell.dataset.fontFamily ||
-    'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+    cell.dataset.fontFamily || 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 
   const host = cell.querySelector(".cell-content") || cell;
   const shadow = host.attachShadow({ mode: "open" });
@@ -257,9 +275,7 @@ function applyPagePatch(page) {
   // remount of every cell whenever theme / style / font changes so the
   // chart helpers re-read tokens() and repaint.
   if (needsRemount) {
-    remountAllCells().catch((err) =>
-      console.error("[composer] remountAllCells failed:", err),
-    );
+    remountAllCells().catch((err) => console.error("[composer] remountAllCells failed:", err));
   }
   if (page.panel && Number(page.panel.w) > 0 && Number(page.panel.h) > 0) {
     const panelEl = document.querySelector(".panel");
@@ -319,17 +335,22 @@ async function remountAllCells() {
   const prefix = window.TESSERAE_URL_PREFIX || "";
   const tasks = [];
   cellState.forEach((state, cellId) => {
-    const cell = document.querySelector(
-      `.cell[data-cell-id="${CSS.escape(cellId)}"]`,
-    );
+    const cell = document.querySelector(`.cell[data-cell-id="${CSS.escape(cellId)}"]`);
     if (!cell || !state.module) return;
     let options = {};
-    try { options = JSON.parse(cell.dataset.options || "{}"); } catch { options = {}; }
+    try {
+      options = JSON.parse(cell.dataset.options || "{}");
+    } catch {
+      options = {};
+    }
     let pluginData = null;
-    try { pluginData = JSON.parse(cell.dataset.data || "null"); } catch { pluginData = null; }
+    try {
+      pluginData = JSON.parse(cell.dataset.data || "null");
+    } catch {
+      pluginData = null;
+    }
     const fontFamily =
-      cell.dataset.fontFamily ||
-      'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+      cell.dataset.fontFamily || 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
     const ctx = buildCtx(cell, options, pluginData, fontFamily);
     // Invalidate the cached fingerprint so the next data-driven patch
     // also re-renders (the cell's data hasn't changed, but we want the
@@ -342,16 +363,14 @@ async function remountAllCells() {
         .then(() => applyParts(state.shadow, cell))
         .then(() => applyCustomCss(state.shadow))
         .then(() => prefixShadowUrls(state.shadow, prefix))
-        .catch((err) => reportError(cell, state.shadow, state.pluginId, err)),
+        .catch((err) => reportError(cell, state.shadow, state.pluginId, err))
     );
   });
   await Promise.all(tasks);
 }
 
 async function applyCellPatch(patch) {
-  const cell = document.querySelector(
-    `.cell[data-cell-id="${CSS.escape(patch.id)}"]`,
-  );
+  const cell = document.querySelector(`.cell[data-cell-id="${CSS.escape(patch.id)}"]`);
   if (!cell) return;
 
   cell.style.left = patch.x + "px";
@@ -376,10 +395,7 @@ async function applyCellPatch(patch) {
     // inside the shadow, so we either set a real override or leave
     // the inherited cascade intact.
     if (patch.font) {
-      cell.style.setProperty(
-        "--font-family",
-        `'${patch.font_family}', system-ui, sans-serif`,
-      );
+      cell.style.setProperty("--font-family", `'${patch.font_family}', system-ui, sans-serif`);
     } else {
       cell.style.removeProperty("--font-family");
     }
@@ -414,8 +430,7 @@ async function applyCellPatch(patch) {
     cell,
     patch.options ?? {},
     patch.data ?? null,
-    patch.font_family ||
-      'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+    patch.font_family || 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
   );
   state.shadow.innerHTML = "";
   try {
@@ -477,10 +492,19 @@ for (const [id, state] of cellState.entries()) {
   if (!cell) continue;
   let options = {};
   let data = null;
-  try { options = JSON.parse(cell.dataset.options || "{}"); } catch { /* fall through */ }
-  try { data = JSON.parse(cell.dataset.data || "null"); } catch { /* fall through */ }
+  try {
+    options = JSON.parse(cell.dataset.options || "{}");
+  } catch {
+    /* fall through */
+  }
+  try {
+    data = JSON.parse(cell.dataset.data || "null");
+  } catch {
+    /* fall through */
+  }
   state.lastFp = ctxFingerprint({
-    options, data,
+    options,
+    data,
     font_family: cell.dataset.fontFamily,
     w: Number(cell.dataset.cellW),
     h: Number(cell.dataset.cellH),

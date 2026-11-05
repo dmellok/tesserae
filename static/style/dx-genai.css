@@ -1,28 +1,109 @@
 /* Settings › Generative AI: the shared fal.ai key, the ceilings and the ledger. */
-.dx-genai-keyrow { display: flex; gap: 8px; align-items: stretch; }
-.dx-genai-keyrow input { flex: 1 1 auto; min-width: 0; font-family: var(--t-font-mono); font-size: 0.85rem; }
-.dx-genai-keyrow .btn { flex: 0 0 auto; }
-.dx-genai-tiles { margin: 4px 0 18px; }
-.dx-genai-tiles .help { margin: 2px 0 0; }
-.dx-genai-bar { height: 5px; margin-top: 8px; background: var(--t-surface-sunk); border-radius: 3px; overflow: hidden; }
-.dx-genai-bar i { display: block; height: 100%; background: var(--t-ok); }
-.dx-genai-bar i.is-full { background: var(--t-danger); }
-.dx-genai-striplabel { margin: 0 0 6px; }
-.dx-genai-strip { display: grid; grid-template-columns: repeat(30, 1fr); gap: 3px; }
-.dx-genai-strip i { display: block; height: 20px; border-radius: 2px; background: var(--t-surface-sunk); }
-.dx-genai-strip i.l1 { background: var(--t-accent-tint); }
-.dx-genai-strip i.l2 { background: color-mix(in srgb, var(--t-accent) 40%, var(--t-accent-tint)); }
-.dx-genai-strip i.l3 { background: color-mix(in srgb, var(--t-accent) 70%, var(--t-accent-tint)); }
-.dx-genai-strip i.l4 { background: var(--t-accent); }
-.dx-genai-stripdates { display: flex; justify-content: space-between; font-size: 0.74rem; color: var(--t-muted); margin: 4px 0 16px; }
-.dx-genai-money { display: flex; align-items: center; gap: 6px; }
-.dx-genai-money span { color: var(--t-muted); font-size: 0.9rem; }
-.dx-genai-money input { max-width: 140px; font-variant-numeric: tabular-nums; }
-.dx-genai-table td.n, .dx-genai-table th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.dx-genai-table .muted { color: var(--t-muted); font-weight: 400; }
-.dx-genai-table .dx-btn-ghost-sm { white-space: nowrap; }
-.dx-genai-total th, .dx-genai-total td { font-weight: 650; border-bottom: 0; }
+.dx-genai-keyrow {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.dx-genai-keyrow input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--t-font-mono);
+  font-size: 0.85rem;
+}
+.dx-genai-keyrow .btn {
+  flex: 0 0 auto;
+}
+.dx-genai-tiles {
+  margin: 4px 0 18px;
+}
+.dx-genai-tiles .help {
+  margin: 2px 0 0;
+}
+.dx-genai-bar {
+  height: 5px;
+  margin-top: 8px;
+  background: var(--t-surface-sunk);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.dx-genai-bar i {
+  display: block;
+  height: 100%;
+  background: var(--t-ok);
+}
+.dx-genai-bar i.is-full {
+  background: var(--t-danger);
+}
+.dx-genai-striplabel {
+  margin: 0 0 6px;
+}
+.dx-genai-strip {
+  display: grid;
+  grid-template-columns: repeat(30, 1fr);
+  gap: 3px;
+}
+.dx-genai-strip i {
+  display: block;
+  height: 20px;
+  border-radius: 2px;
+  background: var(--t-surface-sunk);
+}
+.dx-genai-strip i.l1 {
+  background: var(--t-accent-tint);
+}
+.dx-genai-strip i.l2 {
+  background: color-mix(in srgb, var(--t-accent) 40%, var(--t-accent-tint));
+}
+.dx-genai-strip i.l3 {
+  background: color-mix(in srgb, var(--t-accent) 70%, var(--t-accent-tint));
+}
+.dx-genai-strip i.l4 {
+  background: var(--t-accent);
+}
+.dx-genai-stripdates {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.74rem;
+  color: var(--t-muted);
+  margin: 4px 0 16px;
+}
+.dx-genai-money {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.dx-genai-money span {
+  color: var(--t-muted);
+  font-size: 0.9rem;
+}
+.dx-genai-money input {
+  max-width: 140px;
+  font-variant-numeric: tabular-nums;
+}
+.dx-genai-table td.n,
+.dx-genai-table th.n {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.dx-genai-table .muted {
+  color: var(--t-muted);
+  font-weight: 400;
+}
+.dx-genai-table .dx-btn-ghost-sm {
+  white-space: nowrap;
+}
+.dx-genai-total th,
+.dx-genai-total td {
+  font-weight: 650;
+  border-bottom: 0;
+}
 @media (max-width: 640px) {
-  .dx-genai-strip { grid-template-columns: repeat(15, 1fr); }
-  .dx-genai-table th:nth-child(2), .dx-genai-table td:nth-child(2) { display: none; }
+  .dx-genai-strip {
+    grid-template-columns: repeat(15, 1fr);
+  }
+  .dx-genai-table th:nth-child(2),
+  .dx-genai-table td:nth-child(2) {
+    display: none;
+  }
 }

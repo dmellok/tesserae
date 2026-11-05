@@ -42,7 +42,10 @@
 
   var DAY = 86400 * 1000;
   var HOUR = 3600 * 1000;
-  var LINE = 0, WAKES = 1, BRIDGES = 2, GAPS = 3;
+  var LINE = 0,
+    WAKES = 1,
+    BRIDGES = 2,
+    GAPS = 3;
   var MIN_ZOOM_MS = 5 * 60 * 1000;
   var STORE_KEY = "tesserae.batteryRange.";
 
@@ -132,28 +135,40 @@
 
   /* Tick spacing for the x axis, by how much time is on screen. */
   function pickStep(span) {
-    return span <= 40 * 60e3 ? 5 * 60e3
-         : span <= 2 * HOUR ? 15 * 60e3
-         : span <= 8 * HOUR ? HOUR
-         : span <= 14 * HOUR ? 2 * HOUR
-         : span <= 1.5 * DAY ? 4 * HOUR
-         : span <= 3 * DAY ? DAY
-         : span <= 14 * DAY ? 2 * DAY
-         : span <= 30 * DAY ? 5 * DAY
-         : 14 * DAY;
+    return span <= 40 * 60e3
+      ? 5 * 60e3
+      : span <= 2 * HOUR
+        ? 15 * 60e3
+        : span <= 8 * HOUR
+          ? HOUR
+          : span <= 14 * HOUR
+            ? 2 * HOUR
+            : span <= 1.5 * DAY
+              ? 4 * HOUR
+              : span <= 3 * DAY
+                ? DAY
+                : span <= 14 * DAY
+                  ? 2 * DAY
+                  : span <= 30 * DAY
+                    ? 5 * DAY
+                    : 14 * DAY;
   }
 
   function storedRange(id) {
     try {
       var v = parseFloat(window.localStorage.getItem(STORE_KEY + id));
       return v > 0 ? v : null;
-    } catch (e) {
+    } catch {
       return null;
     }
   }
 
   function storeRange(id, hours) {
-    try { window.localStorage.setItem(STORE_KEY + id, String(hours)); } catch (e) { /* private mode */ }
+    try {
+      window.localStorage.setItem(STORE_KEY + id, String(hours));
+    } catch {
+      /* private mode */
+    }
   }
 
   /* Hover target for every chart (the mode is global, the state is the
@@ -173,14 +188,18 @@
           if (anchor) return [{ element: anchor, datasetIndex: GAPS, index: gi }];
         }
       }
-      var best = null, bestD = Infinity;
+      var best = null,
+        bestD = Infinity;
       [WAKES, LINE].forEach(function (di) {
         var data = chart.getDatasetMeta(di).data;
         var raw = chart.data.datasets[di].data;
         for (var i = 0; i < data.length; i++) {
           if (!raw[i] || raw[i].y === null) continue;
           var d = Math.abs(data[i].x - e.x);
-          if (d < bestD) { bestD = d; best = { element: data[i], datasetIndex: di, index: i }; }
+          if (d < bestD) {
+            bestD = d;
+            best = { element: data[i], datasetIndex: di, index: i };
+          }
         }
       });
       return best ? [best] : [];
@@ -203,11 +222,15 @@
 
     var data = { series: [], wakes: [], gaps: [], windowHours: 168 };
     var chart = null;
-    var full = { min: 0, max: 1 };      // the whole window
-    var view = { min: 0, max: 1 };      // what is on screen (zoomed or not)
-    var shown = [];                     // wakes inside the view
-    var linePoints = [], bridges = [], anchors = [], nav = [];
-    var drag = null, cursor = -1;
+    var full = { min: 0, max: 1 }; // the whole window
+    var view = { min: 0, max: 1 }; // what is on screen (zoomed or not)
+    var shown = []; // wakes inside the view
+    var linePoints = [],
+      bridges = [],
+      anchors = [],
+      nav = [];
+    var drag = null,
+      cursor = -1;
     var loading = 0;
 
     function readAttrs() {
@@ -215,8 +238,10 @@
         data.series = JSON.parse(canvas.dataset.series || "[]");
         data.wakes = JSON.parse(canvas.dataset.wakes || "[]");
         data.gaps = JSON.parse(canvas.dataset.gaps || "[]");
-      } catch (e) {
-        data.series = []; data.wakes = []; data.gaps = [];
+      } catch {
+        data.series = [];
+        data.wakes = [];
+        data.gaps = [];
       }
       data.windowHours = parseFloat(box.dataset.windowHours) || 168;
     }
@@ -230,7 +255,9 @@
       view = { min: full.min, max: full.max };
     }
 
-    function style(i) { return STYLES[(shown[i] || {}).cat] || STYLES.other; }
+    function style(i) {
+      return STYLES[(shown[i] || {}).cat] || STYLES.other;
+    }
     function wakeAt(ms) {
       for (var i = 0; i < shown.length; i++) {
         if (Math.abs(shown[i].t_ms - ms) < 1000) return shown[i];
@@ -242,10 +269,14 @@
     // and a dashed bridge joins the real readings either side of it. Gap
     // anchors are invisible points mid-gap that hover resolves to.
     function prepare() {
-      var series = data.series, gaps = data.gaps;
+      var series = data.series,
+        gaps = data.gaps;
       var gapStarts = {};
-      gaps.forEach(function (g, i) { gapStarts[g.start_ms] = i; });
-      linePoints = []; bridges = [];
+      gaps.forEach(function (g, i) {
+        gapStarts[g.start_ms] = i;
+      });
+      linePoints = [];
+      bridges = [];
       var endPcts = [];
       var visibleIdx = [];
       series.forEach(function (p, i) {
@@ -253,23 +284,43 @@
         linePoints.push({ x: p.t_ms, y: p.pct });
         var gi = gapStarts[p.t_ms];
         if (gi === undefined) return;
-        var g = gaps[gi], next = series[i + 1];
+        var g = gaps[gi],
+          next = series[i + 1];
         endPcts[gi] = next ? (p.pct + next.pct) / 2 : p.pct;
         if (next) {
           linePoints.push({ x: (g.start_ms + g.end_ms) / 2, y: null });
-          bridges.push({ x: g.start_ms, y: p.pct }, { x: g.end_ms, y: next.pct }, { x: g.end_ms, y: null });
+          bridges.push(
+            { x: g.start_ms, y: p.pct },
+            { x: g.end_ms, y: next.pct },
+            { x: g.end_ms, y: null }
+          );
         }
       });
       anchors = gaps.map(function (g, gi) {
-        var lo = Math.max(g.start_ms, view.min), hi = Math.min(g.end_ms, view.max);
+        var lo = Math.max(g.start_ms, view.min),
+          hi = Math.min(g.end_ms, view.max);
         var mid = hi > lo ? (lo + hi) / 2 : (g.start_ms + g.end_ms) / 2;
-        var y = endPcts[gi] !== undefined ? endPcts[gi] : (series.length ? series[series.length - 1].pct : 0);
+        var y =
+          endPcts[gi] !== undefined
+            ? endPcts[gi]
+            : series.length
+              ? series[series.length - 1].pct
+              : 0;
         return { x: mid, y: y };
       });
-      shown = data.wakes.filter(function (w) { return w.t_ms >= view.min && w.t_ms <= view.max; });
+      shown = data.wakes.filter(function (w) {
+        return w.t_ms >= view.min && w.t_ms <= view.max;
+      });
       nav = shown.length
         ? shown.map(function (w, i) {
-            return { ds: WAKES, index: i, when: w.t_ms, pct: w.pct, label: w.label, detail: w.detail };
+            return {
+              ds: WAKES,
+              index: i,
+              when: w.t_ms,
+              pct: w.pct,
+              label: w.label,
+              detail: w.detail,
+            };
           })
         : visibleIdx.map(function (pair) {
             var p = series[pair[0]];
@@ -281,7 +332,9 @@
     function pushData() {
       var ds = chart.data.datasets;
       ds[LINE].data = linePoints;
-      ds[WAKES].data = shown.map(function (w) { return { x: w.t_ms, y: w.pct }; });
+      ds[WAKES].data = shown.map(function (w) {
+        return { x: w.t_ms, y: w.pct };
+      });
       ds[BRIDGES].data = bridges;
       ds[GAPS].data = anchors;
       var xs = chart.options.scales.x;
@@ -308,7 +361,8 @@
       beforeDatasetsDraw: function (c) {
         var area = c.chartArea;
         if (!area || !data.gaps.length) return;
-        var ctx = c.ctx, xs = c.scales.x;
+        var ctx = c.ctx,
+          xs = c.scales.x;
         ctx.save();
         data.gaps.forEach(function (g) {
           var x0 = Math.max(area.left, xs.getPixelForValue(g.start_ms));
@@ -364,7 +418,11 @@
           ctx.save();
           ctx.fillStyle = pal.dotFill;
           Chart.helpers.drawPoint(
-            ctx, { pointStyle: st.style, rotation: 0, radius: r, borderWidth: 0 }, el.x, el.y);
+            ctx,
+            { pointStyle: st.style, rotation: 0, radius: r, borderWidth: 0 },
+            el.x,
+            el.y
+          );
           ctx.restore();
         });
       },
@@ -375,8 +433,10 @@
       id: "batteryZoomSelection",
       afterDatasetsDraw: function (c) {
         if (!drag || Math.abs(drag.x1 - drag.x0) < 2) return;
-        var area = c.chartArea, ctx = c.ctx;
-        var x0 = Math.min(drag.x0, drag.x1), x1 = Math.max(drag.x0, drag.x1);
+        var area = c.chartArea,
+          ctx = c.ctx;
+        var x0 = Math.min(drag.x0, drag.x1),
+          x1 = Math.max(drag.x0, drag.x1);
         ctx.save();
         ctx.fillStyle = rgba(pal.accent, 0.14);
         ctx.fillRect(x0, area.top, x1 - x0, area.bottom - area.top);
@@ -409,9 +469,13 @@
                 g.addColorStop(1, rgba(pal.accent, 0));
                 return g;
               },
-              tension: 0.25, pointRadius: 0, pointHoverRadius: 5,
-              pointHoverBackgroundColor: pal.accent, pointHoverBorderColor: pal.accent,
-              borderWidth: 2, fill: "origin",
+              tension: 0.25,
+              pointRadius: 0,
+              pointHoverRadius: 5,
+              pointHoverBackgroundColor: pal.accent,
+              pointHoverBorderColor: pal.accent,
+              borderWidth: 2,
+              fill: "origin",
             },
             {
               label: "Wake-ups",
@@ -419,14 +483,26 @@
               showLine: false,
               clip: false, // a dot at 100% or at the window edge is not cut in half
               order: -1, // drawn above the line
-              pointStyle: function (ctx) { return style(ctx.dataIndex).style; },
-              pointRadius: function (ctx) { return style(ctx.dataIndex).r; },
-              pointHoverRadius: function (ctx) { return style(ctx.dataIndex).hover; },
-              pointBorderWidth: function (ctx) { return style(ctx.dataIndex).bw; },
-              pointHoverBorderWidth: function (ctx) { return style(ctx.dataIndex).bw; },
+              pointStyle: function (ctx) {
+                return style(ctx.dataIndex).style;
+              },
+              pointRadius: function (ctx) {
+                return style(ctx.dataIndex).r;
+              },
+              pointHoverRadius: function (ctx) {
+                return style(ctx.dataIndex).hover;
+              },
+              pointBorderWidth: function (ctx) {
+                return style(ctx.dataIndex).bw;
+              },
+              pointHoverBorderWidth: function (ctx) {
+                return style(ctx.dataIndex).bw;
+              },
               pointBackgroundColor: function (ctx) {
                 var st = style(ctx.dataIndex);
-                return st.filled ? pal.cat[(shown[ctx.dataIndex] || {}).cat] || pal.accent : pal.dotFill;
+                return st.filled
+                  ? pal.cat[(shown[ctx.dataIndex] || {}).cat] || pal.accent
+                  : pal.dotFill;
               },
               pointBorderColor: function (ctx) {
                 return pal.cat[(shown[ctx.dataIndex] || {}).cat] || pal.accent;
@@ -443,56 +519,86 @@
               data: bridges,
               spanGaps: false,
               borderColor: rgba(pal.muted, 0.85),
-              borderDash: [3, 4], borderWidth: 1.5, fill: false,
-              pointRadius: 0, pointHoverRadius: 0, pointHitRadius: 0, tension: 0,
+              borderDash: [3, 4],
+              borderWidth: 1.5,
+              fill: false,
+              pointRadius: 0,
+              pointHoverRadius: 0,
+              pointHitRadius: 0,
+              tension: 0,
             },
             {
               label: "Gap anchors",
               data: anchors,
               showLine: false,
-              pointRadius: 0, pointHoverRadius: 0, pointHitRadius: 0,
+              pointRadius: 0,
+              pointHoverRadius: 0,
+              pointHitRadius: 0,
             },
           ],
         },
         options: {
-          animation: false, maintainAspectRatio: false, responsive: true,
+          animation: false,
+          maintainAspectRatio: false,
+          responsive: true,
           layout: { padding: { top: 6, right: 12, bottom: 0, left: 10 } },
           interaction: { mode: "batteryChart", intersect: false },
           scales: {
             x: {
-              type: "linear", min: view.min, max: view.max,
+              type: "linear",
+              min: view.min,
+              max: view.max,
               ticks: {
-                stepSize: pickStep(view.max - view.min), color: pal.muted,
-                font: { size: 11 }, padding: 6,
+                stepSize: pickStep(view.max - view.min),
+                color: pal.muted,
+                font: { size: 11 },
+                padding: 6,
                 callback: function (v) {
                   var d = new Date(v);
-                  if (view.max - view.min <= 1.5 * DAY) return window.tesseraeComponents.clockTime(d);
+                  if (view.max - view.min <= 1.5 * DAY)
+                    return window.tesseraeComponents.clockTime(d);
                   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
                 },
               },
-              grid: { display: false }, border: { color: rgba(pal.muted, 0.35) },
+              grid: { display: false },
+              border: { color: rgba(pal.muted, 0.35) },
             },
             y: {
               // The axis reads 0-100%, with room above and below so a dot at
               // either end is whole.
-              min: -5, max: 105,
+              min: -5,
+              max: 105,
               afterBuildTicks: function (axis) {
-                axis.ticks = [0, 25, 50, 75, 100].map(function (v) { return { value: v }; });
+                axis.ticks = [0, 25, 50, 75, 100].map(function (v) {
+                  return { value: v };
+                });
               },
               ticks: {
-                color: pal.muted, font: { size: 11 }, padding: 6,
-                callback: function (v) { return v + "%"; },
+                color: pal.muted,
+                font: { size: 11 },
+                padding: 6,
+                callback: function (v) {
+                  return v + "%";
+                },
               },
-              grid: { color: rgba(pal.muted, 0.1), drawTicks: false }, border: { display: false },
+              grid: { color: rgba(pal.muted, 0.1), drawTicks: false },
+              border: { display: false },
             },
           },
           plugins: {
             legend: { display: false },
             tooltip: {
-              backgroundColor: pal.tipBg, borderColor: pal.tipBorder, borderWidth: 1,
-              titleColor: pal.muted, bodyColor: pal.fg, footerColor: pal.muted,
-              displayColors: false, cornerRadius: 6, padding: 8,
-              titleFont: { size: 11, weight: "normal" }, bodyFont: { size: 13, weight: "bold" },
+              backgroundColor: pal.tipBg,
+              borderColor: pal.tipBorder,
+              borderWidth: 1,
+              titleColor: pal.muted,
+              bodyColor: pal.fg,
+              footerColor: pal.muted,
+              displayColors: false,
+              cornerRadius: 6,
+              padding: 8,
+              titleFont: { size: 11, weight: "normal" },
+              bodyFont: { size: 13, weight: "bold" },
               footerFont: { size: 11, weight: "normal" },
               callbacks: {
                 title: function (items) {
@@ -502,7 +608,8 @@
                 label: function (item) {
                   if (item.datasetIndex === GAPS) return gapLabel(data.gaps[item.dataIndex]);
                   var lines = [item.parsed.y + "%"];
-                  var wake = item.datasetIndex === WAKES ? shown[item.dataIndex] : wakeAt(item.parsed.x);
+                  var wake =
+                    item.datasetIndex === WAKES ? shown[item.dataIndex] : wakeAt(item.parsed.x);
                   if (wake) {
                     lines.push(wake.label);
                     if (wake.detail) lines.push(wake.detail);
@@ -512,7 +619,8 @@
                 footer: function (items) {
                   if (!items.length || items[0].datasetIndex === GAPS) return "";
                   var item = items[0];
-                  var wake = item.datasetIndex === WAKES ? shown[item.dataIndex] : wakeAt(item.parsed.x);
+                  var wake =
+                    item.datasetIndex === WAKES ? shown[item.dataIndex] : wakeAt(item.parsed.x);
                   return wake && wake.reason ? "Device reported: " + wake.reason : "";
                 },
               },
@@ -520,7 +628,11 @@
           },
         },
       });
-      chart.$battery = { gaps: function () { return data.gaps; } };
+      chart.$battery = {
+        gaps: function () {
+          return data.gaps;
+        },
+      };
       pushData();
     }
 
@@ -568,10 +680,12 @@
       box.dataset.windowHours = String(data.windowHours);
       canvas.setAttribute(
         "aria-label",
-        "Battery percent over the last " + card.window_label +
+        "Battery percent over the last " +
+          card.window_label +
           (data.wakes.length
             ? ", with a dot at each wake-up. Use the left and right arrow keys to step through them. Drag across the chart to zoom."
-            : ""));
+            : "")
+      );
     }
 
     function swapParts(card) {
@@ -583,7 +697,9 @@
       var t = document.createElement("template");
       t.innerHTML = card.tiles_html || "";
       grid.insertBefore(t.content, old.length ? old[0] : grid.firstChild);
-      old.forEach(function (n) { n.remove(); });
+      old.forEach(function (n) {
+        n.remove();
+      });
       var next = grid.nextElementSibling;
       if (next && next.hasAttribute("data-battery-hint")) next.remove();
       if (card.hint_html) grid.insertAdjacentHTML("afterend", card.hint_html);
@@ -591,7 +707,10 @@
 
     function markPressed(hours) {
       rangeBtns.forEach(function (b) {
-        b.setAttribute("aria-pressed", Math.abs(parseFloat(b.dataset.hours) - hours) < 0.01 ? "true" : "false");
+        b.setAttribute(
+          "aria-pressed",
+          Math.abs(parseFloat(b.dataset.hours) - hours) < 0.01 ? "true" : "false"
+        );
       });
     }
 
@@ -602,11 +721,16 @@
         credentials: "same-origin",
         headers: { Accept: "application/json" },
       })
-        .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+        .then(function (r) {
+          if (!r.ok) throw new Error(String(r.status));
+          return r.json();
+        })
         .then(function (card) {
           if (token !== loading) return; // a newer choice is on its way
           data = {
-            series: card.series || [], wakes: card.wakes || [], gaps: card.gaps || [],
+            series: card.series || [],
+            wakes: card.wakes || [],
+            gaps: card.gaps || [],
             windowHours: card.window_hours,
           };
           syncAttrs(card);
@@ -641,7 +765,11 @@
     canvas.addEventListener("pointerdown", function (e) {
       if (!chart || e.button > 0 || !inPlot(e.offsetX, e.offsetY)) return;
       drag = { x0: e.offsetX, x1: e.offsetX };
-      try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* not capturable */ }
+      try {
+        canvas.setPointerCapture(e.pointerId);
+      } catch {
+        /* not capturable */
+      }
     });
     canvas.addEventListener("pointermove", function (e) {
       if (!drag) return;
@@ -659,12 +787,19 @@
         var xs = chart.scales.x;
         var a = xs.getValueForPixel(Math.min(d.x0, d.x1));
         var b = xs.getValueForPixel(Math.max(d.x0, d.x1));
-        if (b - a >= MIN_ZOOM_MS) { setView(a, b); return; }
+        if (b - a >= MIN_ZOOM_MS) {
+          setView(a, b);
+          return;
+        }
       }
       chart.draw();
     }
-    canvas.addEventListener("pointerup", function () { endDrag(true); });
-    canvas.addEventListener("pointercancel", function () { endDrag(false); });
+    canvas.addEventListener("pointerup", function () {
+      endDrag(true);
+    });
+    canvas.addEventListener("pointercancel", function () {
+      endDrag(false);
+    });
     function resetZoom() {
       if (view.min === full.min && view.max === full.max) return;
       setView(full.min, full.max);
@@ -685,7 +820,11 @@
       chart.tooltip.setActiveElements(active, { x: el.x, y: el.y });
       chart.update("none");
       if (live) {
-        live.textContent = fmtWhen(n.when) + ", " + n.pct + "%" +
+        live.textContent =
+          fmtWhen(n.when) +
+          ", " +
+          n.pct +
+          "%" +
           (n.label ? ", " + n.label + (n.detail ? ", " + n.detail : "") : "");
       }
     }
@@ -708,7 +847,10 @@
       else if (e.key === "ArrowRight") next = cursor < 0 ? nav.length - 1 : cursor + 1;
       else if (e.key === "Home") next = 0;
       else if (e.key === "End") next = nav.length - 1;
-      else if (e.key === "Escape") { hide(); return; }
+      else if (e.key === "Escape") {
+        hide();
+        return;
+      }
       if (next === null) return;
       e.preventDefault();
       show(next);
@@ -739,7 +881,9 @@
       requestAnimationFrame(function () {
         pending = false;
         pal = readPalette();
-        boxes.forEach(function (b) { b.restyle(); });
+        boxes.forEach(function (b) {
+          b.restyle();
+        });
       });
     }).observe(document.documentElement, {
       attributes: true,
@@ -755,7 +899,9 @@
 
   window.TesseraeBatteryChart = { init: init };
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", function () { init(); });
+    document.addEventListener("DOMContentLoaded", function () {
+      init();
+    });
   } else {
     init();
   }

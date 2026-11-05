@@ -50,7 +50,10 @@
   panelEl.appendChild(svg);
 
   function statusClass(status) {
-    if (["dispatched", "ha_dispatched", "webhook_dispatched", "fetched", "noop"].indexOf(status) >= 0) return "ok";
+    if (
+      ["dispatched", "ha_dispatched", "webhook_dispatched", "fetched", "noop"].indexOf(status) >= 0
+    )
+      return "ok";
     if (["blocked", "error", "ha_failed"].indexOf(status) >= 0) return "bad";
     return "miss"; // no_target / stale / deduped / no_frame
   }
@@ -64,19 +67,26 @@
 
   function el(name, attrs) {
     var n = document.createElementNS(SVGNS, name);
-    Object.keys(attrs || {}).forEach(function (k) { n.setAttribute(k, attrs[k]); });
+    Object.keys(attrs || {}).forEach(function (k) {
+      n.setAttribute(k, attrs[k]);
+    });
     return n;
   }
 
   function renderRegions(regions) {
     gRegions.textContent = "";
     (regions || []).forEach(function (r) {
-      var bad = (r.invalid && r.invalid.length) ? " tm-region--invalid" : "";
-      gRegions.appendChild(el("rect", {
-        x: r.x, y: r.y, width: r.w, height: r.h,
-        class: "tm-region" + bad,
-        rx: 4,
-      }));
+      var bad = r.invalid && r.invalid.length ? " tm-region--invalid" : "";
+      gRegions.appendChild(
+        el("rect", {
+          x: r.x,
+          y: r.y,
+          width: r.w,
+          height: r.h,
+          class: "tm-region" + bad,
+          rx: 4,
+        })
+      );
     });
   }
 
@@ -88,10 +98,16 @@
     var gesture = ev.gesture || "tap";
     var moved = t.x1 != null && (t.x1 !== t.x0 || t.y1 !== t.y0);
     if (gesture.indexOf("swipe") === 0 && moved) {
-      g.appendChild(el("line", {
-        x1: t.x0, y1: t.y0, x2: t.x1, y2: t.y1,
-        class: "tm-swipe", "marker-end": "url(#tm-arrow)",
-      }));
+      g.appendChild(
+        el("line", {
+          x1: t.x0,
+          y1: t.y0,
+          x2: t.x1,
+          y2: t.y1,
+          class: "tm-swipe",
+          "marker-end": "url(#tm-arrow)",
+        })
+      );
     }
     g.appendChild(el("circle", { cx: t.x0, cy: t.y0, r: R, class: "tm-dot" }));
     // Slider value + action label.
@@ -127,32 +143,45 @@
   }
 
   function applyToggles() {
-    gRegions.style.display = (showRegions && showRegions.checked) ? "" : "none";
+    gRegions.style.display = showRegions && showRegions.checked ? "" : "none";
   }
   if (showRegions) showRegions.addEventListener("change", applyToggles);
-  if (showLabels) showLabels.addEventListener("change", function () {
-    // Re-render labels by reloading marks is overkill; just toggle a class.
-    svg.classList.toggle("tm-hide-labels", !showLabels.checked);
-  });
+  if (showLabels)
+    showLabels.addEventListener("change", function () {
+      // Re-render labels by reloading marks is overkill; just toggle a class.
+      svg.classList.toggle("tm-hide-labels", !showLabels.checked);
+    });
   if (fadeChk) fadeChk.addEventListener("change", applyFade);
   function clearView() {
-    gMarks.textContent = ""; count = 0;
+    gMarks.textContent = "";
+    count = 0;
     if (countEl) countEl.textContent = "";
     if (emptyEl) emptyEl.hidden = false;
   }
-  if (clearBtn) clearBtn.addEventListener("click", function () {
-    if (!window.confirm(
-      "Clear the recorded touch events for this device? This removes them " +
-      "from the monitor and the Events history and can't be undone."
-    )) return;
-    var url = clearBtn.dataset.clearUrl;
-    if (!url) { clearView(); return; }
-    // Delete server-side first so the clear survives a refresh; only wipe
-    // the view once the rows are actually gone.
-    fetch(url, { method: "POST" })
-      .then(function (r) { if (r.ok) clearView(); })
-      .catch(function () { /* leave the view as-is on failure */ });
-  });
+  if (clearBtn)
+    clearBtn.addEventListener("click", function () {
+      if (
+        !window.confirm(
+          "Clear the recorded touch events for this device? This removes them " +
+            "from the monitor and the Events history and can't be undone."
+        )
+      )
+        return;
+      var url = clearBtn.dataset.clearUrl;
+      if (!url) {
+        clearView();
+        return;
+      }
+      // Delete server-side first so the clear survives a refresh; only wipe
+      // the view once the rows are actually gone.
+      fetch(url, { method: "POST" })
+        .then(function (r) {
+          if (r.ok) clearView();
+        })
+        .catch(function () {
+          /* leave the view as-is on failure */
+        });
+    });
 
   // Regions for the frame currently on the panel; kept so switching the
   // dashboard picker back to "Live frame" restores them without a refetch.
@@ -160,7 +189,9 @@
 
   // Initial paint.
   fetch(dataUrl)
-    .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+    .then(function (r) {
+      return r.ok ? r.json() : Promise.reject(r.status);
+    })
     .then(function (j) {
       liveRegions = j.regions || [];
       renderRegions(liveRegions);
@@ -169,14 +200,21 @@
       (j.events || []).slice().reverse().forEach(addMark);
       if (emptyEl) emptyEl.hidden = count > 0;
     })
-    .catch(function () { if (emptyEl) { emptyEl.hidden = false; emptyEl.textContent = "Couldn't load touch data."; } });
+    .catch(function () {
+      if (emptyEl) {
+        emptyEl.hidden = false;
+        emptyEl.textContent = "Couldn't load touch data.";
+      }
+    });
 
   // Dashboard picker: overlay any dashboard's regions (rendered on demand
   // at this panel's size) so you can preview a board's touch targets
   // before sending it, not only the frame that's already on the panel.
   if (dashSelect && dashboardsUrl && regionsUrl) {
     fetch(dashboardsUrl)
-      .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function (r) {
+        return r.ok ? r.json() : Promise.reject(r.status);
+      })
       .then(function (j) {
         (j.pages || []).forEach(function (p) {
           var opt = document.createElement("option");
@@ -185,21 +223,32 @@
           dashSelect.appendChild(opt);
         });
       })
-      .catch(function () { /* picker just stays at "Live frame" */ });
+      .catch(function () {
+        /* picker just stays at "Live frame" */
+      });
 
     dashSelect.addEventListener("change", function () {
       var pageId = dashSelect.value;
-      if (!pageId) { renderRegions(liveRegions); return; }
+      if (!pageId) {
+        renderRegions(liveRegions);
+        return;
+      }
       // Rendering headless takes a moment; hint it in the picker.
       dashSelect.disabled = true;
       fetch(regionsUrl + "?page=" + encodeURIComponent(pageId))
-        .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+        .then(function (r) {
+          return r.ok ? r.json() : Promise.reject(r.status);
+        })
         .then(function (j) {
           renderRegions(j.regions || []);
           applyToggles();
         })
-        .catch(function () { renderRegions([]); })
-        .then(function () { dashSelect.disabled = false; });
+        .catch(function () {
+          renderRegions([]);
+        })
+        .then(function () {
+          dashSelect.disabled = false;
+        });
     });
   }
 
@@ -208,7 +257,11 @@
     var es = new EventSource(streamUrl);
     es.addEventListener("log", function (e) {
       var row;
-      try { row = JSON.parse(e.data); } catch (err) { return; }
+      try {
+        row = JSON.parse(e.data);
+      } catch {
+        return;
+      }
       if (!row || row.target !== deviceId) return;
       var x = row.extra || {};
       addMark({
@@ -220,10 +273,16 @@
       });
       if (liveEl) {
         liveEl.classList.add("tm-live--flash");
-        setTimeout(function () { liveEl.classList.remove("tm-live--flash"); }, 250);
+        setTimeout(function () {
+          liveEl.classList.remove("tm-live--flash");
+        }, 250);
       }
     });
-    es.onerror = function () { if (liveEl) liveEl.classList.add("tm-live--down"); };
-    es.onopen = function () { if (liveEl) liveEl.classList.remove("tm-live--down"); };
+    es.onerror = function () {
+      if (liveEl) liveEl.classList.add("tm-live--down");
+    };
+    es.onopen = function () {
+      if (liveEl) liveEl.classList.remove("tm-live--down");
+    };
   }
 })();

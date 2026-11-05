@@ -903,7 +903,9 @@
   border-radius: var(--t-radius-sm);
   background: var(--t-surface);
   cursor: text;
-  transition: border-color var(--t-trans-fast), box-shadow var(--t-trans-fast);
+  transition:
+    border-color var(--t-trans-fast),
+    box-shadow var(--t-trans-fast);
 }
 .wp-box:hover {
   border-color: var(--t-border-strong);
@@ -968,7 +970,7 @@
   font-family: var(--t-font-mono);
   font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: .06em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--t-fg-soft);
 }

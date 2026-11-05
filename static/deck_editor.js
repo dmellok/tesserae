@@ -64,7 +64,8 @@
   // -- fallback accessors (source of truth for per-page data) ---------------
   const row = (id) => fallback.querySelector(`.dxe-fb-row[data-page="${CSS.escape(id)}"]`);
   const memberBox = (id) => row(id) && row(id).querySelector('input[name="member"]');
-  const orderInput = (id) => row(id) && row(id).querySelector('input[type="number"][name^="order"]');
+  const orderInput = (id) =>
+    row(id) && row(id).querySelector('input[type="number"][name^="order"]');
   const homeRadio = (id) => row(id) && row(id).querySelector('input[name="home"]');
   const overrideSel = (id) => row(id) && row(id).querySelector("select");
   const dwellInput = (id) => row(id) && row(id).querySelector('input[name^="dwell"]');
@@ -73,13 +74,15 @@
     (data.pages || []).map((p) => p.id).filter((id) => memberBox(id) && memberBox(id).checked);
   const orderedIds = () =>
     members().sort((a, b) => (+orderInput(a).value || 0) - (+orderInput(b).value || 0));
-  const setOrder = (ids) => ids.forEach((id, i) => orderInput(id) && (orderInput(id).value = String(i + 1)));
+  const setOrder = (ids) =>
+    ids.forEach((id, i) => orderInput(id) && (orderInput(id).value = String(i + 1)));
   const homeId = () => {
     const checked = fallback.querySelector('input[name="home"]:checked');
     const ids = orderedIds();
     return checked && ids.includes(checked.value) ? checked.value : ids[0] || "";
   };
-  const advanceMode = () => (form.querySelector('input[name="advance"]:checked') || {}).value || "manual";
+  const advanceMode = () =>
+    (form.querySelector('input[name="advance"]:checked') || {}).value || "manual";
 
   // -- binding ----------------------------------------------------------------
   const deviceInfo = (id) => {
@@ -150,7 +153,9 @@
   function removeMember(id) {
     if (memberBox(id)) memberBox(id).checked = false;
     const remaining = orderedIds();
-    selected = remaining.length ? remaining[Math.max(0, remaining.indexOf(id) - 1)] || remaining[0] : null;
+    selected = remaining.length
+      ? remaining[Math.max(0, remaining.indexOf(id) - 1)] || remaining[0]
+      : null;
     setOrder(remaining);
     markDirty();
     render();
@@ -309,8 +314,7 @@
 
     const head = document.createElement("div");
     head.className = "dxe-panel-head";
-    head.innerHTML =
-      `<span class="dxe-mono-label">PAGE ${pos}</span><span class="dxe-panel-name">${escape(p.name)}</span>`;
+    head.innerHTML = `<span class="dxe-mono-label">PAGE ${pos}</span><span class="dxe-panel-name">${escape(p.name)}</span>`;
     const rm = document.createElement("button");
     rm.type = "button";
     rm.className = "dxe-remove";
@@ -474,7 +478,8 @@
   function renderStatus() {
     const ids = orderedIds();
     const chain = ids.map((id) => (pagesById[id] || {}).name || id).join(" → ");
-    if (statusEl) statusEl.textContent = (dirty ? "Unsaved changes" : "Saved") + (chain ? " · " + chain : "");
+    if (statusEl)
+      statusEl.textContent = (dirty ? "Unsaved changes" : "Saved") + (chain ? " · " + chain : "");
     if (statusWord) statusWord.textContent = enabledBox.checked ? "Enabled" : "Disabled";
   }
 
@@ -513,7 +518,8 @@
     rail.appendChild(addTile());
     pagesField.value = ids.join(",");
 
-    if (metaEl) metaEl.textContent = `${ids.length} page${ids.length === 1 ? "" : "s"} · drag to reorder`;
+    if (metaEl)
+      metaEl.textContent = `${ids.length} page${ids.length === 1 ? "" : "s"} · drag to reorder`;
 
     const mode = advanceMode();
     if (intervalWrap) intervalWrap.style.display = mode === "manual" ? "none" : "";
@@ -549,10 +555,24 @@
   // -- wiring ---------------------------------------------------------------
   fallback.classList.add("js-hidden");
   if (titleInput) titleInput.addEventListener("input", markDirty);
-  if (enabledBox) enabledBox.addEventListener("change", () => { markDirty(); renderStatus(); });
-  form.querySelectorAll('input[name="advance"]').forEach((r) => r.addEventListener("change", () => { markDirty(); render(); }));
+  if (enabledBox)
+    enabledBox.addEventListener("change", () => {
+      markDirty();
+      renderStatus();
+    });
+  form.querySelectorAll('input[name="advance"]').forEach((r) =>
+    r.addEventListener("change", () => {
+      markDirty();
+      render();
+    })
+  );
   [el("dxe-interval"), returnSel].forEach(
-    (c) => c && c.addEventListener("change", () => { markDirty(); render(); })
+    (c) =>
+      c &&
+      c.addEventListener("change", () => {
+        markDirty();
+        render();
+      })
   );
   // Switching display keeps the steps, so any bound elsewhere need a decision
   // now; cancelling puts the previous display back and changes nothing.
@@ -582,8 +602,16 @@
           : "How often member dashboards re-render out of view; takes over from each dashboard's own \"Updates\" setting while it's in this lineup.";
     }
   }
-  if (cadenceRange) cadenceRange.addEventListener("input", () => { syncCadence(cadenceRange); markDirty(); });
-  if (cadenceNum) cadenceNum.addEventListener("input", () => { syncCadence(cadenceNum); markDirty(); });
+  if (cadenceRange)
+    cadenceRange.addEventListener("input", () => {
+      syncCadence(cadenceRange);
+      markDirty();
+    });
+  if (cadenceNum)
+    cadenceNum.addEventListener("input", () => {
+      syncCadence(cadenceNum);
+      markDirty();
+    });
   if (cadenceNum) syncCadence(cadenceNum);
   // Discard = leave without saving; every bottom action lands on Lineups.
   const discard = el("dxe-discard");

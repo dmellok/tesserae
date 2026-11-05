@@ -10,27 +10,30 @@
  * is harmless on desktop, where the slot is never shown.
  */
 (function () {
-  if (document.documentElement.dataset.ui !== 'paper') return;
-  const slot = document.querySelector('[data-page-bar]');
-  const title = document.querySelector('[data-page-bar-title]');
-  const h1 = document.querySelector('main.page h1');
-  if (!slot || !title || !h1 || !('IntersectionObserver' in window)) return;
+  if (document.documentElement.dataset.ui !== "paper") return;
+  const slot = document.querySelector("[data-page-bar]");
+  const title = document.querySelector("[data-page-bar-title]");
+  const h1 = document.querySelector("main.page h1");
+  if (!slot || !title || !h1 || !("IntersectionObserver" in window)) return;
   const copy = h1.cloneNode(true);
-  copy.querySelectorAll('svg, i, .sr-only').forEach((n) => n.remove());
-  const words = copy.textContent.replace(/\s+/g, ' ').trim();
+  copy.querySelectorAll("svg, i, .sr-only").forEach((n) => n.remove());
+  const words = copy.textContent.replace(/\s+/g, " ").trim();
   if (!words) return;
   title.textContent = words;
-  const bar = document.querySelector('.topbar');
+  const bar = document.querySelector(".topbar");
   const barHeight = () => Math.round(bar ? bar.getBoundingClientRect().height : 56);
   let watcher = null;
   function watch() {
     if (watcher) watcher.disconnect();
     const h = barHeight();
-    watcher = new IntersectionObserver((entries) => {
-      const e = entries[0];
-      const under = !e.isIntersecting && e.boundingClientRect.bottom <= h;
-      document.body.classList.toggle('page-scrolled', under);
-    }, { rootMargin: '-' + h + 'px 0px 0px 0px', threshold: 0 });
+    watcher = new IntersectionObserver(
+      (entries) => {
+        const e = entries[0];
+        const under = !e.isIntersecting && e.boundingClientRect.bottom <= h;
+        document.body.classList.toggle("page-scrolled", under);
+      },
+      { rootMargin: "-" + h + "px 0px 0px 0px", threshold: 0 }
+    );
     watcher.observe(h1);
   }
   watch();
@@ -38,7 +41,7 @@
   // Paper's bar is fixed at 56px but the font may load late), so re-arm
   // on resize with the measured height.
   let resizeTimer = null;
-  window.addEventListener('resize', () => {
+  window.addEventListener("resize", () => {
     if (resizeTimer) clearTimeout(resizeTimer);
     resizeTimer = setTimeout(watch, 150);
   });

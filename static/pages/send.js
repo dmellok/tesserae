@@ -26,12 +26,9 @@
       .then((html) => {
         if (!html) return;
         const doc = new DOMParser().parseFromString(html, "text/html");
-        const fresh =
-          doc.querySelector(".history") ||
-          doc.querySelector("[data-history-empty]");
+        const fresh = doc.querySelector(".history") || doc.querySelector("[data-history-empty]");
         const current =
-          document.querySelector(".history") ||
-          document.querySelector("[data-history-empty]");
+          document.querySelector(".history") || document.querySelector("[data-history-empty]");
         if (fresh && current) {
           current.replaceWith(fresh);
         }
@@ -158,7 +155,7 @@
       let path = "";
       try {
         path = new URL(s).pathname;
-      } catch (e) {
+      } catch {
         return "webpage";
       }
       return IMAGE_EXT.test(path) ? "image" : "webpage";
@@ -192,7 +189,7 @@
       const obj = JSON.parse(raw);
       const n = obj && typeof obj === "object" ? Object.keys(obj).length : 0;
       return n === 1 ? "1 header" : `${n} headers`;
-    } catch (e) {
+    } catch {
       return "headers not valid JSON";
     }
   }
@@ -225,7 +222,13 @@
     const fileLike = src === "file" || src === "gallery";
     const showEditor = src === "text" || (state.typing && !src);
 
-    box.dataset.state = src ? (src === "text" ? "filled" : "file") : state.typing ? "typing" : "empty";
+    box.dataset.state = src
+      ? src === "text"
+        ? "filled"
+        : "file"
+      : state.typing
+        ? "typing"
+        : "empty";
     kindRadios.forEach((r) => {
       r.checked = r.value === k;
       r.disabled = fileLike && r.value !== "image";
@@ -367,7 +370,7 @@
       apply = () => {
         try {
           new URL(url);
-        } catch (e) {
+        } catch {
           previewPhText.textContent = "Enter a full link, starting with http:// or https://";
           showOnly(previewPh);
           return;
@@ -442,7 +445,12 @@
   });
   editor.addEventListener("blur", () => {
     setTimeout(() => {
-      if (!state.text.trim() && !state.file && !state.gallery && document.activeElement !== editor) {
+      if (
+        !state.text.trim() &&
+        !state.file &&
+        !state.gallery &&
+        document.activeElement !== editor
+      ) {
         state.typing = false;
         render();
       }
@@ -573,13 +581,13 @@
     box.addEventListener(ev, (e) => {
       e.preventDefault();
       box.classList.add("is-dragging");
-    }),
+    })
   );
   ["dragleave", "dragend", "drop"].forEach((ev) =>
     box.addEventListener(ev, (e) => {
       e.preventDefault();
       box.classList.remove("is-dragging");
-    }),
+    })
   );
   box.addEventListener("drop", (e) => {
     const dt = e.dataTransfer;
@@ -623,7 +631,7 @@
       if (previewDevice && ev.target.checked) {
         const shown = previewDevice.value;
         const shownTicked = checklist.querySelector(
-          `input[name="device_id"][value="${CSS.escape(shown)}"]:checked`,
+          `input[name="device_id"][value="${CSS.escape(shown)}"]:checked`
         );
         if (!shownTicked) previewDevice.value = ev.target.value;
       }

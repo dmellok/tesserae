@@ -27,15 +27,19 @@
   var WARM_FOR_MS = 30000;
   var LEAVE_MS = 260;
 
-  var cards = {};        // job id -> { el, parts, started }
-  var dismissed = {};    // job id -> started, hidden by the person
+  var cards = {}; // job id -> { el, parts, started }
+  var dismissed = {}; // job id -> started, hidden by the person
   var last = [];
   var timer = null;
   var warmUntil = 0;
   var folded = false;
   var busy = false;
 
-  try { folded = localStorage.getItem(FOLD_KEY) === "1"; } catch (e) { /* private mode */ }
+  try {
+    folded = localStorage.getItem(FOLD_KEY) === "1";
+  } catch {
+    /* private mode */
+  }
 
   function el(tag, cls, text) {
     var n = document.createElement(tag);
@@ -43,7 +47,9 @@
     if (text != null) n.textContent = text;
     return n;
   }
-  function icon(name) { return el("i", "ph ph-" + name); }
+  function icon(name) {
+    return el("i", "ph ph-" + name);
+  }
 
   function span(seconds) {
     if (seconds < 60) return seconds + "s";
@@ -69,11 +75,19 @@
 
   function setFolded(on) {
     folded = on;
-    try { localStorage.setItem(FOLD_KEY, on ? "1" : "0"); } catch (e) { /* private mode */ }
+    try {
+      localStorage.setItem(FOLD_KEY, on ? "1" : "0");
+    } catch {
+      /* private mode */
+    }
     root.classList.toggle("is-folded", on);
   }
-  pill.addEventListener("click", function () { setFolded(false); });
-  foldBtn.addEventListener("click", function () { setFolded(true); });
+  pill.addEventListener("click", function () {
+    setFolded(false);
+  });
+  foldBtn.addEventListener("click", function () {
+    setFolded(true);
+  });
 
   // ---- one card --------------------------------------------------------
   function build(job) {
@@ -101,17 +115,50 @@
     var fill = el("i", "jt-fill");
     bar.appendChild(fill);
     card.append(head, bar);
-    var entry = { el: card, ico: ico, title: title, detail: detail, pct: pct, stop: stop, act: act, fill: fill, bar: bar, started: job.started, job: job };
+    var entry = {
+      el: card,
+      ico: ico,
+      title: title,
+      detail: detail,
+      pct: pct,
+      stop: stop,
+      act: act,
+      fill: fill,
+      bar: bar,
+      started: job.started,
+      job: job,
+    };
     act.addEventListener("click", function () {
       act.disabled = true;
-      fetch(ACT_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: entry.job.id }) })
-        .then(function () { poke(); }, function () { act.disabled = false; });
+      fetch(ACT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: entry.job.id }),
+      }).then(
+        function () {
+          poke();
+        },
+        function () {
+          act.disabled = false;
+        }
+      );
     });
     stop.addEventListener("click", function () {
       stop.disabled = true;
       stop.textContent = "Stopping";
-      fetch(STOP_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: entry.job.id }) })
-        .then(function () { poke(); }, function () { stop.disabled = false; stop.textContent = "Stop"; });
+      fetch(STOP_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: entry.job.id }),
+      }).then(
+        function () {
+          poke();
+        },
+        function () {
+          stop.disabled = false;
+          stop.textContent = "Stop";
+        }
+      );
     });
     x.addEventListener("click", function () {
       dismissed[entry.job.id] = entry.started;
@@ -129,7 +176,10 @@
     var name = job.label ? job.label + " · " : "";
     // The title is a link when the job names a page to go and look at.
     if (job.href) {
-      if (!entry.link) { entry.link = el("a"); entry.title.replaceChildren(entry.link); }
+      if (!entry.link) {
+        entry.link = el("a");
+        entry.title.replaceChildren(entry.link);
+      }
       // A root-relative page needs the ingress prefix under Home Assistant.
       var rooted = job.href.charAt(0) === "/" && job.href.charAt(1) !== "/";
       entry.link.href = rooted ? (window.TESSERAE_URL_PREFIX || "") + job.href : job.href;
@@ -147,9 +197,20 @@
     entry.pct.textContent = !indeterminate && running ? Math.round((p || 0) * 100) + "%" : "";
     entry.stop.hidden = !job.stoppable;
     entry.act.hidden = !job.action;
-    if (job.action && entry.act.textContent !== job.action) { entry.act.textContent = job.action; entry.act.disabled = false; }
-    if (job.stoppable && entry.stop.textContent !== "Stop" && !entry.stop.disabled) entry.stop.textContent = "Stop";
-    var glyph = job.state === "done" ? "check" : job.state === "failed" ? "warning" : job.state === "stopped" ? "stop" : "";
+    if (job.action && entry.act.textContent !== job.action) {
+      entry.act.textContent = job.action;
+      entry.act.disabled = false;
+    }
+    if (job.stoppable && entry.stop.textContent !== "Stop" && !entry.stop.disabled)
+      entry.stop.textContent = "Stop";
+    var glyph =
+      job.state === "done"
+        ? "check"
+        : job.state === "failed"
+          ? "warning"
+          : job.state === "stopped"
+            ? "stop"
+            : "";
     if (entry.glyph !== glyph) {
       entry.glyph = glyph;
       entry.ico.replaceChildren(glyph ? icon(glyph) : el("span", "jt-spin-dot"));
@@ -161,7 +222,10 @@
     if (!entry) return;
     delete cards[id];
     entry.el.classList.add("is-leaving");
-    setTimeout(function () { entry.el.remove(); sync(); }, LEAVE_MS);
+    setTimeout(function () {
+      entry.el.remove();
+      sync();
+    }, LEAVE_MS);
   }
 
   // ---- the whole tray --------------------------------------------------
@@ -178,10 +242,15 @@
       var j = cards[id].job;
       if (j.state !== "running") return;
       running += 1;
-      if (j.progress != null) { sum += j.progress; known += 1; }
+      if (j.progress != null) {
+        sum += j.progress;
+        known += 1;
+      }
     });
     pillText.textContent = running
-      ? running + (running === 1 ? " job running" : " jobs running") + (known === running ? " · " + Math.round((sum / known) * 100) + "%" : "")
+      ? running +
+        (running === 1 ? " job running" : " jobs running") +
+        (known === running ? " · " + Math.round((sum / known) * 100) + "%" : "")
       : shown + (shown === 1 ? " job finished" : " jobs finished");
     ring.classList.toggle("is-idle", !running);
     avoidAgent();
@@ -191,7 +260,7 @@
   function avoidAgent() {
     var af = document.getElementById("agent-follow");
     if (af && af.classList.contains("is-up") && !af.hidden) {
-      root.style.bottom = (window.innerHeight - af.getBoundingClientRect().top + 10) + "px";
+      root.style.bottom = window.innerHeight - af.getBoundingClientRect().top + 10 + "px";
     } else {
       root.style.bottom = "";
     }
@@ -204,29 +273,46 @@
       if (dismissed[job.id] === job.started) return;
       seen[job.id] = true;
       var entry = cards[job.id];
-      if (entry && entry.started !== job.started) { entry.el.remove(); delete cards[job.id]; entry = null; }
+      if (entry && entry.started !== job.started) {
+        entry.el.remove();
+        delete cards[job.id];
+        entry = null;
+      }
       if (!entry) {
         entry = build(job);
         cards[job.id] = entry;
         // Cards drawn from the kept copy on a new page do not replay the entrance.
         if (!fresh) entry.el.classList.add("no-anim");
         list.appendChild(entry.el);
-        if (fresh) requestAnimationFrame(function () { entry.el.classList.add("is-in"); });
+        if (fresh)
+          requestAnimationFrame(function () {
+            entry.el.classList.add("is-in");
+          });
       }
       paint(entry, job);
     });
-    Object.keys(cards).forEach(function (id) { if (!seen[id]) leave(id); });
+    Object.keys(cards).forEach(function (id) {
+      if (!seen[id]) leave(id);
+    });
     sync();
-    var anyRunning = jobs.some(function (j) { return j.state === "running"; });
+    var anyRunning = jobs.some(function (j) {
+      return j.state === "running";
+    });
     if (anyRunning) warmUntil = Math.max(warmUntil, Date.now() + 5000);
-    try { sessionStorage.setItem(KEEP_KEY, JSON.stringify({ at: Date.now(), jobs: jobs })); } catch (e) { /* private mode */ }
+    try {
+      sessionStorage.setItem(KEEP_KEY, JSON.stringify({ at: Date.now(), jobs: jobs }));
+    } catch {
+      /* private mode */
+    }
   }
 
   // Elapsed times tick between polls so the card does not look frozen.
   setInterval(function () {
     if (document.hidden) return;
     avoidAgent();
-    Object.keys(cards).forEach(function (id) { if (cards[id].job.state === "running") paint(cards[id], cards[id].job); });
+    Object.keys(cards).forEach(function (id) {
+      if (cards[id].job.state === "running") paint(cards[id], cards[id].job);
+    });
   }, 1000);
 
   // ---- polling ---------------------------------------------------------
@@ -235,9 +321,15 @@
     if (document.hidden || busy) return;
     busy = true;
     fetch(URL_, { headers: { Accept: "application/json" }, cache: "no-store" })
-      .then(function (r) { return r.ok ? r.json() : { jobs: last }; })
-      .then(function (data) { apply(data.jobs || [], true); })
-      .catch(function () { /* a restart in progress: keep what is drawn */ })
+      .then(function (r) {
+        return r.ok ? r.json() : { jobs: last };
+      })
+      .then(function (data) {
+        apply(data.jobs || [], true);
+      })
+      .catch(function () {
+        /* a restart in progress: keep what is drawn */
+      })
       .then(function () {
         busy = false;
         var warm = Date.now() < warmUntil || Object.keys(cards).length > 0;
@@ -249,12 +341,19 @@
     busy = false;
     poll();
   }
-  document.addEventListener("visibilitychange", function () { if (!document.hidden) poll(); });
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) poll();
+  });
   window.TesseraeJobs = { poke: poke };
 
   // Posting a form usually starts a job and reloads; the next page's first poll finds it.
   var kept = null;
-  try { kept = JSON.parse(sessionStorage.getItem(KEEP_KEY) || "null"); } catch (e) { kept = null; }
-  if (kept && Date.now() - kept.at < 20000 && kept.jobs && kept.jobs.length) apply(kept.jobs, false);
+  try {
+    kept = JSON.parse(sessionStorage.getItem(KEEP_KEY) || "null");
+  } catch {
+    kept = null;
+  }
+  if (kept && Date.now() - kept.at < 20000 && kept.jobs && kept.jobs.length)
+    apply(kept.jobs, false);
   poll();
 })();

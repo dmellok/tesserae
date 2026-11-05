@@ -111,7 +111,9 @@ def test_paper_sidebar_folds_to_a_rail(app: Flask) -> None:
     assert "classList.add('sidebar-collapsed')" in head
     assert head.index("tesserae-sidebar") < head.index("style/base.css")
     css = (Path(app.static_folder or "static") / "style" / "paper.css").read_text(encoding="utf-8")
-    assert ':root[data-ui="paper"].sidebar-collapsed { --p-sidebar-w: 64px; }' in css
+    assert ':root[data-ui="paper"].sidebar-collapsed { --p-sidebar-w: 64px; }' in " ".join(
+        css.split()
+    )
     assert "prefers-reduced-motion" in css
     assert "/static/sidebar-rail.js" in html
     rail = (Path(app.static_folder or "static") / "sidebar-rail.js").read_text(encoding="utf-8")
