@@ -226,6 +226,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   returns to fit. Backdrop click closes in the fit view only; Escape always
   closes.
 
+### Security
+
+- certifi 2026.10.23 in the lockfile, for PYSEC-2026-4320 in 2026.7.22.
+
 ## [0.496.1], 2026-10-31
 
 ### Fixed
