@@ -345,7 +345,7 @@ def test_tooltip_is_readable_and_dots_explain_themselves(
         browser.close()
 
 
-def test_visionect_card_has_no_prediction_tiles_in_the_browser(served: tuple[str, Flask]) -> None:
+def test_visionect_card_has_prediction_tiles_in_the_browser(served: tuple[str, Flask]) -> None:
     from playwright.sync_api import sync_playwright
 
     base, app = served
@@ -359,7 +359,7 @@ def test_visionect_card_has_no_prediction_tiles_in_the_browser(served: tuple[str
                          [...c.querySelectorAll('.dx-stat-label')].map((l) => l.textContent.trim())]))"""
         )
         browser.close()
-    assert labels["hall_frame"] == ["Samples", "Wakes / day"]
+    assert "Reaches 0%" in labels["hall_frame"]
     assert "Drain rate" in labels["attic_esp"]
 
 

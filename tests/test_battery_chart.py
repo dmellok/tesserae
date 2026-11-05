@@ -9,7 +9,6 @@ import time
 from datetime import UTC
 from datetime import time as dtime
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -600,7 +599,6 @@ def test_builder_shape_for_a_normal_device(history: BatteryHistory) -> None:
     assert card["id"] == DEV and card["name"] == "Hall"
     assert card["pct"] == 25 and card["tone"] == "low"
     assert card["samples"] == 12 == len(card["series"]) == len(card["wakes"])
-    assert card["predictions_apply"] is True
     assert card["prediction"] is not None
     assert set(card["series"][0]) == {"t_ms", "pct"}
     assert set(card["wakes"][0]) == {"t_ms", "pct", "cat", "label", "detail", "reason"}
@@ -659,22 +657,23 @@ def test_builder_with_no_samples(history: BatteryHistory) -> None:
     assert card["gaps"] == [] and card["wake_stats"]["total"] == 0
 
 
-def test_visionect_devices_get_no_predictions_but_keep_wake_stats(history: BatteryHistory) -> None:
+def test_any_device_gets_predictions(history: BatteryHistory) -> None:
     _fill(history, "frame")
-    visionect_instance = SimpleNamespace(id="frame", kind_of="visionect", module=None)
-    card = bc.build_battery_chart(
-        "frame", history=history, window_days=7, device=visionect_instance
-    )
-    assert card["predictions_apply"] is False
-    assert card["prediction"] is None
+    card = bc.build_battery_chart("frame", history=history, window_days=7)
+    assert card["prediction"] is not None
     assert card["samples"] == 12 and len(card["series"]) == 12
     assert card["wake_stats"]["total"] == 12
 
 
-def test_other_devices_keep_predictions() -> None:
-    other = SimpleNamespace(id="e1", kind_of="esp32_client", module=SimpleNamespace(PROTOCOL="x"))
-    assert bc.is_battery_predictable(other) is True
-    assert bc.is_battery_predictable(None) is True
+def test_a_short_chart_window_still_predicts_from_a_week_of_readings(
+    history: BatteryHistory,
+) -> None:
+    # A slow drain: a percent a day, so the last 12 hours alone look flat.
+    for hour in range(0, 7 * 24, 6):
+        history.record("slow", pct=83 + hour // 24, timestamp=NOW - hour * 3600)
+    card = bc.build_battery_chart("slow", history=history, window_hours=12)
+    assert card["prediction"]["slope_per_day"] < -0.5
+    assert card["prediction"]["days_to_empty"] is not None
 
 
 def test_load_wake_events_is_batched_and_window_bounded(tmp_path: Path) -> None:

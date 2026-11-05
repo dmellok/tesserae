@@ -21,7 +21,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - Device batteries: the chart marks each wake-up with a dot and why it happened.
 - Device batteries: a Wakes / day tile, and time with no readings is shaded instead of drawn as a line.
 - Device batteries: each chart has its own 12h / 24h / 7d / 30d range and drag-to-zoom.
-- Device batteries: a readable dark tooltip, no drain predictions for Visionect, and Clear history is a corner link.
+- Device batteries: a readable dark tooltip, and Clear history is a corner link.
+- Device batteries: Visionect frames get drain and Reaches predictions too, and a short chart range predicts from at least a week of readings.
 - Device page: six collapsible sections instead of eleven, and the top tiles jump to their section.
 - Lineups: next update times are right for a display asleep in quiet hours, such as no more ~6:31 PM after a 9 AM wake.
 - Quiet hours: a lineup step or interval skipped overnight now lands as quiet hours end, and a sleeping display wakes for it.

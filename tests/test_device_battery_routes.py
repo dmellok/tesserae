@@ -445,7 +445,7 @@ def _add(client, device_id: str, kind: str) -> None:
     assert resp.status_code in (200, 302)
 
 
-def test_visionect_card_hides_predictions_but_keeps_chart_and_clear(app: Flask) -> None:
+def test_visionect_card_shows_predictions_like_any_other(app: Flask) -> None:
     store: BatteryHistory = app.config["BATTERY_HISTORY"]
     client = app.test_client()
     _sign_in(client)
@@ -467,19 +467,12 @@ def test_visionect_card_hides_predictions_but_keeps_chart_and_clear(app: Flask) 
         return body[start:end]
 
     frame, esp = card("hall_frame"), card("attic_esp")
-    # Chart, samples and Clear stay on the Visionect card.
-    assert "battery-chart" in frame
-    assert '<div class="dx-stat-label">Samples</div>' in frame
+    # A Visionect frame's card is like any other's.
+    for one in (frame, esp):
+        assert "battery-chart" in one
+        for label in ("Samples", "Wakes / day", "Drain rate", "Reaches 20%", "Reaches 0%"):
+            assert f'<div class="dx-stat-label">{label}</div>' in one
     assert "Clear battery history" in frame
-    # Wakes per day is a measurement, not a prediction: Visionect keeps it.
-    assert '<div class="dx-stat-label">Wakes / day</div>' in frame
-    # No predictions of any kind, and no "need 8 samples" hint.
-    for label in ("Drain rate", "Reaches 20%", "Reaches 0%", "Charging", "Full in"):
-        assert f'<div class="dx-stat-label">{label}</div>' not in frame
-    assert "Need at least 8 samples" not in frame
-    # The other frame still gets them.
-    assert '<div class="dx-stat-label">Drain rate</div>' in esp
-    assert '<div class="dx-stat-label">Reaches 20%</div>' in esp
 
 
 def test_cards_embed_wake_dots_with_reasons(app: Flask) -> None:
@@ -531,7 +524,6 @@ def test_card_json_returns_the_builder_shape_for_the_asked_range(app: Flask) -> 
         "wake_stats",
         "prediction",
         "samples",
-        "predictions_apply",
         "window_hours",
         "window_label",
         "ranges",
@@ -563,11 +555,10 @@ def test_card_json_clamps_the_range_and_404s_unknown_devices(app: Flask) -> None
     assert client.get("/devices/battery/nobody/card.json").status_code == 404
 
 
-def test_card_json_for_a_visionect_frame_has_no_prediction(app: Flask) -> None:
+def test_card_json_for_a_visionect_frame_has_its_prediction(app: Flask) -> None:
     client = _seeded(app, "hall_frame", "visionect_place_and_play_32")
     card = client.get("/devices/battery/hall_frame/card.json?hours=24").get_json()
-    assert card["predictions_apply"] is False and card["prediction"] is None
-    assert "Drain rate" not in card["tiles_html"] and "Wakes / day" in card["tiles_html"]
+    assert "Reaches 0%" in card["tiles_html"] and "Wakes / day" in card["tiles_html"]
 
 
 def test_clear_history_link_is_in_the_card_header_and_keeps_its_confirm(app: Flask) -> None:

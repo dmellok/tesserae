@@ -55,7 +55,6 @@ from datetime import datetime, tzinfo
 from itertools import pairwise
 from typing import Any
 
-from app import visionect
 from app.battery_offset import apply_to_pct
 from app.quiet_hours import QuietHoursWindow, is_in_window
 from app.state.battery_history import BatteryHistory, BatteryRow, Prediction
@@ -229,12 +228,7 @@ class WakeEvents:
     links: Sequence[EventRow] = field(default_factory=tuple)
 
 
-def is_battery_predictable(device: Any) -> bool:
-    """Whether drain / reaches-X predictions are shown for ``device``.
-
-    A Visionect frame shows the chart, the percentage and the sample count only.
-    ``None`` (no registry entry) is predictable."""
-    return not visionect.is_visionect_device(device)
+PREDICTION_MIN_DAYS: float = 7.0
 
 
 def reason_label(raw: str | None) -> str:
@@ -712,7 +706,6 @@ def build_battery_chart(
     window_days: float | None = None,
     window_hours: float | None = None,
     name: str | None = None,
-    device: Any = None,
     current: dict[str, Any] | None = None,
     mv_offset: int = 0,
     pct_offset: int = 0,
@@ -751,7 +744,6 @@ def build_battery_chart(
                                        # from the unthinned wakes
           "legend": [{"cat", "name"}, ...],  # categories drawn, in legend order
           "gaps": [{"start_ms", "end_ms", "kind": "asleep" | "offline"}, ...],
-          "predictions_apply": bool,   # False for a Visionect frame
           "prediction": {...} | None,  # always None when predictions don't apply
         }
     """
@@ -781,7 +773,6 @@ def build_battery_chart(
     stats = wake_stats(all_wakes, window_days=days, now_ms=now_ms)
     wakes = thin_wakes(all_wakes, start_ms=now_ms - int(hours * 3_600_000), end_ms=now_ms)
     drawn = {w["cat"] for w in wakes}
-    applies = is_battery_predictable(device)
     pct = (current or {}).get("pct")
     return {
         "id": device_id,
@@ -805,9 +796,10 @@ def build_battery_chart(
             quiet_window=quiet_window,
             tz=tz,
         ),
-        "predictions_apply": applies,
-        "prediction": (
-            prediction_dict(history.predict(device_id, window_days=days)) if applies else None
+        # At least a week of readings, whatever the chart shows: a whole
+        # percent takes more than a day to move, so a short window reads as flat.
+        "prediction": prediction_dict(
+            history.predict(device_id, window_days=max(days, PREDICTION_MIN_DAYS))
         ),
     }
 
