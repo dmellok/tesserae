@@ -116,6 +116,8 @@ def fetch_text(
                 return text
         except (urllib.error.URLError, TimeoutError, OSError) as err:
             last_err = err
+            if isinstance(err, urllib.error.HTTPError):
+                err.close()  # the error is the open response; don't leak its socket (#444)
             if attempt < attempts - 1:
                 time.sleep(backoff_s)
                 continue
@@ -157,6 +159,8 @@ def fetch_json(
                 return json.loads(raw.decode("utf-8"))
         except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as err:
             last_err = err
+            if isinstance(err, urllib.error.HTTPError):
+                err.close()  # the error is the open response; don't leak its socket (#444)
             if attempt < attempts - 1:
                 logger.debug(
                     "plugin_http: %s on %s (attempt %d/%d), retrying in %.1fs",

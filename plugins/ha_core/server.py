@@ -12,6 +12,7 @@ a Long-Lived Access Token (HA → profile → Long-Lived Access Tokens).
 
 from __future__ import annotations
 
+import http.client
 import json
 import ssl
 import threading
@@ -103,6 +104,57 @@ def _headers() -> dict[str, str]:
     }
 
 
+# After HA answers 401, every request with that same (base_url, token)
+# skips the network until this much time has passed and re-raises the 401
+# straight away. A rejected token stays rejected, so without the cooldown
+# each preview, push and poll sends HA another doomed request, and HA logs
+# each one as an invalid login (and with ip_ban_enabled, can end up
+# banning this host) (#444). Changing the token or URL in Settings changes
+# the key, so the next request goes out immediately.
+_AUTH_COOLDOWN_S = 300.0
+_auth_lock = threading.Lock()
+_auth_failure: tuple[tuple[str, str], float, str, str] | None = None
+
+
+def _reset_auth_cooldown() -> None:
+    global _auth_failure
+    with _auth_lock:
+        _auth_failure = None
+
+
+def _urlopen(req: urllib.request.Request, *, timeout: float) -> http.client.HTTPResponse:
+    """``urlopen`` that never leaks the socket of an error response.
+
+    On a non-2xx answer, ``urlopen`` raises ``HTTPError``, and that error
+    is itself the still-open response. The caller's ``with`` block never
+    starts, so nothing closes it. The error then lives on in tracebacks,
+    in the states cache, and in widget error paths until a garbage-collector
+    pass happens to free it. Meanwhile the socket sits in CLOSE_WAIT. With a
+    revoked token that means one more stuck socket per poll, until the
+    process runs out of file descriptors and waitress can no longer accept
+    connections (#444). Callers only need ``code`` / ``reason`` (see
+    ``coerce_error``), so the body is closed here before re-raising."""
+    global _auth_failure
+    key = (base_url(), token())
+    with _auth_lock:
+        failure = _auth_failure
+    if failure is not None:
+        f_key, ts, f_url, f_reason = failure
+        if f_key == key and time.monotonic() - ts < _AUTH_COOLDOWN_S:
+            raise urllib.error.HTTPError(f_url, 401, f_reason, None, None)  # type: ignore[arg-type]
+    try:
+        resp: http.client.HTTPResponse = urllib.request.urlopen(
+            req, timeout=timeout, context=_ssl_context()
+        )
+        return resp
+    except urllib.error.HTTPError as err:
+        err.close()
+        if err.code == 401:
+            with _auth_lock:
+                _auth_failure = (key, time.monotonic(), req.full_url, str(err.reason))
+        raise
+
+
 def request_json(path: str, *, timeout: int = 10) -> Any:
     """GET ``<base_url><path>`` with auth, return the parsed JSON body.
 
@@ -112,7 +164,7 @@ def request_json(path: str, *, timeout: int = 10) -> Any:
     if not is_configured():
         raise _not_configured()
     req = urllib.request.Request(base_url() + path, headers=_headers(), method="GET")
-    with urllib.request.urlopen(req, timeout=timeout, context=_ssl_context()) as resp:
+    with _urlopen(req, timeout=timeout) as resp:
         return json.loads(decode_body(resp).decode("utf-8"))
 
 
@@ -142,7 +194,7 @@ def call_service_with_response(
     path = f"/api/services/{quote(domain)}/{quote(service)}?return_response"
     body = json.dumps(data or {}).encode("utf-8")
     req = urllib.request.Request(base_url() + path, data=body, headers=_headers(), method="POST")
-    with urllib.request.urlopen(req, timeout=timeout, context=_ssl_context()) as resp:
+    with _urlopen(req, timeout=timeout) as resp:
         payload = json.loads(decode_body(resp).decode("utf-8"))
     _invalidate_states_cache()
     return payload if isinstance(payload, dict) else {}
@@ -171,7 +223,7 @@ def call_service(
     path = f"/api/services/{quote(domain)}/{quote(service)}"
     body = json.dumps(data or {}).encode("utf-8")
     req = urllib.request.Request(base_url() + path, data=body, headers=_headers(), method="POST")
-    with urllib.request.urlopen(req, timeout=timeout, context=_ssl_context()) as resp:
+    with _urlopen(req, timeout=timeout) as resp:
         raw = decode_body(resp).decode("utf-8")
     _invalidate_states_cache()
     try:
@@ -196,7 +248,7 @@ def render_template(template: str, *, timeout: int = 10) -> str:
     req = urllib.request.Request(
         base_url() + "/api/template", data=body, headers=_headers(), method="POST"
     )
-    with urllib.request.urlopen(req, timeout=timeout, context=_ssl_context()) as resp:
+    with _urlopen(req, timeout=timeout) as resp:
         return resp.read().decode("utf-8")
 
 
