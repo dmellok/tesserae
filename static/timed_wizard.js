@@ -13,7 +13,7 @@
   let DASHBOARDS = [];
   try {
     DASHBOARDS = JSON.parse($("[data-wizard-dashboards]").textContent);
-  } catch (err) {
+  } catch {
     DASHBOARDS = [];
   }
   const nameOf = (id) => {

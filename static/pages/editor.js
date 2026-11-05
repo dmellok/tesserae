@@ -579,7 +579,7 @@
       let value = {};
       try {
         value = JSON.parse(mount.dataset.touchValue || "{}") || {};
-      } catch (e) {
+      } catch {
         value = {};
       }
       const node = TouchInteraction.render({
@@ -935,14 +935,14 @@
     if (field) {
       try {
         field.focus({ preventScroll: true });
-      } catch (e) {
+      } catch {
         field.focus();
       }
     }
     previewFrames().forEach((iframe) => {
       try {
         iframe.contentWindow.postMessage({ type: "tesserae-focus-cell", cellId }, location.origin);
-      } catch (e) {
+      } catch {
         /* iframe not ready / cross-origin */
       }
     });

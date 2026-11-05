@@ -37,7 +37,7 @@
 
   try {
     folded = localStorage.getItem(FOLD_KEY) === "1";
-  } catch (e) {
+  } catch {
     /* private mode */
   }
 
@@ -77,7 +77,7 @@
     folded = on;
     try {
       localStorage.setItem(FOLD_KEY, on ? "1" : "0");
-    } catch (e) {
+    } catch {
       /* private mode */
     }
     root.classList.toggle("is-folded", on);
@@ -301,7 +301,7 @@
     if (anyRunning) warmUntil = Math.max(warmUntil, Date.now() + 5000);
     try {
       sessionStorage.setItem(KEEP_KEY, JSON.stringify({ at: Date.now(), jobs: jobs }));
-    } catch (e) {
+    } catch {
       /* private mode */
     }
   }
@@ -350,7 +350,7 @@
   var kept = null;
   try {
     kept = JSON.parse(sessionStorage.getItem(KEEP_KEY) || "null");
-  } catch (e) {
+  } catch {
     kept = null;
   }
   if (kept && Date.now() - kept.at < 20000 && kept.jobs && kept.jobs.length)

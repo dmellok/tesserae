@@ -259,7 +259,7 @@
       var row;
       try {
         row = JSON.parse(e.data);
-      } catch (err) {
+      } catch {
         return;
       }
       if (!row || row.target !== deviceId) return;

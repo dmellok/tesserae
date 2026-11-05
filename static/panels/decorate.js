@@ -236,7 +236,7 @@
 
     if (kind === "text") {
       var t = document.createElement("div");
-      var size = el.size && el.size > 0 ? el.size : Math.max(10, Math.round(px(el.h, 40) * 0.5));
+      let size = el.size && el.size > 0 ? el.size : Math.max(10, Math.round(px(el.h, 40) * 0.5));
       var wmap = { thin: 300, light: 300, regular: 400, bold: 700, fill: 800, duotone: 700 };
       var fw = wmap[el.weight] || 700;
       var align = el.align || "left";
@@ -263,7 +263,7 @@
       wrap.style.cssText =
         "width:100%;height:100%;display:flex;align-items:center;justify-content:center";
       var bar = document.createElement("div");
-      var t = Math.max(1, px(el.stroke, 2));
+      let t = Math.max(1, px(el.stroke, 2));
       // Draw along the box's longer axis: wide box = horizontal rule, tall box
       // = vertical rule.
       if (px(el.w, 0) >= px(el.h, 0)) {
@@ -423,7 +423,7 @@
       xhr.open("GET", url, false); // sync: one-time, same-origin, cached
       xhr.send();
       if (xhr.status >= 200 && xhr.status < 300) src = xhr.responseText;
-    } catch (e) {
+    } catch {
       src = null;
     }
     _libCache[url] = src;
@@ -637,7 +637,7 @@
       var mMeta = null;
       try {
         mMeta = JSON.parse(libSource(urls.mosaic_json) || "null");
-      } catch (e) {
+      } catch {
         mMeta = null;
       }
       var mLook = (probe.match(/data-look\s*=\s*["']?([a-z0-9_-]+)/) || [])[1] || "";

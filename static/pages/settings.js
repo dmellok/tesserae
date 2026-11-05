@@ -295,7 +295,7 @@
               redirect: "manual",
               headers: { "X-Requested-With": "fetch" },
             });
-          } catch (e) {
+          } catch {
             /* keep going, the reload shows what stuck */
           }
         }
@@ -614,7 +614,7 @@
     if (!key) return null;
     try {
       return window.localStorage.getItem(key);
-    } catch (e) {
+    } catch {
       return null;
     }
   }
@@ -622,7 +622,7 @@
     if (!key) return;
     try {
       window.localStorage.setItem(key, value);
-    } catch (e) {
+    } catch {
       /* private mode / disabled storage: no-op */
     }
   }

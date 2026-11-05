@@ -168,7 +168,7 @@
         if (raw) {
           try {
             payload = JSON.parse(raw) || {};
-          } catch (err) {
+          } catch {
             hint.textContent = "Extra data is not valid JSON.";
             return;
           }

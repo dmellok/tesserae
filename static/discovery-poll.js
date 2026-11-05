@@ -43,7 +43,7 @@
       if (sig !== seen && !userIsTyping()) {
         location.reload();
       }
-    } catch (e) {
+    } catch {
       /* broker/transport hiccup, try again next tick */
     }
   }

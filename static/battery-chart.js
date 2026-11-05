@@ -158,7 +158,7 @@
     try {
       var v = parseFloat(window.localStorage.getItem(STORE_KEY + id));
       return v > 0 ? v : null;
-    } catch (e) {
+    } catch {
       return null;
     }
   }
@@ -166,7 +166,7 @@
   function storeRange(id, hours) {
     try {
       window.localStorage.setItem(STORE_KEY + id, String(hours));
-    } catch (e) {
+    } catch {
       /* private mode */
     }
   }
@@ -238,7 +238,7 @@
         data.series = JSON.parse(canvas.dataset.series || "[]");
         data.wakes = JSON.parse(canvas.dataset.wakes || "[]");
         data.gaps = JSON.parse(canvas.dataset.gaps || "[]");
-      } catch (e) {
+      } catch {
         data.series = [];
         data.wakes = [];
         data.gaps = [];
@@ -767,7 +767,7 @@
       drag = { x0: e.offsetX, x1: e.offsetX };
       try {
         canvas.setPointerCapture(e.pointerId);
-      } catch (err) {
+      } catch {
         /* not capturable */
       }
     });

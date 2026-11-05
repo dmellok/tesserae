@@ -27,7 +27,7 @@
     const caret = start + text.length;
     try {
       textarea.setSelectionRange(caret, caret);
-    } catch (e) {
+    } catch {
       // Some textareas (e.g. type=hidden via display:none) throw.
       // Already inserted the text; the caret position is best-effort.
     }

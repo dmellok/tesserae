@@ -716,9 +716,6 @@
     if (s.url) return "url:" + s.url + "|" + JSON.stringify(s.headers || {});
     return s.key + "|" + JSON.stringify(s.options || {});
   }
-  function dataKey(e) {
-    return sourceOf(e) + "|" + JSON.stringify(e.options || {});
-  }
   function dataForSrc(s) {
     var k = srcKey(s);
     if (k in S.data) return S.data[k]; // fetched live value (may be null)
@@ -3429,7 +3426,7 @@
             try {
               var o = JSON.parse(v);
               if (o && typeof o === "object") parsed = o;
-            } catch (er) {
+            } catch {
               hin.value = "";
             }
           }
@@ -4629,7 +4626,7 @@
     var es;
     try {
       es = new EventSource(S.cfg.streamUrl);
-    } catch (e) {
+    } catch {
       return;
     }
     es.addEventListener("changed", function (ev) {
@@ -5036,7 +5033,7 @@
   function saveUi() {
     try {
       localStorage.setItem("tesserae.panels.ui", JSON.stringify(S.ui || {}));
-    } catch (e) {
+    } catch {
       /* ignore */
     }
   }
@@ -5089,7 +5086,7 @@
         else S.ui.rightW = Math.max(RW_MIN, Math.min(RW_MAX, w));
         applyGridCols();
       }
-      function up(u) {
+      function up() {
         h.releasePointerCapture(ev.pointerId);
         document.body.style.cursor = "";
         h.removeEventListener("pointermove", move);
@@ -5121,7 +5118,7 @@
       if (field === "js" && b.js) return b.js(src, opts);
       if (field === "css" && b.css) return b.css(src, opts);
       if (field === "html" && b.html) return b.html(src, opts);
-    } catch (e) {
+    } catch {
       /* leave as-is on any parse hiccup */
     }
     return src;
@@ -6124,7 +6121,7 @@
     // Collapsible sidebars (persisted) + rich code-editor drawer.
     try {
       S.ui = JSON.parse(localStorage.getItem("tesserae.panels.ui")) || {};
-    } catch (e) {
+    } catch {
       S.ui = {};
     }
     wireSidebarToggle("panels-toggle-left", "lcol");

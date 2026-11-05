@@ -63,7 +63,7 @@
           var body = null;
           try {
             body = JSON.parse(text);
-          } catch (err) {
+          } catch {
             body = null;
           }
           if (!body || typeof body !== "object") {

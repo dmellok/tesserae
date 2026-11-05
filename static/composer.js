@@ -133,7 +133,6 @@ function reportError(cell, shadow, pluginId, err) {
   cell.dataset.error = err.message || String(err);
   shadow.innerHTML = `<div>${pluginId}: ${err.message || err}</div>`;
   cell.dataset.rendered = "true";
-  // eslint-disable-next-line no-console
   console.error(`[composer] plugin ${pluginId} failed:`, err);
 }
 

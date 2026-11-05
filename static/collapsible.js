@@ -37,14 +37,14 @@
     try {
       if (window.localStorage.getItem(old) === "1") window.localStorage.setItem(key(sec), "1");
       window.localStorage.removeItem(old);
-    } catch (e) {
+    } catch {
       /* private mode */
     }
   }
   function stored(sec) {
     try {
       return window.localStorage.getItem(key(sec)) === "1";
-    } catch (e) {
+    } catch {
       return false;
     }
   }
@@ -52,7 +52,7 @@
     try {
       if (collapsed) window.localStorage.setItem(key(sec), "1");
       else window.localStorage.removeItem(key(sec));
-    } catch (e) {
+    } catch {
       /* private mode: the state just isn't remembered */
     }
   }
@@ -158,7 +158,7 @@
       if (!raw) return null;
       try {
         raw = decodeURIComponent(raw);
-      } catch (e) {
+      } catch {
         /* use as is */
       }
       return document.getElementById(raw);
@@ -200,7 +200,7 @@
       var id = a.getAttribute("href").slice(1);
       try {
         id = decodeURIComponent(id);
-      } catch (e) {
+      } catch {
         /* use as is */
       }
       var el = document.getElementById(id);

@@ -175,13 +175,13 @@ jobs:
         run: mypy app
 
   frontend-lint:
-    name: frontend lint (advisory)
+    name: frontend lint
     runs-on: ubuntu-latest
-    # Advisory: the hand-rolled static/ JS+CSS predates any linter, so ESLint /
-    # Stylelint / Prettier run for visibility without blocking main. Each step
-    # is continue-on-error so all three report independently. Baseline today is
-    # small (ESLint ~36, Stylelint ~19, Prettier ~45 files); once worked down,
-    # drop continue-on-error to make them required.
+    # ESLint and Prettier are required: static/ JS is clean of both. Stylelint
+    # is still advisory (continue-on-error) while its baseline of duplicate
+    # selectors is worked down; merging those can move rules in the cascade,
+    # so each needs a look rather than a mechanical fix. The later steps run
+    # even when ESLint fails, so all three report on every push.
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v5
@@ -191,13 +191,13 @@ jobs:
       - name: Install lint deps
         run: npm ci
       - name: eslint
-        continue-on-error: true
         run: npm run lint:js
-      - name: stylelint
+      - name: stylelint (advisory)
+        if: ${{ !cancelled() }}
         continue-on-error: true
         run: npm run lint:css
       - name: prettier
-        continue-on-error: true
+        if: ${{ !cancelled() }}
         run: npm run format:check
 
   lockfile:

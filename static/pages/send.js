@@ -155,7 +155,7 @@
       let path = "";
       try {
         path = new URL(s).pathname;
-      } catch (e) {
+      } catch {
         return "webpage";
       }
       return IMAGE_EXT.test(path) ? "image" : "webpage";
@@ -189,7 +189,7 @@
       const obj = JSON.parse(raw);
       const n = obj && typeof obj === "object" ? Object.keys(obj).length : 0;
       return n === 1 ? "1 header" : `${n} headers`;
-    } catch (e) {
+    } catch {
       return "headers not valid JSON";
     }
   }
@@ -370,7 +370,7 @@
       apply = () => {
         try {
           new URL(url);
-        } catch (e) {
+        } catch {
           previewPhText.textContent = "Enter a full link, starting with http:// or https://";
           showOnly(previewPh);
           return;
