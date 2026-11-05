@@ -327,9 +327,10 @@ def _serve_raw(answer: bytes) -> tuple[str, Any]:
     [
         # A chunked body cut short: http.client raises IncompleteRead.
         b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n40\r\nshort",
-        # A gzip body cut short: EOFError, not OSError.
+        # A gzip body cut short: EOFError, not OSError. mtime=0 keeps the
+        # bytes, and so the test id, the same on every xdist worker.
         b"HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: 12\r\n\r\n"
-        + gzip.compress(b'{"Firmwares": {}}')[:12],
+        + gzip.compress(b'{"Firmwares": {}}', mtime=0)[:12],
         # Not gzip's deflate stream at all: zlib.error.
         b"HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: 14\r\n\r\n"
         + b"\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\x03"
