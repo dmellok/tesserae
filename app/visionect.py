@@ -574,6 +574,8 @@ def params_line(packet: Any) -> str:
         name = names.get(pid, f"TCLV {pid}")
         if control in (PARAM_READ_ERROR, PARAM_WRITE_ERROR):
             parts.append(f"{name}: {'read' if control == PARAM_READ_ERROR else 'write'} refused")
+        elif pid in WRITE_ONLY:
+            parts.append(f"{name} (hidden)" if item.value else f"{name} ok")
         elif pid in TEXT_PARAMS:
             parts.append(f"{name} {_text_value(item.value)}")
         elif item.value:
@@ -1054,7 +1056,14 @@ class VisionectService:
             return {}
         section = ctx.settings.get_section("devices") or {}
         cfg = section.get(device_id) if isinstance(section, dict) else None
-        return dict(cfg) if isinstance(cfg, dict) else {}
+        if not isinstance(cfg, dict):
+            return {}
+        # A secret field (the Wi-Fi password) is stored as ``<name>_secret``;
+        # get_section unwraps the value but keeps that key.
+        return {
+            (k[: -len("_secret")] if isinstance(k, str) and k.endswith("_secret") else k): v
+            for k, v in cfg.items()
+        }
 
     def device_uuid(self, device_id: str) -> str:
         return normalise_uuid(self._device_cfg(device_id).get("uuid"))

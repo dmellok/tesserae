@@ -9,6 +9,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 ### Added
 
 - Visionect frames: update firmware from the Firmware page, more frame settings and connection health on the device page, and a sleeping frame keeps its old picture with newer ones Queued.
+- Visionect firmware: the builds tested on a frame are checked against a known SHA-256 when downloaded or read from the cache, and a list entry whose checksum isn't plain hex is skipped.
 - Device page: summary tiles and the next picture in the left column, a Lineups link, accent group titles, Troubleshooting's buttons at its foot, and devices listed under Settings in the sidebar.
 - GPT Image from words alone (`gpt_image_t2i`) for a widget that puts a
   picture's whole layout in its prompt, such as a card with its own type,
@@ -165,6 +166,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- Visionect frames: a saved Wi-Fi password now reaches the frame, is masked on the device page instead of sent back to the browser, and is hidden in the frame log if the frame echoes it.
 - History: 12-hour times no longer overlap the thumbnail.
 - A link now always sits left of a button, and the primary action is rightmost,
   across the admin pages, dialogs and banners.

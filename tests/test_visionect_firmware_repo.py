@@ -22,6 +22,12 @@ from app import visionect_firmware as fwrepo
 from tests.test_visionect_bootloader import make_firmware
 
 
+@pytest.fixture(autouse=True)
+def _no_pinned_hashes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The test files are made up, so the real builds' known hashes are off."""
+    monkeypatch.setattr(fwrepo, "KNOWN_SHA256", {})
+
+
 def entry(checksum: str, fw: str, hw: str = "1.1.0", display: str = "3255107884", **meta) -> dict:
     fw_major, fw_minor, fw_rev = fw.split(".")
     hw_major, hw_minor, bom = hw.split(".")
@@ -395,3 +401,29 @@ def test_release_notes_are_split_by_version() -> None:
     assert [s["title"] for s in notes["7.1.4276"]] == ["Changes", "Fixes"]
     assert notes["7.1.4276"][0]["items"] == ["CODE change."]
     assert "6.0.1" not in notes and "7.4.4407" not in notes
+
+
+def test_a_pinned_build_refuses_a_file_that_isnt_the_known_one(
+    server, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import hashlib
+
+    _state, url = server
+    repo = make(tmp_path, url)
+    repo.refresh()
+    build = next(b for b in repo.builds() or [] if b.checksum_hex == "a529a106")
+    monkeypatch.setattr(fwrepo, "KNOWN_SHA256", {build.checksum: "0" * 64})
+    with pytest.raises(fwrepo.RepositoryError, match="doesn't match the known file"):
+        repo.fetch(build)
+    assert repo.cached_file(build) is None
+    good = hashlib.sha256(FIRMWARE).hexdigest()
+    monkeypatch.setattr(fwrepo, "KNOWN_SHA256", {build.checksum: good})
+    assert repo.fetch(build) == FIRMWARE
+    # A cached file that has changed since is not used.
+    monkeypatch.setattr(fwrepo, "KNOWN_SHA256", {build.checksum: "0" * 64})
+    assert repo.cached_file(build) is None
+
+
+def test_a_checksum_that_isnt_plain_hex_is_skipped() -> None:
+    payload = {"Firmwares": {"x": [entry("+a529a106", "7.3.4358"), entry("٣", "7.3.4358")]}}
+    assert fwrepo.parse_list(payload) == []

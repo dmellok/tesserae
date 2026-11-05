@@ -621,6 +621,16 @@ def test_visionect_device_page_shows_the_signs_report_and_its_actions(
     state["problem"] = "The frame isn't connected right now."
     resp = client.post("/settings/devices/hall/visionect/status", follow_redirects=True)
     assert "The frame isn&#39;t connected right now." in resp.get_data(as_text=True)
+    # A saved password never goes back to the browser, and saving the mask
+    # keeps it.
+    client.post("/settings/device-hall", data={"wifi_psk": "hunter22xx"})
+    store = app.config["SETTINGS_STORE"]
+    psk_field = [{"name": "wifi_psk", "secret": True}]
+    assert store.get_for_runtime("devices", "hall", psk_field)["wifi_psk"] == "hunter22xx"
+    page = client.get("/settings/devices/hall").get_data(as_text=True)
+    assert "hunter22xx" not in page and 'value="********"' in page
+    client.post("/settings/device-hall", data={"wifi_psk": "********"})
+    assert store.get_for_runtime("devices", "hall", psk_field)["wifi_psk"] == "hunter22xx"
 
 
 def test_every_config_save_checks_the_sign_binding_and_adding_arms_auto_bind(

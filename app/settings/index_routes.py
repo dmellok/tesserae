@@ -1142,7 +1142,9 @@ def _build_device_section(store: Any, device: Device) -> dict[str, Any] | None:
         # Colour depth control in place of the renderer picker, and a
         # one-time upgrade prompt once their firmware advertises grey.
         "colour_depth": (_colour_depth_for(device) if is_instance else None),
-        "state": (store.get_for_runtime("devices", device.id, fields) if fields else {}),
+        # Masked: a secret field (a Visionect frame's Wi-Fi password) never
+        # goes back to the browser; saving the mask keeps the stored value.
+        "state": (store.get_for_admin("devices", device.id, fields) if fields else {}),
         "endpoint": (url_for("auth.settings_update", section_kind=sid) if fields else None),
         # Single Save for the whole device card, the template
         # wraps the renderer-config + panel + quiet-hours fields

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import contextlib
 import gzip
+import hashlib
 import http.client
 import io
 import json
@@ -55,6 +56,25 @@ CACHE_VERSION = 1
 NOTES_URL = "https://docs.visionect.com/_sources/TechnicalDocumentation/ReleaseNotes/VisionectFirmware.rst.txt"
 NOTES_PAGE = "https://docs.visionect.com/TechnicalDocumentation/ReleaseNotes/VisionectFirmware.html"
 MAX_NOTES_BYTES = 2 * 1024 * 1024
+# SHA-256 of the files for builds flashed and confirmed on a real frame, keyed
+# by repository checksum. The repository is plain HTTP and its checksum is not
+# a hash of the file, so for these builds a file that doesn't match is refused
+# (downloaded or cached). Other builds are used as they come, with a warning.
+KNOWN_SHA256: dict[int, str] = {
+    # 32" Place & Play, hardware 1.1.0
+    0x2CB91ED6: "491cdd69ee0561a15d164f3882c76e690e26e426a068f3fa177529356f199a68",  # 7.4.4407
+    0xA529A106: "30c23c9a0d8f8dda4db4ec6d349022dfb59c909cd46f07bf6ca4306da7e64628",  # 7.3.4358
+}
+_CHECKSUM_RE = re.compile(r"[0-9a-f]{1,8}")
+
+
+def pin_matches(build: Build, data: bytes) -> bool:
+    """Whether ``data`` is the known file for ``build``; True for a build
+    with no known hash."""
+    pin = KNOWN_SHA256.get(build.checksum)
+    return pin is None or hashlib.sha256(data).hexdigest() == pin
+
+
 NOTES_MAX_AGE_S = 24 * 3600.0
 
 
@@ -110,6 +130,8 @@ def parse_list(payload: Any) -> list[Build]:
             if meta.get("AppName") != APP_NAME or meta.get("type") != KIND:
                 continue
             text = str(meta.get("Checksum") or "").strip().lower()
+            if not _CHECKSUM_RE.fullmatch(text):
+                continue
             try:
                 checksum = int(text, 16)
             except ValueError:
@@ -478,6 +500,12 @@ class FirmwareRepository:
             walk_firmware(data)
         except (OSError, BootloaderError):
             return None
+        if not pin_matches(build, data):
+            logger.warning(
+                "visionect: cached firmware %s doesn't match its known hash; not used",
+                build.checksum_hex,
+            )
+            return None
         return data
 
     def fetch(self, build: Build) -> bytes:
@@ -507,7 +535,7 @@ class FirmwareRepository:
                 last = exc
                 if exc.code != 404:
                     break
-            except (OSError, http.client.HTTPException, RepositoryError) as exc:
+            except (OSError, ValueError, http.client.HTTPException, RepositoryError) as exc:
                 last = exc
                 break
         if last is not None:
@@ -518,6 +546,16 @@ class FirmwareRepository:
             raise RepositoryError(
                 f"the downloaded firmware is not a file the frame accepts ({exc}); not used"
             ) from exc
+        if not pin_matches(build, data):
+            raise RepositoryError(
+                "the downloaded firmware doesn't match the known file for this build; not used"
+            )
+        if build.checksum not in KNOWN_SHA256:
+            logger.warning(
+                "visionect: firmware %s is not a build Tesserae has checked on a frame; sha256 %s",
+                build.checksum_hex,
+                hashlib.sha256(data).hexdigest(),
+            )
         try:
             self._write_atomic(self._file_path(build), data)
         except OSError as exc:

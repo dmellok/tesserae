@@ -2253,7 +2253,11 @@ def test_settings_go_one_packet_at_a_time_as_the_suite_sends_them(
     monkeypatch.setattr(visionect, "PARAM_WAIT_S", 30.0)
     h = Harness(tmp_path, uuid=UUID)
     h.settings.sections["devices"]["lobby"].update(
-        heartbeat_min="5", frame_sleep="awake", system_screens="3", wifi_psk="hunter22xx"
+        heartbeat_min="5",
+        frame_sleep="awake",
+        system_screens="3",
+        # As the settings store holds a secret field.
+        wifi_psk_secret="hunter22xx",
     )
     try:
         assert h.svc.start()
@@ -2788,3 +2792,10 @@ def test_port_change_rebinds_real_listener_and_closes_old_sockets(
             svc.stop()
         if probe is not None:
             probe.close()
+
+
+def test_params_line_hides_an_echoed_wifi_password() -> None:
+    item = SimpleNamespace(id=visionect.PARAM_WIFI_PSK, control=1, value=b"hunter22xx")
+    line = visionect.params_line(SimpleNamespace(items=[item]))
+    assert "hunter22xx" not in line
+    assert str(int.from_bytes(b"hunter22xx", "little")) not in line

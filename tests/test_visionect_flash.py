@@ -34,6 +34,12 @@ FIRMWARE = make_firmware([bytes([i]) * 64 for i in range(1, 6)])
 CONNECT_REBOOT = 1
 
 
+@pytest.fixture(autouse=True)
+def _no_pinned_hashes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The test files are made up, so the real builds' known hashes are off."""
+    monkeypatch.setattr(fwrepo, "KNOWN_SHA256", {})
+
+
 def tags(
     *,
     fw: tuple[int, int, int] = (7, 4, 4407),
