@@ -1,6 +1,6 @@
 # Quickstart: Visionect signs
 
-Visionect's e-paper signs (the 32" Place & Play, Joan, the 13" boards) are thin clients. The sign dials a server address stored in its flash on a configured TCP port (11113 by default) and draws whatever framebuffer the server pushes. Normally that server is the Visionect Software Suite (VSS), which needs a paid licence from version 7.7. Tesserae can be that server instead: it listens on the configured port and speaks the sign's protocol directly, through [pyvisionect](https://github.com/schlarpc/pyvisionect). No VSS, no Visionect account, no flashing.
+Visionect's e-paper signs (the 32" Place & Play, Joan, the 13" boards) are thin clients. The sign dials a server address stored in its flash on a configured TCP port (11113 by default) and draws whatever framebuffer the server pushes. Normally that server is the Visionect Software Suite (VSS), which needs a paid licence from version 7.7. Tesserae can be that server instead: it listens on the configured port and speaks the sign's protocol directly, through [pyvisionect](https://github.com/schlarpc/pyvisionect). No VSS, no Visionect account, and nothing to flash to get started.
 
 !!! note "Tested on one sign so far"
     A Place & Play 32 (HardwareNameID 8, firmware 6.17.4168) has drawn frames pushed over this protocol by pyvisionect. Joan 6, Joan 13, the 13" Place & Play and the 9.7" boards use the same protocol and are in the catalog, but haven't been tried on hardware yet.
@@ -80,6 +80,8 @@ When the sign reconnects already showing the current frame (after a Tesserae res
 
 ## 04 — Sleep and battery
 
-Battery, signal, temperature and firmware from each check-in show on the device card, in battery history and in Home Assistant. The device page also shows the sign's own check-in interval and sleep mode. Tesserae only reads those; it doesn't change them.
+Battery, signal, temperature and firmware from each check-in show on the device card, in battery history and in Home Assistant. The device page also shows the sign's own settings and lets you change its heart beat interval, power saving mode, touch mode and system screens.
+
+The device page can update the sign's firmware too, from Visionect's own firmware list. It only runs when you ask, on a connected sign with at least 30% battery, and only offers builds for that sign's exact hardware and display. If a flash goes wrong, the way back is the USB cable and Visionect's Configurator.
 
 To save battery overnight, set quiet hours (app-wide or on the device) and turn on **sleep through**. When a window starts, the sign gets the current frame and then a deep-sleep command lasting until the window ends. Nothing can wake a sleeping sign early over the network: a frame pushed during its sleep shows when it wakes.

@@ -817,6 +817,7 @@
 .dx-dp .dx-empty-text > p { margin: 0; text-align: left; }
 .dx-dp .dx-empty-title { font-weight: 700; }
 
+.dx-dp .dx-frame-actions { display: flex; align-items: center; gap: 10px 16px; flex-wrap: wrap; margin-top: 12px; }
 .dx-dp .dx-sec-foot { display: flex; align-items: center; justify-content: flex-end; gap: 10px 16px; flex-wrap: wrap; margin-top: var(--t-gap-title); padding-top: var(--t-gap-title); border-top: 1px solid var(--t-border); }
 .dx-dp .dx-sec-foot > .dx-help { margin-right: auto; }
 .dx-dp .dx-collect { display: flex; align-items: flex-start; gap: 12px 20px; flex-wrap: wrap; padding: 4px 0 12px; }
@@ -934,3 +935,6 @@
 .dx-devpage .dx-dp .dx-btn.is-primary { background: oklch(from var(--t-accent) calc(l - 0.04) c h); border-color: oklch(from var(--t-accent) calc(l - 0.04) c h); }
 .dx-devpage .dx-dp .dx-btn.is-primary:hover { background: oklch(from var(--t-accent) calc(l - 0.09) c h); border-color: oklch(from var(--t-accent) calc(l - 0.09) c h); }
 :root:not([data-theme="dark"]):not([data-ui="paper"]) .dx-devpage .dx-dp :is(.dx-link-btn, .dx-callout > a, .dx-subnav-link.is-active) { color: var(--t-accent-hover); }
+
+/* Visionect firmware: progress of a flash. */
+.dx-devpage .dx-dp .dx-progress { display: block; width: 100%; max-width: 420px; height: 8px; margin: 6px 0; accent-color: var(--t-accent); }

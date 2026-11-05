@@ -553,6 +553,21 @@ def test_visionect_device_page_shows_the_signs_report_and_its_actions(
             "connect_reason": "wakeup",
             "status": {"firmware": "6.17.4168", "battery_pct": 61, "rssi": -53},
             "heartbeat_min": 5,
+            "health": {
+                "connections": 40,
+                "protocol_errors": 39,
+                "connection_errors": 0,
+                "reboots": 0,
+                "pictures": 1,
+                "stuck": 25,
+            },
+            "network": {"IP address": "172.16.3.151"},
+            "settings": {
+                "touch_mode": "On",
+                "frame_sleep": "CLI and CPU always on",
+                "wifi_ssid": "home-wifi",
+                "wifi_psk": "",
+            },
             "sleep_disabled": 1,
             "wifi": "home-wifi",
             "param_error": "",
@@ -571,13 +586,30 @@ def test_visionect_device_page_shows_the_signs_report_and_its_actions(
         "6.17.4168",
         "61%",
         "home-wifi · -53 dBm",
-        "Every 5 min",  # the Sleep interval, read-only: set on the frame
-        "set on the frame",
-        "Off (stays awake)",
+        'name="heartbeat_min"',  # the Sleep interval editor
+        "CLI and CPU always on",
         "Full refresh asked",
-        "Sleep between check-ins",
+        "Power saving mode",
     ):
         assert text in page, text
+    assert 'name="heartbeat_min" value="5"' in page
+    # Advanced: only the settings this frame answered, with what it is set to.
+    assert "Advanced: frame settings" in page
+    assert 'name="touch_mode"' in page and "The frame is set to On." in page
+    assert 'name="frame_sleep"' in page
+    assert 'name="wifi_region"' not in page and 'name="charging_mode"' not in page
+    assert "40 connections, 39 protocol errors, 1 picture" in page
+    assert "This frame looks stuck" in page and "reconnected 25 times" in page
+    assert "172.16.3.151" in page
+    assert "/settings/devices/hall/visionect/network" in page
+    assert 'name="status_poll_min"' in page
+    # Network settings sit behind a USB-cable warning, and only offered ones show.
+    assert "Advanced: network" in page and "DownloadConfigurator.html" in page
+    assert 'name="wifi_ssid"' in page and "The frame is set to home-wifi." in page
+    assert 'name="wifi_psk"' in page and 'type="password"' in page
+    assert 'name="server_address"' not in page and 'name="wifi_band"' not in page
+    # ...and none of them leaks into the Identity group.
+    assert page.count('name="wifi_ssid"') == 1
     for action in ("status", "refresh", "reboot"):
         assert f"/settings/devices/hall/visionect/{action}" in page
     # The frame log replaces the diagnostics that only repeated the report.

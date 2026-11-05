@@ -25,6 +25,7 @@ from flask import current_app, flash, redirect, render_template, request, url_fo
 from werkzeug.wrappers import Response
 
 from app import firmware_check as fw_check
+from app import visionect
 from app.online import online_enabled
 from app.ota import auto as ota_auto
 from app.ota.release import is_newer
@@ -77,6 +78,31 @@ def _ota_capable(device_id: str) -> bool:
     facts_store = current_app.config.get("DEVICE_FACTS")
     facts = facts_store.get(device_id) if facts_store is not None else None
     return bool(facts and facts.get("ota_schema") is not None)
+
+
+def _visionect_view(device: Any) -> dict[str, Any] | None:
+    """A Visionect sign's firmware, from Visionect's own repository rather than
+    Tesserae's releases. None for any other device; an empty view for a sign the
+    service can't report on yet."""
+    from app.settings.visionect_routes import _visionect_firmware
+
+    if not visionect.is_visionect_device(device):
+        return None
+    svc = visionect.service()
+    view = _visionect_firmware(svc, device) if svc is not None else None
+    return view or {
+        "installed": "",
+        "latest": "",
+        "update_available": False,
+        "options": [],
+        "can_flash": False,
+        "blocked": "Tesserae isn't talking to this frame yet.",
+        "flash": None,
+        "unknown_because": "Waiting for the frame to connect",
+        "min_battery": 0,
+        "endpoint": "",
+        "notes_page": "",
+    }
 
 
 def _device_view(device: Any, rel_fw: str | None, canary_ids: set[str]) -> dict[str, Any]:
@@ -188,7 +214,13 @@ def _devices_model(*, online: bool) -> list[dict[str, Any]]:
         queued_ids = _queued_ids(rel, kind_id) if rel else set()
 
         dev_views = [_device_view(d, rel_fw, queued_ids) for d in by_kind[kind_id]]
-        latest = _latest_view(kind_id, rel_fw, dev_views) if online else None
+        visionect_views = {d.id: _visionect_view(d) for d in by_kind[kind_id]}
+        # Visionect frames have no release feed of Tesserae's to ask.
+        latest = (
+            _latest_view(kind_id, rel_fw, dev_views)
+            if online and not any(visionect_views.values())
+            else None
+        )
 
         # What the row's Available column shows: the newest of the imported
         # release and the published latest. Queueing needs something it can
@@ -229,6 +261,15 @@ def _devices_model(*, online: bool) -> list[dict[str, Any]]:
                     "can_withdraw": queued,
                 }
             )
+            vs = visionect_views.get(v["id"])
+            if vs is not None:
+                rows[-1].update(
+                    visionect=vs,
+                    fw_version=vs["installed"] or v["fw_version"],
+                    available_fw=vs["latest"] or None,
+                    update_available=vs["update_available"],
+                    needs_attention=bool(vs["flash"] and vs["flash"]["failed"]),
+                )
     # rolled_back / failed float to the top, then by name.
     rows.sort(key=lambda r: (not r["needs_attention"], str(r["name"]).lower()))
     return rows
@@ -252,6 +293,9 @@ def _fleet_model() -> list[dict[str, Any]]:
     for kind_id in sorted(set(by_kind) | set(releases)):
         rel = releases.get(kind_id) if isinstance(releases.get(kind_id), dict) else None
         rel_fw = str(rel["fw_version"]) if rel and rel.get("fw_version") else None
+        # A Visionect frame has no Tesserae releases to stage.
+        if not rel and any(visionect.is_visionect_device(d) for d in by_kind.get(kind_id, [])):
+            continue
         queued = _queued_ids(rel, kind_id) if rel else set()
         dev_views = [_device_view(d, rel_fw, queued) for d in by_kind.get(kind_id, [])]
         dev_views.sort(key=lambda v: str(v["name"]).lower())

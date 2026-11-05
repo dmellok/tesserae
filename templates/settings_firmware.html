@@ -11,7 +11,8 @@
   <p class="lede">
     Update device firmware over the air. Queue a device and it is offered the signed release on its
     next heartbeat; the device fetches and verifies the image itself, and this page never touches the
-    firmware bytes.
+    firmware bytes. Visionect frames are the exception: they run Visionect's own firmware, which
+    Tesserae downloads from Visionect and sends to the frame when you ask.
   </p>
 </header>
 
@@ -85,8 +86,15 @@
     </thead>
     <tbody>
       {% for d in device_rows %}
+      {% set _vs = d.visionect %}
+      {% set _fl = _vs.flash if _vs else none %}
+      {% if _vs %}
+      {% set _st = 'busy' if _fl and _fl.active else ('attention' if _fl and _fl.failed else ('available' if d.update_available else ('current' if d.available_fw else 'unknown'))) %}
+      {% else %}
       {% set _st = 'unknown' if not d.known else ('usb' if not d.capable else (('busy' if d.pill_class != 'is-danger' else 'attention') if d.phase else ('busy' if d.queued else ('available' if d.update_available else ('current' if d.fw_version else 'unknown'))))) %}
+      {% endif %}
       <tr{% if d.needs_attention %} class="fw-row--attention"{% endif %} data-lf-item
+          {% if _vs %}data-fw-visionect-row="{{ d.id }}"{% if _fl and _fl.active %} data-fw-flash-active{% endif %}{% endif %}
           data-lf-text="{{ (d.name ~ ' ' ~ d.kind_name ~ ' ' ~ d.id ~ ' ' ~ (d.fw_version or '') ~ ' ' ~ (d.available_fw or ''))|lower }}"
           data-lf-status="{{ _st }}{{ ' attention' if d.needs_attention and _st != 'attention' else '' }}"
           data-lf-auto="{{ 'on' if d.capable and d.auto else 'off' }}"
@@ -96,6 +104,7 @@
         <td class="fw-cell-name">
           <span>{{ d.name }}</span>
           <span class="dx-status-muted">{{ d.kind_name }}</span>
+          {% if _vs %}<span class="dx-status-muted">Official Visionect firmware</span>{% endif %}
         </td>
         <td>
           {% if d.fw_version %}<code>{{ fw(d.fw_version) }}</code>
@@ -108,9 +117,29 @@
                {% if d.notes_headline %}title="{{ d.notes_headline }}"{% endif %}><code>{{ fw(d.available_fw) }}</code></a>
             {% else %}<code>{{ fw(d.available_fw) }}</code>{% endif %}
           {% else %}<span class="dx-muted">none</span>{% endif %}
+          {% if _vs and _vs.options and not (_fl and _fl.active) %}
+          <button type="button" class="fw-vs-gear" data-fw-open="fw-vs-{{ d.id }}" title="Other versions" aria-label="Other versions for {{ d.name }}"><i class="ph ph-gear" aria-hidden="true"></i></button>
+          {% endif %}
         </td>
         <td>
-          {% if not d.known %}
+          {% if _vs %}
+            {% if _fl and _fl.active %}
+            <span class="tg tg--teal">updating to {{ fw(_fl.target) }}</span>
+            <progress class="fw-progress" max="100" value="{{ _fl.percent }}" aria-label="Firmware update progress"></progress>
+            <span class="dx-status-muted">{{ _fl.text }}</span>
+            {% elif _fl and _fl.failed %}
+            <span class="tg {{ tg_tone('is-danger') }}">update failed</span>
+            <span class="fw-vs-message">{{ _fl.text }}</span>
+            {% elif d.update_available %}
+            <span class="tg tg--warn">update available</span>
+            {% elif _fl and _fl.ok %}
+            <span class="tg tg--ok">updated to {{ fw(_fl.target) }}</span>
+            {% elif d.available_fw %}
+            <span class="dx-status-muted">up to date</span>
+            {% else %}
+            <span class="dx-status-muted">{{ _vs.unknown_because or 'Not known right now' }}</span>
+            {% endif %}
+          {% elif not d.known %}
           <span class="dx-status-muted" title="No heartbeat received yet; OTA capability unknown.">awaiting first heartbeat</span>
           {% elif not d.capable %}
           <span class="dx-status-muted" title="Device has not advertised OTA support; update over USB.">USB update only</span>
@@ -144,7 +173,13 @@
           {% endif %}
         </td>
         <td class="fw-cell-action">
-          {% if d.can_queue %}
+          {% if _vs %}
+            {% if _vs.options and d.update_available and not (_fl and _fl.active) %}
+            <button type="button" class="button" data-fw-open="fw-vs-{{ d.id }}">
+              <i class="ph ph-cpu" aria-hidden="true"></i><span>Update firmware</span>
+            </button>
+            {% endif %}
+          {% elif d.can_queue %}
           <form method="post" action="{{ url_for('auth.firmware_queue') }}">
             <input type="hidden" name="device_id" value="{{ d.id }}">
             <button type="submit" class="button">
@@ -165,6 +200,45 @@
     </tbody>
   </table>
   <p class="lf-empty" data-lf-empty hidden>No devices match.</p>
+  {% for d in device_rows if d.visionect and d.visionect.options %}
+  {% set _vs = d.visionect %}
+  {% set _default = (_vs.options|rejectattr('installed')|first).value if d.update_available and (_vs.options|rejectattr('installed')|list) else '' %}
+  <dialog class="fw-vs-dialog" id="fw-vs-{{ d.id }}" aria-labelledby="fw-vs-{{ d.id }}-title">
+    <form method="post" action="{{ _vs.endpoint }}"
+          onsubmit="var o = this.checksum.options[this.checksum.selectedIndex]; return confirm('Flash firmware ' + o.text + ' onto the frame?\n\nThe frame restarts into its bootloader, takes the update (about a minute) and restarts again. Do not power it off meanwhile: an interrupted update can leave it unable to start, and only Visionect\'s USB Configurator may bring it back.');">
+      <h2 id="fw-vs-{{ d.id }}-title">Update {{ d.name }}</h2>
+      <p class="fw-vs-source"><i class="ph ph-seal-check" aria-hidden="true"></i><span>This is official Visionect firmware, downloaded from Visionect's server. Tesserae doesn't make or sign it; it only sends the file to the frame, the way Visionect's own software does.</span></p>
+      <label class="fw-vs-field" for="fw-vs-{{ d.id }}-version">Version</label>
+      <select id="fw-vs-{{ d.id }}-version" name="checksum" class="dx-devtb-select" required data-fw-version>
+        <option value="">Choose a version</option>
+        {% for o in _vs.options %}
+        <option value="{{ o.value }}"{% if o.value == _default %} selected{% endif %}{% if o.installed %} disabled{% endif %}>{{ o.label }}</option>
+        {% endfor %}
+      </select>
+      {% for o in _vs.options %}
+      <section class="fw-vs-notes" data-fw-notes="{{ o.value }}"{% if o.value != _default %} hidden{% endif %}>
+        <h3>Visionect's notes for {{ o.version }}</h3>
+        {% for part in o.notes %}
+        <h4>{{ part.title }}</h4>
+        <ul>{% for item in part['items'] %}<li>{{ item }}</li>{% endfor %}</ul>
+        {% else %}
+        <p class="cf-hint">Visionect hasn't published notes for this version.</p>
+        {% endfor %}
+        <p class="cf-hint"><a href="{{ _vs.notes_page }}" target="_blank" rel="noopener">All of Visionect's release notes</a></p>
+        {% if o.downgrade %}<p class="cf-hint">This is older than what the frame runs now.</p>{% endif %}
+      </section>
+      {% endfor %}
+      <p class="cf-hint">{% if _vs.blocked %}{{ _vs.blocked }}{% else %}Needs the frame connected and its battery above {{ _vs.min_battery }}%.{% endif %}</p>
+      <div class="fw-vs-actions">
+        <button type="button" class="ghost" data-fw-close>Cancel</button>
+        <button type="submit" class="button"{% if not _vs.can_flash %} disabled{% endif %}>
+          <i class="ph ph-cpu" aria-hidden="true"></i><span>Update firmware</span>
+        </button>
+      </div>
+    </form>
+  </dialog>
+  {% endfor %}
+  <script src="{{ url_for('static', filename='firmware_visionect.js') }}" defer></script>
 </section>
 {% else %}
 {{ empty_state('download-simple', 'No devices yet',

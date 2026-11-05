@@ -140,6 +140,40 @@ def fake_visionect_service() -> SimpleNamespace:
         },
         request_action=lambda *_a: None,
         on_push=lambda *_a: None,
+        firmware_view=lambda _d: {
+            "installed": "6.17.4168",
+            "latest": "7.4.4407",
+            "update_available": True,
+            "builds": [
+                {
+                    "checksum": "2cb91ed6",
+                    "version": "7.4.4407",
+                    "installed": False,
+                    "newest": True,
+                    "downgrade": False,
+                },
+                {
+                    "checksum": "3d145f36",
+                    "version": "6.17.4168",
+                    "installed": True,
+                    "newest": False,
+                    "downgrade": False,
+                },
+                {
+                    "checksum": "6006f7ed",
+                    "version": "6.13.4080",
+                    "installed": False,
+                    "newest": False,
+                    "downgrade": True,
+                },
+            ],
+            "blocked": "",
+            "flash": None,
+            "list_known": True,
+            "min_battery": 30,
+        },
+        firmware_token=lambda _d: "",
+        request_firmware_update=lambda *_a: None,
     )
 
 
