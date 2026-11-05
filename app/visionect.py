@@ -147,6 +147,8 @@ MAX_WARNED_UNBOUND = 64
 # A firmware update is refused below this battery level (an interrupted flash
 # is not something anyone has seen recover).
 FLASH_MIN_BATTERY_PCT = 30
+# Where the firmware builds someone chose to ignore are kept (app settings).
+FIRMWARE_IGNORED_KEY = "visionect_firmware_ignored"
 # Longest to wait for a bootloader's complete hello once it has connected.
 HELLO_READ_S = 10.0
 # How long a reboot for a flash waits for an unanswered packet to be answered.
@@ -2385,6 +2387,18 @@ class VisionectService:
             )
         return ""
 
+    def _firmware_ignored(self) -> set[int]:
+        """Checksums of the builds someone chose to ignore. An ignored build is
+        no longer offered as an update, and can still be picked by hand."""
+        ctx = self._ctx
+        settings = ctx.app.config.get("SETTINGS_STORE") if ctx is not None else None
+        raw = settings.get_section("app").get(FIRMWARE_IGNORED_KEY) if settings is not None else ()
+        out: set[int] = set()
+        for text in raw if isinstance(raw, list) else ():
+            with contextlib.suppress(TypeError, ValueError):
+                out.add(int(str(text), 16))
+        return out
+
     def _compatible_builds(self, view: dict[str, Any] | None) -> list[Build] | None:
         """Builds for exactly this frame's hardware and display, newest first,
         from the cached list; None when the list or what the frame reports
@@ -2424,8 +2438,10 @@ class VisionectService:
         installed = ident.get("firmware")
         checksum = ident.get("checksum")
         builds = self._compatible_builds(view)
+        ignored = self._firmware_ignored()
+        latest = next((b for b in builds or [] if b.checksum not in ignored), None)
         rows: list[dict[str, Any]] = []
-        for i, b in enumerate(builds or []):
+        for b in builds or []:
             is_installed = (
                 b.checksum == checksum if checksum is not None else b.version == installed
             )
@@ -2434,12 +2450,12 @@ class VisionectService:
                     "checksum": b.checksum_hex,
                     "version": b.version_text,
                     "installed": is_installed,
-                    "newest": i == 0,
+                    "newest": b is latest,
+                    "ignored": b.checksum in ignored,
                     "downgrade": installed is not None and b.version < installed,
                     "notes": repo.notes_for(b.version_text) if repo is not None else [],
                 }
             )
-        latest = builds[0] if builds else None
         update = bool(
             latest is not None
             and installed is not None
@@ -2449,6 +2465,7 @@ class VisionectService:
         return {
             "installed": ".".join(map(str, installed)) if installed else "",
             "latest": latest.version_text if latest is not None else "",
+            "latest_checksum": latest.checksum_hex if latest is not None else "",
             "update_available": update,
             "builds": rows,
             "blocked": self._flash_blocked(view),

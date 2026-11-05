@@ -9,6 +9,7 @@ hooks). Only the page builders in ``index_routes`` call into this module."""
 from __future__ import annotations
 
 import os
+import re
 import socket
 import time
 from typing import Any
@@ -110,7 +111,15 @@ def _visionect_firmware(svc: Any, device: Device) -> dict[str, Any] | None:
         return None
     options = []
     for b in fv["builds"]:
-        tags = [t for t, on in (("installed", b["installed"]), ("newest", b["newest"])) if on]
+        tags = [
+            t
+            for t, on in (
+                ("installed", b["installed"]),
+                ("newest", b["newest"]),
+                ("ignored", b.get("ignored")),
+            )
+            if on
+        ]
         if b["downgrade"]:
             tags.append("downgrade")
         label = b["version"] + (f" ({', '.join(tags)})" if tags else "")
@@ -121,6 +130,7 @@ def _visionect_firmware(svc: Any, device: Device) -> dict[str, Any] | None:
                 "version": b["version"],
                 "installed": b["installed"],
                 "downgrade": b["downgrade"],
+                "ignored": bool(b.get("ignored")),
                 "notes": b.get("notes") or [],
             }
         )
@@ -148,6 +158,7 @@ def _visionect_firmware(svc: Any, device: Device) -> dict[str, Any] | None:
     return {
         "installed": fv["installed"],
         "latest": fv["latest"],
+        "latest_checksum": fv.get("latest_checksum", ""),
         "update_available": fv["update_available"],
         "options": options,
         "can_flash": not fv["blocked"] and any(not o["installed"] for o in options),
@@ -157,6 +168,7 @@ def _visionect_firmware(svc: Any, device: Device) -> dict[str, Any] | None:
         "unknown_because": fv.get("unknown_because", ""),
         "min_battery": fv["min_battery"],
         "endpoint": url_for("auth.devices_visionect_firmware", instance_id=device.id),
+        "ignore_endpoint": url_for("auth.visionect_firmware_ignore"),
         "notes_page": NOTES_PAGE,
     }
 
@@ -429,6 +441,28 @@ def devices_visionect_action(instance_id: str, action: str) -> Response:
         flash(problem, "error")
     else:
         flash(_VISIONECT_ACTION_DONE[action].format(name=device.name), "ok")
+    return redirect_to
+
+
+@bp.post("/settings/firmware/visionect-ignore")
+def visionect_firmware_ignore() -> Response:
+    """Ignore a firmware build, or stop ignoring it. An ignored build stops being
+    offered as an update on any page; it can still be chosen by hand."""
+    redirect_to = redirect(url_for("auth.firmware_index"))
+    ignore = request.form.get("ignore", "").strip().lower()
+    restore = request.form.get("restore", "").strip().lower()
+    text = ignore or restore
+    if not re.fullmatch(r"[0-9a-f]{1,8}", text):
+        flash("Unknown firmware build.", "error")
+        return redirect_to
+    store = settings_store()
+    raw = store.get_section("app").get(visionect.FIRMWARE_IGNORED_KEY)
+    current = [str(x) for x in raw] if isinstance(raw, list) else []
+    wanted = int(text, 16)
+    kept = [x for x in current if int(x, 16) != wanted]
+    store.patch_section(
+        "app", {visionect.FIRMWARE_IGNORED_KEY: [*kept, f"{wanted:08x}"] if ignore else kept}
+    )
     return redirect_to
 
 

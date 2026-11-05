@@ -119,6 +119,9 @@
           {% else %}<span class="dx-muted">none</span>{% endif %}
           {% if _vs and _vs.options and not (_fl and _fl.active) %}
           <button type="button" class="fw-vs-gear" data-fw-open="fw-vs-{{ d.id }}" title="Other versions" aria-label="Other versions for {{ d.name }}"><i class="ph ph-gear" aria-hidden="true"></i></button>
+          {% if d.update_available and _vs.latest_checksum %}
+          <button type="submit" form="fw-vs-ignore-{{ d.id }}" name="ignore" value="{{ _vs.latest_checksum }}" class="fw-vs-gear" title="Ignore this version" aria-label="Ignore version {{ d.available_fw }}"><i class="ph ph-eye-slash" aria-hidden="true"></i></button>
+          {% endif %}
           {% endif %}
         </td>
         <td>
@@ -202,7 +205,8 @@
   <p class="lf-empty" data-lf-empty hidden>No devices match.</p>
   {% for d in device_rows if d.visionect and d.visionect.options %}
   {% set _vs = d.visionect %}
-  {% set _default = (_vs.options|rejectattr('installed')|first).value if d.update_available and (_vs.options|rejectattr('installed')|list) else '' %}
+  {% set _default = _vs.latest_checksum if d.update_available else '' %}
+  <form method="post" action="{{ _vs.ignore_endpoint }}" id="fw-vs-ignore-{{ d.id }}" hidden></form>
   <dialog class="fw-vs-dialog" id="fw-vs-{{ d.id }}" aria-labelledby="fw-vs-{{ d.id }}-title">
     <form method="post" action="{{ _vs.endpoint }}"
           onsubmit="var o = this.checksum.options[this.checksum.selectedIndex]; return confirm('Flash firmware ' + o.text + ' onto the frame?\n\nThe frame restarts into its bootloader, takes the update (about a minute) and restarts again. Do not power it off meanwhile: an interrupted update can leave it unable to start, and only Visionect\'s USB Configurator may bring it back.');">
@@ -226,6 +230,11 @@
         {% endfor %}
         <p class="cf-hint"><a href="{{ _vs.notes_page }}" target="_blank" rel="noopener">All of Visionect's release notes</a></p>
         {% if o.downgrade %}<p class="cf-hint">This is older than what the frame runs now.</p>{% endif %}
+        {% if o.ignored %}
+        <button type="submit" form="fw-vs-ignore-{{ d.id }}" name="restore" value="{{ o.value }}" class="ghost"><i class="ph ph-eye" aria-hidden="true"></i><span>Stop ignoring this version</span></button>
+        {% elif not o.installed %}
+        <button type="submit" form="fw-vs-ignore-{{ d.id }}" name="ignore" value="{{ o.value }}" class="ghost"><i class="ph ph-eye-slash" aria-hidden="true"></i><span>Ignore this version</span></button>
+        {% endif %}
       </section>
       {% endfor %}
       <p class="cf-hint">{% if _vs.blocked %}{{ _vs.blocked }}{% else %}Needs the frame connected and its battery above {{ _vs.min_battery }}%.{% endif %}</p>

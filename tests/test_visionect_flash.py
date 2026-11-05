@@ -598,6 +598,7 @@ def fake_service(
     firmware = {
         "installed": "7.4.4407",
         "latest": "7.5.1",
+        "latest_checksum": "7ffffff0",
         "update_available": True,
         "builds": [
             {
@@ -1022,3 +1023,60 @@ def test_a_firmware_view_says_nothing_about_an_update_on_the_newest_build(h: Har
         assert view["update_available"] is (newest != "7.4.4407")
     finally:
         sign.close()
+
+
+def test_an_ignored_build_is_no_longer_offered_as_an_update(h: Harness) -> None:
+    sign = connect(h, fw=(7, 3, 4358), checksum=0xA529A106)
+    try:
+        view = h.svc.firmware_view("lobby")
+        assert view["update_available"] and view["latest"] == "7.4.4407"
+        h.settings.sections.setdefault("app", {})[visionect.FIRMWARE_IGNORED_KEY] = ["2cb91ed6"]
+        view = h.svc.firmware_view("lobby")
+        assert not view["update_available"] and view["latest"] == "7.3.4358"
+        ignored = next(b for b in view["builds"] if b["version"] == "7.4.4407")
+        assert ignored["ignored"] and not ignored["newest"]
+    finally:
+        sign.close()
+
+
+def test_an_ignored_build_can_still_be_chosen_by_hand(h: Harness) -> None:
+    sign = connect(h)
+    try:
+        h.settings.sections.setdefault("app", {})[visionect.FIRMWARE_IGNORED_KEY] = [TARGET_HEX]
+        assert h.svc.request_firmware_update("lobby", TARGET_HEX) is None
+    finally:
+        sign.close()
+
+
+def test_the_ignore_route_adds_and_removes_a_build(client_app) -> None:
+    app, client = client_app
+    store = app.config["SETTINGS_STORE"]
+
+    def saved() -> Any:
+        return store.get_section("app").get(visionect.FIRMWARE_IGNORED_KEY)
+
+    url = "/settings/firmware/visionect-ignore"
+    assert client.post(url, data={"ignore": "2CB91ED6"}).status_code == 302
+    assert saved() == ["2cb91ed6"]
+    client.post(url, data={"ignore": "2cb91ed6"})
+    assert saved() == ["2cb91ed6"]  # no duplicates
+    client.post(url, data={"ignore": "a529a106"})
+    client.post(url, data={"restore": "2cb91ed6"})
+    assert saved() == ["a529a106"]
+    client.post(url, data={"ignore": "not hex; <b>"})
+    assert saved() == ["a529a106"]
+
+
+def test_the_firmware_page_offers_to_ignore_and_to_stop_ignoring(
+    client_app, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _app, client = client_app
+    fake = fake_service([])
+    view = fake.firmware_view("hall")
+    next(b for b in view["builds"] if b["version"] == "7.3.4358")["ignored"] = True
+    fake.firmware_view = lambda _d: view
+    monkeypatch.setattr(visionect, "service", lambda: fake)
+    page = client.get("/settings/firmware").get_data(as_text=True)
+    assert 'name="ignore" value="7ffffff0"' in page and "ph-eye-slash" in page
+    assert 'name="restore" value="a529a106"' in page and "Stop ignoring" in page
+    assert "7.3.4358 (downgrade, ignored)" in page or "7.3.4358 (ignored, downgrade)" in page

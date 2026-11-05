@@ -93,6 +93,7 @@ def _visionect_view(device: Any) -> dict[str, Any] | None:
     return view or {
         "installed": "",
         "latest": "",
+        "latest_checksum": "",
         "update_available": False,
         "options": [],
         "can_flash": False,
@@ -101,6 +102,7 @@ def _visionect_view(device: Any) -> dict[str, Any] | None:
         "unknown_because": "Waiting for the frame to connect",
         "min_battery": 0,
         "endpoint": "",
+        "ignore_endpoint": "",
         "notes_page": "",
     }
 
