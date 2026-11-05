@@ -18,12 +18,14 @@ function formatReading(reading, fallbackUnit = "") {
   return `${escapeHtml(formatted)}${unit ? ` ${escapeHtml(unit)}` : ""}`;
 }
 
-function energyReading(label, current, yesterday, index, t) {
+function energyReading(label, current, yesterday, index, t, showYesterday) {
   const yesterdayValue = yesterday?.value;
   const hasYesterday = yesterdayValue !== null
     && yesterdayValue !== undefined
     && Number.isFinite(Number(yesterdayValue));
-  const yesterdayMarkup = hasYesterday
+  const yesterdayMarkup = !showYesterday
+    ? ""
+    : hasYesterday
     ? `<span class="hp-yesterday">${escapeHtml(t("yesterday", "Yesterday"))}: ${formatReading(yesterday, "kWh")}</span>`
     : yesterday?.error
       ? `<span class="hp-yesterday">${escapeHtml(t("history_unavailable", "Yesterday unavailable"))}</span>`
@@ -73,6 +75,7 @@ function temperatureGauge(reading, label, accent) {
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
   const t = ctx?.t || ((key, fallback) => fallback ?? key);
+  const fragment = ctx?.fragment || ctx?.cell?.fragment || "full";
   const size = ["xs", "sm", "md", "lg"].includes(ctx?.cell?.size) ? ctx.cell.size : "md";
   const place = data.place && data.place !== "Heat pump"
     ? data.place
@@ -110,7 +113,12 @@ export default function render(shadow, ctx) {
   const options = ctx?.cell?.options || {};
   const showHeating = options.show_heating !== false && options.show_heating !== "false";
   const showHotWater = options.show_hot_water !== false && options.show_hot_water !== "false";
-  const singleReading = showHeating !== showHotWater;
+  const showYesterday = options.show_yesterday !== false && options.show_yesterday !== "false";
+  const showTemperatureGauge = options.show_temperature_gauge === true
+    || options.show_temperature_gauge === "true";
+  const includeHeating = fragment === "heating" || (showHeating && fragment === "full");
+  const includeHotWater = fragment === "hot_water" || (showHotWater && fragment === "full");
+  const singleReading = includeHeating !== includeHotWater;
   const power = data.power || {};
   const overallSpf = data.overall_spf || {};
   const energy = data.energy || {};
@@ -135,12 +143,15 @@ export default function render(shadow, ctx) {
       index: "water",
     },
   ].filter(({ current, yesterday }) => current?.name || current?.value != null || yesterday?.value != null);
+  const energyCards = Object.fromEntries(energyItems.map(({ label, current, yesterday, index }) => [
+    index,
+    energyReading(label, current, yesterday, index, t, showYesterday),
+  ]));
   const details = energyItems.length
-    ? energyItems.map(({ label, current, yesterday, index }) =>
-      energyReading(label, current, yesterday, index, t)).join("")
+    ? Object.values(energyCards).join("")
     : `<p class="u-muted hp-no-energy">${escapeHtml(t("no_energy_data", "Configure daily energy sensors to see details."))}</p>`;
   const readings = [];
-  if (showHeating) {
+  if (includeHeating) {
     readings.push(`
       <div class="hp-reading hp-reading--heating status-cell ${singleReading ? "hp-reading--full" : ""}">
         <div class="hp-reading-top">
@@ -151,10 +162,10 @@ export default function render(shadow, ctx) {
           </div>
           <strong class="hp-reading-value">${formatReading(heating, "°C")}</strong>
         </div>
-        ${size === "lg" ? temperatureGauge(heating, t("heating_temperature", "Heating"), "--accent-1") : ""}
+        ${size === "lg" || (fragment === "heating" && showTemperatureGauge) ? temperatureGauge(heating, t("heating_temperature", "Heating"), "--accent-1") : ""}
       </div>`);
   }
-  if (showHotWater) {
+  if (includeHotWater) {
     readings.push(`
       <div class="hp-reading hp-reading--water status-cell ${singleReading ? "hp-reading--full" : ""}">
         <div class="hp-reading-top">
@@ -165,7 +176,7 @@ export default function render(shadow, ctx) {
           </div>
           <strong class="hp-reading-value">${formatReading(hotWater, "°C")}</strong>
         </div>
-        ${size === "lg" ? temperatureGauge(hotWater, t("hot_water_temperature", "Hot water"), "--accent-2") : ""}
+        ${size === "lg" || (fragment === "hot_water" && showTemperatureGauge) ? temperatureGauge(hotWater, t("hot_water_temperature", "Hot water"), "--accent-2") : ""}
       </div>`);
   }
   const readingsMarkup = readings.length
@@ -175,6 +186,13 @@ export default function render(shadow, ctx) {
   const layout = `
     .hp { container: heat-pump / size; color: var(--text-primary); }
     .hp-body { gap: var(--space-3); overflow: hidden; }
+    .hp-fragment-content { width: 100%; height: 100%; box-sizing: border-box; }
+    .hp-fragment-compressor .hp-hero { width: 100%; height: 100%; box-sizing: border-box; }
+    .hp-fragment-total_energy .hp-energy-card,
+    .hp-fragment-heating_energy .hp-energy-card,
+    .hp-fragment-hot_water_energy .hp-energy-card { display: flex; width: 100%; height: 100%; box-sizing: border-box; }
+    .hp-fragment-heating .hp-temperature-gauge,
+    .hp-fragment-hot_water .hp-temperature-gauge { display: flex; }
     .hp-hero {
       display: flex;
       align-items: center;
@@ -268,6 +286,9 @@ export default function render(shadow, ctx) {
     .hp-md .hp-reading-caption { gap: var(--space-1); }
     .hp-md .hp-reading-mode { display: none; }
     .hp-md .hp-reading-value { flex: 0 0 auto; }
+    .hp-fragment-total_energy .hp-yesterday,
+    .hp-fragment-heating_energy .hp-yesterday,
+    .hp-fragment-hot_water_energy .hp-yesterday { display: block; }
     .hp-lg .hp-reading-mode {
       display: inline-flex;
       width: auto;
@@ -287,48 +308,69 @@ export default function render(shadow, ctx) {
     .hp-md .hp-energy-details,
     .hp-md .hp-current-power,
     .hp-md .hp-daily-total { display: none; }
+    .hp-fragment-current_power .hp-current-power { display: flex; }
     @container heat-pump (max-height: 260px) {
       .hp-hero { padding-block: var(--space-2); }
       .hp-reading { padding-block: var(--space-2); }
     }
   `;
 
+  const heroMarkup = `
+    <div class="status-hero hp-hero ${stateClass}">
+      <i class="ph-bold ph-fan" aria-hidden="true"></i>
+      <div class="lockup hp-hero-lockup">
+        <span class="hp-hero-label">${escapeHtml(t("compressor", "Compressor"))}</span>
+        <strong class="status-state hp-state">${escapeHtml(statusText)}</strong>
+      </div>
+      <div class="hp-hero-spf">
+        <span class="hp-hero-label">${escapeHtml(t("overall_spf", "Overall SPF"))}</span>
+        <strong class="hp-hero-spf-value">${formatReading(overallSpf)}</strong>
+      </div>
+    </div>`;
+  const powerMarkup = `
+    <div class="hp-current-power">
+      <i class="ph-bold ph-lightning" aria-hidden="true"></i>
+      <div class="hp-power-lockup">
+        <span class="hp-energy-label">${escapeHtml(t("current_consumption", "Current consumption"))}</span>
+        <strong class="hp-power-value">${formatReading(power, "W")}</strong>
+      </div>
+    </div>`;
+  const energyMarkup = `
+    <div class="hp-daily-total">
+      <span class="hp-energy-label">${escapeHtml(t("electricity_today", "Electricity today"))}</span>
+      <strong class="hp-daily-total-value">${formatReading(dailyTotal, "kWh")}</strong>
+    </div>
+    <div class="hp-energy-details" aria-label="${escapeHtml(t("energy_details", "Daily electricity use"))}">
+      ${details}
+    </div>`;
+  const fullMarkup = `
+    <div class="w-title">
+      <h3>${escapeHtml(place)}</h3>
+      <span class="w-title-meta">${escapeHtml(data.time || "")}</span>
+    </div>
+    <div class="w-body status-body hp-body">
+      ${heroMarkup}
+      ${readingsMarkup}
+      ${power.value != null ? powerMarkup : ""}
+      ${energyMarkup}
+    </div>`;
+  const fragmentBody = {
+    compressor: heroMarkup,
+    heating: readingsMarkup,
+    hot_water: readingsMarkup,
+    current_power: powerMarkup,
+    total_energy: energyCards.total ?? "",
+    heating_energy: energyCards.heating ?? "",
+    hot_water_energy: energyCards.water ?? "",
+  }[fragment];
+  const content = fragment === "full"
+    ? fullMarkup
+    : `<div class="w-body status-body hp-body hp-fragment-content">${fragmentBody ?? ""}</div>`;
+
   shadow.innerHTML = `
     ${stylesheet}
     <style>${layout}</style>
-    <div class="w hp hp-${size}" data-widget="ha_heat_pump">
-      <div class="w-title">
-        <h3>${escapeHtml(place)}</h3>
-        <span class="w-title-meta">${escapeHtml(data.time || "")}</span>
-      </div>
-      <div class="w-body status-body hp-body">
-        <div class="status-hero hp-hero ${stateClass}">
-          <i class="ph-bold ph-fan" aria-hidden="true"></i>
-          <div class="lockup hp-hero-lockup">
-            <span class="hp-hero-label">${escapeHtml(t("compressor", "Compressor"))}</span>
-            <strong class="status-state hp-state">${escapeHtml(statusText)}</strong>
-          </div>
-          <div class="hp-hero-spf">
-            <span class="hp-hero-label">${escapeHtml(t("overall_spf", "Overall SPF"))}</span>
-            <strong class="hp-hero-spf-value">${formatReading(overallSpf)}</strong>
-          </div>
-        </div>
-        ${readingsMarkup}
-        ${power.value != null ? `
-          <div class="hp-current-power">
-            <i class="ph-bold ph-lightning" aria-hidden="true"></i>
-            <div class="hp-power-lockup">
-              <span class="hp-energy-label">${escapeHtml(t("current_consumption", "Current consumption"))}</span>
-              <strong class="hp-power-value">${formatReading(power, "W")}</strong>
-            </div>
-          </div>` : ""}
-        <div class="hp-daily-total">
-          <span class="hp-energy-label">${escapeHtml(t("electricity_today", "Electricity today"))}</span>
-          <strong class="hp-daily-total-value">${formatReading(dailyTotal, "kWh")}</strong>
-        </div>
-        <div class="hp-energy-details" aria-label="${escapeHtml(t("energy_details", "Daily electricity use"))}">
-          ${details}
-        </div>
-      </div>
+    <div class="w hp hp-${size} ${fragment === "full" ? "" : `hp-fragment-${fragment}`}" data-widget="ha_heat_pump">
+      ${content}
     </div>`;
 }

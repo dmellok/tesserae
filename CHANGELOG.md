@@ -737,6 +737,9 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - Installers that own the upgrade path can set `TESSERAE_INSTALL_METHOD`;
   Settings → System then points at their update command instead of
   suggesting a re-run of install.sh. The helper script sets it.
+- A Home Assistant heat-pump widget with configurable entity selectors,
+  responsive compressor and temperature panels, optional temperature gauges,
+  current power and daily energy fragments, and yesterday-value controls.
 
 ## [0.480.1], 2026-10-26
 

@@ -10,19 +10,29 @@
   "supports": {
     "sizes": ["xs", "sm", "md", "lg"]
   },
+  "fragments": [
+    { "id": "full", "label": "Full widget", "w": 396, "h": 256, "icon": "ph-fan" },
+    { "id": "compressor", "label": "Compressor status", "w": 220, "h": 128, "icon": "ph-fan" },
+    { "id": "heating", "label": "Heating temperature", "w": 220, "h": 120, "icon": "ph-thermometer-simple" },
+    { "id": "hot_water", "label": "Hot-water temperature", "w": 220, "h": 120, "icon": "ph-drop" },
+    { "id": "current_power", "label": "Current consumption", "w": 220, "h": 110, "icon": "ph-lightning" },
+    { "id": "total_energy", "label": "Total energy", "w": 220, "h": 120, "icon": "ph-lightning" },
+    { "id": "heating_energy", "label": "Heating energy", "w": 220, "h": 120, "icon": "ph-thermometer-simple" },
+    { "id": "hot_water_energy", "label": "Hot-water energy", "w": 220, "h": 120, "icon": "ph-drop" }
+  ],
   "cell_options": [
     {
       "name": "compressor_entity",
       "type": "select",
       "label": "Compressor status",
-      "default": "binary_sensor.e3_vitocal_17_kompressor",
+      "default": "",
       "choices_from": "binary_sensor"
     },
     {
       "name": "flow_entity",
       "type": "select",
       "label": "Heating temperature",
-      "default": "sensor.e3_vitocal_17_vorlauftemperatur",
+      "default": "",
       "choices_from": "sensor"
     },
     {
@@ -35,7 +45,7 @@
       "name": "hot_water_temperature_entity",
       "type": "select",
       "label": "Hot-water temperature",
-      "default": "sensor.e3_vitocal_17_ww_speichertemperatur",
+      "default": "",
       "choices_from": "sensor"
     },
     {
@@ -43,6 +53,18 @@
       "type": "boolean",
       "label": "Show hot-water panel",
       "default": true
+    },
+    {
+      "name": "show_yesterday",
+      "type": "boolean",
+      "label": "Show yesterday's energy",
+      "default": true
+    },
+    {
+      "name": "show_temperature_gauge",
+      "type": "boolean",
+      "label": "Show temperature gauge",
+      "default": false
     },
     {
       "name": "power_entity",
@@ -55,7 +77,7 @@
       "name": "heating_entity",
       "type": "select",
       "label": "Heating climate entity",
-      "default": "climate.e3_vitocal_17_heizung",
+      "default": "",
       "choices_from": "heating",
       "advanced": true,
       "help": "Used as a fallback if the heating temperature sensor is unavailable."
@@ -64,7 +86,7 @@
       "name": "hot_water_entity",
       "type": "select",
       "label": "Hot-water entity",
-      "default": "water_heater.e3_vitocal_17_warmwasser",
+      "default": "",
       "choices_from": "hot_water",
       "advanced": true,
       "help": "Used as a fallback if the hot-water temperature sensor is unavailable."
@@ -73,7 +95,7 @@
       "name": "daily_energy_entity",
       "type": "select",
       "label": "Total daily electricity",
-      "default": "sensor.keller_e3_vitocal_17_strom_taglich",
+      "default": "",
       "choices_from": "sensor",
       "advanced": true
     },
@@ -81,7 +103,7 @@
       "name": "heating_energy_entity",
       "type": "select",
       "label": "Heating daily electricity",
-      "default": "sensor.keller_e3_vitocal_17_vitocal_heizung_taglich",
+      "default": "",
       "choices_from": "sensor",
       "advanced": true
     },
@@ -89,7 +111,7 @@
       "name": "hot_water_energy_entity",
       "type": "select",
       "label": "Hot-water daily electricity",
-      "default": "sensor.keller_e3_vitocal_17_vitocal_warmwasser_taglich",
+      "default": "",
       "choices_from": "sensor",
       "advanced": true
     },
@@ -97,7 +119,7 @@
       "name": "overall_spf_entity",
       "type": "select",
       "label": "Overall seasonal performance",
-      "default": "sensor.e3_vitocal_17_saisonale_arbeitszahl",
+      "default": "",
       "choices_from": "sensor",
       "advanced": true
     },

@@ -184,16 +184,57 @@ class HeatPumpSmokeTests(unittest.TestCase):
         client = (PLUGIN_DIR / "client.js").read_text(encoding="utf-8")
         self.assertEqual(manifest["name"], "Home Assistant, Heat Pump")
         self.assertEqual(manifest["supports"]["sizes"], ["xs", "sm", "md", "lg"])
+        fragments = {fragment["id"]: fragment for fragment in manifest["fragments"]}
+        self.assertEqual(
+            set(fragments),
+            {
+                "full",
+                "compressor",
+                "heating",
+                "hot_water",
+                "current_power",
+                "total_energy",
+                "heating_energy",
+                "hot_water_energy",
+            },
+        )
+        self.assertIn('ctx?.fragment || ctx?.cell?.fragment || "full"', client)
+        self.assertIn("compressor: heroMarkup", client)
+        self.assertNotIn(
+            '"id": "temperatures"', (PLUGIN_DIR / "plugin.json").read_text(encoding="utf-8")
+        )
+        self.assertIn("current_power: powerMarkup", client)
+        self.assertIn("total_energy: energyCards.total", client)
+        self.assertIn("heating_energy: energyCards.heating", client)
+        self.assertIn("hot_water_energy: energyCards.water", client)
+        self.assertIn('${fragmentBody ?? ""}', client)
+        self.assertNotIn("${fragmentBody ?? fullMarkup}", client)
+        self.assertIn(".hp-fragment-current_power .hp-current-power { display: flex; }", client)
+        self.assertIn("options.show_yesterday !== false", client)
+        self.assertIn("energyReading(label, current, yesterday, index, t, showYesterday)", client)
+        self.assertIn("options.show_temperature_gauge === true", client)
+        self.assertIn('fragment === "heating" && showTemperatureGauge', client)
+        self.assertIn('fragment === "hot_water" && showTemperatureGauge', client)
+        self.assertIn(".hp-fragment-heating .hp-temperature-gauge,", client)
         options = {option["name"]: option["default"] for option in manifest["cell_options"]}
-        self.assertEqual(options["flow_entity"], "sensor.e3_vitocal_17_vorlauftemperatur")
+        for entity_option in (
+            "compressor_entity",
+            "flow_entity",
+            "hot_water_temperature_entity",
+            "power_entity",
+            "heating_entity",
+            "hot_water_entity",
+            "daily_energy_entity",
+            "heating_energy_entity",
+            "hot_water_energy_entity",
+            "overall_spf_entity",
+        ):
+            self.assertEqual(options[entity_option], "")
         self.assertTrue(options["show_heating"])
         self.assertTrue(options["show_hot_water"])
+        self.assertTrue(options["show_yesterday"])
+        self.assertFalse(options["show_temperature_gauge"])
         self.assertNotIn("return_entity", options)
-        self.assertEqual(options["heating_entity"], "climate.e3_vitocal_17_heizung")
-        self.assertEqual(options["hot_water_entity"], "water_heater.e3_vitocal_17_warmwasser")
-        self.assertEqual(
-            options["overall_spf_entity"], "sensor.e3_vitocal_17_saisonale_arbeitszahl"
-        )
         self.assertIn("ctx?.cell?.size", client)
         self.assertIn('class="w-body status-body hp-body"', client)
         self.assertIn("status-hero hp-hero", client)
@@ -255,8 +296,8 @@ class HeatPumpSmokeTests(unittest.TestCase):
         self.assertIn(".hp-lg .hp-energy-details", client)
         self.assertIn('role="meter" aria-label="${escapeHtml(label)}"', client)
         self.assertIn(".hp-lg .hp-temperature-gauge { display: flex; }", client)
-        self.assertIn('size === "lg" ? temperatureGauge(heating', client)
-        self.assertIn('size === "lg" ? temperatureGauge(hotWater', client)
+        self.assertIn('size === "lg" || (fragment === "heating" && showTemperatureGauge)', client)
+        self.assertIn('size === "lg" || (fragment === "hot_water" && showTemperatureGauge)', client)
         self.assertIn("const max = fahrenheit ? 176 : 80;", client)
         self.assertIn(
             ".hp-md .hp-reading-top { align-items: flex-start; flex-direction: column; }", client
