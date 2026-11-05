@@ -74,7 +74,6 @@
   {# ================= SUMMARY RAIL ================= #}
   <aside class="dx-rail" id="overview" aria-label="Summary">
     <header class="dx-rail-head">
-      <span class="dx-rail-icon" aria-hidden="true"><i class="ph ph-{{ section.icon or 'device-mobile' }}" data-device-head-icon></i></span>
       <div class="dx-rail-titles">
         <h1 class="dx-rail-name" data-device-head-name>{{ _name }}</h1>
         <div class="dx-rail-meta">
@@ -88,11 +87,9 @@
     {{ rail_now(section) }}
     {{ rail_vitals(section) }}
 
-    {% set env = section.status.tiles.environment %}
     {% set mo = section.mode_observation %}
-    {% if env or (mo and mo.mode != 'bluetooth') %}
+    {% if mo and mo.mode != 'bluetooth' %}
     <p class="dx-rail-aside">
-      {%- if env %}<span>{{ env.value }}{% if env.sub %} · {{ env.sub }}{% endif %} at the display</span>{% endif %}
       {%- if mo and mo.mode != 'bluetooth' %}<span class="dx-mode-observation" data-device-mode-observation>Phone last confirmed {{ mo.label }} · <time datetime="{{ mo.observed_at }}">{{ mo.observed_label }}</time></span>{% endif -%}
     </p>
     {% endif %}
@@ -551,13 +548,6 @@
               <span class="tg-count">{{ _ota.phase }}{% if _ota.target_fw %} {{ _ota.target_fw if _ota.target_fw.startswith('v') else 'v' ~ _ota.target_fw }}{% endif %}{% if _ota.reason and _ota.pill_class == 'is-danger' %} ({{ _ota.reason }}){% endif %}</span>
             </span>
             {% endif %}
-            <span class="dx-grp-end">
-              {% if _fw and _fw.state == 'outdated' and _fw.latest and _fw.release_url %}
-              <a class="dx-link-btn" href="{{ _fw.release_url }}" target="_blank" rel="noopener" title="Release notes for v{{ _fw.latest }} on GitHub">Release notes</a>
-              {% endif %}
-              <a class="dx-btn is-sm" href="{{ url_for('auth.firmware_index') }}" data-firmware-page-link
-                 title="Firmware versions and rollouts for every display"><i class="ph ph-cpu" aria-hidden="true"></i><span>Firmware page</span></a>
-            </span>
           </div>
 
           {% for band in [section.opendisplay_setup, vs] if band and not band.ok %}
@@ -591,25 +581,6 @@
           </dl>
 
           {% if sign %}
-          {#- What the bound sign can be asked to do (devices_visionect_action;
-              only while it is connected). -#}
-          <div class="dx-frame-actions">
-            {% if sign.note %}<span class="dx-help">{{ sign.note }}</span>
-            {% elif not sign.connected %}<span class="dx-help">The frame takes these while it's connected.</span>{% endif %}
-            <span class="dx-btn-row">
-              {% for action, icon, label, title in [
-                  ('refresh', 'arrows-clockwise', 'Full refresh', 'Repaint the picture it shows from scratch, to clear ghosting'),
-                  ('reboot', 'power', 'Reboot', 'Restart the frame; it reconnects in a minute or two'),
-                  ('status', 'heartbeat', 'Report in', 'Ask the frame for its battery, signal and state now')] %}
-              <form method="post" action="{{ url_for('auth.devices_visionect_action', instance_id=section.device_id, action=action) }}"
-                    {% if action == 'reboot' %}onsubmit="return confirm('Reboot the frame? It reconnects in a minute or two and then gets the latest picture.');"{% endif %}>
-                <button type="submit" class="dx-btn is-sm" title="{{ title }}"{% if not sign.connected %} disabled{% endif %}>
-                  <i class="ph ph-{{ icon }}" aria-hidden="true"></i><span>{{ label }}</span>
-                </button>
-              </form>
-              {% endfor %}
-            </span>
-          </div>
           {% if sign.error %}
           <div class="dx-band is-warn"><i class="ph ph-warning" aria-hidden="true"></i><div class="dx-band-text"><p>{{ sign.error }}</p></div></div>
           {% endif %}
@@ -805,6 +776,33 @@
           {% endif %}
         </div>
         {% endif %}
+        {#- The section's actions, together at its foot: the Firmware page for every
+            display, and what a bound Visionect sign can be asked to do
+            (devices_visionect_action; only while it is connected). -#}
+        <div class="dx-sec-foot">
+          {% if sign and sign.note %}<span class="dx-help">{{ sign.note }}</span>
+          {% elif sign and not sign.connected %}<span class="dx-help">The frame takes these while it's connected.</span>{% endif %}
+          {% if _fw and _fw.state == 'outdated' and _fw.latest and _fw.release_url %}
+          <a class="dx-link-btn" href="{{ _fw.release_url }}" target="_blank" rel="noopener" title="Release notes for v{{ _fw.latest }} on GitHub">Release notes</a>
+          {% endif %}
+          <span class="dx-btn-row">
+            <a class="dx-btn is-sm" href="{{ url_for('auth.firmware_index') }}" data-firmware-page-link
+               title="Firmware versions and rollouts for every display"><i class="ph ph-cpu" aria-hidden="true"></i><span>Firmware page</span></a>
+            {% if sign %}
+              {% for action, icon, label, title in [
+                  ('refresh', 'arrows-clockwise', 'Full refresh', 'Repaint the picture it shows from scratch, to clear ghosting'),
+                  ('reboot', 'power', 'Reboot', 'Restart the frame; it reconnects in a minute or two'),
+                  ('status', 'heartbeat', 'Report in', 'Ask the frame for its battery, signal and state now')] %}
+              <form method="post" action="{{ url_for('auth.devices_visionect_action', instance_id=section.device_id, action=action) }}"
+                    {% if action == 'reboot' %}onsubmit="return confirm('Reboot the frame? It reconnects in a minute or two and then gets the latest picture.');"{% endif %}>
+                <button type="submit" class="dx-btn is-sm" title="{{ title }}"{% if not sign.connected %} disabled{% endif %}>
+                  <i class="ph ph-{{ icon }}" aria-hidden="true"></i><span>{{ label }}</span>
+                </button>
+              </form>
+              {% endfor %}
+            {% endif %}
+          </span>
+        </div>
       </div>
     </section>
 

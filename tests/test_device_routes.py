@@ -65,7 +65,7 @@ def test_device_section_renders_with_no_heartbeat(app: Flask) -> None:
     # ESP32 instance inherits its kind's config_topic, so the sleep
     # interval form lives on its device page.
     esp = client.get("/settings/devices/esp32_lab").get_data(as_text=True)
-    assert "no heartbeat" in esp
+    assert "No heartbeat" in esp
     assert "Sleep interval" in esp
     assert 'name="sleep_interval_s"' in esp
     # The Pi instance has its own page too.

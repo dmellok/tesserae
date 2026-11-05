@@ -135,6 +135,27 @@
     color: var(--t-fg);
     font-weight: 600;
   }
+  /* Settings > Devices: every device by name, for quick switching. */
+  :root[data-ui="paper"] .topnav .nav-subdevices {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin: 2px 0 4px 18px;
+    padding-left: 8px;
+    border-left: 1px solid var(--t-border);
+  }
+  :root[data-ui="paper"] .topnav .nav-subdevice {
+    padding: 5px 8px;
+    font-size: 12px;
+    color: var(--t-fg-soft);
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  :root[data-ui="paper"] .topnav .nav-subdevice:hover { background: var(--p-hover); color: var(--t-fg); }
+  :root[data-ui="paper"] .topnav .nav-subdevice.is-active { color: var(--t-fg); font-weight: 600; background: var(--p-hover); }
+  :root[data-ui="paper"].sidebar-collapsed .topnav .nav-subdevices { display: none; }
 
   /* Everything after the nav (update badge, new devices, batteries,
      opt-in, restart, theme) collects at the sidebar foot. */

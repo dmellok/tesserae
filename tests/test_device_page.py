@@ -283,7 +283,7 @@ def test_display_fields_are_compact_rows_with_their_actions(app: Flask) -> None:
 def test_rail_vitals_link_to_the_settings_behind_them(app: Flask) -> None:
     client, dev = _full_device(app)
     rail = _rail_html(client.get(f"/settings/devices/{dev}").get_data(as_text=True))
-    assert re.search(r'<a class="dx-now" href="#lineups"', rail)
+    assert re.search(r'<a class="dx-now-link" href="#lineups"', rail)
     for label, anchor in (
         ("Battery", "#power"),
         ("Next update", "#timing"),
@@ -511,7 +511,7 @@ def test_push_now_without_a_page_explains_itself(app: Flask) -> None:
 
 
 def test_connection_chips_link_to_the_firmware_page(app: Flask, monkeypatch) -> None:
-    """The Connection header always offers the Firmware page; a newer build
+    """Troubleshooting's foot always offers the Firmware page; a newer build
     makes the "available" pill go there too, with the GitHub release one
     step away as release notes (#280)."""
     from app.firmware_check import FirmwareInfo
@@ -548,11 +548,10 @@ def test_connection_chips_link_to_the_firmware_page(app: Flask, monkeypatch) -> 
         r'<span>Firmware v1.40.0 available</span><a href="/settings/firmware" title="Faster wakes',
         rail,
     )
-    # The Connection head keeps the release notes, left of the Firmware page.
-    conn = body[body.index('id="connection"') :]
-    head = conn[: conn.index('class="dx-kv"')]
-    assert 'href="https://github.com/example/firmware/releases/tag/v1.40.0"' in head
-    assert head.index("Release notes") < head.index("Firmware page")
+    # The section's foot keeps the release notes, left of the Firmware page.
+    foot = body[body.index('class="dx-sec-foot"') :]
+    assert 'href="https://github.com/example/firmware/releases/tag/v1.40.0"' in foot
+    assert foot.index("Release notes") < foot.index("Firmware page")
 
 
 @pytest.mark.parametrize("source", ["ios_ble", "android_ble"])
@@ -726,3 +725,13 @@ def test_every_thumbnail_style_fits_instead_of_cropping() -> None:
     assert re.search(
         r'\.dx-dash-thumb\[style\*="--thumb-r"\] img\s*{[^}]*object-fit: contain', dashboards
     )
+
+
+def test_the_firmware_vital_has_no_update_tag_without_an_update(app: Flask) -> None:
+    """``firmware.update`` would be the dict's own method in a template, which
+    is always true: the tag was on every device."""
+    client = app.test_client()
+    _sign_in(client)
+    dev = _add(client)
+    rail = _rail_html(client.get(f"/settings/devices/{dev}").get_data(as_text=True))
+    assert "dx-v-badge" not in rail

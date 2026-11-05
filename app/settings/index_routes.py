@@ -1574,6 +1574,25 @@ def _now_line_for(device_id: str) -> dict[str, Any] | None:
         key=lambda lu: lu.next_run.epoch if lu.next_run is not None else 0.0,
     )
     nxt = coming[0] if coming else None
+    # The little "next" thumbnail in the rail: the live lineup's next step, else
+    # the first step of the next lineup to run.
+    next_step = next((s for s in live.steps if s.next), None) if live is not None else None
+    next_when = ""
+    if next_step is not None and display is not None and display.next_update is not None:
+        next_when = display.next_update.at_label
+    if next_step is None and nxt is not None and nxt.steps:
+        next_step = nxt.steps[0]
+        next_when = nxt.next_run.main if nxt.next_run is not None else ""
+    upcoming: dict[str, Any] = (
+        {
+            "next_thumb": next_step.thumb_url,
+            "next_name": next_step.name,
+            "next_when": next_when,
+            "next_url": url,
+        }
+        if next_step is not None and next_step.thumb_url
+        else {}
+    )
     if live is not None:
         parts: list[str] = []
         window = live.window
@@ -1587,9 +1606,10 @@ def _now_line_for(device_id: str) -> dict[str, Any] | None:
             "name": live.name,
             "meta": " · ".join(parts),
             "url": url_for("decks.index", hl=live.id) + f"#display-{device_id}",
+            **upcoming,
         }
     meta = f"next {nxt.name} {nxt.next_run.main}" if nxt and nxt.next_run else ""
-    return {"state": "idle", "name": "Nothing running", "meta": meta, "url": url}
+    return {"state": "idle", "name": "Nothing running", "meta": meta, "url": url, **upcoming}
 
 
 def _battery_card_or_none(device_id: str) -> dict[str, Any] | None:

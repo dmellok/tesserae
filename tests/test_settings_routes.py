@@ -1313,7 +1313,7 @@ def test_device_card_renders_humanized_status_tiles(app_with_gate: Flask) -> Non
     assert "Signal" in body
     assert "Battery" in body
     assert "Firmware" in body
-    assert "at the display" in body  # the environment line under the vitals
+    assert ">Environment</span>" in body  # the environment tile in the rail
     # Humanized signal label + dBm sub-line.
     assert "Good" in body
     assert "-64 dBm" in body

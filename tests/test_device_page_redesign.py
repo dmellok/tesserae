@@ -122,9 +122,9 @@ def test_rail_summarises_identity_what_is_on_and_vitals(seeded: Any) -> None:
     assert "Pico BIN client" in rail and ">REST</span>" in rail
     assert 'data-render-sync="thumb:kitchen"' in rail and "Evening agenda" in rail
     labels = re.findall(r'<span class="dx-vital-k">([^<]+)</span>', rail)
-    assert labels == ["Battery", "Next update", "Signal", "Firmware", "Checked in"]
-    assert "76%" in rail and 'title="3980 mV"' in rail  # mV in the tooltip only
-    assert "20.4 °C · 48% RH at the display" in rail  # environment: one muted line
+    assert labels == ["Battery", "Next update", "Firmware", "Signal", "Environment", "Checked in"]
+    assert "76%" in rail and "3980 mV" in rail
+    assert "dx-rail-icon" not in rail
     # The vital signs and the call-outs follow a push without a reload.
     assert 'data-render-sync="tiles:kitchen"' in rail
     assert 'data-render-sync="callouts:kitchen"' in rail

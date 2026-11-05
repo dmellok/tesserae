@@ -347,6 +347,14 @@
           <a class="nav-dropdown-link{% if slug == settings_nav_current %} is-active{% endif %}" href="{{ href }}"{% if slug == settings_nav_current %} aria-current="page"{% endif %}>
             <i class="ph ph-{{ ic }}" aria-hidden="true"></i>{{ label }}
           </a>
+          {%- if slug == 'devices' and settings_nav_current == 'devices' and nav_devices %}
+          <div class="nav-subdevices">
+            {% set _here_device = (request.view_args or {}).get('instance_id') if request is defined else none %}
+            {% for dev in nav_devices %}
+            <a class="nav-subdevice{% if dev.id == _here_device %} is-active{% endif %}" href="{{ url_for('auth.device_page', instance_id=dev.id) }}"{% if dev.id == _here_device %} aria-current="page"{% endif %}>{{ dev.name }}</a>
+            {% endfor %}
+          </div>
+          {%- endif %}
           {% endfor %}
         </div>
       </details>

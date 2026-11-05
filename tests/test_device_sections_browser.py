@@ -274,7 +274,7 @@ def test_rail_vitals_jump_to_their_sections(browser: Any, base_url: str) -> None
         assert _expanded(pg, section), label
         pg.click(f"#{section} [data-collapsible-toggle]")
     # What is on now links to the lineups.
-    pg.click("#overview a.dx-now")
+    pg.click("#overview a.dx-now-link")
     pg.wait_for_function("() => !document.getElementById('schedule-body').hidden")
 
 
