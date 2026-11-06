@@ -181,7 +181,9 @@ class LineupInput:
     end: str | None = None
     interval_minutes: int = 0
     runtime: RuntimeStep | None = None
-    playing: bool = False  # a by-hand deck the display is on right now
+    #: the display was last driven by this lineup and nothing has been sent by hand since
+    #: (a by-hand deck it is on, or a step pushed from the page, even on another day)
+    playing: bool = False
     urls: LineupUrls = field(default_factory=LineupUrls)
     priority: int = 0  # wins a tie with another lineup due at the same moment
     last_fired: float | None = None  # epoch of an interval lineup's last fire
@@ -2314,7 +2316,7 @@ def _lineup_view(
     status: LineupStatus
     if not lineup.enabled:
         status, status_label = "off", "Off"
-    elif live or (lineup.kind == "manual" and lineup.playing):
+    elif live or lineup.playing:
         status, status_label = "live", "Live"
     elif later:
         status, status_label = "later_today", "Later today"
