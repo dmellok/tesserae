@@ -149,19 +149,22 @@ def index() -> str:
         for device_id in ordered:
             device = devices.get(device_id)
             mv_off, pct_off = get_offset(device.manifest) if device is not None else (0, 0)
-            cards.append(
-                build_battery_chart(
-                    device_id,
-                    history=store,
-                    window_hours=DEFAULT_WINDOW_HOURS,
-                    name=names.get(device_id, device_id),
-                    current=current.get(device_id),
-                    mv_offset=mv_off,
-                    pct_offset=pct_off,
-                    events=wake_events.get(device_id, WakeEvents()),
-                    **app_chart_options(current_app.config, device, names=names_by_lineup),
-                )
+            card = build_battery_chart(
+                device_id,
+                history=store,
+                window_hours=DEFAULT_WINDOW_HOURS,
+                name=names.get(device_id, device_id),
+                current=current.get(device_id),
+                mv_offset=mv_off,
+                pct_offset=pct_off,
+                events=wake_events.get(device_id, WakeEvents()),
+                **app_chart_options(current_app.config, device, names=names_by_lineup),
             )
+            # A gear to the device's settings, only for a device in the registry.
+            card["settings_url"] = (
+                url_for("auth.device_page", instance_id=device_id) if device is not None else None
+            )
+            cards.append(card)
     return render_template(
         "device_battery.html",
         cards=cards,

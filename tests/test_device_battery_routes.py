@@ -587,3 +587,30 @@ def test_clear_history_link_is_in_the_card_header_and_keeps_its_confirm(app: Fla
     head = body[body.index('class="dx-battery-head"') : body.index("dx-battery-chartbox")]
     assert "Clear battery history" in head and "return confirm(" in head
     assert 'action="/devices/battery/attic/clear"' in head
+
+
+def test_each_card_has_a_gear_to_its_device_settings(app: Flask) -> None:
+    client = _seeded(app)
+    body = client.get("/devices/battery").get_data(as_text=True)
+    assert 'class="dx-battery-gear" href="/settings/devices/attic"' in body
+    assert 'aria-label="Open settings for ' in body and 'title="Open settings for ' in body
+    assert '<i class="ph ph-gear" aria-hidden="true"></i>' in body
+
+
+def test_a_card_without_a_registered_device_gets_no_gear(app: Flask) -> None:
+    """The page only builds cards for registered devices, so render the template
+    with a card that carries no settings link (what a device with no registry
+    entry would get)."""
+    from flask import render_template
+
+    from app.device_battery_routes import device_card
+
+    _seeded(app)
+    with app.test_request_context("/devices/battery"):
+        card = device_card("attic")
+        assert card is not None and "settings_url" not in card
+        html = render_template("device_battery.html", cards=[card], now_ms=0)
+        assert "dx-battery-gear" not in html and "Open settings for" not in html
+        card["settings_url"] = "/settings/devices/attic"
+        html = render_template("device_battery.html", cards=[card], now_ms=0)
+        assert 'href="/settings/devices/attic"' in html

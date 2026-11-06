@@ -46,6 +46,47 @@
   color: var(--t-fg);
   letter-spacing: -0.005em;
 }
+.dx-battery-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+/* The settings gear shows on hover (mouse), when something in the title row has
+   keyboard focus, and always on touch screens, where there is no hover. */
+.dx-battery-gear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--t-muted);
+  font-size: 15px;
+  text-decoration: none;
+  opacity: 0;
+  transition:
+    opacity 0.12s ease,
+    color 0.12s ease;
+}
+.dx-battery-name:hover .dx-battery-gear,
+.dx-battery-name:has(:focus-visible) .dx-battery-gear,
+.dx-battery-gear:focus-visible {
+  opacity: 1;
+}
+.dx-battery-gear:hover {
+  color: var(--t-fg);
+}
+.dx-battery-gear:focus-visible {
+  outline: 2px solid var(--t-accent);
+  outline-offset: 1px;
+}
+@media (hover: none) {
+  .dx-battery-gear {
+    opacity: 1;
+  }
+}
 .dx-battery-id {
   font-family: var(--t-font-mono);
   font-size: 11px;

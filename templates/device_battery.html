@@ -52,7 +52,13 @@
              data-sort-empty="{{ c.prediction.days_to_empty if c.prediction and c.prediction.days_to_empty is not none else '' }}">
       <header class="dx-battery-head">
         <div class="dx-battery-name">
-          <h4>{{ c.name }}</h4>
+          <div class="dx-battery-title">
+            <h4>{{ c.name }}</h4>
+            {% if c.settings_url %}
+            <a class="dx-battery-gear" href="{{ c.settings_url }}"
+               aria-label="Open settings for {{ c.name }}" title="Open settings for {{ c.name }}"><i class="ph ph-gear" aria-hidden="true"></i></a>
+            {% endif %}
+          </div>
           {% if show_id %}<code class="dx-battery-id">{{ c.id }}</code>{% endif %}
         </div>
         <div class="dx-battery-side">
