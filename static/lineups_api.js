@@ -76,13 +76,27 @@
     },
     /** POST /decks/<id>/push-step {index, composition_digest, display_id?}: push one step now.
         Replies {lands: "lands now" | "lands ~18:18", message, fresh}. */
-    pushStep(lineup, step, displayId) {
+    pushStep(lineup, step, displayId, itemKey) {
       const url =
         (lineup.actions && lineup.actions.push_step_url) ||
         `${PREFIX}/decks/${encodeURIComponent(lineup.id)}/push-step`;
-      const body = { index: step.index, composition_digest: step.composition_digest || null };
+      // A chosen item is sent as drawn for that item (no earlier composition applies).
+      const body = itemKey
+        ? { index: step.index, item: itemKey }
+        : { index: step.index, composition_digest: step.composition_digest || null };
       if (displayId) body.display_id = displayId;
       return send("POST", url, body);
+    },
+    /** GET /decks/<id>/step-item?index&item&display_id: the step drawn with one item chosen.
+        Replies {state: "ready", thumb_url, large_url} or, while it is being drawn, 202
+        {state: "pending"} (ask again); 503 {state: "busy"} when too many are waiting. */
+    stepItem(lineup, step, displayId, itemKey) {
+      const base =
+        (lineup.actions && lineup.actions.step_item_url) ||
+        `${PREFIX}/decks/${encodeURIComponent(lineup.id)}/step-item`;
+      const q = new URLSearchParams({ index: String(step.index), item: itemKey });
+      if (displayId) q.set("display_id", displayId);
+      return send("GET", `${base}?${q}`);
     },
   };
 })();

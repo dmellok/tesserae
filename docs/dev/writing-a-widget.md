@@ -212,6 +212,25 @@ before any code, using the template in
 size, an icon manifest, a tone-rules table. It front-loads the layout decisions
 and makes the build pass cleaner.
 
+## Lineups arrows (optional)
+
+A widget that walks a list can let the Lineups page step through its items.
+Declare how in `plugin.json`:
+
+```json
+"lineups": { "pin_option": "paper" }
+```
+
+and give `server.py` a `lineup_items(options)` returning `[{"key": ..., "label": ...}]`.
+The page then renders the dashboard with `options["paper"]` set to the chosen key,
+and Push now sends exactly that picture. For a widget that cannot name its items
+but looks different on every render, declare `"lineups": { "draw": true }`
+instead: the arrows draw the dashboard again, and the host sets a sequential
+`mode` to `random` for those renders so browsing never moves your cursor. A
+drawing render also carries hidden options `_draw` (a token) and `_browse`
+(how many turns past the current one, for a widget that keeps its own turn:
+show that turn and move nothing).
+
 ## Submitting
 
 You have two paths, pick the one that matches your widget's audience:

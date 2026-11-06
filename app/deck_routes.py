@@ -14,6 +14,7 @@ import json
 import math
 import re
 import time
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta, tzinfo
 from pathlib import Path
 from typing import Any, Literal, cast
@@ -48,7 +49,6 @@ from app.lineups_view import (
     DashboardInfo,
     DisplayInput,
     FrameInput,
-    ItemInfo,
     LineupInput,
     LineupKind,
     LineupsView,
@@ -72,6 +72,8 @@ from app.next_update import DeviceTiming, reach_for_device, tracks_held_frame
 from app.state.deck_model import Deck, DeckPage
 from app.state.deck_store import DeckStore
 from app.state.page_store import PageStore
+from app.step_items import step_draws as _step_draws
+from app.step_items import step_items as _step_items
 
 bp = Blueprint("decks", __name__, url_prefix="/decks")
 
@@ -1079,10 +1081,6 @@ def _fold_by_default(groups: list[dict[str, Any]]) -> bool:
 # ``app.lineups_view`` is pure; everything below reads the stores and the
 # live state and turns them into its inputs.
 
-#: Items listed for a multi-item step (a gallery folder): enough for the peek
-#: grid, without walking a folder of thousands of photos into the page.
-MAX_STEP_ITEMS = 60
-
 
 def _lineup_kind(deck: Deck) -> LineupKind:
     if deck.advance == "manual":
@@ -1135,6 +1133,7 @@ def _lineup_input(
             delete=url_for("decks.delete", deck_id=deck.id),
             fire=fire,
             push_step=url_for("decks.push_step", deck_id=deck.id),
+            step_item=url_for("decks.step_item", deck_id=deck.id),
             window=url_for("decks.edit_window", deck_id=deck.id),
             days=url_for("decks.edit_days", deck_id=deck.id),
             bind=url_for("decks.bind_pages", deck_id=deck.id),
@@ -1219,71 +1218,6 @@ def _device_size(device: Any) -> tuple[int, int, str]:
     size = f"{w}×{h}" if w and h else ""
     spec = " · ".join(x for x in (name, size) if x)
     return w, h, spec
-
-
-#: folder -> (stamp, total count, first MAX_STEP_ITEMS names). The stamp is
-#: the folder's mtime (adding or removing a photo changes it), or a one-minute
-#: bucket when the folder path can't be resolved, so a polling page doesn't
-#: list a large folder on every refresh.
-_GALLERY_CACHE: dict[str, tuple[float, int, tuple[str, ...]]] = {}
-
-
-def _gallery_files(module: Any, folder: str) -> tuple[int, tuple[str, ...]] | None:
-    stamp: float = float(int(time.time() // 60))
-    resolve = getattr(module, "_folder_path", None)
-    data_dir = getattr(module, "_data_dir", None)
-    if callable(resolve) and callable(data_dir):
-        try:
-            path = resolve(folder, data_dir())
-            if path is not None:
-                stamp = -float(path.stat().st_mtime_ns)
-        except Exception:
-            pass
-    cached = _GALLERY_CACHE.get(folder)
-    if cached is not None and cached[0] == stamp:
-        return cached[1], cached[2]
-    lister = getattr(module, "list_folder_files", None)
-    if not callable(lister):
-        return None
-    try:
-        files = [str(f) for f in lister(folder)]
-    except Exception:
-        return None
-    entry = (stamp, len(files), tuple(files[:MAX_STEP_ITEMS]))
-    _GALLERY_CACHE[folder] = entry
-    return entry[1], entry[2]
-
-
-def _step_items(page: Any) -> tuple[int, tuple[ItemInfo, ...]]:
-    """Items a dashboard shows one per visit: a page whose only widget with
-    a source is a Picture Gallery cell walks that folder's photos. Anything
-    else is one item."""
-    cells = [c for c in getattr(page, "cells", []) or [] if getattr(c, "plugin", None)]
-    galleries = [c for c in cells if c.plugin == "picture_gallery"]
-    if len(galleries) != 1:
-        return 1, ()
-    folder = str(galleries[0].options.get("folder") or "")
-    reg = current_app.config.get("PLUGIN_REGISTRY")
-    plugin = reg.get("picture_gallery") if reg is not None else None
-    module = getattr(plugin, "server_module", None) if plugin is not None else None
-    listed = _gallery_files(module, folder) if module is not None else None
-    if listed is None or listed[0] <= 1:
-        return 1, ()
-    count, names = listed
-    version = getattr(module, "thumb_version", None)
-    items: list[ItemInfo] = []
-    for i, name in enumerate(names):
-        try:
-            thumb = url_for(
-                "picture_gallery_admin.serve_thumbnail",
-                folder=folder or "_root",
-                filename=name,
-                v=str(version(folder, name)) if callable(version) else None,
-            )
-        except Exception:
-            thumb = ""
-        items.append(ItemInfo(i, name, thumb))
-    return count, tuple(items)
 
 
 def _upcoming_inputs(device: Any, now_utc: datetime) -> tuple[UpcomingInput, ...] | None:
@@ -1475,6 +1409,7 @@ def _build_lineups_view(
             height=h,
             item_count=count,
             items=items,
+            draw=_step_draws(page) if page is not None else False,
         )
 
     by_display: dict[str, list[LineupInput]] = {d.id: [] for d in devices}
@@ -2171,11 +2106,145 @@ def save_edits() -> Response:
     return _apply_edits(edits, _body_view_day(body, day_alias=True), require_on=True)
 
 
+@dataclass(frozen=True)
+class _ItemRender:
+    """Where one dashboard item's render for one display lives, and how to
+    make it: the cache file, the panel size it is drawn at and the extra
+    compose query that pins the item and names the display."""
+
+    cache_key: str
+    path: Path
+    width: int
+    height: int
+    query: str
+
+
+def _item_render(page: Any, display_id: str, item: Any) -> _ItemRender | None:
+    """The render of ``page`` pinned to ``item`` at ``display_id``'s own panel
+    size, or None when the display or its panel is unknown. The file name
+    carries the page's look, the item's version and the size, so an edit, a new
+    edition or a replaced photo draws afresh and nothing stale is reused."""
+    import hashlib
+    import urllib.parse
+
+    from app.composer import clamp_screenshot_dim, page_preview_token
+    from app.panel import device_panel
+
+    devices_reg = current_app.config.get("DEVICE_REGISTRY")
+    device = devices_reg.devices.get(display_id) if devices_reg is not None else None
+    panel = device_panel(device) if device is not None else None
+    if panel is None:
+        return None
+    width, height = clamp_screenshot_dim(int(panel.w)), clamp_screenshot_dim(int(panel.h))
+    token = page_preview_token(page, (width, height))
+    who = hashlib.sha256(f"{display_id}|{item.key}".encode()).hexdigest()
+    look = hashlib.sha256(
+        f"{token}|{display_id}|{item.key}|{item.version}|{width}x{height}".encode()
+    ).hexdigest()
+    cache_key = f"{page.id}-i{who[:10]}__{look[:16]}"
+    path = Path(current_app.config["DATA_ROOT"]) / "core" / "previews" / f"{cache_key}.png"
+    query = f"&device_id={urllib.parse.quote(display_id)}&item={urllib.parse.quote(item.key)}"
+    return _ItemRender(cache_key, path, width, height, query)
+
+
+def _submit_item_render(page: Any, render: _ItemRender) -> None:
+    from app import preview_cache
+    from app.composer import _preview_timezone_id
+
+    preview_cache.submit(
+        key=render.cache_key,
+        base_url=request.host_url.rstrip("/"),
+        page_id=page.id,
+        width=render.width,
+        height=render.height,
+        cache_path=render.path,
+        pool=current_app.config.get("BROWSER_POOL"),
+        timezone_id=_preview_timezone_id(),
+        query=render.query,
+    )
+
+
+@bp.get("/<deck_id>/step-item")
+def step_item(deck_id: str) -> Response:
+    """The preview of one lineup step with one of its items chosen: query
+    ``index`` (or ``page_id``), ``item`` (a key from the view's step items) and
+    ``display_id``. It is the dashboard drawn at that display's panel size with
+    the item pinned, the same render a push of that item sends. Never blocks on
+    a render: ``{"state": "ready", thumb_url, large_url, label}`` when it is
+    drawn, 202 ``{"state": "pending"}`` once queued (ask again), 503
+    ``{"state": "busy"}`` when too many are waiting."""
+    from app import preview_cache
+    from app.lineup_thumbs import _EXT
+
+    def fail(message: str, status: int) -> Response:
+        resp = jsonify({"ok": False, "error": message})
+        resp.status_code = status
+        return resp
+
+    deck = _store().get(deck_id)
+    if deck is None:
+        return fail(f"No lineup with id {deck_id!r}.", 404)
+    page_id = request.args.get("page_id") or ""
+    if not page_id:
+        raw = request.args.get("index", "")
+        if not raw.isdigit() or int(raw) >= len(deck.pages):
+            return fail("Send a step index or page_id.", 400)
+        page_id = deck.pages[int(raw)].page_id
+    elif page_id not in deck.page_ids:
+        return fail("That dashboard isn't in this lineup.", 400)
+    page = _pages().get(page_id)
+    if page is None:
+        return fail("That dashboard was deleted.", 404)
+    page_devices = {p.id: list(p.device_ids) for p in _pages().list()}
+    display_id = request.args.get("display_id") or ""
+    if display_id not in _deck_displays(deck, page_devices):
+        return fail("This lineup doesn't play on that display.", 400)
+    from app.step_items import find_item
+
+    item = find_item(page, request.args.get("item") or "")
+    if item is None:
+        return fail("That item isn't in this dashboard.", 404)
+    render = _item_render(page, display_id, item)
+    if render is None:
+        return fail("That display's panel is unknown.", 400)
+    if render.path.is_file():
+        import hashlib
+
+        base = url_for("composer.lineup_thumbnail", kind="draft", key=render.cache_key, ext=_EXT)
+        return jsonify(
+            {
+                "ok": True,
+                "state": "ready",
+                "item": item.key,
+                "label": item.label,
+                "thumb_url": base,
+                "large_url": f"{base}?lg=1",
+                # Lets the page tell when a draw came out the same as one before.
+                "sig": hashlib.sha256(render.path.read_bytes()).hexdigest()[:16],
+            }
+        )
+    if not preview_cache.is_pending(render.path) and (
+        preview_cache.backlog() >= preview_cache.ITEM_BACKLOG_MAX
+    ):
+        resp = jsonify({"ok": True, "state": "busy"})
+        resp.status_code = 503
+        resp.headers["Retry-After"] = "5"
+        return resp
+    _submit_item_render(page, render)
+    resp = jsonify({"ok": True, "state": "pending", "item": item.key})
+    resp.status_code = 202
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
 @bp.post("/<deck_id>/push-step")
 def push_step(deck_id: str) -> Response:
     """Push one dashboard of a lineup to its display now (the step tile's
     "Push now"). JSON ``{"index": n}`` or ``{"page_id": id}``, optional
-    ``composition_digest`` pins the shown upright composition, and optional
+    ``composition_digest`` pins the shown upright composition, optional
+    ``item`` (a key from the step's items) sends that item of a multi-item
+    dashboard instead: the dashboard drawn with the item pinned, at each
+    target's panel size, as ``step-item`` previews it. Optional
     ``display_id`` (else every display the lineup lands on). Same path and
     rules as a manual send from the Send page: force-published, no
     coalescing, not held by quiet hours. The lineup's own schedule is not
@@ -2210,6 +2279,11 @@ def push_step(deck_id: str) -> Response:
     for key in ("page_id", "display_id"):
         if body.get(key) is not None and not isinstance(body[key], str):
             return fail(_EditError(f"{key} must be a string.", 400, deck_id))
+    item_key = body.get("item")
+    if item_key is not None and (not isinstance(item_key, str) or not item_key):
+        return fail(_EditError("item must be a non-empty string.", 400, deck_id))
+    if item_key and digest:
+        return fail(_EditError("Send an item or a composition_digest, not both.", 400, deck_id))
     if "index" in body and body["index"] is not None and not _is_int(body["index"]):
         return fail(_EditError("index must be a whole number.", 400, deck_id))
     deck = _store().get(deck_id)
@@ -2243,6 +2317,29 @@ def push_step(deck_id: str) -> Response:
     page = _pages().get(page_id)
     name = page.name if page is not None else page_id
     composition: bytes | None = None
+    renders: dict[str, _ItemRender] = {}
+    if item_key:
+        from app.step_items import find_item
+
+        chosen = find_item(page, item_key) if page is not None else None
+        if page is None or chosen is None:
+            return fail(_EditError("That item isn't in this dashboard any more.", 409, deck_id))
+        for did in targets:
+            made = _item_render(page, did, chosen)
+            if made is None:
+                return fail(_EditError("That display's panel is unknown.", 400, deck_id))
+            renders[did] = made
+        drawn = chosen.key.startswith("draw:")
+        if drawn and not all(r.path.is_file() for r in renders.values()):
+            # A draw is only ever what the preview showed; drawing it again
+            # would send a different picture.
+            return fail(_EditError("That picture is no longer stored. Draw another.", 409, deck_id))
+        name = page.name if drawn else f"{page.name} ({chosen.label})"
+        item_base_url = request.host_url.rstrip("/")
+        item_pool = current_app.config.get("BROWSER_POOL")
+        from app.composer import _preview_timezone_id
+
+        item_tz = _preview_timezone_id()
     if digest:
         events = current_app.config.get("EVENT_LOG")
         rows = (
@@ -2263,10 +2360,30 @@ def push_step(deck_id: str) -> Response:
             # Read on the request thread so GC cannot evict it between
             # accepting the click and the background send. Never read an artifact.
             composition = (Path(current_app.config["RENDERS_DIR"]) / f"{digest}.png").read_bytes()
-    fresh = composition is None
+    fresh = composition is None and not renders
 
     def send_step() -> None:
-        if composition is None:
+        if renders:
+            from app import preview_cache
+
+            for did, made in renders.items():
+                # The picture the preview showed when it is still on disk;
+                # otherwise drawn the same way now.
+                if not made.path.is_file():
+                    preview_cache.render_now(
+                        base_url=item_base_url,
+                        page_id=page_id,
+                        width=made.width,
+                        height=made.height,
+                        cache_path=made.path,
+                        pool=item_pool,
+                        timezone_id=item_tz,
+                        query=made.query,
+                    )
+                pusher.republish_composition(
+                    made.path.read_bytes(), page_id=page_id, device_ids={did}
+                )
+        elif composition is None:
             pusher.push(page_id, device_ids=set(targets), bypass_coalesce=True, force_publish=True)
         else:
             # History's normal per-device transform handles resizing and

@@ -374,6 +374,20 @@ def fetch(
         }
 
     folder_segment = folder_name if folder_name else ROOT_FOLDER_VALUE
+    # ``file`` is not a manifest option: the Lineups page's per-item Push
+    # (app/step_items.py) pins one photo by name so a render shows exactly
+    # the picture that was chosen. It skips the orientation filter and never
+    # moves the album's cursor.
+    pinned = str(options.get("file") or "")
+    if pinned:
+        match = next((p for p in images if p.name == pinned), None)
+        if match is not None:
+            return {
+                "url": f"/plugins/picture_gallery/folders/{folder_segment}/{match.name}",
+                "filename": match.name,
+                "folder": folder_segment,
+                "count": len(images),
+            }
     orientation = (options.get("orientation") or "any").lower()
     if orientation in ("portrait", "landscape", "square"):
         images = _filter_by_orientation(images, folder_segment, orientation, data_dir)

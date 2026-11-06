@@ -1186,7 +1186,7 @@ def test_display_filter_builds_only_that_display(
 def test_gallery_items_are_cached_by_folder_mtime(
     app: Flask, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import app.deck_routes as routes
+    import app.step_items as routes
     from app.state.page_store import Cell, Page
 
     module = app.config["PLUGIN_REGISTRY"].get("picture_gallery").server_module
@@ -1211,16 +1211,16 @@ def test_gallery_items_are_cached_by_folder_mtime(
         ],
     )
     with app.test_request_context():
-        count, items = routes._step_items(page)
+        count, items = routes.step_items(page)
         assert count == 500 and len(items) == routes.MAX_STEP_ITEMS
-        routes._step_items(page)
+        routes.step_items(page)
         assert calls == ["photos"]
         (folder / "new.jpg").write_bytes(b"x")
         import os
 
         st = folder.stat()
         os.utime(folder, ns=(st.st_atime_ns, st.st_mtime_ns + 1_000_000_000))
-        routes._step_items(page)
+        routes.step_items(page)
         assert calls == ["photos", "photos"]
 
 
@@ -2559,3 +2559,664 @@ def test_link_label_without_a_future_wake_time() -> None:
     assert _link(next_checkin_at=now - 60, gap_s=1200.0, cadence_stable=True).label == (
         "Wakes every 20 min"
     )
+
+
+# ---------------------------------------------------------------------------
+# Choosing an item of a multi-item step (arrows, lightbox, per-item push)
+# ---------------------------------------------------------------------------
+
+
+def test_only_pinnable_items_can_be_chosen() -> None:
+    """Items with a key can be previewed and pushed; the rest (a widget that
+    cannot be pinned) show a count but offer no arrows."""
+    data = sample_view_model().to_dict()
+    steps = {
+        s["dashboard_id"]: s for d in data["displays"] for lu in d["lineups"] for s in lu["steps"]
+    }
+    assert steps["art"]["pick_items"] is True
+    assert steps["art"]["items"][2]["key"] == "art-3.jpg"
+    assert steps["quotes"]["item_count"] == 20 and steps["quotes"]["pick_items"] is False
+    assert steps["family"]["pick_items"] is False
+    dinner = next(lu for d in data["displays"] for lu in d["lineups"] if lu["id"] == "dinner")
+    assert dinner["actions"]["step_item_url"] == "/decks/dinner/step-item"
+
+
+def _gallery_page(app: Flask, names: list[str], monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    import app.step_items as items
+    from app.state.page_store import Cell, Page
+
+    module = app.config["PLUGIN_REGISTRY"].get("picture_gallery").server_module
+    monkeypatch.setattr(module, "list_folder_files", lambda folder: list(names))
+    monkeypatch.setattr(module, "_folder_path", lambda name, data_dir: tmp_path)
+    monkeypatch.setattr(items, "_GALLERY_CACHE", {})
+    page = Page(
+        id="photos",
+        name="Photos",
+        device_ids=["panel"],
+        cells=[
+            Cell(
+                id="c1", plugin="picture_gallery", x=0, y=0, w=10, h=10, options={"folder": "trip"}
+            )
+        ],
+    )
+    app.config["PAGE_STORE"].save(page)
+    return page
+
+
+def test_gallery_items_carry_the_file_name_as_their_key(
+    app: Flask, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from app.step_items import find_item, pin_item, step_choices
+
+    page = _gallery_page(app, ["a.jpg", "b.jpg", "c.jpg"], monkeypatch, tmp_path)
+    with app.test_request_context():
+        found = step_choices(page)
+        assert found is not None and found.option == "file" and found.cell_id == "c1"
+        assert [it.key for it in found.items] == ["a.jpg", "b.jpg", "c.jpg"]
+        assert find_item(page, "b.jpg") is not None and find_item(page, "zzz.jpg") is None
+        pinned = pin_item(page, page.model_dump(mode="json"), "b.jpg")
+        assert pinned is not None and pinned["cells"][0]["options"]["file"] == "b.jpg"
+        assert pinned["cells"][0]["options"]["folder"] == "trip"
+        assert pin_item(page, page.model_dump(mode="json"), "../etc/passwd") is None
+
+
+def _install_widgets(
+    app: Flask, monkeypatch: pytest.MonkeyPatch, **widgets: dict[str, Any]
+) -> None:
+    """Make widgets that are not in this repository look installed: each keyword is a
+    plugin id, its value the ``manifest`` and ``module`` attributes of a stand-in."""
+    from types import SimpleNamespace
+
+    reg = app.config["PLUGIN_REGISTRY"]
+    real = reg.get
+
+    def get(plugin_id: str) -> Any:
+        if plugin_id in widgets:
+            spec = widgets[plugin_id]
+            return SimpleNamespace(
+                manifest=spec.get("manifest", {}),
+                server_module=spec.get("module"),
+                data_dir=Path("/nonexistent"),
+            )
+        return real(plugin_id)
+
+    monkeypatch.setattr(reg, "get", get)
+
+
+ALBUMS = ("picture_google_album", "picture_apple_album")
+
+
+def _canvas_page(app: Flask, widget: str, options: dict[str, Any], page_id: str = "wall"):
+    from app.state.page_store import Page
+    from app.state.panel_store import CanvasLayout, Element
+
+    els = [Element(id="e1", widget=widget, x=0, y=0, w=100, h=100, options=options)]
+    page = Page(
+        id=page_id,
+        name=page_id,
+        device_ids=["panel"],
+        layout_kind="canvas",
+        cells=[],
+        canvas=CanvasLayout(w=800, h=480, els=els),
+    )
+    app.config["PAGE_STORE"].save(page)
+    return page
+
+
+def test_a_gallery_on_a_canvas_offers_its_photos_and_pins_the_element(
+    app: Flask, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from app.step_items import find_item, pin_item, step_choices
+
+    _gallery_page(app, ["a.jpg", "b.jpg"], monkeypatch, tmp_path)  # stubs the folder
+    page = _canvas_page(app, "picture_gallery", {"folder": "art"})
+    with app.test_request_context():
+        found = step_choices(page)
+        assert found is not None and found.option == "file" and found.cell_id == "e1"
+        assert find_item(page, "b.jpg") is not None
+        pinned = pin_item(page, page.model_dump(mode="json"), "b.jpg")
+        assert pinned is not None
+        options = pinned["canvas"]["els"][0]["options"]
+        assert options == {"folder": "art", "file": "b.jpg"}
+        assert page.canvas.els[0].options == {"folder": "art"}  # the saved page is untouched
+
+
+def test_a_widget_that_declares_a_pin_option_offers_its_items_on_a_canvas(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from types import SimpleNamespace
+
+    from app.step_items import step_choices
+
+    _install_widgets(
+        app,
+        monkeypatch,
+        papers={
+            "manifest": {"lineups": {"pin_option": "paper"}},
+            "module": SimpleNamespace(lineup_items=lambda options: [{"key": "A"}, {"key": "B"}]),
+        },
+    )
+    with app.test_request_context():
+        found = step_choices(_canvas_page(app, "papers", {"paper": ""}))
+        assert found is not None and found.option == "paper"
+        assert step_choices(_canvas_page(app, "papers", {"paper": "A"}, "one")) is None
+
+
+def test_compose_item_reaches_a_canvas_widget(
+    app: Flask, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _gallery_page(app, ["a.jpg", "b.jpg"], monkeypatch, tmp_path)
+    _canvas_page(app, "picture_gallery", {"folder": "art"})
+    seen: list[dict[str, Any]] = []
+    module = app.config["PLUGIN_REGISTRY"].get("picture_gallery").server_module
+    monkeypatch.setattr(
+        module,
+        "fetch",
+        lambda options, settings, ctx: (
+            seen.append(dict(options)) or {"url": "/x.jpg", "filename": options.get("file", "")}
+        ),
+    )
+    c = app.test_client()
+    assert c.get("/compose/wall?item=b.jpg&w=800&h=480").status_code == 200
+    assert seen and seen[-1].get("file") == "b.jpg"
+    assert c.get("/compose/wall?item=nope.jpg&w=800&h=480").status_code == 404
+    seen.clear()
+    assert c.get("/compose/wall?w=800&h=480").status_code == 200
+    assert seen and "file" not in seen[-1]
+
+
+def test_a_single_photo_or_two_list_widgets_offer_no_choice(
+    app: Flask, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from app.state.page_store import Cell
+    from app.step_items import step_choices, step_items
+
+    page = _gallery_page(app, ["only.jpg"], monkeypatch, tmp_path)
+    with app.test_request_context():
+        assert step_choices(page) is None and step_items(page) == (1, ())
+    page = _gallery_page(app, ["a.jpg", "b.jpg"], monkeypatch, tmp_path)
+    twin = page.model_copy(
+        update={
+            "cells": [
+                *page.cells,
+                Cell(id="c2", plugin="picture_gallery", x=0, y=10, w=10, h=10),
+            ]
+        }
+    )
+    with app.test_request_context():
+        assert step_choices(page) is not None
+        assert step_choices(twin) is None  # which cell would a pin apply to?
+
+
+def test_plain_widgets_report_one_item_and_no_draw(app: Flask) -> None:
+    from app.state.page_store import Cell, Page
+    from app.step_items import step_draws, step_items
+
+    page = Page(
+        id="clock", name="Clock", cells=[Cell(id="c", plugin="clock_analog", x=0, y=0, w=10, h=10)]
+    )
+    with app.test_request_context():
+        assert step_items(page) == (1, ()) and step_draws(page) is False
+
+
+def _declared_page(app: Flask, paper: str = "") -> Any:
+    from app.state.page_store import Cell, Page
+
+    page = Page(
+        id="paper",
+        name="Papers",
+        device_ids=["panel"],
+        cells=[Cell(id="n", plugin="papers", x=0, y=0, w=10, h=10, options={"paper": paper})],
+    )
+    app.config["PAGE_STORE"].save(page)
+    return page
+
+
+def test_a_declared_widget_lists_its_items_and_is_pinned_through_its_option(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from types import SimpleNamespace
+
+    from app.step_items import find_item, pin_item, step_choices
+
+    listed = [
+        {"key": "NYT", "label": "New York Times", "version": "2026-11-04"},
+        {"key": "WSJ", "label": "WSJ", "version": "2026-11-04"},
+    ]
+    _install_widgets(
+        app,
+        monkeypatch,
+        papers={
+            "manifest": {"lineups": {"pin_option": "paper"}},
+            "module": SimpleNamespace(lineup_items=lambda options: listed),
+        },
+    )
+    page = _declared_page(app)
+    with app.test_request_context():
+        found = step_choices(page)
+        assert found is not None and found.option == "paper"
+        assert [it.key for it in found.items] == ["NYT", "WSJ"]
+        assert found.items[0].label == "New York Times" and found.items[0].version == "2026-11-04"
+        assert find_item(page, "WSJ") is not None and find_item(page, "FT") is None
+        pinned = pin_item(page, page.model_dump(mode="json"), "WSJ")
+        assert pinned is not None and pinned["cells"][0]["options"]["paper"] == "WSJ"
+        # A cell already pinned to one entry has one item to choose.
+        assert step_choices(_declared_page(app, "WSJ")) is None
+
+
+def test_a_declared_widget_with_nothing_to_list_offers_no_arrows(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from types import SimpleNamespace
+
+    from app.step_items import step_choices
+
+    def boom(options: dict[str, Any]) -> list[dict[str, str]]:
+        raise RuntimeError("no list")
+
+    for lister in (lambda o: [], lambda o: [{"key": "only"}], boom):
+        _install_widgets(
+            app,
+            monkeypatch,
+            papers={
+                "manifest": {"lineups": {"pin_option": "paper"}},
+                "module": SimpleNamespace(lineup_items=lister),
+            },
+        )
+        with app.test_request_context():
+            assert step_choices(_declared_page(app)) is None
+    # Declared, but the module has no lineup_items: nothing to offer either.
+    _install_widgets(app, monkeypatch, papers={"manifest": {"lineups": {"pin_option": "paper"}}})
+    with app.test_request_context():
+        assert step_choices(_declared_page(app)) is None
+
+
+def test_compose_item_pins_the_widget_and_refuses_an_unlisted_item(
+    app: Flask, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _gallery_page(app, ["a.jpg", "b.jpg"], monkeypatch, tmp_path)
+    seen: list[dict[str, Any]] = []
+    module = app.config["PLUGIN_REGISTRY"].get("picture_gallery").server_module
+    monkeypatch.setattr(
+        module,
+        "fetch",
+        lambda options, settings, ctx: (
+            seen.append(dict(options)) or {"url": "/x.jpg", "filename": options.get("file", "")}
+        ),
+    )
+    c = app.test_client()
+    assert c.get("/compose/photos?item=b.jpg&w=800&h=480").status_code == 200
+    assert seen and seen[-1].get("file") == "b.jpg"
+    assert c.get("/compose/photos?item=nope.jpg&w=800&h=480").status_code == 404
+    assert c.get("/compose/photos?w=800&h=480").status_code == 200
+    assert "file" not in seen[-1]
+
+
+def test_gallery_fetch_shows_the_pinned_photo_and_leaves_the_cursor(tmp_path: Path) -> None:
+    import importlib.util
+
+    from PIL import Image
+
+    spec = importlib.util.spec_from_file_location(
+        "gallery_pin", Path(__file__).resolve().parents[1] / "plugins/picture_gallery/server.py"
+    )
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    for n in ("a.jpg", "b.jpg", "c.jpg"):
+        Image.new("RGB", (40, 30), "red").save(tmp_path / n)
+    ctx = {"data_dir": str(tmp_path), "preview": False, "target_device_id": "panel"}
+    opts = {"folder": "", "mode": "sequential", "file": "c.jpg"}
+    out = mod.fetch(opts, {}, ctx=ctx)
+    assert out["filename"] == "c.jpg"
+    assert not list(tmp_path.glob(".sequential_index*")), "a pinned render must not move the album"
+    # An unknown name falls back to the normal choice rather than failing the render.
+    assert mod.fetch({**opts, "file": "gone.jpg"}, {}, ctx=ctx)["filename"] in (
+        "a.jpg",
+        "b.jpg",
+        "c.jpg",
+    )
+
+
+@pytest.fixture
+def album(client: Any, app: Flask, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Any:
+    from app.state.deck_model import Deck, DeckPage
+
+    _gallery_page(app, [f"p{i}.jpg" for i in range(5)], monkeypatch, tmp_path)
+    app.config["DECK_STORE"].upsert(
+        Deck(
+            id="album",
+            name="Album",
+            device_ids=["panel"],
+            pages=[DeckPage(page_id="photos"), DeckPage(page_id="news")],
+        )
+    )
+    return client
+
+
+def test_view_marks_gallery_steps_as_choosable(album: Any) -> None:
+    data = album.get("/decks/view.json").get_json()
+    lineup = next(lu for d in data["displays"] for lu in d["lineups"] if lu["id"] == "album")
+    photos, news = lineup["steps"]
+    assert photos["pick_items"] is True and photos["item_count"] == 5
+    assert [it["key"] for it in photos["items"]] == [f"p{i}.jpg" for i in range(5)]
+    assert news["pick_items"] is False and news["item_count"] == 1
+    assert lineup["actions"]["step_item_url"] == "/decks/album/step-item"
+
+
+def test_step_item_asks_for_a_render_once_then_reports_ready(
+    album: Any, app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app import preview_cache
+
+    submitted: list[dict[str, Any]] = []
+    monkeypatch.setattr(preview_cache, "submit", lambda **kw: submitted.append(kw))
+    monkeypatch.setattr(preview_cache, "backlog", lambda: 0)
+    monkeypatch.setattr(preview_cache, "is_pending", lambda p: False)
+    url = "/decks/album/step-item?index=0&item=p2.jpg&display_id=panel"
+    resp = album.get(url)
+    assert resp.status_code == 202 and resp.get_json()["state"] == "pending"
+    assert len(submitted) == 1
+    job = submitted[0]
+    assert job["page_id"] == "photos" and "item=p2.jpg" in job["query"]
+    assert "device_id=panel" in job["query"] and job.get("thumb_max") is None  # full size
+    job["cache_path"].parent.mkdir(parents=True, exist_ok=True)
+    job["cache_path"].write_bytes(b"\x89PNG\r\n")
+    ready = album.get(url)
+    assert ready.status_code == 200
+    body = ready.get_json()
+    assert body["state"] == "ready" and body["item"] == "p2.jpg"
+    assert body["large_url"] == body["thumb_url"] + "?lg=1"
+    assert job["cache_path"].stem in body["thumb_url"]
+    # A different item is a different picture.
+    other = album.get("/decks/album/step-item?index=0&item=p3.jpg&display_id=panel")
+    assert other.status_code == 202 and submitted[-1]["cache_path"] != job["cache_path"]
+
+
+def test_step_item_is_refused_when_too_many_renders_wait(
+    album: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app import preview_cache
+
+    submitted: list[Any] = []
+    monkeypatch.setattr(preview_cache, "submit", lambda **kw: submitted.append(kw))
+    monkeypatch.setattr(preview_cache, "backlog", lambda: preview_cache.ITEM_BACKLOG_MAX)
+    monkeypatch.setattr(preview_cache, "is_pending", lambda p: False)
+    resp = album.get("/decks/album/step-item?index=0&item=p1.jpg&display_id=panel")
+    assert resp.status_code == 503 and resp.get_json()["state"] == "busy"
+    assert resp.headers["Retry-After"] and not submitted
+    # One already in flight is not a new render.
+    monkeypatch.setattr(preview_cache, "is_pending", lambda p: True)
+    assert (
+        album.get("/decks/album/step-item?index=0&item=p1.jpg&display_id=panel").status_code == 202
+    )
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "index=0&item=nope.jpg&display_id=panel",
+        "index=0&item=&display_id=panel",
+        "index=1&item=p1.jpg&display_id=panel",  # the second step has no items
+        "index=0&item=p1.jpg&display_id=other",
+        "index=9&item=p1.jpg&display_id=panel",
+        "item=p1.jpg&display_id=panel",
+    ],
+)
+def test_step_item_refuses_what_is_not_an_item_of_that_step(album: Any, query: str) -> None:
+    resp = album.get(f"/decks/album/step-item?{query}")
+    assert resp.status_code in (400, 404) and resp.get_json()["ok"] is False
+    assert album.get("/decks/nope/step-item?index=0&item=p1.jpg").status_code == 404
+
+
+def test_push_step_sends_the_chosen_item_as_drawn(
+    album: Any, app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app import preview_cache
+
+    fake = _FakePush()
+    app.config["PUSH_MANAGER"] = fake
+    drawn: list[dict[str, Any]] = []
+
+    def render_now(**kw: Any) -> None:
+        drawn.append(kw)
+        kw["cache_path"].parent.mkdir(parents=True, exist_ok=True)
+        kw["cache_path"].write_bytes(b"PNG-OF-P3")
+
+    monkeypatch.setattr(preview_cache, "render_now", render_now)
+    resp = album.post(
+        "/decks/album/push-step", json={"index": 0, "item": "p3.jpg", "display_id": "panel"}
+    )
+    assert resp.status_code == 200, resp.get_json()
+    data = resp.get_json()
+    assert data["name"] == "Photos (p3.jpg)" and data["fresh"] is False
+    assert data["lands"].startswith("lands ") and "Photos (p3.jpg)" in data["message"]
+    assert fake.calls == []
+    assert fake.stored_calls == [(b"PNG-OF-P3", {"page_id": "photos", "device_ids": {"panel"}})]
+    assert len(drawn) == 1 and "item=p3.jpg" in drawn[0]["query"]
+    # The picture the preview already drew is sent as it is, not drawn again.
+    resp = album.post("/decks/album/push-step", json={"index": 0, "item": "p3.jpg"})
+    assert resp.status_code == 200 and len(drawn) == 1
+    assert fake.stored_calls[-1][0] == b"PNG-OF-P3"
+
+
+@pytest.mark.parametrize(
+    ("body", "status"),
+    [
+        ({"index": 0, "item": "gone.jpg"}, 409),
+        ({"index": 1, "item": "p1.jpg"}, 409),  # a step that has no choosable items
+        ({"index": 0, "item": "p1.jpg", "composition_digest": "abc123"}, 400),
+        ({"index": 0, "item": 5}, 400),
+        ({"index": 0, "item": ""}, 400),
+    ],
+)
+def test_push_step_item_is_checked(
+    album: Any, app: Flask, body: dict[str, Any], status: int
+) -> None:
+    fake = _FakePush()
+    app.config["PUSH_MANAGER"] = fake
+    resp = album.post("/decks/album/push-step", json=body)
+    assert resp.status_code == status, resp.get_json()
+    assert not fake.calls and not fake.stored_calls
+
+
+def test_item_renders_are_capped_and_bounded(tmp_path: Path) -> None:
+    from app import preview_cache
+
+    keep = preview_cache.ITEM_KEEP
+    names = [f"pg-i{i:010x}__{i:016x}.png" for i in range(keep + 6)]
+    for i, n in enumerate(names):
+        f = tmp_path / n
+        f.write_bytes(b"x")
+        import os
+
+        os.utime(f, (1000 + i, 1000 + i))
+    (tmp_path / "plain__0123456789abcdef.png").write_bytes(b"x")  # a dashboard's own preview
+    newest = tmp_path / f"pg-i{99:010x}__{99:016x}.png"
+    preview_cache.PreviewRenderQueue._evict_stale(newest)
+    left = sorted(p.name for p in tmp_path.glob("pg-i*.png"))
+    assert len(left) == keep - 1  # room for the one being written
+    assert names[-1] in left and names[0] not in left
+    assert (tmp_path / "plain__0123456789abcdef.png").exists()
+
+
+# -- "draw next": widgets with no way to name an item ---------------------------------
+
+
+def _draw_page(plugin: str, options: dict[str, Any] | None = None, pid: str = "drawn") -> Any:
+    from app.state.page_store import Page
+
+    return Page.model_validate(
+        {
+            "id": pid,
+            "name": "Drawn",
+            "device_ids": ["panel"],
+            "layout_kind": "canvas",
+            "canvas": {
+                "w": 800,
+                "h": 480,
+                "els": [
+                    {
+                        "id": "w1",
+                        "kind": "widget",
+                        "widget": plugin,
+                        "x": 0,
+                        "y": 0,
+                        "w": 800,
+                        "h": 480,
+                        "options": options or {},
+                    }
+                ],
+            },
+        }
+    )
+
+
+@pytest.mark.parametrize("plugin", [*ALBUMS, "shuffler"])
+def test_widgets_that_differ_per_render_get_draw_arrows(
+    app: Flask, monkeypatch: pytest.MonkeyPatch, plugin: str
+) -> None:
+    from app.step_items import find_item, step_choices, step_draws, step_items
+
+    # The albums are known by id (they live in their own repositories); any other
+    # widget declares it in its manifest.
+    _install_widgets(app, monkeypatch, **{plugin: {"manifest": {"lineups": {"draw": True}}}})
+    page = _draw_page(plugin)
+    with app.test_request_context():
+        found = step_choices(page)
+        assert found is not None and found.mode == "draw" and found.cell_id == "w1"
+        assert step_draws(page) is True
+        assert step_items(page) == (1, ())  # no list, no count, no stack
+        assert find_item(page, "draw:0123456789ab:1") is not None
+        for bad in ("draw:xyz:1", "draw:0123456789ab", "draw:0123456789ab:100", "file.jpg", ""):
+            assert find_item(page, bad) is None
+
+
+def test_a_draw_pins_nothing_but_hidden_options_and_never_a_sequential_cursor(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.step_items import pin_item
+
+    _install_widgets(app, monkeypatch, **{a: {} for a in ALBUMS})
+
+    page = _draw_page("picture_google_album", {"mode": "sequential", "album": "x"})
+    with app.test_request_context():
+        out = pin_item(page, page.model_dump(mode="json"), "draw:0123456789ab:3")
+        assert out is not None
+        opts = out["canvas"]["els"][0]["options"]
+        assert opts["_draw"] == "0123456789ab" and opts["_browse"] == 3
+        assert opts["mode"] == "random", "a preview would move the frame's own album cursor"
+        assert opts["album"] == "x"
+        # Random stays random; the stored page is untouched.
+        rnd = _draw_page("picture_apple_album", {"mode": "random"})
+        again = pin_item(rnd, rnd.model_dump(mode="json"), "draw:0123456789ab:1")
+        assert again is not None and again["canvas"]["els"][0]["options"]["mode"] == "random"
+        assert page.canvas.els[0].options["mode"] == "sequential"
+
+
+def test_a_widget_that_is_not_installed_or_declares_nothing_offers_no_arrows(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.step_items import step_choices, step_draws
+
+    # Named by the page, absent from the install: nothing happens.
+    with app.test_request_context():
+        assert step_choices(_draw_page("picture_google_album")) is None
+        assert step_choices(_draw_page("shuffler")) is None
+    # Installed but declaring nothing (and not a known album): one item, no arrows.
+    _install_widgets(
+        app, monkeypatch, shuffler={"manifest": {}}, other={"manifest": {"lineups": 5}}
+    )
+    with app.test_request_context():
+        assert step_draws(_draw_page("shuffler")) is False
+        assert step_draws(_draw_page("other")) is False
+
+
+def test_two_list_widgets_still_offer_no_arrows_even_when_one_draws(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.step_items import step_choices
+
+    _install_widgets(
+        app,
+        monkeypatch,
+        shuffler={"manifest": {"lineups": {"draw": True}}},
+        **{a: {} for a in ALBUMS},
+    )
+    page = _draw_page("shuffler")
+    els = page.model_dump(mode="json")["canvas"]["els"]
+    twin = {**els[0], "id": "w2", "widget": "picture_google_album"}
+    both = page.model_validate(
+        {
+            **page.model_dump(mode="json"),
+            "canvas": {**page.model_dump(mode="json")["canvas"], "els": [els[0], twin]},
+        }
+    )
+    with app.test_request_context():
+        assert step_choices(both) is None
+
+
+@pytest.fixture
+def drawn(client: Any, app: Flask, monkeypatch: pytest.MonkeyPatch) -> Any:
+    from app.state.deck_model import Deck, DeckPage
+
+    _install_widgets(app, monkeypatch, **{a: {} for a in ALBUMS})
+    app.config["PAGE_STORE"].save(_draw_page("picture_google_album"))
+    app.config["DECK_STORE"].upsert(
+        Deck(
+            id="draws",
+            name="Draws",
+            device_ids=["panel"],
+            pages=[DeckPage(page_id="drawn"), DeckPage(page_id="news")],
+        )
+    )
+    return client
+
+
+def test_view_marks_a_drawing_step_without_a_list(drawn: Any) -> None:
+    data = drawn.get("/decks/view.json").get_json()
+    lineup = next(lu for d in data["displays"] for lu in d["lineups"] if lu["id"] == "draws")
+    step, other = lineup["steps"]
+    assert step["draw_items"] is True and step["pick_items"] is False
+    assert step["item_count"] == 1 and step["items"] == []
+    assert other["draw_items"] is False
+
+
+def test_step_item_reports_a_signature_and_push_sends_exactly_the_drawn_pixels(
+    drawn: Any, app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app import preview_cache
+
+    fake = _FakePush()
+    app.config["PUSH_MANAGER"] = fake
+    submitted: list[dict[str, Any]] = []
+    monkeypatch.setattr(preview_cache, "submit", lambda **kw: submitted.append(kw))
+    monkeypatch.setattr(preview_cache, "backlog", lambda: 0)
+    monkeypatch.setattr(preview_cache, "is_pending", lambda p: False)
+    drew: list[Any] = []
+    monkeypatch.setattr(preview_cache, "render_now", lambda **kw: drew.append(kw))
+    key = "draw:0123456789ab:2"
+    url = f"/decks/draws/step-item?index=0&display_id=panel&item={key}"
+    assert drawn.get(url).status_code == 202
+    job = submitted[0]
+    assert job["page_id"] == "drawn" and "item=draw%3A0123456789ab%3A2" in job["query"]
+    # Pushing before it is drawn must not draw a different picture instead.
+    resp = drawn.post(
+        "/decks/draws/push-step", json={"index": 0, "item": key, "display_id": "panel"}
+    )
+    assert resp.status_code == 409 and "Draw another" in resp.get_json()["error"]
+    assert not fake.stored_calls and not drew
+    job["cache_path"].parent.mkdir(parents=True, exist_ok=True)
+    job["cache_path"].write_bytes(b"THE-PIXELS")
+    ready = drawn.get(url).get_json()
+    assert ready["state"] == "ready" and len(ready["sig"]) == 16
+    resp = drawn.post(
+        "/decks/draws/push-step", json={"index": 0, "item": key, "display_id": "panel"}
+    )
+    assert resp.status_code == 200, resp.get_json()
+    assert resp.get_json()["name"] == "Drawn" and resp.get_json()["fresh"] is False
+    assert fake.stored_calls == [(b"THE-PIXELS", {"page_id": "drawn", "device_ids": {"panel"}})]
+    assert not drew, "the picture shown is sent, never drawn again"
+    # A different nonce is a different picture, with its own file and signature.
+    other = drawn.get(url.replace("0123456789ab", "ba9876543210"))
+    assert other.status_code == 202 and submitted[-1]["cache_path"] != job["cache_path"]

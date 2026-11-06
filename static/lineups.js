@@ -318,6 +318,7 @@
     collapsed: (d) => collapsed.has(d.id),
     day: dayOf,
     order: (ls) => ordered(ls, null),
+    itemChoice: (d, l, s) => choiceFor(d, l, s),
     pendingBar: (d) => {
       const f = st.flash[d.id];
       delete st.flash[d.id];
@@ -334,6 +335,8 @@
       "data-dpick",
       "data-push",
       "data-peek",
+      "data-zoom",
+      "data-item",
       "data-win-edit",
       "data-undo",
       "data-save",
@@ -493,6 +496,7 @@
       const el = host.querySelector(fk);
       if (el) el.focus({ preventScroll: true });
     }
+    syncZoom(); // a lightbox open over the page follows the redraw
     requestAnimationFrame(() => {
       fit();
       host.querySelectorAll(".lu-row:not(.is-folded) .lu-strip-scroll").forEach((sc) => {
@@ -924,15 +928,20 @@
       document.body.style.overflow = "hidden";
     }
   }
-  function closeSheet() {
-    releaseModal();
-    if (root.querySelector(".lu-dp-pop, .lu-peek")) return;
-    root.querySelectorAll("[data-sheet-scrim]").forEach((x) => x.remove());
+  function unlockScroll() {
     if (lockedScroll !== null) {
       document.documentElement.style.overflow = lockedScroll[0];
       document.body.style.overflow = lockedScroll[1];
       lockedScroll = null;
     }
+  }
+  function closeSheet() {
+    releaseModal();
+    if (root.querySelector(".lu-dp-pop, .lu-peek")) return;
+    root.querySelectorAll("[data-sheet-scrim]").forEach((x) => x.remove());
+    // A redraw closes the popovers (and so lands here) while the lightbox keeps the page still.
+    if (window.TesseraeLineupsLightbox && window.TesseraeLineupsLightbox.isOpen()) return;
+    unlockScroll();
   }
 
   /* ------------------------------------------------------------ day picker */
@@ -1009,6 +1018,412 @@
     pop.querySelector("[data-peek-close]").focus({ preventScroll: true });
   }
 
+  /* ------------------------------------------------------------ items */
+  // What a person chose with the arrows on a step (tile or lightbox), per display, lineup
+  // and step. Ours, not the server's: it survives every redraw and is dropped when the step
+  // no longer offers it. Two kinds:
+  //  - pick (a gallery, or any widget that lists its items): {key, idx, ...}, an item named in the step's list.
+  //    Previews are asked for once the arrows have rested (ITEM_DEBOUNCE), so clicking
+  //    through a folder asks for the item you stopped on, not every one passed.
+  //  - draw (a widget that cannot name its items but differs per render): {mode: "draw",
+  //    hist: [entry], pos}. Next draws the dashboard once more (one at a time) and shows it;
+  //    previous walks back through what was already drawn here without drawing again. An
+  //    entry is {key: "draw:<nonce>:<n>", state: "loading" | "ready" | "error", thumb_url,
+  //    large_url, sig}.
+  // choiceFor() gives the renderers one shape for both.
+  const ITEM_DEBOUNCE = 280;
+  const ITEM_POLL = 1500;
+  const ITEM_POLLS = 40;
+  const DRAW_KEEP = 8; // pictures kept per step to go back through
+  const picks = new Map();
+  let pickSeq = 0;
+  const pickKey = (did, lid, i) => `${did}|${lid}|${i}`;
+  function stopPick(p) {
+    clearTimeout(p.timer);
+    (p.hist || []).forEach((e) => clearTimeout(e.timer));
+  }
+  function dropPick(k) {
+    const p = picks.get(k);
+    if (p) stopPick(p);
+    picks.delete(k);
+  }
+  function choiceFor(d, l, s) {
+    const k = pickKey(d.id, l.id, s.index);
+    const p = picks.get(k);
+    if (!p) return null;
+    const landed = p.pushed && (s.composition_digest || "") !== p.digest;
+    if (p.mode === "draw") {
+      if (p.dash !== s.dashboard_id || !s.draw_items || landed) {
+        dropPick(k);
+        return null;
+      }
+      const e = p.pos >= 0 ? p.hist[p.pos] : null;
+      return e
+        ? {
+            mode: "draw",
+            owner: p,
+            key: e.key,
+            state: e.state,
+            thumb_url: e.thumb_url,
+            large_url: e.large_url,
+            error: e.error,
+            pos: p.pos,
+            of: p.hist.length,
+            note: p.note,
+          }
+        : null;
+    }
+    const it = s.pick_items && s.items ? s.items[p.idx] : null;
+    // Gone: another dashboard now, the item left the list, or what was pushed has landed.
+    if (p.dash !== s.dashboard_id || !it || it.key !== p.key || landed) {
+      dropPick(k);
+      return null;
+    }
+    return p;
+  }
+  const largeUrl = (u) => (u ? u + (u.includes("?") ? "&" : "?") + "lg=1" : "");
+  function stepOf(did, lid, i) {
+    const found = lineupOf(lid, did);
+    const s = found && found.l.steps[Number(i)];
+    return s ? { d: found.d, l: found.l, s } : null;
+  }
+  // Ask for ``e``'s picture until it is drawn. ``owner`` is the pick it belongs to (itself,
+  // for a named item); the chain stops when either is gone.
+  function pollEntry(k, owner, e, n) {
+    const alive = () => picks.get(k) === owner && (owner === e || owner.hist.includes(e));
+    if (!alive()) return;
+    const [did, lid, i] = k.split("|");
+    const at = stepOf(did, lid, i);
+    if (!at) return;
+    const tok = e.token;
+    const fail = (msg) => {
+      e.state = "error";
+      e.error = msg;
+      pickChanged();
+    };
+    API.stepItem(at.l, at.s, did, e.key).then(
+      (r) => {
+        if (!alive() || e.token !== tok) return;
+        if (r && r.state === "ready") {
+          e.state = "ready";
+          e.thumb_url = r.thumb_url;
+          e.large_url = r.large_url;
+          e.sig = r.sig || "";
+          const twin = owner.hist && e.sig && owner.hist.find((x) => x !== e && x.sig === e.sig);
+          if (twin) {
+            // The widget drew what it already drew: not a new picture, so it is not kept.
+            owner.hist.splice(owner.hist.indexOf(e), 1);
+            owner.pos = Math.min(owner.pos, owner.hist.length - 1);
+            owner.note =
+              "That came out the same as one already drawn. Try again, or this may be all there is.";
+            say(owner.note);
+          }
+          pickChanged();
+        } else if (n >= ITEM_POLLS) {
+          fail("It took too long to draw.");
+        } else {
+          e.timer = setTimeout(() => pollEntry(k, owner, e, n + 1), ITEM_POLL);
+        }
+      },
+      (err) => {
+        if (!alive() || e.token !== tok) return;
+        if (err && err.status === 503 && n < 8) {
+          // Other previews are being drawn; wait our turn instead of piling on.
+          e.timer = setTimeout(() => pollEntry(k, owner, e, n + 1), 5000);
+          return;
+        }
+        fail(
+          err && err.status === 503
+            ? "Too many previews are being drawn; try again in a moment."
+            : (err && err.message) || "It could not be drawn."
+        );
+      }
+    );
+  }
+  const newNonce = () => {
+    const a = new Uint8Array(6);
+    if (window.crypto && crypto.getRandomValues) crypto.getRandomValues(a);
+    else a.forEach((_, j) => (a[j] = Math.floor(Math.random() * 256)));
+    return [...a].map((b) => b.toString(16).padStart(2, "0")).join("");
+  };
+  // Draw next: the next picture already drawn here, else one more drawing (one at a time).
+  // Draw previous: back through what was drawn, then to the step as last sent.
+  function drawStep(did, lid, i, delta) {
+    const at = stepOf(did, lid, i);
+    if (!at || !at.s.draw_items) return;
+    const k = pickKey(did, lid, i);
+    let p = picks.get(k);
+    if (!p || p.mode !== "draw" || p.dash !== at.s.dashboard_id) {
+      if (p) stopPick(p);
+      p = {
+        mode: "draw",
+        dash: at.s.dashboard_id,
+        hist: [],
+        pos: -1,
+        count: 0,
+        pushed: false,
+        digest: at.s.composition_digest || "",
+        note: "",
+        timer: null,
+      };
+      picks.set(k, p);
+    }
+    p.note = "";
+    if (delta < 0) {
+      if (p.pos < 0) return;
+      p.pos--;
+    } else if (p.pos < p.hist.length - 1) {
+      p.pos++;
+    } else {
+      if (p.hist.some((e) => e.state === "loading")) return;
+      const e = {
+        key: `draw:${newNonce()}:${++p.count}`,
+        state: "loading",
+        thumb_url: "",
+        large_url: "",
+        error: "",
+        sig: "",
+        token: ++pickSeq,
+        timer: null,
+      };
+      p.hist.push(e);
+      if (p.hist.length > DRAW_KEEP) clearTimeout(p.hist.shift().timer);
+      p.pos = p.hist.length - 1;
+      e.timer = setTimeout(() => pollEntry(k, p, e, 0), 0);
+      say(`${at.s.name}: drawing another picture.`);
+    }
+    pickChanged();
+  }
+  // Move the chosen item by ``delta`` (wrapping); nothing chosen yet starts at the first
+  // (next) or the last (previous).
+  function stepItem(did, lid, i, delta) {
+    const at = stepOf(did, lid, i);
+    if (!at) return;
+    if (at.s.draw_items) return drawStep(did, lid, i, delta);
+    if (!at.s.pick_items || !at.s.items.length) return;
+    const n = at.s.items.length;
+    const k = pickKey(did, lid, i);
+    const cur = picks.get(k);
+    const idx = cur && cur.mode !== "draw" ? (cur.idx + delta + n) % n : delta > 0 ? 0 : n - 1;
+    if (cur) stopPick(cur);
+    const it = at.s.items[idx];
+    const p = {
+      key: it.key,
+      idx,
+      dash: at.s.dashboard_id,
+      state: "loading",
+      thumb_url: "",
+      large_url: "",
+      error: "",
+      pushed: false,
+      digest: at.s.composition_digest || "",
+      token: ++pickSeq,
+      timer: null,
+    };
+    p.timer = setTimeout(() => pollEntry(k, p, p, 0), ITEM_DEBOUNCE);
+    picks.set(k, p);
+    say(`${at.s.name}: ${it.label}, ${idx + 1} of ${n}. Drawing it.`);
+    pickChanged();
+  }
+  function pickChanged() {
+    render(); // draws the tile from the choice, then brings an open lightbox up to date
+  }
+
+  /* ------------------------------------------------------------ zoom (lightbox) */
+  const LB = window.TesseraeLineupsLightbox;
+  let zoom = null; // {kind: "step" | "head", did, lid, i, dash, pushing, msg, last}
+  let zoomFocus = null; // selector of the control to return to
+  function lockPage(el) {
+    const inert = [];
+    for (let node = el; node && node !== document.body; node = node.parentElement) {
+      [...node.parentElement.children].forEach((sibling) => {
+        if (sibling === node) return;
+        inert.push([sibling, sibling.inert]);
+        sibling.inert = true;
+      });
+    }
+    if (lockedScroll === null) {
+      lockedScroll = [document.documentElement.style.overflow, document.body.style.overflow];
+      document.documentElement.style.overflow = "hidden";
+      document.body.style.overflow = "hidden";
+    }
+    return () => {
+      inert.forEach(([x, was]) => {
+        x.inert = was;
+      });
+      unlockScroll();
+    };
+  }
+  function zoomModel() {
+    if (!zoom) return null;
+    const hooks = {
+      onStep: (delta) =>
+        zoom && zoom.kind === "step" && stepItem(zoom.did, zoom.lid, zoom.i, delta),
+      onPush: () => lightboxPush(),
+      onClose: () => closeZoom(),
+    };
+    if (zoom.kind === "head") {
+      const d = displayById(zoom.did);
+      if (!d) return gone();
+      const op =
+        d.on_screen && !(d.placeholder && d.placeholder.state === "delivering")
+          ? d.on_screen
+          : null;
+      const fr = !d.on_screen ? d.frame : null;
+      const url = op ? op.thumb_url : fr ? fr.thumb_url : "";
+      if (!url) return gone();
+      return (zoom.last = {
+        ...hooks,
+        title: op ? op.name : fr.label,
+        sub: `${d.name} · showing now`,
+        img: { src: largeUrl(url), alt: `What ${d.name} is showing: ${op ? op.name : fr.label}` },
+        aspect: op ? op.aspect : `${d.width || 16}/${d.height || 10}`,
+        orientation: (op && op.orientation) || d.orientation,
+        gamut: d.gamut,
+        greyLevels: d.grey_levels,
+      });
+    }
+    const at = stepOf(zoom.did, zoom.lid, zoom.i);
+    if (!at || at.s.dashboard_id !== zoom.dash || at.s.missing || at.s.off_display) return gone();
+    const { d, l, s } = at;
+    const p = choiceFor(d, l, s);
+    const canPush = !!(d.id && l.actions.push_step_url);
+    const n = s.items ? s.items.length : 0;
+    const url = p && p.state === "ready" ? p.large_url : largeUrl(s.thumb_url);
+    const drawn = !!p && p.mode === "draw";
+    const it = p && !drawn ? s.items[p.idx] : null;
+    let notice = "";
+    if (p && p.state === "error") notice = `Could not draw this one: ${p.error}`;
+    const own = picks.get(pickKey(d.id, l.id, s.index));
+    if (!notice && own && own.mode === "draw" && own.note) notice = own.note;
+    const canNav = canPush && !!l.actions.step_item_url;
+    let nav = null;
+    if (canNav && s.draw_items) {
+      const last = p && p.pos === p.of - 1;
+      nav = {
+        text: p ? `Drawn here: ${p.pos + 1} of ${p.of}` : "As last sent",
+        label: `Draw another ${s.name} picture`,
+        prev: "Previous picture",
+        next: "Draw the next picture",
+        hasPrev: !!p,
+        hasNext: !(last && p.state === "loading"),
+      };
+    } else if (canNav && s.pick_items && n > 1) {
+      nav = {
+        text: it
+          ? `${p.idx + 1} of ${n}${s.item_count > n ? ` (first ${n} of ${s.item_count})` : ""} · ${it.label}`
+          : `As last sent · ${s.item_count} items`,
+        label: `Choose which ${s.name} item to push`,
+        hasPrev: true,
+        hasNext: true,
+      };
+    }
+    return (zoom.last = {
+      ...hooks,
+      title: s.name,
+      sub: `${d.name} · step ${s.position}${s.conditional ? " · shows only while its conditions pass" : ""}`,
+      img: url
+        ? {
+            src: url,
+            alt: it
+              ? `${s.name}: ${it.label}`
+              : drawn
+                ? `${s.name}, picture ${p.pos + 1}`
+                : `${s.name}, as last sent`,
+          }
+        : null,
+      loading: !!p && p.state === "loading",
+      notice,
+      aspect: s.aspect,
+      orientation: d.orientation || s.orientation,
+      gamut: d.gamut,
+      greyLevels: d.grey_levels,
+      nav,
+      push: canPush ? { label: "Push now", title: s.push_title, busy: !!zoom.pushing } : null,
+      msg: zoom.msg || null,
+    });
+  }
+  // The step left the lineup (or its picture went) while the lightbox was open: keep the
+  // picture, take the controls away and say so.
+  function gone() {
+    const last = zoom && zoom.last;
+    if (!last) return null;
+    return {
+      ...last,
+      nav: null,
+      push: null,
+      loading: false,
+      msg: null,
+      notice: "This is no longer on the page, so it can no longer be pushed from here.",
+    };
+  }
+  function syncZoom() {
+    if (!zoom || !LB || !LB.isOpen()) return;
+    const m = zoomModel();
+    if (m) LB.update(m);
+  }
+  function openZoom(btn) {
+    const [kind, a, b] = String(btn.dataset.zoom || "").split(":");
+    const did = displayOf(btn);
+    if (kind === "step" && did !== undefined) {
+      const at = stepOf(did, a, b);
+      if (!at) return;
+      zoom = {
+        kind: "step",
+        did,
+        lid: a,
+        i: Number(b),
+        dash: at.s.dashboard_id,
+        pushing: false,
+        msg: null,
+        last: null,
+      };
+    } else if (kind === "head" && did !== undefined) {
+      zoom = { kind: "head", did, pushing: false, msg: null, last: null };
+    } else return;
+    zoomFocus = focusKey(btn);
+    closePeek();
+    closeDayPop();
+    const m = zoomModel();
+    if (!m || !LB) {
+      zoom = null;
+      return;
+    }
+    LB.open(root, m, lockPage);
+  }
+  function closeZoom() {
+    zoom = null;
+    // The opener may have been redrawn while the lightbox was open: find it again.
+    const el = zoomFocus ? host.querySelector(zoomFocus) : null;
+    zoomFocus = null;
+    if (el) el.focus({ preventScroll: true });
+  }
+  async function lightboxPush() {
+    if (!zoom || zoom.kind !== "step" || zoom.pushing) return;
+    const at = stepOf(zoom.did, zoom.lid, zoom.i);
+    if (!at) return;
+    const p = choiceFor(at.d, at.l, at.s);
+    zoom.pushing = true;
+    zoom.msg = null;
+    syncZoom();
+    try {
+      const r = await doPush(at.d, at.l, at.s, p);
+      if (!zoom) return;
+      zoom.msg = { text: r.msg, kind: r.queued ? "queued" : "ok" };
+      say(r.say);
+      scheduleRefresh(2500);
+    } catch (err) {
+      if (!zoom) return;
+      zoom.msg = { text: `Could not push: ${err.message}`, kind: "err" };
+      say(`Could not push ${at.s.name}: ${err.message}`);
+    } finally {
+      if (zoom) {
+        zoom.pushing = false;
+        syncZoom();
+      }
+    }
+  }
+
   /* ------------------------------------------------------------ push now */
   let lastPointer = "mouse";
   let pressX = 0;
@@ -1028,6 +1443,28 @@
     const live = root.querySelector("[data-lu-live]");
     if (live) live.textContent = msg;
   };
+  // One push, from the tile or the lightbox: the same route, the same "lands ..." wording.
+  // ``pick`` is the item chosen with the arrows (null: the step as it is).
+  async function doPush(d, l, step, pick) {
+    const res = await API.pushStep(l, step, d ? d.id : "", pick ? pick.key : "");
+    if (pick) {
+      const own = pick.owner || pick;
+      own.pushed = true;
+      own.digest = step.composition_digest || "";
+    }
+    const lands = (res && res.lands) || (d ? d.push_lands : "");
+    // A sleeping frame only fetches it at its next check-in: the tile says
+    // "Queued · picks up ~3:48 PM", the live region the whole sentence.
+    const waits = ((res && res.delivery) || []).filter((n) => n.mode !== "live");
+    const mine = waits.find((n) => d && n.device_id === d.id) || waits[0];
+    const msg = mine ? mine.short : (res && res.message) || `Pushed${lands ? " · " + lands : ""}`;
+    const fresh = res && res.fresh && step.composition_digest ? res.message : "";
+    return {
+      msg,
+      queued: !!mine,
+      say: mine ? [fresh, ...waits.map((n) => n.text)].filter(Boolean).join(" ") : msg,
+    };
+  }
   async function pushNow(btn) {
     const tile = btn.closest(".lu-tile, .lu-pk-item");
     // Touch: the first tap only reveals the button.
@@ -1048,19 +1485,17 @@
     const msgEl = tile.querySelector(".lu-pushed-msg");
     btn.disabled = true;
     try {
-      const res = await API.pushStep(found.l, step, found.d ? found.d.id : "");
-      const lands = (res && res.lands) || (found.d ? found.d.push_lands : "");
-      // A sleeping frame only fetches it at its next check-in: the tile says
-      // "Queued · picks up ~3:48 PM", the live region the whole sentence.
-      const waits = ((res && res.delivery) || []).filter((n) => n.mode !== "live");
-      const mine = waits.find((n) => found.d && n.device_id === found.d.id) || waits[0];
-      const msg = mine ? mine.short : (res && res.message) || `Pushed${lands ? " · " + lands : ""}`;
+      const r = await doPush(
+        found.d,
+        found.l,
+        step,
+        found.d ? choiceFor(found.d, found.l, step) : null
+      );
       tile.classList.remove("push-failed");
-      tile.classList.toggle("push-queued", !!mine);
+      tile.classList.toggle("push-queued", r.queued);
       tile.classList.add("pushed");
-      if (msgEl) msgEl.textContent = msg;
-      const fresh = res && res.fresh && step.composition_digest ? res.message : "";
-      say(mine ? [fresh, ...waits.map((n) => n.text)].filter(Boolean).join(" ") : msg);
+      if (msgEl) msgEl.textContent = r.msg;
+      say(r.say);
       scheduleRefresh(2500);
     } catch (err) {
       tile.classList.remove("push-queued");
@@ -1409,6 +1844,27 @@
     if (!root.contains(e.target)) {
       closePeek();
       closeDayPop();
+      return;
+    }
+    if (e.target.closest(".lu-lb")) return; // the lightbox handles its own clicks
+    // The zoom icon, or the thumbnail itself (anywhere but Push now, the arrows and x N).
+    const zb = e.target.closest(".lu-zoom");
+    if (zb) {
+      openZoom(zb);
+      return;
+    }
+    const hit = e.target.closest(".lu-tile .lu-thumb, .lu-now-thumb .lu-thumb");
+    if (hit && !e.target.closest("button, a") && !travelled(e)) {
+      const z = hit.querySelector(".lu-zoom");
+      if (z) {
+        openZoom(z);
+        return;
+      }
+    }
+    const ib = e.target.closest(".lu-it");
+    if (ib) {
+      const [lid, i, dir] = ib.dataset.item.split(":");
+      stepItem(displayOf(ib), lid, i, Number(dir));
       return;
     }
     const t = e.target.closest("button, a, summary");
