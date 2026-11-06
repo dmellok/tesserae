@@ -88,7 +88,7 @@ nav:
   - Gallery: gallery.md
   - Install Tesserae: install/server.md
   - Install via Docker: install/docker.md
-  - Install via LXC: install/lxc.md
+  - Install via LXC / Proxmox: install/lxc.md
   - Configuration reference: install/configuration.md
   - Home Assistant integration: install/home-assistant.md
   - Companion snapshot retention: integrations/companion-data-retention.md

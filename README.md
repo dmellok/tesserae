@@ -24,6 +24,18 @@ Self-hosted dashboard companion for e-ink displays. Compose tile-based
 dashboards in a browser, render the frame headless, push it to one or
 more panels over MQTT or HTTP.
 
+> [!NOTE]
+> **Available for contract work.** I'm Kayden, and I build and maintain
+> Tesserae on my own. I take on contracts building with AI: custom agents, MCP
+> servers that connect AI models to your tools and data, and AI-assisted
+> development workflows for teams. I also take on full-stack, embedded and Home
+> Assistant projects, the same work Tesserae is built from.
+>
+> If Tesserae is useful to you, sponsoring helps keep it independent and
+> actively maintained.
+>
+> **[Email me about a contract](mailto:dmellok@icloud.com?subject=Contract%20work%20enquiry)** · **[Sponsor Tesserae](https://github.com/sponsors/dmellok)**
+
 Open source under AGPL-3.0-or-later. The self-hosted server needs no
 account and never has to talk to us: the only outbound contact is
 `api.tesserae.ink` for update checks, an anonymous install count, and a
@@ -58,7 +70,8 @@ and the onboarding wizard.
 
 Other install paths:
 [Home Assistant App](https://docs.tesserae.ink/install/home-assistant/),
-[LXC / Proxmox / MicroCloud](https://docs.tesserae.ink/install/lxc/),
+[Proxmox VE helper script](https://docs.tesserae.ink/install/lxc/#proxmox-ve-helper-script),
+[LXC / MicroCloud](https://docs.tesserae.ink/install/lxc/),
 [macOS / Linux / Pi shell installer](https://docs.tesserae.ink/install/server/),
 [Windows PowerShell](https://docs.tesserae.ink/install/server/),
 [manual venv](https://docs.tesserae.ink/install/server/#manual-install).
