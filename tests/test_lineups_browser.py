@@ -3551,6 +3551,9 @@ def test_draw_next_end_to_end_with_a_real_chromium_render(
         def __getattr__(self, name: str) -> Any:
             return getattr(self.inner, name)
 
+    # The scheduler's warm-up is a real render and moves the cursor on its own
+    # clock: only what the arrows and Push do is being checked here.
+    monkeypatch.setattr(type(app.config["PUSH_MANAGER"]), "warm_deck_page", lambda *_a, **_k: True)
     spy = _Spy(app.config["PUSH_MANAGER"])
     app.config["PUSH_MANAGER"] = spy
     previews = Path(app.config["DATA_ROOT"]) / "core" / "previews"
