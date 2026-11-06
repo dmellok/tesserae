@@ -548,6 +548,7 @@ def test_unknown_glass_says_so(app: Flask) -> None:
     k = vm["displays"][1]
     k["on_screen"], k["on_screen_known"] = None, False
     k["show_note"] = ", waiting for check-in"
+    k["queued_thumb"] = None
     k["placeholder"] = _note("none", "No image yet", "", "No image is known for this display yet.")
     hdr = _section(_render(app, vm), "kitchen").split("</header>")[0]
     assert "No image yet" in hdr and "lu-thumb-ph" not in hdr and ">?<" not in hdr
@@ -563,7 +564,7 @@ def _kitchen_header(app: Flask, **fields: Any) -> str:
     vm = sample_view_model().to_dict()
     k = vm["displays"][1]
     k["on_screen"], k["on_screen_known"] = None, False
-    k["queued_badge"] = None
+    k["queued_thumb"] = None
     k["placeholder"] = _note("none", "No image yet", "", "No image is known for this display yet.")
     k.update(fields)
     return _section(_render(app, vm), "kitchen").split("</header>")[0]
@@ -603,28 +604,55 @@ def test_nothing_sent_is_honest(app: Flask) -> None:
     assert 'title="Nothing has been sent yet."' in hdr and ">?<" not in hdr
 
 
-def test_queued_placeholder_and_badge_markup(app: Flask) -> None:
-    sentence = "A new frame is queued. The frame picks it up at its next check-in ~3:48 PM."
-    hdr = _kitchen_header(
-        app,
-        placeholder=_note(
-            "queued", "Queued", "Frame picks it up at its next check-in ~3:48 PM", sentence
-        ),
-    )
-    assert "note-queued" in hdr and f'aria-label="{sentence}"' in hdr
-    assert "<b>Queued</b><small>Frame picks it up at its next check-in ~3:48 PM</small>" in hdr
-    assert ">?<" not in hdr
+def _queued_thumb(**over: Any) -> dict[str, Any]:
+    return {
+        "name": "News",
+        "thumb_url": "/compose/thumbs/v1/sent/q1.webp",
+        "aspect": "800/480",
+        "orientation": "l",
+        "label": "Queued",
+        "title": "A new frame is queued. The frame picks it up at its next check-in ~3:48 PM.",
+        **over,
+    }
+
+
+def test_the_header_thumb_is_the_glass_and_the_queued_one_sits_on_its_corner(app: Flask) -> None:
     frame = {
         "label": "a frame sent by hand",
         "thumb_url": "/compose/thumbs/v1/sent/abc123.webp",
         "since": "17:58",
         "title": "A frame sent by hand, on screen since 17:58",
     }
-    badged = _kitchen_header(
-        app, frame=frame, placeholder=None, queued_badge=_note("queued", "Queued", "", sentence)
-    )
-    assert '<img src="/compose/thumbs/v1/sent/abc123.webp"' in badged
-    assert f'<span class="lu-qbadge" title="{sentence}"' in badged
+    qt = _queued_thumb()
+    hdr = _kitchen_header(app, frame=frame, placeholder=None, queued_thumb=qt)
+    figure = hdr[hdr.index('<figure class="lu-now-thumb"') : hdr.index("</figure>")]
+    # The figure's own title is the glass; the Queued tag is not on the main thumb.
+    assert 'title="A frame sent by hand, on screen since 17:58"' in figure.split(">")[0]
+    wrap = figure[figure.index('<span class="lu-now-wrap">') :]
+    main, queued = wrap.split('<span class="lu-qthumb"')
+    assert '<img src="/compose/thumbs/v1/sent/abc123.webp"' in main and "lu-qtag" not in main
+    assert 'role="group"' in queued and f'aria-label="{qt["title"]}"' in queued
+    assert '<img src="/compose/thumbs/v1/sent/q1.webp"' in queued
+    assert '<span class="lu-qtag">' in queued and "<span>Queued</span>" in queued
+    assert "lu-qbadge" not in hdr
+    # Nothing queued: no overlay, no wrapper.
+    calm = _kitchen_header(app, frame=frame, placeholder=None, queued_thumb=None)
+    assert "lu-qthumb" not in calm and "lu-now-wrap" not in calm
+
+
+def test_a_queued_picture_with_no_image_still_shows_a_tagged_box_and_the_glass_placeholder(
+    app: Flask,
+) -> None:
+    hdr = _kitchen_header(app, queued_thumb=_queued_thumb(name="A new frame", thumb_url=""))
+    assert "<b>No image yet</b>" in hdr  # what is on the glass, not "Queued"
+    assert "note-queued" not in hdr
+    queued = hdr[hdr.index('<span class="lu-qthumb"') :]
+    assert '<span class="lu-thumb-ph"' in queued and "<span>Queued</span>" in queued
+
+
+def test_queued_thumb_has_its_corner_rules(app: Flask) -> None:
+    assert ".lu .lu-qthumb { position: absolute; z-index: 2; right: -10px; bottom: -10px;" in CSS
+    assert ".lu .lu-now-thumb .lu-qthumb .lu-thumb.p { height: 46px;" in CSS
 
 
 def test_checked_in_display_is_not_waiting(app: Flask) -> None:

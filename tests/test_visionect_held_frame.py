@@ -208,7 +208,7 @@ def _lineups_display(client) -> dict[str, Any]:
     return next(d for d in data["displays"] if d["id"] == DEVICE)
 
 
-def test_lineups_header_shows_the_glass_and_a_queued_badge(
+def test_lineups_header_shows_the_glass_and_a_queued_thumb(
     app: Flask, client, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _night_then_newspaper(app)
@@ -220,8 +220,9 @@ def test_lineups_header_shows_the_glass_and_a_queued_badge(
     assert display["in_sync"] is False
     assert display["queued"]["dashboard_id"] == "news"
     assert display["queued"]["lands"].startswith("~")
-    badge = display["queued_badge"]
-    assert badge["label"] == "Queued" and "next check-in" in badge["title"]
+    queued = display["queued_thumb"]
+    assert queued["label"] == "Queued" and "next check-in" in queued["title"]
+    assert queued["name"] == display["queued"]["name"] and "queued_badge" not in display
 
 
 def test_lineups_header_moves_to_the_new_picture_after_the_ack(app: Flask, client) -> None:
@@ -229,7 +230,7 @@ def test_lineups_header_moves_to_the_new_picture_after_the_ack(app: Flask, clien
     _ack(app)
     display = _lineups_display(client)
     assert display["on_screen"]["dashboard_id"] == "news"
-    assert display["queued"] is None and display["queued_badge"] is None
+    assert display["queued"] is None and display["queued_thumb"] is None
     assert display["in_sync"] is True
 
 

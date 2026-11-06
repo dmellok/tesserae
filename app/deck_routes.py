@@ -375,6 +375,33 @@ def _frame_state(device: Any) -> tuple[FrameInput | None, bool]:
     ), False
 
 
+def _glass_thumb(device: Any) -> str:
+    """The thumbnail of the picture a display reports holding, or "" when it
+    reports none. This is the actual frame, unlike a dashboard's own thumbnail,
+    which is its newest render."""
+    from app.lineup_thumbs import sent_thumb_url
+
+    push = current_app.config.get("PUSH_MANAGER")
+    if not tracks_held_frame(push, device):
+        return ""
+    served_fn = getattr(push, "last_served_render_for", None)
+    served = served_fn(device.id) if callable(served_fn) else None
+    if not isinstance(served, dict):
+        return ""
+    latest_fn = getattr(push, "latest_render_for", None)
+    latest = latest_fn(device.id) if callable(latest_fn) else None
+    if isinstance(latest, dict) and served.get("digest") == latest.get("digest"):
+        digest = latest.get("composition_digest")
+        preview = served.get("preview_digest") or latest.get("preview_digest")
+    else:
+        resolve = getattr(push, "composition_for_digest", None)
+        digest = served.get("composition_digest") or (
+            resolve(device.id, served.get("digest")) if callable(resolve) else None
+        )
+        preview = served.get("preview_digest")
+    return sent_thumb_url(digest) or sent_thumb_url(preview)
+
+
 def _frame_pending(device: Any) -> bool:
     """True when a display that reports what it holds has a render it has
     not taken yet: its latest digest differs from the last one served (or
@@ -389,6 +416,21 @@ def _frame_pending(device: Any) -> bool:
     served_fn = getattr(push, "last_served_render_for", None)
     served = served_fn(device.id) if callable(served_fn) else None
     return not isinstance(served, dict) or served.get("digest") != latest.get("digest")
+
+
+def _pending_thumb(device: Any) -> str:
+    """The thumbnail of the render a display has not taken yet (what waits for it
+    when no dashboard explains it: a file, a note or a link sent by hand)."""
+    from app.lineup_thumbs import sent_thumb_url
+
+    push = current_app.config.get("PUSH_MANAGER")
+    latest_fn = getattr(push, "latest_render_for", None)
+    latest = latest_fn(device.id) if callable(latest_fn) else None
+    if not isinstance(latest, dict):
+        return ""
+    return sent_thumb_url(latest.get("composition_digest")) or sent_thumb_url(
+        latest.get("preview_digest")
+    )
 
 
 def _heard_from(device: Any) -> tuple[float | None, bool]:
@@ -1538,6 +1580,7 @@ def _build_lineups_view(
         frame, nothing_sent = _frame_state(d) if not on_pid else (None, False)
         last_seen, heard = _heard_from(d)
         pending = _frame_pending(d)
+        pending_thumb = _pending_thumb(d) if pending else ""
         w, h, spec = _device_size(d)
         published, published_known = _published_state(d)
         color = display_color_mode(
@@ -1568,6 +1611,8 @@ def _build_lineups_view(
                 last_seen=last_seen,
                 heard=heard,
                 pending=pending,
+                pending_thumb_url=pending_thumb,
+                glass_thumb_url=_glass_thumb(d) if on_pid else "",
             )
         )
     today = now.weekday()

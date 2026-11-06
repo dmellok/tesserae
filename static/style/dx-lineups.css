@@ -582,26 +582,57 @@ main.page.lu-page {
 .lu .lu-thumb.note-queued .lu-thumb-note .lu-ico {
   color: var(--lu-acc);
 }
-/* A newer frame waits behind the one shown. */
-.lu .lu-qbadge {
+/* A newer frame waits behind the one shown: a small second thumbnail on the header
+   thumb's bottom right corner, carrying the Queued tag. The header thumb itself is
+   always the glass. */
+.lu .lu-now-wrap {
+  position: relative;
+  display: flex;
+  max-width: 100%;
+  max-height: 100%;
+}
+.lu .lu-qthumb {
   position: absolute;
-  right: 3px;
-  bottom: 3px;
+  z-index: 2;
+  right: -10px;
+  bottom: -10px;
+  display: block;
+}
+.lu .lu-now-thumb .lu-qthumb .lu-thumb {
+  border: 1px solid var(--lu-warn-text);
+  box-shadow:
+    0 0 0 2px var(--t-surface),
+    0 2px 6px rgb(0 0 0 / 0.35);
+}
+.lu .lu-now-thumb .lu-qthumb .lu-thumb.p {
+  height: 46px;
+  width: calc(46px * var(--arw) / var(--arh));
+}
+.lu .lu-now-thumb .lu-qthumb .lu-thumb.l {
+  width: 58px;
+  height: calc(58px * var(--arh) / var(--arw));
+}
+.lu .lu-qtag {
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  transform: translateX(-50%);
   display: inline-flex;
   align-items: center;
   gap: 3px;
   padding: 1px 5px 1px 3px;
   border-radius: 999px;
-  font: 600 10px/1.3 var(--t-font);
+  font: 600 9.5px/1.3 var(--t-font);
+  white-space: nowrap;
   color: var(--t-fg);
-  background: color-mix(in oklab, var(--t-surface, #fff) 92%, transparent);
-  border: 1px solid var(--lu-acc);
+  background: var(--t-surface);
+  border: 1px solid var(--lu-warn-text);
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
 }
-.lu .lu-qbadge .lu-ico {
-  width: 11px;
-  height: 11px;
-  color: var(--lu-acc);
+.lu .lu-qtag .lu-ico {
+  width: 10px;
+  height: 10px;
+  color: var(--lu-warn-text);
 }
 /* The phone slot is too small for the sub-line; the tooltip and aria-label
    carry the full sentence and the header's next line gives the time. */

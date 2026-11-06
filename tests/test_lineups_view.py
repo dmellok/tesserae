@@ -2451,22 +2451,30 @@ def test_heard_display_with_unknown_cadence_is_not_offline() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_queued_delivery_placeholder_names_the_next_check_in() -> None:
+def test_queued_delivery_is_a_tagged_thumb_and_the_glass_placeholder_stays_honest() -> None:
     d = _unexplained(pending=True)
-    assert d.placeholder is not None and d.queued_badge is None
-    assert d.placeholder.state == "queued" and d.placeholder.label == "Queued"
-    assert d.placeholder.sub.startswith("Frame picks it up at its next check-in ~")
-    assert d.placeholder.sub.split("check-in ")[1] in d.placeholder.title
-    assert "?" not in d.placeholder.label + d.placeholder.sub
+    # The header thumb says what is on the glass (nothing known), never "Queued".
+    assert d.placeholder is not None and d.placeholder.state == "none"
+    assert d.placeholder.label == "No image yet" and "queued" not in d.placeholder.title.lower()
+    q = d.queued_thumb
+    assert q is not None and q.label == "Queued" and q.name == "A new frame"
+    assert "next check-in ~" in q.title and q.thumb_url == ""
+    assert "?" not in q.label
 
 
-def test_queued_placeholder_with_unknown_reach_still_estimates() -> None:
+def test_a_render_waiting_for_a_sleeper_shows_its_own_thumbnail() -> None:
+    d = _unexplained(pending=True, pending_thumb_url="/compose/thumbs/v1/sent/abc123.webp")
+    assert d.queued_thumb is not None
+    assert d.queued_thumb.thumb_url == "/compose/thumbs/v1/sent/abc123.webp"
+    assert d.queued_thumb.aspect == "800/480" and d.queued_thumb.orientation == "l"
+
+
+def test_queued_thumb_with_unknown_reach_still_estimates() -> None:
     from app.next_update import Reach
 
     d = _unexplained(pending=True, reach=Reach("unknown"))
-    assert d.placeholder is not None and d.placeholder.state == "queued"
-    assert d.placeholder.sub.startswith("Frame picks it up at its next check-in")
-    assert d.placeholder.title.endswith(".")
+    assert d.queued_thumb is not None and d.queued_thumb.title.endswith(".")
+    assert "next check-in" in d.queued_thumb.title or "next checks in" in d.queued_thumb.title
 
 
 def test_no_render_is_nothing_sent_placeholder() -> None:
@@ -2497,19 +2505,84 @@ def test_live_device_being_delivered_says_delivering() -> None:
     )
     d = _display(build_view([kitchen], dashboards, now=SAMPLE_NOW), "kitchen")
     assert d.placeholder is not None and d.placeholder.label == "Delivering"
-    assert d.queued_badge is None
+    assert d.queued_thumb is None
 
 
-def test_served_image_stays_and_a_queued_badge_appears() -> None:
+def test_served_image_stays_and_a_queued_thumb_appears_beside_it() -> None:
     from app.lineups_view import FrameInput
 
-    d = _unexplained(frame=FrameInput("a frame sent by hand", "/x.webp"), pending=True)
-    assert d.frame is not None and d.frame.thumb_url == "/x.webp"
+    d = _unexplained(
+        frame=FrameInput("a frame sent by hand", "/x.webp"),
+        pending=True,
+        pending_thumb_url="/q.webp",
+    )
+    assert d.frame is not None and d.frame.thumb_url == "/x.webp"  # the glass, untouched
     assert d.placeholder is None
-    assert d.queued_badge is not None and d.queued_badge.label == "Queued"
-    assert "next check-in" in d.queued_badge.title
+    assert d.queued_thumb is not None and d.queued_thumb.thumb_url == "/q.webp"
+    assert d.queued_thumb.label == "Queued" and "next check-in" in d.queued_thumb.title
     calm = _unexplained(frame=FrameInput("a frame sent by hand", "/x.webp"))
-    assert calm.queued_badge is None and calm.placeholder is None
+    assert calm.queued_thumb is None and calm.placeholder is None
+
+
+def test_the_header_shows_the_frame_taken_not_the_dashboards_newest_render() -> None:
+    # An album's next photo is rendered and waiting: the dashboard's thumbnail is
+    # that new photo, so the header must show what the frame actually took.
+    displays, dashboards = sample_inputs()
+    kitchen = replace(
+        displays[1],
+        pending=True,
+        pending_thumb_url="/compose/thumbs/v1/sent/new.webp",
+        glass_thumb_url="/compose/thumbs/v1/sent/old.webp",
+    )
+    d = _display(build_view([kitchen], dashboards, now=SAMPLE_NOW), "kitchen")
+    assert d.on_screen is not None
+    assert d.on_screen.thumb_url == "/compose/thumbs/v1/sent/old.webp"
+    assert d.queued_thumb is not None
+    assert d.queued_thumb.thumb_url == "/compose/thumbs/v1/sent/new.webp"
+
+
+def test_a_lineups_queued_step_is_the_small_thumb_and_the_glass_stays_the_header() -> None:
+    from app.lineups_view import DashboardInfo
+
+    displays, dashboards = sample_inputs()
+    dashboards = {
+        **dashboards,
+        "weather": replace(dashboards["weather"], thumb_url="/w.webp"),
+        "family": replace(dashboards["family"], thumb_url="/f.webp"),
+    }
+    view = build_view(displays, dashboards, now=SAMPLE_NOW)
+    kitchen = _display(view, "kitchen")  # asleep, with a scheduled step it has not picked up
+    assert kitchen.queued is not None
+    q = kitchen.queued_thumb
+    assert q is not None and q.name == kitchen.queued.name and q.label == "Queued"
+    assert q.thumb_url == dashboards[kitchen.queued.dashboard_id].thumb_url
+    # What is on the glass is the header thumb, and it carries no tag.
+    assert (
+        kitchen.on_screen is not None
+        and kitchen.on_screen.dashboard_id != kitchen.queued.dashboard_id
+    )
+    frame = _display(view, "frame")  # connected and in sync: nothing waits
+    assert frame.queued is None and frame.queued_thumb is None
+    assert isinstance(dashboards["art"], DashboardInfo)
+
+
+def test_a_manual_send_to_a_sleeping_display_is_queued_too() -> None:
+    """A dashboard sent by hand from the Send page (no lineup behind it) waits for the
+    sleeper like a scheduled step does, so it is the small thumbnail as well."""
+    from app.lineups_view import PublishedInput
+
+    displays, dashboards = sample_inputs()
+    kitchen = replace(displays[1], lineups=())
+    kitchen = replace(
+        kitchen,
+        published=PublishedInput("recipes", SAMPLE_NOW.timestamp() - 60),
+        published_known=True,
+    )
+    dashboards = {**dashboards, "recipes": replace(dashboards["recipes"], thumb_url="/r.webp")}
+    d = _display(build_view([kitchen], dashboards, now=SAMPLE_NOW), "kitchen")
+    assert d.queued is not None and d.queued.dashboard_id == "recipes"
+    assert d.queued_thumb is not None and d.queued_thumb.thumb_url == "/r.webp"
+    assert d.queued_thumb.name == "Recipes" and d.queued_thumb.label == "Queued"
 
 
 def test_pending_needs_a_render_the_display_has_not_fetched(app: Flask) -> None:
