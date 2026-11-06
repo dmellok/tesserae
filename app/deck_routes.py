@@ -242,6 +242,55 @@ _MANUAL_PUSH_SOURCES = frozenset(
 )
 
 
+def _manual_send_times() -> dict[str, float]:
+    """display id -> when something was last sent to it by hand (the Send page,
+    a file, a note, History's resend ...). Newest few rows per source, so one
+    busy display cannot hide another's."""
+    events = current_app.config.get("EVENT_LOG")
+    out: dict[str, float] = {}
+    if events is None:
+        return out
+    for source in sorted(_MANUAL_PUSH_SOURCES):
+        try:
+            rows = events.list(type="push", source=source, statuses=("sent",), limit=8)
+        except Exception:
+            continue
+        for ev in rows:
+            for did in ev.extra.get("device_ids") or []:
+                if isinstance(did, str):
+                    out[did] = max(out.get(did, 0.0), float(ev.timestamp))
+    return out
+
+
+def _lineups_in_control(devices: list[Any]) -> dict[str, str]:
+    """display id -> the lineup whose step the display was last driven by.
+
+    The nav record is written whenever a lineup puts a step on a display (the
+    scheduler's advances and fires, a button or Home Assistant step, and Push
+    now on a step tile), so it is the one record of "this lineup is playing
+    here". It stops holding the moment something is sent to that display by
+    hand afterwards, so a Send page push marks no lineup live. A lineup the
+    scheduler fires next takes the record over (it writes its own), which ends
+    a forced lineup's turn."""
+    nav = _nav_store()
+    if nav is None:
+        return {}
+    manual = _manual_send_times()
+    out: dict[str, str] = {}
+    for d in devices:
+        try:
+            rec = nav.get(d.id)
+        except Exception:
+            continue
+        if not rec or not rec.get("deck_id"):
+            continue
+        updated = rec.get("updated_at")
+        if isinstance(updated, (int, float)) and manual.get(d.id, 0.0) > float(updated):
+            continue
+        out[d.id] = str(rec["deck_id"])
+    return out
+
+
 def _frame_origin(
     device_id: str,
     page_id: str,
@@ -1468,6 +1517,7 @@ def _build_lineups_view(
         current = {}
     panel_states = _panel_states(devices)
     live = _live_map()
+    in_control = _lineups_in_control(devices)
 
     known = {d.id for d in devices}
     scheduler = current_app.config.get("SCHEDULER")
@@ -1542,8 +1592,7 @@ def _build_lineups_view(
                 unassigned.append(_lineup_input(deck, runtime=runtime, last_fired=last_fired))
             continue
         for did in targets:
-            rec = live.get(did)
-            playing = bool(rec and rec[0] == deck.id)
+            playing = in_control.get(did) == deck.id
             by_display[did].append(
                 _lineup_input(deck, runtime=runtime, playing=playing, last_fired=last_fired)
             )
@@ -2310,14 +2359,40 @@ def push_step(deck_id: str) -> Response:
             composition = (Path(current_app.config["RENDERS_DIR"]) / f"{digest}.png").read_bytes()
     fresh = composition is None
 
+    def mark_playing(shown: list[str]) -> None:
+        """Record that this lineup now has its step on those displays: the one
+        record the page (and the buttons) read for "this lineup is playing
+        here", the same one the scheduler writes after its own fires. Without
+        it the push left no trace of which lineup it came from."""
+        from app.state.deck_nav_store import navigation_locked
+
+        nav = _nav_store()
+        if nav is None or not shown:
+            return
+        with navigation_locked(nav, shown), contextlib.suppress(Exception):
+            for did in shown:
+                nav.set(did, deck.id, page_id)
+
     def send_step() -> None:
+        from app.push import DELIVERED_STATUSES
+
+        shown: list[str] = []
         if composition is None:
-            pusher.push(page_id, device_ids=set(targets), bypass_coalesce=True, force_publish=True)
+            result = pusher.push(
+                page_id, device_ids=set(targets), bypass_coalesce=True, force_publish=True
+            )
+            if result.status in DELIVERED_STATUSES:
+                shown = list(targets)
         else:
             # History's normal per-device transform handles resizing and
             # physical rotation. Resolve each target's own panel dimensions.
             for did in targets:
-                pusher.republish_composition(composition, page_id=page_id, device_ids={did})
+                result = pusher.republish_composition(
+                    composition, page_id=page_id, device_ids={did}
+                )
+                if result.status in DELIVERED_STATUSES:
+                    shown.append(did)
+        mark_playing(shown)
 
     _run_in_background(send_step, label=f"lineup-step:{deck_id}:{page_id}")
     now_ts = time.time()
