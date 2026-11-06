@@ -31,7 +31,7 @@ more panels over MQTT or HTTP.
 > the full-stack, embedded and Home Assistant work that Tesserae itself is built
 > from. If Tesserae is useful to you, sponsoring helps keep it going.
 >
-> **[Get in touch about a contract](https://github.com/dmellok)** · **[Sponsor Tesserae](https://github.com/sponsors/dmellok)**
+> **[Get in touch about a contract](mailto:dmellok@icloud.com?subject=Contract%20work%20enquiry)** · **[Sponsor Tesserae](https://github.com/sponsors/dmellok)**
 >
 > Kayden, maker of Tesserae
 
