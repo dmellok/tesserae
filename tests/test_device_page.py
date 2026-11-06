@@ -749,6 +749,7 @@ def _lineups_view_for_rail(*, showing: str, next_id: str) -> object:
         next_run=None,
         steps=[step],
         window=NS(is_point=False, end="24:00", end_min=1440),
+        progress=None,
     )
     display = NS(
         id="door",
