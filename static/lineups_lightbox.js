@@ -168,7 +168,7 @@
     if (e.target.closest("[data-lb-close]")) {
       close();
     } else if (e.target.closest("[data-lb-push]")) {
-      if (m && m.push && !m.push.busy && m.onPush) m.onPush();
+      if (m && m.push && !m.push.busy && !m.push.disabled && m.onPush) m.onPush();
     } else {
       const s = e.target.closest("[data-lb-step]");
       if (s && m && m.onStep) m.onStep(Number(s.dataset.lbStep));

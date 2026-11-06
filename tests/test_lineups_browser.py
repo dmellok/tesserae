@@ -2970,6 +2970,8 @@ def test_the_queued_thumbnail_sits_on_the_glass_thumbs_corner(
         assert fig.locator(".lu-now-wrap > .lu-thumb .lu-qtag").count() == 0
         assert page._lu_errors == []
         browser.close()
+
+
 @pytest.mark.parametrize("variant", ["pauses", "paused", "none"])
 def test_all_day_block_row_matches_in_both_renderers_and_has_no_end(
     live: str, variant: str

@@ -2784,6 +2784,8 @@ def test_the_next_scheduled_step_takes_the_display_back_from_a_forced_lineup(
     app.config["DECK_NAV_STORE"].set("panel", "morning", "news")  # what a scheduled advance writes
     assert _status_of(other_day, "elsewhen") != "live"
     assert _status_of(other_day, "morning") == "live"
+
+
 # -- an all-day block never reaches an end ---------------------------------------------
 
 
@@ -3326,6 +3328,85 @@ def test_push_step_sends_the_chosen_item_as_drawn(
     resp = album.post("/decks/album/push-step", json={"index": 0, "item": "p3.jpg"})
     assert resp.status_code == 200 and len(drawn) == 1
     assert fake.stored_calls[-1][0] == b"PNG-OF-P3"
+
+
+def test_a_stale_item_render_is_drawn_again_before_it_is_pushed(
+    album: Any, app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import os
+
+    from app import deck_routes, preview_cache
+
+    fake = _FakePush()
+    app.config["PUSH_MANAGER"] = fake
+    drawn: list[Any] = []
+
+    def render_now(**kw: Any) -> None:
+        drawn.append(kw)
+        kw["cache_path"].parent.mkdir(parents=True, exist_ok=True)
+        kw["cache_path"].write_bytes(b"P3-TODAY" if len(drawn) > 1 else b"P3-THEN")
+
+    monkeypatch.setattr(preview_cache, "render_now", render_now)
+    body = {"index": 0, "item": "p3.jpg", "display_id": "panel"}
+    assert album.post("/decks/album/push-step", json=body).status_code == 200
+    path = drawn[0]["cache_path"]
+    # Hours later the stored picture carries hours-old clock and weather cells.
+    old = path.stat().st_mtime - deck_routes.ITEM_PUSH_FRESH_S - 60
+    os.utime(path, (old, old))
+    assert album.post("/decks/album/push-step", json=body).status_code == 200
+    assert len(drawn) == 2 and fake.stored_calls[-1][0] == b"P3-TODAY"
+
+
+def test_a_draw_is_read_when_the_push_is_accepted_not_when_it_is_sent(
+    drawn: Any, app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app import preview_cache, send_routes
+
+    fake = _FakePush()
+    app.config["PUSH_MANAGER"] = fake
+    submitted: list[dict[str, Any]] = []
+    monkeypatch.setattr(preview_cache, "submit", lambda **kw: submitted.append(kw))
+    monkeypatch.setattr(preview_cache, "backlog", lambda: 0)
+    monkeypatch.setattr(preview_cache, "is_pending", lambda p: False)
+    drew: list[Any] = []
+    monkeypatch.setattr(preview_cache, "render_now", lambda **kw: drew.append(kw))
+    later: list[Any] = []
+    monkeypatch.setattr(send_routes, "_run_in_background", lambda work, label: later.append(work))
+    key = "draw:0123456789ab:2"
+    assert (
+        drawn.get(f"/decks/draws/step-item?index=0&display_id=panel&item={key}").status_code == 202
+    )
+    path = submitted[0]["cache_path"]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"THE-PIXELS")
+    resp = drawn.post(
+        "/decks/draws/push-step", json={"index": 0, "item": key, "display_id": "panel"}
+    )
+    assert resp.status_code == 200 and len(later) == 1
+    # Evicted by other previews between the click and the background send.
+    path.unlink()
+    with app.app_context():  # as the real background runner does
+        later[0]()
+    assert fake.stored_calls == [(b"THE-PIXELS", {"page_id": "drawn", "device_ids": {"panel"}})]
+    assert not drew, "a draw is never drawn again"
+
+
+def test_pushing_an_item_marks_its_lineup_live(
+    album: Any, app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app import preview_cache
+
+    app.config["PUSH_MANAGER"] = _FakePush()
+
+    def render_now(**kw: Any) -> None:
+        kw["cache_path"].parent.mkdir(parents=True, exist_ok=True)
+        kw["cache_path"].write_bytes(b"PNG")
+
+    monkeypatch.setattr(preview_cache, "render_now", render_now)
+    body = {"index": 0, "item": "p3.jpg", "display_id": "panel"}
+    assert album.post("/decks/album/push-step", json=body).status_code == 200
+    rec = app.config["DECK_NAV_STORE"].get("panel")
+    assert rec and rec["deck_id"] == "album" and rec["page_id"] == "photos"
 
 
 @pytest.mark.parametrize(

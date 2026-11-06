@@ -208,9 +208,18 @@ class PreviewRenderQueue:
 def _evict_items(cache_path: Path) -> None:
     """Keep this page item's newest render and the ``ITEM_KEEP`` newest item
     renders overall; drop the rest with their small and large thumbnails."""
+
+    def mtime(f: Path) -> float:
+        # Another render may evict the same folder at once; a file gone
+        # mid-sort just sorts last (and its unlink below is a no-op).
+        try:
+            return f.stat().st_mtime
+        except FileNotFoundError:
+            return 0.0
+
     files = sorted(
         (f for f in cache_path.parent.glob("*.png") if _ITEM_FILE.match(f.name)),
-        key=lambda f: f.stat().st_mtime,
+        key=mtime,
         reverse=True,
     )
     for f in files[ITEM_KEEP - 1 :]:

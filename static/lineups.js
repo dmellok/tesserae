@@ -1339,7 +1339,15 @@
       gamut: d.gamut,
       greyLevels: d.grey_levels,
       nav,
-      push: canPush ? { label: "Push now", title: s.push_title, busy: !!zoom.pushing } : null,
+      // Push sends the picture shown: not while it is still drawing or failed to.
+      push: canPush
+        ? {
+            label: "Push now",
+            title: p && p.state !== "ready" ? "Wait for this picture to finish" : s.push_title,
+            busy: !!zoom.pushing,
+            disabled: !!p && p.state !== "ready",
+          }
+        : null,
       msg: zoom.msg || null,
     });
   }
@@ -1446,6 +1454,8 @@
   // One push, from the tile or the lightbox: the same route, the same "lands ..." wording.
   // ``pick`` is the item chosen with the arrows (null: the step as it is).
   async function doPush(d, l, step, pick) {
+    // Push sends the picture shown, so never one still drawing or that failed to draw.
+    if (pick && pick.state !== "ready") throw new Error("this picture isn't ready yet");
     const res = await API.pushStep(l, step, d ? d.id : "", pick ? pick.key : "");
     if (pick) {
       const own = pick.owner || pick;

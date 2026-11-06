@@ -592,7 +592,14 @@ def _last_good_key(
 
     A widget that declares ``render.per_placement`` also keys on its
     ``placement``: its payload is fitted to one cell, so another cell's last
-    good result is not a fallback for this one."""
+    good result is not a fallback for this one.
+
+    A Lineups draw's per-drawing tokens (``_draw``, ``_browse``, see
+    :mod:`app.step_items`) are left out: each draw is unique, so keying on them
+    would add an entry per draw that never goes, and any earlier drawing of the
+    same widget is as good a fallback."""
+    if "_draw" in options:
+        options = {k: v for k, v in options.items() if k not in ("_draw", "_browse")}
     opts = json.dumps(options, sort_keys=True, default=str)
     key = f"{plugin_id}::{panel_w}x{panel_h}::{opts}"
     return f"{key}::{placement}" if placement else key
