@@ -230,7 +230,19 @@
           : `<span class="lu-hn q" title="Scheduled, queued: lands ${esc(n.lands || "")}">${esc(n.scheduled_name)}</span>${n.on_screen_name ? `<span class="lu-hn dim" title="Still on screen">${esc(n.on_screen_name)} on screen</span>` : ""}`;
         now = `<span class="lu-hs-now">${now}</span>`;
       }
-      return `<div class="lu-hs" title="${esc(p.title)}"><span class="lu-hs-line">${w}${ws}<span>ends in <b>${esc(p.ends_in_label)}</b></span></span><span class="lu-hs-bar" role="progressbar" aria-label="Time through this window" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${p.window_pct}"><i style="width:${p.window_pct}%"></i></span>${now}</div>`;
+      // An all-day block that carries on into tomorrow has no end and no bar; only an
+      // interruption by quiet hours is said.
+      const tail = p.always_on
+        ? p.pauses_in_label
+          ? `${ws}<span>pauses in <b>${esc(p.pauses_in_label)}</b></span>`
+          : p.paused_until_label
+            ? `${ws}<span>paused until <b>${esc(p.paused_until_label)}</b></span>`
+            : ""
+        : `${ws}<span>ends in <b>${esc(p.ends_in_label)}</b></span>`;
+      const bar = p.always_on
+        ? ""
+        : `<span class="lu-hs-bar" role="progressbar" aria-label="Time through this window" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${p.window_pct}"><i style="width:${p.window_pct}%"></i></span>`;
+      return `<div class="lu-hs" title="${esc(p.title)}"><span class="lu-hs-line">${w}${tail}</span>${bar}${now}</div>`;
     }
     if (l.status === "live") {
       return `<div class="lu-hs"><span class="lu-hs-line">${w}${ws}<span>${l.kind === "manual" ? "playing now" : "live"}</span></span></div>`;

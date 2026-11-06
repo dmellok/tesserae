@@ -557,6 +557,14 @@ class ProgressView(_Dict):
     starts_in_minutes: int | None
     starts_in_label: str | None  # "3h 48m"
     title: str
+    #: a block that runs all day and carries on into the next day: it has no end to
+    #: count down to, so there is no bar and no ends-in; only an interruption is said
+    always_on: bool = False
+    #: always-on only: minutes until the display's quiet hours pause it (None: none soon),
+    #: or the label of when they end while it is paused now
+    pauses_in_minutes: int | None = None
+    pauses_in_label: str | None = None
+    paused_until_label: str | None = None
 
 
 @dataclass
@@ -949,6 +957,18 @@ def _dwells(lineup: LineupInput) -> list[int]:
     return [max(1, s.dwell_minutes or 1) for s in lineup.steps]
 
 
+def _always_on(lineup: LineupInput, block: _Block) -> bool:
+    """A cycle or interval block that fills its calendar day (00:00 to 24:00) and whose
+    next day is on too, so it never reaches an end: it carries on at midnight. Not a
+    block that merely ends at midnight (06:00 to 24:00), and not the last day of a run
+    (a Friday-only block really does stop at Friday's midnight)."""
+    if lineup.kind not in ("cycle", "interval") or block.push or block.hold:
+        return False
+    if block.s % DAY_MIN != 0 or block.e - block.s != DAY_MIN:
+        return False
+    return ((block.s // DAY_MIN + 1) % 7) in lineup.days
+
+
 def window_minutes(lineup: LineupInput) -> tuple[int, int] | None:
     """``(start, end)`` in day minutes, for showing the window: ``end`` may
     exceed 1440 for an interval window that wraps past midnight and equals
@@ -1247,6 +1267,34 @@ def _pause_display_parts(pause: PauseInput | None, day: int) -> list[tuple[int, 
         if e > s:
             out.append((s, e))
     return out
+
+
+def next_pause(pause: PauseInput | None, now_abs: int) -> tuple[int, int, bool] | None:
+    """The display's next quiet hours as ``(start, end, inside)`` in week minutes:
+    ``inside`` when ``now_abs`` is already in them (``start`` is then now or earlier,
+    ``end`` where they stop). Uses :func:`_pause_display_parts`, the spans the day bar
+    draws (a 23:00-06:30 pause ends at 06:30), and joins spans that touch (a 23:00-06:30 pause is one stretch
+    across midnight). ``None`` when there are no quiet hours in the coming week."""
+    if pause is None:
+        return None
+    spans: list[tuple[int, int]] = []
+    first_day = now_abs // DAY_MIN - 1  # yesterday's tail can still be running
+    for day in range(first_day, first_day + 9):
+        for ps, pe in _pause_display_parts(pause, day % 7):
+            spans.append((day * DAY_MIN + ps, day * DAY_MIN + pe))
+    spans.sort()
+    merged: list[list[int]] = []
+    for a, b in spans:
+        if merged and a <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], b)
+        else:
+            merged.append([a, b])
+    for a, b in merged:
+        if a <= now_abs < b:
+            return a, b, True
+        if a > now_abs:
+            return a, b, False
+    return None
 
 
 def in_pause(pause: PauseInput | None, week_minute: int) -> bool:
@@ -2385,7 +2433,37 @@ def _lineup_view(
 
     # -- progress ----------------------------------------------------------
     progress: ProgressView | None = None
-    if live and lb is not None:
+    if live and lb is not None and _always_on(lineup, lb):
+        # Runs all day and on into tomorrow (12 AM to 12 AM): there is no end to
+        # count down to. Only an interruption by quiet hours is worth saying.
+        pause = next_pause(d.pause, now_abs)
+        pauses_in = paused_until = None
+        if pause is not None:
+            if pause[2]:
+                paused_until = clock(pause[1] % DAY_MIN)
+            else:
+                pauses_in = pause[0] - now_abs
+        title = f"{refreshes} refreshes today. Runs all day."
+        if pauses_in is not None:
+            title += (
+                f" Quiet hours ({pause_label(d.pause)}) pause it in {rel_short(pauses_in)}."
+                if d.pause
+                else ""
+            )
+        progress = ProgressView(
+            refreshes_today=refreshes,
+            window_pct=None,
+            ends_in_minutes=None,
+            ends_in_label=None,
+            starts_in_minutes=None,
+            starts_in_label=None,
+            title=title,
+            always_on=True,
+            pauses_in_minutes=pauses_in,
+            pauses_in_label=rel_short(pauses_in) if pauses_in is not None else None,
+            paused_until_label=paused_until,
+        )
+    elif live and lb is not None:
         s_rel = lb.s if lb.s <= now_abs else lb.s - WEEK_MIN
         e_rel = lb.e if lb.s <= now_abs else lb.e - WEEK_MIN
         span = max(1, e_rel - s_rel)

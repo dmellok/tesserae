@@ -61,6 +61,25 @@ def _sample_vm(cycle: str = "h23") -> dict[str, Any]:
     return vm
 
 
+def _always_on(vm: dict[str, Any], variant: str) -> None:
+    """Make Dinner an all-day block that carries on into tomorrow: no end, no bar."""
+    dinner = next(lu for lu in vm["displays"][0]["lineups"] if lu["id"] == "dinner")
+    dinner["window"].update(
+        start="00:00", end="24:00", label="00:00–24:00", start_min=0, end_min=1440
+    )
+    p = dinner["progress"]
+    p.update(
+        always_on=True,
+        window_pct=None,
+        ends_in_label=None,
+        ends_in_minutes=None,
+        pauses_in_label="4h 48m" if variant == "pauses" else None,
+        pauses_in_minutes=288 if variant == "pauses" else None,
+        paused_until_label="06:30" if variant == "paused" else None,
+        title="Runs all day.",
+    )
+
+
 _PIXEL = "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=="
 _FRAME = {
     "label": "a frame sent by hand",
@@ -133,6 +152,8 @@ def live(tmp_path: Path) -> Iterator[str]:
 
     def sample() -> str:
         vm = _sample_vm(request.args.get("cycle", "h23"))
+        if request.args.get("always"):
+            _always_on(vm, request.args["always"])
         _header_variant(vm["displays"][1], request.args.get("hdr", ""))
         for d in vm["displays"]:
             for lu in d["lineups"]:
@@ -203,6 +224,7 @@ def _open(
     before_load: Any = None,
     hdr: str = "",
     off: bool = False,
+    extra: str = "",
 ) -> tuple[Any, Any, _Api]:
     browser = _launch(p)
     ctx = browser.new_context(
@@ -217,7 +239,8 @@ def _open(
     if before_load:
         before_load(page)
     page.goto(
-        base + PAGE + f"?cycle={cycle}&hdr={hdr}" + ("&off=1" if off else ""), wait_until="load"
+        base + PAGE + f"?cycle={cycle}&hdr={hdr}" + ("&off=1" if off else "") + extra,
+        wait_until="load",
     )
     if js:
         page.wait_for_function(
@@ -2790,3 +2813,32 @@ def test_scope_works_when_storage_is_blocked(live: str) -> None:
         page.locator('[data-scope="today"]').click()
         assert len(_rows(page)) == 3
         browser.close()
+
+
+@pytest.mark.parametrize("variant", ["pauses", "paused", "none"])
+def test_all_day_block_row_matches_in_both_renderers_and_has_no_end(
+    live: str, variant: str
+) -> None:
+    from playwright.sync_api import sync_playwright
+
+    sel = "#lu-row-dinner .lu-row-state"
+    with sync_playwright() as p:
+        browser, nojs, _ = _open(p, live, js=False, extra=f"&always={variant}")
+        server = nojs.eval_on_selector(sel, "e => e.outerHTML")
+        text = nojs.locator(sel).inner_text()
+        assert nojs.locator("#lu-row-dinner .lu-hs-bar").count() == 0
+        browser.close()
+        browser, page, _ = _open(p, live, extra=f"&always={variant}")
+        client = page.eval_on_selector(sel, "e => e.outerHTML")  # drawn by lineups_render.js
+        live_text = page.locator(sel).inner_text()
+        assert page.locator("#lu-row-dinner .lu-hs-bar").count() == 0
+        browser.close()
+    assert _shape(server) == _shape(client)
+    assert "ends in" not in text and "ends in" not in live_text
+    assert "00:00–24:00" in text
+    want = {"pauses": "pauses in 4h 48m", "paused": "paused until 06:30", "none": ""}[variant]
+    for t in (text, live_text):
+        if want:
+            assert want in t
+        else:
+            assert "pauses" not in t and "paused" not in t

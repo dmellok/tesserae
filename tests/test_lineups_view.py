@@ -2559,3 +2559,108 @@ def test_link_label_without_a_future_wake_time() -> None:
     assert _link(next_checkin_at=now - 60, gap_s=1200.0, cadence_stable=True).label == (
         "Wakes every 20 min"
     )
+
+
+# -- an all-day block never reaches an end ---------------------------------------------
+
+
+def _live_progress(
+    *,
+    start: str = "00:00",
+    end: str | None = None,
+    kind: str = "cycle",
+    days: tuple[int, ...] = (0, 1, 2, 3, 4, 5, 6),
+    at: tuple[int, int] = (18, 12),
+    pause: Any = "keep",
+    interval: int = 30,
+    weekday: int | None = None,
+) -> Any:
+    from app.lineups_view import SAMPLE_NOW
+
+    displays, dashboards = sample_inputs()
+    d = displays[0]
+    lineup = replace(
+        d.lineups[0],
+        kind=kind,
+        start=start,
+        end=end,
+        days=days,
+        interval_minutes=interval if kind == "interval" else 0,
+        steps=tuple(StepInput(x.dashboard_id, 30) for x in d.lineups[0].steps),
+    )
+    d = replace(d, lineups=(lineup,), pause=d.pause if pause == "keep" else pause)
+    now = SAMPLE_NOW.replace(hour=at[0], minute=at[1])
+    if weekday is not None:
+        now = now + __import__("datetime").timedelta(days=weekday - now.weekday())
+    out = build_view([d], dashboards, now=now).displays[0].lineups[0]
+    return out
+
+
+def test_an_all_day_block_has_no_end_and_says_when_quiet_hours_pause_it() -> None:
+    lu = _live_progress()  # Wednesday 18:12, quiet hours 23:00-06:30
+    assert lu.status == "live" and lu.window is not None and lu.window.label == "00:00–24:00"
+    p = lu.progress
+    assert p is not None and p.always_on
+    assert p.window_pct is None and p.ends_in_label is None and p.ends_in_minutes is None
+    assert p.pauses_in_minutes == 4 * 60 + 48 and p.pauses_in_label == "4h 48m"
+    assert "ends" not in p.title and "through this window" not in p.title
+
+
+def test_an_all_day_block_inside_quiet_hours_says_when_they_end() -> None:
+    lu = _live_progress(at=(1, 0))
+    p = lu.progress
+    assert p is not None and p.always_on and p.pauses_in_label is None
+    assert (
+        p.paused_until_label == "06:30"
+    )  # the page's own quiet hours end, as the day bar draws it
+
+
+def test_an_all_day_block_without_quiet_hours_says_nothing_about_an_end() -> None:
+    p = _live_progress(pause=None).progress
+    assert p is not None and p.always_on
+    assert p.pauses_in_label is None and p.paused_until_label is None and p.ends_in_label is None
+
+
+def test_an_all_day_interval_lineup_is_always_on_too() -> None:
+    p = _live_progress(kind="interval", end=None).progress
+    assert p is not None and p.always_on
+
+
+def test_a_whole_day_quiet_day_pauses_it_at_midnight() -> None:
+    from app.lineups_view import PauseInput
+
+    # Quiet hours "all day Thursday": Wednesday's block is paused when Thursday begins.
+    pause = PauseInput(23 * 60, 6 * 60 + 30, days=(), all_day=(3,))
+    p = _live_progress(pause=pause, weekday=2).progress
+    assert p is not None and p.always_on
+    assert p.pauses_in_minutes == 24 * 60 - (18 * 60 + 12) and p.pauses_in_label == "5h 48m"
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "why"),
+    [
+        ({"start": "06:00", "end": "00:00"}, "ends at midnight, is not 24 hours"),
+        ({"start": "00:00", "end": "23:00"}, "stops at 23:00"),
+        (
+            {"kind": "interval", "start": "22:00", "end": "06:00", "at": (23, 30)},
+            "runs overnight, not all day",
+        ),
+        ({"days": (2,), "weekday": 2}, "Wednesday only: it really stops at Wednesday's midnight"),
+        ({"days": (0, 1, 2), "weekday": 2}, "the last day of a run stops at its midnight"),
+    ],
+)
+def test_a_block_that_really_ends_keeps_its_countdown_and_bar(
+    kwargs: dict[str, Any], why: str
+) -> None:
+    lu = _live_progress(**kwargs)
+    assert lu.status == "live", why
+    p = lu.progress
+    assert p is not None and not p.always_on, why
+    assert p.ends_in_label and p.window_pct is not None, why
+
+
+def test_a_block_that_carries_on_into_tomorrow_is_always_on_until_its_last_day() -> None:
+    mon_wed = (0, 1, 2)
+    assert _live_progress(days=mon_wed, weekday=1).progress.always_on  # type: ignore[union-attr]
+    last = _live_progress(days=mon_wed, weekday=2).progress
+    assert last is not None and not last.always_on and last.ends_in_label == "5h 48m"
