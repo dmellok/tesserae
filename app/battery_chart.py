@@ -601,11 +601,24 @@ def tone_for(pct: int | None) -> str:
 
 
 #: The per-chart range buttons: (hours, label). A chart's window need not be
-#: one of these (the Batteries page also offers 3, 14 and 90 days); none is
-#: pressed then.
-RANGES: tuple[tuple[int, str], ...] = ((12, "12h"), (24, "24h"), (168, "7d"), (720, "30d"))
-#: The longest window the JSON endpoint serves.
-MAX_WINDOW_HOURS: int = 90 * 24
+#: one of these (a hand-typed ``?hours=`` on the JSON endpoint); none is pressed
+#: then.
+RANGES: tuple[tuple[int, str], ...] = (
+    (6, "6h"),
+    (12, "12h"),
+    (24, "24h"),
+    (168, "7d"),
+    (720, "30d"),
+)
+#: What a chart opens at when the browser has no remembered range for it.
+DEFAULT_WINDOW_HOURS: float = 168
+#: The longest window the JSON endpoint serves: the longest range button.
+MAX_WINDOW_HOURS: int = max(h for h, _ in RANGES)
+
+
+def _hours(window_days: float | None) -> float:
+    """A window in hours: ``window_days`` when given, else the default."""
+    return window_days * 24 if window_days else DEFAULT_WINDOW_HOURS
 
 
 def window_label(hours: float) -> str:
@@ -636,7 +649,7 @@ def load_wake_events(
     :func:`build_battery_chart` as ``events``."""
     if event_log is None or not device_ids:
         return {}
-    hours = window_hours if window_hours is not None else (window_days or 7) * 24
+    hours = window_hours if window_hours is not None else _hours(window_days)
     since = time.time() - hours * 3600.0
     status = event_log.device_status_events(list(device_ids), since=since)
     context = event_log.context_events(_CONTEXT_TYPES, since=since - PICKUP_MAX_S)
@@ -718,7 +731,7 @@ def build_battery_chart(
 ) -> dict[str, Any]:
     """Everything one device's battery card needs.
 
-    The window is ``window_hours`` when given, else ``window_days`` (default 7).
+    The window is ``window_hours`` when given, else ``window_days`` (default 7 days).
     ``events`` are the device's pre-fetched event-log rows (from
     :func:`load_wake_events`, two queries for a whole page); when ``None`` and an
     ``event_log`` is given, they are fetched here for this one device.
@@ -747,7 +760,7 @@ def build_battery_chart(
           "prediction": {...} | None,  # always None when predictions don't apply
         }
     """
-    hours: float = window_hours if window_hours is not None else (window_days or 7) * 24
+    hours: float = window_hours if window_hours is not None else _hours(window_days)
     days = hours / 24
     rows: list[BatteryRow] = history.recent(device_id, window_days=days)
     series: list[dict[str, Any]] = []

@@ -115,7 +115,7 @@
 
 .dx-battery-stats {
   gap: 8px;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
 }
 @media (max-width: 720px) {
   .dx-battery-stats {
@@ -243,7 +243,7 @@
   border-radius: 3px;
 }
 
-/* Per-chart range: 12h | 24h | 7d | 30d, above the chart. */
+/* Per-chart range: 6h | 12h | 24h | 7d | 30d, above the chart. */
 .dx-battery-chartbox {
   display: flex;
   flex-direction: column;

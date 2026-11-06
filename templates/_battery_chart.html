@@ -8,7 +8,7 @@ Inputs: every macro takes ``card``, the dict returned by
 
   card.id / card.name        device id and display name
   card.window_hours          chart window (x axis spans this); window_label is
-                             it as words, ranges the 12h / 24h / 7d / 30d
+                             it as words, ranges the 6h / 12h / 24h / 7d / 30d
                              buttons [{hours, label, pressed}]
   card.tone                  'ok' | 'low' | 'critical' (drives nothing here
                              beyond the chart's data-tone hook)
@@ -35,7 +35,7 @@ Macros:
                              static/battery-chart.js, which finds every
                              ``canvas.battery-chart`` and draws it (theme-aware,
                              hover and arrow-key tooltips on the line and dots).
-  battery_chart(card)        the chart block: a range switch (12h | 24h | 7d |
+  battery_chart(card)        the chart block: a range switch (6h | 12h | 24h | 7d |
                              30d, buttons with aria-pressed; each chart keeps
                              its own choice in localStorage and fetches that
                              range from /devices/battery/<id>/card.json

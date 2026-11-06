@@ -9,12 +9,12 @@
  *   data-gaps         [{start_ms, end_ms, kind}]         spans with no readings
  *   data-window-hours the x axis spans this many hours
  *
- * Range. The buttons above the chart (12h | 24h | 7d | 30d) change this chart
+ * Range. The buttons above the chart (6h | 12h | 24h | 7d | 30d) change this chart
  * only: it fetches that range for its device from the box's data-url
  * (/devices/battery/<id>/card.json), redraws, and swaps the stat tiles, hint
- * and key for the new range. The choice is kept per device in localStorage and
- * overrides the page's default window. Dragging across the plot zooms into that
- * span (no refetch); "Reset zoom" or a double click undoes it.
+ * and key for the new range. The choice is kept per device in localStorage; a
+ * chart with none opens at the server's default (7 days). Dragging across the
+ * plot zooms into that span (no refetch); "Reset zoom" or a double click undoes it.
  *
  * A dot's shape and colour say why the device woke (STYLES below; the legend
  * under the chart is drawn from the same table in dx-battery.css). Hovering the
@@ -861,7 +861,7 @@
     readAttrs();
     apply();
     boxes.push({ restyle: restyle });
-    // This chart's own range overrides the page's default window.
+    // A remembered range for this device replaces the server's default one.
     var stored = storedRange(deviceId);
     if (stored && Math.abs(stored - data.windowHours) > 0.01) {
       markPressed(stored);

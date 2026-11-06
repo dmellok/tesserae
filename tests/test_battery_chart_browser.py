@@ -241,7 +241,7 @@ _TIP_TEXT_JS = """() => {
 
 def _open(page: Any, base: str, app: Flask, *, ui: str, theme: str) -> None:
     app.config["SETTINGS_STORE"].patch_section("app", {"ui_design": ui})
-    page.goto(f"{base}/devices/battery?window=1")
+    page.goto(f"{base}/devices/battery")
     page.evaluate(
         "(t) => { const r = document.documentElement;"
         " if (t === 'dark') r.setAttribute('data-theme', 'dark');"
@@ -412,10 +412,10 @@ def test_each_chart_has_its_own_range_that_survives_a_reload(served: tuple[str, 
     with sync_playwright() as p:
         browser = _launch(p)
         page = browser.new_page(viewport={"width": 1100, "height": 2400})
-        _open(page, base, app, ui="classic", theme="light")  # page default: 1 day
+        _open(page, base, app, ui="classic", theme="light")  # nothing remembered: opens on 7 days
         before = _state(page, ATTIC)
         busy_before = _state(page, BUSY)
-        assert before["hours"] == 24 and before["pressed"] == ["24h"]
+        assert before["hours"] == 168 and before["pressed"] == ["7d"]
 
         # 12h: only this card changes, without a reload, tiles included.
         page.click(f"{ATTIC} .dx-battery-range button[data-hours='12']")
@@ -436,7 +436,16 @@ def test_each_chart_has_its_own_range_that_survives_a_reload(served: tuple[str, 
             "(c) => document.querySelector(c + ' canvas').dataset.windowHours === '12'", arg=ATTIC
         )
         assert _state(page, ATTIC)["pressed"] == ["12h"]
-        assert _state(page, BUSY)["hours"] == 24
+        assert _state(page, BUSY)["hours"] == 168
+
+        # 6h, the shortest, draws too: its own x axis, fewer samples than 12h.
+        page.click(f"{ATTIC} .dx-battery-range button[data-hours='6']")
+        page.wait_for_function(
+            "(c) => document.querySelector(c + ' canvas').dataset.windowHours === '6'", arg=ATTIC
+        )
+        six = _state(page, ATTIC)
+        assert six["pressed"] == ["6h"] and 0 < six["series"] < after["series"]
+        assert six["xmax"] - six["xmin"] <= 6 * 3600 * 1000 + 1
 
         # And it switches back, key and tiles following.
         page.click(f"{ATTIC} .dx-battery-range button[data-hours='168']")
