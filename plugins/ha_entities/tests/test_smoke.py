@@ -58,6 +58,37 @@ def test_lock_icon_flips_when_unlocked(app: Flask, monkeypatch) -> None:
     assert out["items"][0]["icon"] == "lock-open"
 
 
+def test_binary_sensor_label_follows_device_class(app: Flask, monkeypatch) -> None:
+    """A binary_sensor reads the way Home Assistant words it: a door is
+    Closed, not Off. Without a known device_class it stays On / Off."""
+    ent, core = _mods(app)
+    states = [
+        {
+            "entity_id": "binary_sensor.front",
+            "state": "off",
+            "attributes": {"device_class": "door"},
+        },
+        {
+            "entity_id": "binary_sensor.slide",
+            "state": "on",
+            "attributes": {"device_class": "opening"},
+        },
+        {
+            "entity_id": "binary_sensor.hall",
+            "state": "on",
+            "attributes": {"device_class": "motion"},
+        },
+        {"entity_id": "binary_sensor.plain", "state": "off", "attributes": {}},
+        {"entity_id": "switch.kettle", "state": "off", "attributes": {"device_class": "door"}},
+    ]
+    with app.app_context():
+        monkeypatch.setattr(core, "get_states", lambda: states)
+        out = ent.fetch({"entities": [s["entity_id"] for s in states]}, {}, ctx={})
+    labels = [r["label"] for r in out["items"]]
+    assert labels == ["Closed", "Open", "Detected", "Off", "Off"]
+    assert [r["status"] for r in out["items"]] == ["off", "on", "on", "off", "off"]
+
+
 def test_visibility_toggles_pass_through(app: Flask, monkeypatch) -> None:
     """show_title / show_names ride the payload for the client; absent
     options (cells saved before the toggles existed) default to on."""
