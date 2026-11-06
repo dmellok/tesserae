@@ -58,20 +58,23 @@
       "name": "show_yesterday",
       "type": "boolean",
       "label": "Show yesterday's energy",
-      "default": true
+      "default": true,
+      "advanced": true
     },
     {
       "name": "show_temperature_gauge",
       "type": "boolean",
       "label": "Show temperature gauge",
-      "default": false
+      "default": false,
+      "advanced": true
     },
     {
       "name": "power_entity",
       "type": "select",
       "label": "Current energy consumption",
       "default": "",
-      "choices_from": "sensor"
+      "choices_from": "sensor",
+      "advanced": true
     },
     {
       "name": "heating_entity",
