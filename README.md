@@ -25,15 +25,16 @@ dashboards in a browser, render the frame headless, push it to one or
 more panels over MQTT or HTTP.
 
 > [!NOTE]
-> **Available for contract work.** I build and maintain Tesserae on my own, and
-> I'm taking on contract work in agentic development: AI agents and MCP servers,
-> LLM tool integrations, and agent-driven development workflows. I also take on
-> the full-stack, embedded and Home Assistant work that Tesserae itself is built
-> from. If Tesserae is useful to you, sponsoring helps keep it going.
+> **Available for contract work.** I'm Kayden, and I build and maintain
+> Tesserae on my own. I take on contracts in agentic development: designing AI
+> agents, MCP servers and LLM tool integrations, and setting up agent-driven
+> development workflows for teams. I also take on full-stack, embedded and Home
+> Assistant projects, the same work Tesserae is built from.
 >
-> **[Get in touch about a contract](mailto:dmellok@icloud.com?subject=Contract%20work%20enquiry)** · **[Sponsor Tesserae](https://github.com/sponsors/dmellok)**
+> If Tesserae is useful to you, sponsoring helps keep it independent and
+> actively maintained.
 >
-> Kayden, maker of Tesserae
+> **[Email me about a contract](mailto:dmellok@icloud.com?subject=Contract%20work%20enquiry)** · **[Sponsor Tesserae](https://github.com/sponsors/dmellok)**
 
 Open source under AGPL-3.0-or-later. The self-hosted server needs no
 account and never has to talk to us: the only outbound contact is
