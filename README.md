@@ -26,8 +26,8 @@ more panels over MQTT or HTTP.
 
 > [!NOTE]
 > **Available for contract work.** I'm Kayden, and I build and maintain
-> Tesserae on my own. I take on contracts in agentic development: designing AI
-> agents, MCP servers and LLM tool integrations, and setting up agent-driven
+> Tesserae on my own. I take on contracts building with AI: custom agents, MCP
+> servers that connect AI models to your tools and data, and AI-assisted
 > development workflows for teams. I also take on full-stack, embedded and Home
 > Assistant projects, the same work Tesserae is built from.
 >
