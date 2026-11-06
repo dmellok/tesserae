@@ -853,7 +853,7 @@ def test_rotation_row_marks_intended_step_waiting_until_the_panel_fetches_it(
     assert (
         "lu-step is-now" in section or "lu-step is-next" in section
     )  # the held frame (2 steps: also next)
-    assert re.search(r'role="progressbar"[^>]*aria-valuenow="\d+"', section)
+    assert 'role="progressbar"' not in section  # it runs all day: nothing to count down to
     assert "when it wakes" in section
     assert re.search(r'class="lu-sdot"[^>]*title="[^"]*\d+ min behind[^"]*poll ≈\d\d:\d\d', section)
     assert "Send now" not in body and "next fire" not in body
@@ -882,7 +882,7 @@ def test_rotation_row_reads_live_once_the_panel_shows_the_intended_step(
     )
     assert "is-waiting" not in section and "p-queued" not in section
     assert "lu-step is-now" in section
-    assert re.search(r'role="progressbar"[^>]*aria-valuenow="\d+"', section)
+    assert 'role="progressbar"' not in section  # it runs all day: nothing to count down to
 
 
 def test_rotation_row_says_when_the_panel_page_is_unknown(app: Flask) -> None:

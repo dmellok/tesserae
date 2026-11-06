@@ -751,3 +751,26 @@ def test_deleted_dashboard_step_is_flagged_in_markup_and_js(app: Flask) -> None:
         '.includes("missing")',
     ):
         assert token in js, token
+
+
+def test_an_all_day_block_draws_no_bar_and_no_ends_in(app: Flask) -> None:
+    vm = sample_view_model().to_dict()
+    dinner = next(lu for lu in vm["displays"][0]["lineups"] if lu["id"] == "dinner")
+    assert dinner["progress"]["ends_in_label"]  # an ordinary window counts down
+    assert "ends in" in _row(_render(app, vm), "dinner") and "lu-hs-bar" in _row(
+        _render(app, vm), "dinner"
+    )
+    dinner["progress"].update(
+        always_on=True,
+        window_pct=None,
+        ends_in_label=None,
+        ends_in_minutes=None,
+        pauses_in_label="4h 48m",
+        pauses_in_minutes=288,
+    )
+    row = _row(_render(app, vm), "dinner")
+    assert "ends in" not in row and "lu-hs-bar" not in row and 'role="progressbar"' not in row
+    assert "pauses in <b>4h 48m</b>" in row
+    dinner["progress"].update(pauses_in_label=None, pauses_in_minutes=None)
+    quiet = _row(_render(app, vm), "dinner")
+    assert "pauses" not in quiet and "ends in" not in quiet and "lu-hs-bar" not in quiet

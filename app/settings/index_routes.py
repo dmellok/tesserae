@@ -1598,7 +1598,8 @@ def _now_line_for(device_id: str) -> dict[str, Any] | None:
     if live is not None:
         parts: list[str] = []
         window = live.window
-        if window is not None and not window.is_point and window.end is not None:
+        always_on = bool(live.progress and live.progress.always_on)
+        if window is not None and not window.is_point and window.end is not None and not always_on:
             parts.append(f"until {clock(window.end_min, end=True, cycle=view.time_cycle)}")
             # The next lineup takes over where this one ends.
             if nxt is not None and nxt.next_run is not None and nxt.next_run.hhmm == window.end:

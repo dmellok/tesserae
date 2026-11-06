@@ -120,8 +120,11 @@
 {% macro row_state(l) -%}
 {%- set sep = '<span class="lu-sep-dot">·</span>'|safe -%}
 {%- if l.status == 'live' and l.progress -%}
-<div class="lu-hs" title="{{ l.progress.title }}"><span class="lu-hs-line">{{ win_button(l) }}{% if l.window %}{{ sep }}{% endif %}<span>ends in <b>{{ l.progress.ends_in_label }}</b></span></span>
-<span class="lu-hs-bar" role="progressbar" aria-label="Time through this window" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ l.progress.window_pct }}"><i style="width:{{ l.progress.window_pct }}%"></i></span>
+<div class="lu-hs" title="{{ l.progress.title }}"><span class="lu-hs-line">{{ win_button(l) }}
+{%- if l.progress.always_on %}{% if l.progress.pauses_in_label %}{% if l.window %}{{ sep }}{% endif %}<span>pauses in <b>{{ l.progress.pauses_in_label }}</b></span>{% elif l.progress.paused_until_label %}{% if l.window %}{{ sep }}{% endif %}<span>paused until <b>{{ l.progress.paused_until_label }}</b></span>{% endif %}
+{%- else %}{% if l.window %}{{ sep }}{% endif %}<span>ends in <b>{{ l.progress.ends_in_label }}</b></span>{% endif %}</span>
+{%- if not l.progress.always_on %}
+<span class="lu-hs-bar" role="progressbar" aria-label="Time through this window" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ l.progress.window_pct }}"><i style="width:{{ l.progress.window_pct }}%"></i></span>{% endif %}
 {%- if l.live_now %}<span class="lu-hs-now">
 {%- if l.live_now.in_sync %}{{ ico('play', 'acc') }}<span class="lu-hn live" title="On screen now">{{ l.live_now.scheduled_name }}</span>
 {%- else %}<span class="lu-hn q" title="Scheduled, queued: lands {{ l.live_now.lands or '' }}">{{ l.live_now.scheduled_name }}</span>{% if l.live_now.on_screen_name %}<span class="lu-hn dim" title="Still on screen">{{ l.live_now.on_screen_name }} on screen</span>{% endif %}{% endif -%}
