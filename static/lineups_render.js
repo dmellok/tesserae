@@ -402,11 +402,8 @@
     const linkIcon = { connected: "signal", sleeps: "clock" }[d.link.mode] || "info";
     const fr = op ? null : d.frame;
     const ph = d.placeholder;
-    const qb = d.queued_badge;
-    const qbHtml = qb
-      ? `<span class="lu-qbadge" title="${esc(qb.title)}" aria-label="${esc(qb.title)}">${ico("clock")}<span>${esc(qb.label)}</span></span>`
-      : "";
-    const phIcon = { queued: "clock", delivering: "send", unavailable: "info" };
+    const qt = d.queued_thumb;
+    const phIcon = { delivering: "send", unavailable: "info" };
     const delivering = !!ph && ph.state === "delivering";
     const thumbHtml =
       op && !delivering
@@ -418,8 +415,7 @@
             "",
             null,
             vm.displays[0]?.id === d.id,
-            d,
-            qbHtml
+            d
           )
         : fr && fr.thumb_url
           ? thumb(
@@ -430,8 +426,7 @@
               "",
               fr.title,
               vm.displays[0]?.id === d.id,
-              d,
-              qbHtml
+              d
             )
           : `<span class="lu-thumb ${d.orientation || "l"} empty note-${esc(ph.state)}" style="--ar:${d.width || 16}/${d.height || 10};--arw:${d.width || 16};--arh:${d.height || 10}" role="img" aria-label="${esc(ph.title)}" title="${esc(ph.title)}"><span class="lu-thumb-note">${ico(phIcon[ph.state] || "screen")}<b>${esc(ph.label)}</b>${ph.sub ? `<small>${esc(ph.sub)}</small>` : ""}</span></span>`;
     let tags = `<span class="lu-im" title="${esc(d.link.title)}">${ico(linkIcon)}<span>${esc(d.link.label)}</span></span>`;
@@ -455,7 +450,7 @@
       ? `<div class="lu-today"><div class="lu-today-bar">${dayTrack(d, d.day, editable)}${dayScale(d.day)}</div>${dayPick(d, d.day, vm.now.weekday)}</div>`
       : "";
     return (
-      `<header class="lu-ds-hdr"><figure class="lu-now-thumb" title="${esc(qb ? qb.title : delivering ? ph.title : op ? `On screen: ${op.name}` : fr ? fr.title : ph.title)}">${thumbHtml}</figure>` +
+      `<header class="lu-ds-hdr"><figure class="lu-now-thumb" title="${esc(delivering ? ph.title : op ? `On screen: ${op.name}` : fr ? fr.title : ph.title)}">${qt ? `<span class="lu-now-wrap">${thumbHtml}<span class="lu-qthumb" role="group" aria-label="${esc(qt.title)}" title="${esc(qt.title)}">${thumb(qt.name, qt.thumb_url, qt.aspect, qt.orientation, "", null, false, d)}<span class="lu-qtag">${ico("clock")}<span>${esc(qt.label)}</span></span></span></span>` : thumbHtml}</figure>` +
       `<div class="lu-ds-name-row"><div class="lu-ds-title"><h2>${esc(d.name)}</h2>${d.settings_url ? `<a class="lu-gear" href="${esc(d.settings_url)}" title="${esc(d.name)} settings" aria-label="${esc(d.name)} settings">${ico("gear")}</a>` : ""}</div><span class="lu-ds-tags">${tags}</span></div>` +
       `<div class="lu-ds-state">${show}${next}</div>${today}` +
       `<button class="lu-fold lu-ds-fold" type="button" data-collapse="${esc(d.id)}" aria-expanded="${collapsed ? "false" : "true"}" aria-controls="lu-dsb-${esc(d.id)}" aria-label="${esc(d.name)}: collapse or expand">${ico("caret")}</button></header>`

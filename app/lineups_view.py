@@ -278,6 +278,13 @@ class DisplayInput:
     # True when a render exists that a pull/REST display has not fetched yet
     # (its latest digest differs from the last one served, or none was served).
     pending: bool = False
+    #: the picture waiting for it when that is no dashboard (a file, a note, a link sent
+    #: by hand): the thumbnail of the latest render, "" when it cannot be named
+    pending_thumb_url: str = ""
+    #: the picture the display actually took, when it reports one. A dashboard's
+    #: own thumbnail is its newest render, which for a dashboard that changes on
+    #: every render (an album) may be the one still waiting.
+    glass_thumb_url: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -361,14 +368,28 @@ class FrameView(_Dict):
 
 @dataclass
 class HeaderNoteView(_Dict):
-    """What the header thumb says about delivery: the placeholder that stands
-    in for a missing image (``state`` queued / nothing / unavailable /
-    delivering / none) or the corner badge on a shown image (``queued``).
-    ``title`` is the full sentence (tooltip and aria-label)."""
+    """What the header thumb says when it has no image to show: the placeholder that
+    stands in for it (``state`` nothing / unavailable / delivering / none). ``title`` is
+    the full sentence (tooltip and aria-label)."""
 
     state: str
     label: str
     sub: str
+    title: str
+
+
+@dataclass
+class QueuedThumbView(_Dict):
+    """The small second thumbnail on a corner of the header thumb: what waits for the
+    frame (a lineup's step, or something sent by hand) and carries the Queued tag. The
+    header thumb itself always shows what is on the glass. ``thumb_url`` is empty when
+    the waiting picture cannot be shown; the box then carries the tag alone."""
+
+    name: str
+    thumb_url: str
+    aspect: str
+    orientation: Literal["p", "l"]
+    label: str
     title: str
 
 
@@ -712,9 +733,10 @@ class DisplayView(_Dict):
     nothing_sent: bool = False
     show_note: str = ""
     # Additive: the dashed placeholder text when the header has no image, and
-    # the "Queued" corner badge when a newer frame waits behind the shown one.
+    # the small queued thumbnail on its corner when a newer frame waits behind the
+    # shown one (the header thumb itself never carries the Queued tag).
     placeholder: HeaderNoteView | None = None
-    queued_badge: HeaderNoteView | None = None
+    queued_thumb: QueuedThumbView | None = None
 
 
 @dataclass
@@ -1473,17 +1495,19 @@ def _lands_at(d: DisplayInput, clk: _Clock, push_epoch: float) -> _Lands:
 def _header_notes(
     d: DisplayInput,
     clk: _Clock,
+    dashboards: Mapping[str, DashboardInfo],
     on_screen: ScreenView | None,
     queued: QueuedView | None,
     connected: bool,
     in_sync: bool,
-) -> tuple[HeaderNoteView | None, HeaderNoteView | None]:
-    """``(placeholder, badge)`` for the header thumb.
+) -> tuple[HeaderNoteView | None, QueuedThumbView | None]:
+    """``(placeholder, queued thumbnail)`` for the header.
 
-    A frame waits when the display is a sleeper with a render it has not
-    fetched (``d.pending``) or the schedule's step has not landed
-    (``queued``). With an image to show the wait is a corner badge on it;
-    without one the dashed box says what is going on."""
+    The header thumb always shows what is on the glass, or says why it cannot
+    (``placeholder``). A frame waits when the display is a sleeper with a render
+    it has not fetched (``d.pending``) or the schedule's step has not landed
+    (``queued``); that is the small thumbnail on the header thumb's corner,
+    carrying the Queued tag, whether a lineup or a manual send put it there."""
     waiting = not connected and (d.pending or queued is not None)
     if (
         connected
@@ -1499,28 +1523,42 @@ def _header_notes(
             None,
         )
     has_image = on_screen is not None or (d.frame is not None and bool(d.frame.thumb_url))
-    when = ""
+    thumb: QueuedThumbView | None = None
     if waiting:
+        when = ""
         if queued is not None and queued.lands:
             when = queued.lands
         else:
             when = _lands_at(d, clk, clk.epoch).label
-    sentence = (
-        f"A new frame is queued. The frame picks it up at its next check-in {when}."
-        if when
-        else "A new frame is queued. The frame picks it up when it next checks in."
-    )
-    if has_image:
-        if not waiting:
-            return None, None
-        return None, HeaderNoteView("queued", "Queued", "", sentence)
-    if waiting:
-        sub = (
-            f"Frame picks it up at its next check-in {when}"
+        sentence = (
+            f"A new frame is queued. The frame picks it up at its next check-in {when}."
             if when
-            else "when the frame next checks in"
+            else "A new frame is queued. The frame picks it up when it next checks in."
         )
-        return HeaderNoteView("queued", "Queued", sub, sentence), None
+        if queued is not None:
+            scr = _screen(dashboards.get(queued.dashboard_id), queued.dashboard_id, d)
+            # A render already waiting is the picture itself; the dashboard's
+            # thumbnail only stands in for a step not rendered yet.
+            waiting_url = (
+                d.pending_thumb_url
+                if d.pending and d.published and d.published.dashboard_id == queued.dashboard_id
+                else ""
+            )
+            thumb = QueuedThumbView(
+                queued.name,
+                waiting_url or scr.thumb_url,
+                scr.aspect,
+                scr.orientation,
+                "Queued",
+                sentence,
+            )
+        else:
+            aspect, orient = _aspect(d.width, d.height)
+            thumb = QueuedThumbView(
+                "A new frame", d.pending_thumb_url, aspect, orient, "Queued", sentence
+            )
+    if has_image:
+        return None, thumb
     if d.frame is not None:
         return (
             HeaderNoteView(
@@ -1529,18 +1567,18 @@ def _header_notes(
                 "",
                 "The frame on this display is known, but its image file is gone.",
             ),
-            None,
+            thumb,
         )
     if d.nothing_sent:
         return (
             HeaderNoteView(
                 "nothing", "Nothing sent yet", "", "Nothing has been sent to this display yet."
             ),
-            None,
+            thumb,
         )
     return (
         HeaderNoteView("none", "No image yet", "", "No image is known for this display yet."),
-        None,
+        thumb,
     )
 
 
@@ -2077,6 +2115,8 @@ def build_display(
         )
 
     on_screen = _screen(dashboards.get(on_id), on_id, d, on_since) if on_id is not None else None
+    if on_screen is not None and d.glass_thumb_url:
+        on_screen.thumb_url = d.glass_thumb_url
     scheduled_view: ScheduledView | None = None
     if sched is not None and sched_dash is not None:
         scheduled_view = ScheduledView(
@@ -2132,7 +2172,9 @@ def build_display(
             )
         else:
             show_note = ", waiting for check-in"
-    placeholder, queued_badge = _header_notes(d, clk, on_screen, queued, connected, in_sync)
+    placeholder, queued_thumb = _header_notes(
+        d, clk, dashboards, on_screen, queued, connected, in_sync
+    )
     next_title = (
         next_update.text + (f" {next_update.then_text}." if next_update.then_text else "")
         if next_update
@@ -2234,7 +2276,7 @@ def build_display(
         nothing_sent=nothing_sent,
         show_note=show_note,
         placeholder=placeholder,
-        queued_badge=queued_badge,
+        queued_thumb=queued_thumb,
     )
 
 
@@ -2868,6 +2910,7 @@ __all__ = [
     "PrimaryAction",
     "ProgressView",
     "PublishedInput",
+    "QueuedThumbView",
     "QueuedView",
     "RuntimeStep",
     "ScheduledView",
