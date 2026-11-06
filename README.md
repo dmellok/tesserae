@@ -58,7 +58,8 @@ and the onboarding wizard.
 
 Other install paths:
 [Home Assistant App](https://docs.tesserae.ink/install/home-assistant/),
-[LXC / Proxmox / MicroCloud](https://docs.tesserae.ink/install/lxc/),
+[Proxmox VE helper script](https://docs.tesserae.ink/install/lxc/#proxmox-ve-helper-script),
+[LXC / MicroCloud](https://docs.tesserae.ink/install/lxc/),
 [macOS / Linux / Pi shell installer](https://docs.tesserae.ink/install/server/),
 [Windows PowerShell](https://docs.tesserae.ink/install/server/),
 [manual venv](https://docs.tesserae.ink/install/server/#manual-install).

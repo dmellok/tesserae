@@ -9,6 +9,9 @@ This page covers both:
 
 Both wrap the same underlying LXC / LXD stack. Proxmox ships a nicer web UI; MicroCloud has less overhead and is the right pick on a Pi. Proxmox has an unofficial arm64 port maintained outside the official project, so on Raspberry Pi hardware MicroCloud is the safer path.
 
+!!! tip "On Proxmox VE? Use the helper script"
+    One command on the Proxmox host creates the container and installs Tesserae for you. See [Proxmox VE helper script](#proxmox-ve-helper-script) below and skip the manual steps.
+
 !!! tip "Or just install bare-metal"
     If you don't already use containers, the [manual install path](server.md#manual-install) on bare-metal Linux is simpler. LXC is for people who want their applications isolated in a container without Docker's process-model constraints.
 
