@@ -34,7 +34,7 @@ more panels over MQTT or HTTP.
 > If Tesserae is useful to you, sponsoring helps keep it independent and
 > actively maintained.
 >
-> **[Email me about a contract](mailto:dmellok@icloud.com?subject=Contract%20work%20enquiry)** · **[Sponsor Tesserae](https://github.com/sponsors/dmellok)**
+> **[Email me about a contract](mailto:dmellok@icloud.com?subject=Contract%20work%20enquiry)** · **[Sponsor on GitHub](https://github.com/sponsors/dmellok)** · **[Tip once on Ko-fi](https://ko-fi.com/dmellok)**
 
 Open source under AGPL-3.0-or-later. The self-hosted server needs no
 account and never has to talk to us: the only outbound contact is
