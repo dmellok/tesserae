@@ -19,6 +19,40 @@ _ON = {"on", "open", "unlocked", "home", "playing", "active", "detected"}
 _OFF = {"off", "closed", "locked", "away", "not_home", "idle", "standby", "disarmed"}
 _UNAVAILABLE = {"unavailable", "unknown", "none", ""}
 
+# A binary_sensor's state is always the bare "on" / "off"; Home Assistant's
+# own frontend words it by device_class, so a door reads "Closed", not
+# "Off". Same (on, off) wording as HA's English translations.
+_BINARY_LABELS: dict[str, tuple[str, str]] = {
+    "battery": ("Low", "Normal"),
+    "battery_charging": ("Charging", "Not charging"),
+    "carbon_monoxide": ("Detected", "Clear"),
+    "cold": ("Cold", "Normal"),
+    "connectivity": ("Connected", "Disconnected"),
+    "door": ("Open", "Closed"),
+    "garage_door": ("Open", "Closed"),
+    "gas": ("Detected", "Clear"),
+    "heat": ("Hot", "Normal"),
+    "light": ("Light detected", "No light"),
+    "lock": ("Unlocked", "Locked"),
+    "moisture": ("Wet", "Dry"),
+    "motion": ("Detected", "Clear"),
+    "moving": ("Moving", "Not moving"),
+    "occupancy": ("Detected", "Clear"),
+    "opening": ("Open", "Closed"),
+    "plug": ("Plugged in", "Unplugged"),
+    "power": ("Detected", "Clear"),
+    "presence": ("Home", "Away"),
+    "problem": ("Problem", "OK"),
+    "running": ("Running", "Not running"),
+    "safety": ("Unsafe", "Safe"),
+    "smoke": ("Detected", "Clear"),
+    "sound": ("Detected", "Clear"),
+    "tamper": ("Tampering detected", "Clear"),
+    "update": ("Update available", "Up-to-date"),
+    "vibration": ("Detected", "Clear"),
+    "window": ("Open", "Closed"),
+}
+
 _DOMAIN_ICONS: dict[str, str] = {
     "light": "lightbulb",
     "switch": "toggle-right",
@@ -281,14 +315,21 @@ def fetch(
         else:
             status = "other"
         unit = str(attrs.get("unit_of_measurement") or "")
+        device_class = str(attrs.get("device_class") or "")
+        if status == "missing":
+            label = "unavailable"
+        elif (
+            eid.startswith("binary_sensor.")
+            and low in ("on", "off")
+            and device_class in _BINARY_LABELS
+        ):
+            label = _BINARY_LABELS[device_class][0 if low == "on" else 1]
+        else:
+            label = _humanise(raw, unit, ov.get("format") or number_format)
         items.append(
             {
                 "name": ov.get("name") or core.friendly_name(st),
-                "label": (
-                    "unavailable"
-                    if status == "missing"
-                    else _humanise(raw, unit, ov.get("format") or number_format)
-                ),
+                "label": label,
                 "status": status,
                 "icon": ov.get("icon") or _icon_for(eid, attrs, status),
                 # Surface last_changed so the client can flag rows

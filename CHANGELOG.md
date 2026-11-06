@@ -166,6 +166,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- Home Assistant, Entities: a door, window or motion sensor reads Closed / Open / Clear the way Home Assistant words it, instead of Off / On.
 - Visionect frames: a saved Wi-Fi password now reaches the frame, is masked on the device page instead of sent back to the browser, and is hidden in the frame log if the frame echoes it.
 - History: 12-hour times no longer overlap the thumbnail.
 - A link now always sits left of a button, and the primary action is rightmost,
