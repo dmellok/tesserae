@@ -510,3 +510,59 @@ def test_clear_history_is_a_small_quiet_link_in_the_cards_top_right(
     assert geo["top"] < geo["chartTop"]  # in the header, above the chart
     assert geo["right"] < 40  # against the right edge
     assert geo["h"] < 24 and geo["w"] < 160  # text-sized, not a big button
+
+
+_GEAR = f"{ATTIC} .dx-battery-gear"
+
+
+def _gear_opacity(page: Any) -> float:
+    return float(page.evaluate("(s) => getComputedStyle(document.querySelector(s)).opacity", _GEAR))
+
+
+def test_a_gear_opens_the_frames_settings(served: tuple[str, Flask]) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, app = served
+    with sync_playwright() as p:
+        browser = _launch(p)
+        page = browser.new_page(viewport={"width": 1100, "height": 1500})
+        _open(page, base, app, ui="paper", theme="dark")
+
+        # The gear: hidden until the row is hovered or has keyboard focus.
+        href = page.get_attribute(_GEAR, "href")
+        assert href and href.endswith("/settings/devices/attic_esp")
+        assert page.get_attribute(
+            _GEAR,
+            "aria-label",
+        ).startswith("Open settings for ")
+        assert page.get_attribute(_GEAR, "title") == page.get_attribute(_GEAR, "aria-label")
+        assert page.locator(f"{_GEAR} i.ph.ph-gear").count() == 1
+        page.mouse.move(2, 2)
+        assert _gear_opacity(page) == 0
+        page.hover(f"{ATTIC} .dx-battery-name h4")
+        page.wait_for_timeout(250)
+        assert _gear_opacity(page) == 1
+        if os.environ.get("BATTERY_SHOTS"):
+            page.screenshot(path=str(Path(os.environ["BATTERY_SHOTS"]) / "batteries-range.png"))
+        page.mouse.move(2, 2)
+        page.wait_for_timeout(250)
+        page.keyboard.press("Tab")  # keyboard focus into the page
+        page.focus(_GEAR)
+        page.keyboard.press("Shift+Tab")
+        page.keyboard.press("Tab")
+        page.wait_for_timeout(250)
+        assert page.evaluate("(s) => document.activeElement === document.querySelector(s)", _GEAR)
+        assert _gear_opacity(page) == 1
+        browser.close()
+
+        # A touch screen has no hover: the gear is always there.
+        browser = _launch(p)
+        ctx = browser.new_context(
+            has_touch=True, is_mobile=True, viewport={"width": 420, "height": 900}
+        )
+        touch = ctx.new_page()
+        touch.goto(f"{base}/devices/battery")
+        touch.wait_for_selector(_GEAR)
+        assert touch.evaluate("() => matchMedia('(hover: none)').matches")
+        assert _gear_opacity(touch) == 1
+        browser.close()
