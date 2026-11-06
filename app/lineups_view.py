@@ -106,11 +106,18 @@ PrimaryAction = Literal["skip", "play", "push"]
 
 @dataclass(frozen=True)
 class ItemInfo:
-    """One item inside a multi-item dashboard (a gallery photo, a quote)."""
+    """One item inside a multi-item dashboard (a gallery photo, a quote).
+
+    ``key`` is what the dashboard can be pinned to for a render and a push
+    (a photo's file name, a paper's code); empty when the widget has no way to
+    show a chosen item. ``version`` changes when that item's picture does, so a
+    cached preview is never reused past it."""
 
     index: int
     label: str
     thumb_url: str = ""
+    key: str = ""
+    version: str = ""
 
 
 @dataclass(frozen=True)
@@ -129,6 +136,8 @@ class DashboardInfo:
     item_count: int = 1
     items: tuple[ItemInfo, ...] = ()
     composition_digest: str | None = None
+    #: the arrows draw it again (a widget that cannot name its items but differs per render)
+    draw: bool = False
     missing: bool = False  # a lineup step still points at a deleted dashboard
     #: displays it is bound to, and "Name (WxH)" for each, for the off-display flag
     bound_ids: tuple[str, ...] = ()
@@ -160,6 +169,7 @@ class LineupUrls:
     fire: str = ""
     play: str = ""
     push_step: str = ""
+    step_item: str = ""
     window: str = ""
     days: str = ""
     bind: str = ""
@@ -341,6 +351,7 @@ class ItemView(_Dict):
     index: int
     label: str
     thumb_url: str
+    key: str = ""
 
 
 @dataclass
@@ -635,6 +646,10 @@ class StepView(_Dict):
     separator: Literal["arrow", "loop", ""]
     push_title: str
     composition_digest: str | None = None
+    #: items can be chosen: each has a ``key`` the preview and Push now accept
+    pick_items: bool = False
+    #: "draw next": the arrows render the dashboard again; there is no list to choose from
+    draw_items: bool = False
     missing: bool = False  # its dashboard was deleted; the scheduler cannot show it
     #: its dashboard is bound only to other displays, so this one never shows it
     off_display: bool = False
@@ -665,6 +680,7 @@ class ActionsView(_Dict):
     days_url: str
     can_push_step: bool
     bind_url: str = ""
+    step_item_url: str = ""
 
 
 @dataclass
@@ -2600,7 +2616,9 @@ def _lineup_view(
                 dwell_minutes=st.dwell_minutes,
                 conditional=st.conditional,
                 item_count=count,
-                items=[ItemView(it.index, it.label, it.thumb_url) for it in items],
+                items=[ItemView(it.index, it.label, it.thumb_url, it.key) for it in items],
+                pick_items=not (off_display or scr.missing) and any(it.key for it in items),
+                draw_items=not (off_display or scr.missing) and bool(dash and dash.draw),
                 current=i == intended,
                 next=i == nxt,
                 queued=is_queued,
@@ -2683,6 +2701,7 @@ def _lineup_view(
             days_url=u.days,
             can_push_step=bool(lineup.steps),
             bind_url=u.bind,
+            step_item_url=u.step_item,
         ),
         sort_minutes=sort_minutes,
     )
@@ -2803,7 +2822,13 @@ def sample_inputs() -> tuple[list[DisplayInput], dict[str, DashboardInfo]]:
             name=v,
             item_count=_SAMPLE_ITEMS.get(k, 1),
             items=tuple(
-                ItemInfo(i, f"{v} {i + 1} of {_SAMPLE_ITEMS[k]}")
+                ItemInfo(
+                    i,
+                    f"{v} {i + 1} of {_SAMPLE_ITEMS[k]}",
+                    # Only the art gallery can show a chosen item (the others
+                    # stand for widgets that cannot be pinned).
+                    key=f"{k}-{i + 1}.jpg" if k == "art" else "",
+                )
                 for i in range(_SAMPLE_ITEMS.get(k, 0))
             ),
         )
@@ -2927,6 +2952,7 @@ def _sample_urls(lineup_id: str) -> LineupUrls:
         toggle=f"/decks/{lineup_id}/toggle",
         delete=f"/decks/{lineup_id}/delete",
         push_step=f"/decks/{lineup_id}/push-step",
+        step_item=f"/decks/{lineup_id}/step-item",
         window=f"/decks/{lineup_id}/window",
         days=f"/decks/{lineup_id}/days",
     )

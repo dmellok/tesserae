@@ -774,3 +774,109 @@ def test_an_all_day_block_draws_no_bar_and_no_ends_in(app: Flask) -> None:
     dinner["progress"].update(pauses_in_label=None, pauses_in_minutes=None)
     quiet = _row(_render(app, vm), "dinner")
     assert "pauses" not in quiet and "ends in" not in quiet and "lu-hs-bar" not in quiet
+
+
+# -- zoom icon, item arrows and the lightbox ------------------------------------------
+
+
+def _with_thumbs() -> dict[str, Any]:
+    vm = sample_view_model().to_dict()
+    for d in vm["displays"]:
+        for lu in d["lineups"]:
+            for s in lu["steps"]:
+                s["thumb_url"] = f"/compose/thumbs/v1/sent/{s['dashboard_id']}0abc.webp"
+        if d["on_screen"]:
+            d["on_screen"]["thumb_url"] = "/compose/thumbs/v1/sent/onscreen0abc.webp"
+    return vm
+
+
+def test_thumbnails_carry_a_zoom_icon_in_their_corner(app: Flask) -> None:
+    body = _render(app, _with_thumbs())
+    dinner = _row(body, "dinner")
+    # Inside the thumb (so it sits in the picture's own top right corner), a real button.
+    assert re.search(
+        r'<span class="lu-thumb [^"]*"[^>]*>\s*<img [^>]*>\s*<button type="button" class="lu-zoom" '
+        r'data-zoom="step:dinner:0" aria-haspopup="dialog" aria-label="Zoom Newspaper" title="Zoom Newspaper">',
+        dinner,
+    )
+    assert dinner.count('class="lu-zoom"') == 6  # one per step
+    header = _section(body, "frame").split("</header>")[0]
+    assert 'data-zoom="head:frame"' in header and "Zoom what Visionect frame is showing" in header
+    # Quiet and hidden without the script, always there on touch, 44px to hit.
+    assert ".lu:not(.is-enhanced) .lu-zoom," in CSS
+    assert ".lu .lu-zoom { top: 0; right: 0; width: 44px; height: 44px;" in CSS
+
+
+def test_no_zoom_icon_without_a_picture_to_zoom(app: Flask) -> None:
+    """The sample has no thumbnails yet: nothing to enlarge, so no icon."""
+    body = _render(app, sample_view_model().to_dict())
+    assert 'class="lu-zoom"' not in body
+    vm = _with_thumbs()
+    vm["displays"][0]["lineups"][0]["steps"][0]["missing"] = True
+    vm["displays"][0]["lineups"][0]["steps"][1]["off_display"] = True
+    dinner = _row(_render(app, vm), "dinner")
+    assert 'data-zoom="step:dinner:0"' not in dinner and 'data-zoom="step:dinner:1"' not in dinner
+    assert 'data-zoom="step:dinner:2"' in dinner
+
+
+def test_item_arrows_only_where_an_item_can_be_chosen(app: Flask) -> None:
+    dinner = _row(_render(app, sample_view_model().to_dict()), "dinner")
+    # The art gallery (12 items, pinnable): previous / next under Push now.
+    art = dinner.split('data-step="1"')[1].split('data-step="2"')[0]
+    assert 'class="lu-tile stacked has-items"' in art
+    assert re.search(
+        r'<span class="lu-items" role="group" aria-label="Choose which Art item to push">'
+        r'<button type="button" class="lu-it" data-item="dinner:1:-1" aria-label="Previous item" title="Previous item">',
+        art,
+    )
+    assert 'data-item="dinner:1:1"' in art and 'aria-label="Next item"' in art
+    assert art.index("lu-push-form") < art.index("lu-items") < art.index("lu-pushed-msg")
+    # Quotes have 20 items but no way to ask for one; a single dashboard has one.
+    assert dinner.count('<span class="lu-items"') == 1
+    assert 'data-item="dinner:4' not in dinner and 'data-item="dinner:0' not in dinner
+    assert 'class="lu-tile stacked"' in dinner  # quotes still stack with a count
+    assert ">×20<" in dinner
+
+
+def test_no_arrows_without_a_push_route_or_when_off_display(app: Flask) -> None:
+    vm = sample_view_model().to_dict()
+    vm["displays"][0]["lineups"][0]["actions"]["step_item_url"] = ""
+    assert "lu-items" not in _row(_render(app, vm), "dinner")
+    vm = sample_view_model().to_dict()
+    vm["displays"][0]["lineups"][0]["steps"][1]["off_display"] = True
+    assert "lu-items" not in _row(_render(app, vm), "dinner")
+
+
+def test_lightbox_script_loads_before_the_page_script_and_the_tabbar_stays_below(
+    app: Flask,
+) -> None:
+    body = _render(app, sample_view_model().to_dict())
+    assert body.index("lineups_lightbox.js") < body.index("static/lineups.js")
+    assert body.index("lineups_render.js") < body.index("lineups_lightbox.js")
+    z = int(re.search(r"\.lu \.lu-lb \{[^}]*z-index: (\d+)", CSS).group(1))  # type: ignore[union-attr]
+    paper = (REPO_ROOT / "static" / "style" / "paper.css").read_text()
+    tabbar = int(re.search(r'data-ui="paper"\] \.tabbar \{[^}]*z-index: (\d+)', paper).group(1))  # type: ignore[union-attr]
+    assert z > tabbar, "the lightbox must cover Paper's phone tab bar"
+    assert "padding: max(16px, env(safe-area-inset-top))" in CSS
+
+
+def test_draw_arrows_say_picture_not_item_and_wait_for_something_drawn(app: Flask) -> None:
+    """A widget that cannot name its items but differs per render: Next draws,
+    Previous waits for a picture, and no count is ever drawn (the total is unknown)."""
+    vm = sample_view_model().to_dict()
+    step = vm["displays"][0]["lineups"][0]["steps"][2]  # a plain one-item dashboard
+    step["draw_items"] = True
+    row = _row(_render(app, vm), "dinner")
+    seg = row.split('data-step="2"')[1].split('data-step="3"')[0]
+    assert 'class="lu-tile has-items"' in seg and "stacked" not in seg
+    assert re.search(
+        r'<span class="lu-items" role="group" aria-label="Draw another Family picture">'
+        r'<button type="button" class="lu-it" data-item="dinner:2:-1" aria-label="Previous picture" '
+        r'title="Previous picture" disabled>',
+        seg,
+    )
+    assert 'data-item="dinner:2:1" aria-label="Draw the next picture"' in seg
+    assert '<span class="lu-it-pos" aria-hidden="true"></span>' in seg and "lu-count" not in seg
+    # Named items keep their wording; a step that is neither gets no arrows.
+    assert "Choose which Art item to push" in row and "Previous item" in row
+    assert row.count("lu-items") == 2

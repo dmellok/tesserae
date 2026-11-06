@@ -1759,6 +1759,21 @@ def compose(page_id: str) -> Response:
     # wins (the editor's per-aspect previews and the per-panel push render
     # at a specific size); otherwise fall back to the page's primary panel.
     page_dict = page.model_dump(mode="json", exclude_none=True)
+    # ``?item=<key>`` renders the dashboard with its list widget pinned to one
+    # item (the Lineups page's per-item preview and push); a key the dashboard
+    # does not list is a 404, so nothing else can be written into a cell.
+    item_key = request.args.get("item")
+    if item_key:
+        from app.step_items import pin_item
+
+        pinned_dict = pin_item(page, page_dict, item_key)
+        if pinned_dict is None:
+            abort(404)
+        page_dict = pinned_dict
+    # A canvas renders from its layout, not page_dict, so the pin has to reach it.
+    canvas_layout = page.canvas
+    if item_key and page.canvas is not None:
+        canvas_layout = type(page.canvas).model_validate(page_dict["canvas"])
     settings_store = current_app.config["SETTINGS_STORE"]
     devices = current_app.config.get("DEVICE_REGISTRY")
     override = _panel_override(request.args.get("w"), request.args.get("h"))
@@ -1788,14 +1803,14 @@ def compose(page_id: str) -> Response:
     # panel, and share this route so push / scheduler / rotation drive them by
     # page id exactly like a grid page. An unbound, un-overridden canvas renders
     # at its authored size.
-    if page.layout_kind == "canvas" and page.canvas is not None:
+    if page.layout_kind == "canvas" and canvas_layout is not None:
         if override is None and not page.device_ids:
-            target_w, target_h = page.canvas.w, page.canvas.h
+            target_w, target_h = canvas_layout.w, canvas_layout.h
         else:
             target_w, target_h = panel_w, panel_h
         return _uncacheable(
             _render_canvas(
-                page.canvas,
+                canvas_layout,
                 page_id=page.id,
                 target_w=target_w,
                 target_h=target_h,
@@ -1925,7 +1940,7 @@ def page_preview_token(page: Page, dims: tuple[int, int]) -> str:
 def lineup_thumbnail(kind: str, key: str, ext: str) -> WerkzeugResponse:
     from app.lineup_thumbs import serve
 
-    return serve(kind, key, ext)
+    return serve(kind, key, ext, large=request.args.get("lg") == "1")
 
 
 @bp.get("/compose/<page_id>/preview.png")

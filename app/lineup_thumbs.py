@@ -16,15 +16,17 @@ from app.state.page_store import Page
 
 logger = logging.getLogger(__name__)
 MAX_DIM = 360
+#: The lightbox's larger rendition (``?lg=1`` on a thumbnail URL).
+LARGE_DIM = 1200
 _FORMAT = "WEBP" if features.check("webp") else "PNG"
 _EXT = "webp" if _FORMAT == "WEBP" else "png"
 _ENCODE_LOCK = threading.Lock()
 
 
-def _paths(kind: str, key: str) -> tuple[Path, Path]:
+def _paths(kind: str, key: str, dim: int = MAX_DIM) -> tuple[Path, Path]:
     core = Path(current_app.config["DATA_ROOT"]) / "core"
     directory = core / ("renders" if kind == "sent" else "previews")
-    return directory / f"{key}.png", directory / ".thumbs" / f"{key}-lu-v1-{MAX_DIM}.{_EXT}"
+    return directory / f"{key}.png", directory / ".thumbs" / f"{key}-lu-v1-{dim}.{_EXT}"
 
 
 def page_compositions(pages: list[Page]) -> dict[str, str]:
@@ -108,12 +110,14 @@ def page_thumbs(pages: list[Page], compositions: dict[str, str] | None = None) -
     return out
 
 
-def serve(kind: str, key: str, ext: str) -> Response:
-    """Serve a version directly, without reading the page store or event log."""
+def serve(kind: str, key: str, ext: str, large: bool = False) -> Response:
+    """Serve a version directly, without reading the page store or event log.
+    ``large`` is the lightbox rendition (``LARGE_DIM``) rather than the card's."""
+    dim = LARGE_DIM if large else MAX_DIM
     pattern = r"[0-9a-f]{6,64}" if kind == "sent" else r"[a-z0-9_][a-z0-9_-]*__[0-9a-f]{16}"
     if kind not in ("sent", "draft") or ext != _EXT or not re.fullmatch(pattern, key):
         abort(404)
-    source, cached = _paths(kind, key)
+    source, cached = _paths(kind, key, dim)
     if not cached.is_file():
         # Serialise first encodes; readers never see a partial file and each
         # variant is resized once even when several cards ask simultaneously.
@@ -123,7 +127,7 @@ def serve(kind: str, key: str, ext: str) -> Response:
                     abort(404)
                 cached.parent.mkdir(parents=True, exist_ok=True)
                 with Image.open(source) as im:
-                    im.thumbnail((MAX_DIM, MAX_DIM), Image.Resampling.LANCZOS)
+                    im.thumbnail((dim, dim), Image.Resampling.LANCZOS)
                     tmp_path: Path | None = None
                     try:
                         with tempfile.NamedTemporaryFile(
@@ -134,7 +138,7 @@ def serve(kind: str, key: str, ext: str) -> Response:
                                 tmp,
                                 format=_FORMAT,
                                 **(
-                                    {"quality": 75, "method": 4}
+                                    {"quality": 82 if large else 75, "method": 4}
                                     if _FORMAT == "WEBP"
                                     else {"optimize": True}
                                 ),
@@ -148,7 +152,7 @@ def serve(kind: str, key: str, ext: str) -> Response:
         cached,
         mimetype=f"image/{_EXT}",
         conditional=True,
-        etag=f"lu-v1-{MAX_DIM}-{kind}-{key}-{_EXT}",
+        etag=f"lu-v1-{dim}-{kind}-{key}-{_EXT}",
         max_age=31536000,
     )
     # Authenticated images belong in the user's browser cache, not shared proxies.

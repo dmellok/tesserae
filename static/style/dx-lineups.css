@@ -3310,3 +3310,386 @@ main.page.lu-page {
   align-items: center;
   gap: 4px 10px;
 }
+
+/* ----- Zoom, item arrows and the lightbox -----------------------------------
+   The zoom icon sits in the top right corner of a thumbnail (it is inside the
+   .lu-thumb, so it follows the picture's own corner), quiet until the thumbnail
+   is hovered or focused; on touch it is always there and 44px to hit. Clicking
+   anywhere on a thumbnail (outside Push now, the arrows and x N) does the same.
+   The item arrows sit under Push now on the hover scrim. On touch the
+   lightbox is where items are chosen: the tile keeps only its corner controls. */
+.lu:not(.is-enhanced) .lu-zoom,
+.lu:not(.is-enhanced) .lu-items {
+  display: none;
+}
+.lu .lu-zoom {
+  position: absolute;
+  z-index: 3;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--lu-r-xs);
+  background: rgba(21, 20, 18, 0.58);
+  color: #fffdf8;
+  font-size: 13px;
+  cursor: zoom-in;
+  opacity: 0.7;
+  transition: opacity 150ms ease-out;
+}
+.lu .lu-zoom:hover {
+  background: rgba(21, 20, 18, 0.82);
+}
+.lu .lu-tile:hover .lu-zoom,
+.lu .lu-now-thumb:hover .lu-zoom,
+.lu .lu-zoom:focus-visible {
+  opacity: 1;
+}
+.lu .lu-zoom:focus-visible {
+  outline: 2px solid #fffdf8;
+  outline-offset: 1px;
+  box-shadow: 0 0 0 4px var(--lu-acc);
+}
+.lu.is-enhanced :is(.lu-tile, .lu-now-thumb) .lu-thumb:has(.lu-zoom) {
+  cursor: zoom-in;
+}
+.lu .lu-now-thumb .lu-thumb .lu-zoom {
+  top: 3px;
+  right: 3px;
+}
+/* Under Push now, over the scrim. */
+.lu .lu-items {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  bottom: 5px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  color: #fffdf8;
+  opacity: 0;
+  transition: opacity 150ms ease-out;
+  white-space: nowrap;
+}
+.lu .lu-it {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 253, 248, 0.2);
+  color: #fffdf8;
+  font-size: 13px;
+  cursor: pointer;
+}
+.lu .lu-it:not(:disabled):hover {
+  background: var(--lu-acc);
+  color: var(--lu-acc-fg);
+}
+.lu .lu-it:disabled {
+  opacity: 0.35;
+}
+.lu .lu-it:focus-visible {
+  outline: 2px solid #fffdf8;
+  outline-offset: 1px;
+}
+.lu .lu-it-pos {
+  padding: 0 3px;
+  font: 600 10px/1 var(--t-font-mono);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+.lu .lu-it-pos:empty {
+  display: none;
+}
+.lu .lu-tile:hover .lu-items,
+.lu .lu-tile:focus-within .lu-items {
+  opacity: 1;
+}
+.lu .lu-tile.pushed .lu-items {
+  display: none;
+}
+.lu .lu-tile.has-items .lu-push-ov {
+  top: 40%;
+}
+/* A chosen item being drawn (or that could not be): said on the tile itself. */
+.lu .lu-tile.is-loading .lu-thumb img,
+.lu .lu-tile.is-itemfail .lu-thumb img {
+  opacity: 0.45;
+}
+.lu .lu-tile.is-loading .lu-thumb::after,
+.lu .lu-lb-spin {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in oklab, var(--lu-acc) 30%, transparent);
+  border-top-color: var(--lu-acc);
+  animation: lu-spin 0.9s linear infinite;
+}
+.lu .lu-tile.is-itemfail .lu-thumb::after {
+  content: "!";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font: 700 18px var(--t-font);
+  color: var(--lu-warn-text);
+}
+@keyframes lu-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* The lightbox: one component for the header thumbnail and the steps. */
+.lu .lu-lb {
+  position: fixed;
+  inset: 0;
+  z-index: 2100;
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  place-items: center;
+  box-sizing: border-box;
+  /* What the card spends on everything but the picture: the picture takes the rest. */
+  --lb-chrome: 230px;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  overscroll-behavior: contain;
+}
+.lu .lu-lb-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(12, 11, 10, 0.74);
+}
+.lu .lu-lb-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-sizing: border-box;
+  width: min(1100px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 12px 14px 14px;
+  background: var(--t-surface);
+  color: var(--t-fg);
+  border: 1px solid var(--t-border-strong);
+  border-radius: var(--lu-r-card);
+  box-shadow: var(--t-shadow-lg, var(--lu-shadow-pop));
+}
+.lu .lu-lb-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.lu .lu-lb-titles {
+  min-width: 0;
+  flex: 1;
+}
+.lu .lu-lb-titles h2 {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.lu .lu-lb-sub {
+  margin: 1px 0 0;
+  font-size: 12px;
+  color: var(--t-muted);
+}
+.lu .lu-lb-x {
+  flex: none;
+}
+.lu .lu-lb-stage {
+  position: relative;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 8px;
+  border-radius: var(--lu-r);
+  background: var(--lu-sched-bg);
+}
+/* Fit the picture in its own shape: as large as the screen leaves room for. */
+.lu .lu-lb-stage .lu-thumb {
+  width: min(100%, calc((100vh - var(--lb-chrome)) * var(--arw) / var(--arh)));
+  width: min(100%, calc((100dvh - var(--lb-chrome)) * var(--arw) / var(--arh)));
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--lu-r-xs);
+}
+.lu .lu-lb-stage .lu-thumb-ph {
+  font-size: 48px;
+  min-height: 120px;
+}
+.lu .lu-lb.is-loading .lu-lb-stage .lu-thumb img {
+  opacity: 0.4;
+}
+.lu .lu-lb-load {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 8px;
+  border-radius: var(--lu-r-pill);
+  background: var(--t-surface);
+  border: 1px solid var(--t-border-strong);
+  font-size: 12px;
+  color: var(--t-fg);
+}
+.lu .lu-lb-spin {
+  position: static;
+  margin: 0;
+  flex: none;
+}
+.lu .lu-lb-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--lu-warn-text);
+}
+.lu .lu-lb-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.lu .lu-lb-items {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+.lu .lu-lb-items .lu-ibtn {
+  flex: none;
+}
+.lu .lu-lb-pos {
+  min-width: 0;
+  padding: 0 6px;
+  font: 12px var(--t-font-mono);
+  color: var(--t-fg-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lu .lu-lb-msg {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: right;
+  font-size: 12px;
+  color: var(--t-muted);
+  overflow-wrap: anywhere;
+}
+.lu .lu-lb-msg.ok {
+  color: var(--lu-acc-text);
+}
+.lu .lu-lb-msg.queued {
+  color: var(--lu-warn-text);
+}
+.lu .lu-lb-msg.err {
+  color: var(--t-danger);
+}
+.lu .lu-lb-push {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  margin-left: auto;
+}
+.lu .lu-lb-push .lu-ico {
+  font-size: 13px;
+}
+.lu .lu-lb-push:disabled {
+  cursor: progress;
+}
+@media (pointer: coarse) {
+  /* Always there, 44px to hit, the chip itself stays small. */
+  .lu .lu-zoom {
+    top: 0;
+    right: 0;
+    width: 44px;
+    height: 44px;
+    max-width: 100%;
+    background: none;
+    opacity: 0.9;
+  }
+  .lu .lu-zoom:hover {
+    background: none;
+  }
+  .lu .lu-zoom .lu-ico {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    box-sizing: border-box;
+    width: 26px;
+    height: 26px;
+    padding: 5px;
+    border-radius: var(--lu-r-xs);
+    background: rgba(21, 20, 18, 0.62);
+  }
+  .lu .lu-items {
+    display: none;
+  }
+  .lu .lu-tile.has-items .lu-push-ov {
+    top: auto;
+  }
+  /* x N moves to the bottom-right corner so the zoom icon has the top right. */
+  .lu .lu-count {
+    top: auto;
+    bottom: -10px;
+    align-items: flex-end;
+    background-position: right bottom;
+  }
+  .lu .lu-count:hover,
+  .lu .lu-count[aria-expanded="true"] {
+    background-position: right bottom;
+  }
+  .lu .lu-lb-x,
+  .lu .lu-lb-items .lu-ibtn {
+    width: 44px;
+    height: 44px;
+  }
+}
+@media (max-width: 600px) {
+  .lu .lu-lb {
+    --lb-chrome: 290px;
+    padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right))
+      max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  }
+  .lu .lu-lb-card {
+    padding: 10px 10px 12px;
+  }
+  .lu .lu-lb-stage {
+    padding: 6px;
+  }
+  .lu .lu-lb-items {
+    flex: 1 1 100%;
+  }
+  .lu .lu-lb-pos {
+    flex: 1;
+    text-align: center;
+  }
+  .lu .lu-lb-msg {
+    text-align: left;
+    flex: 1 1 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lu .lu-zoom,
+  .lu .lu-items {
+    transition: none;
+  }
+  .lu .lu-tile.is-loading .lu-thumb::after,
+  .lu .lu-lb-spin {
+    animation: none;
+  }
+}

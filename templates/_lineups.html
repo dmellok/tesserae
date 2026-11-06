@@ -19,6 +19,8 @@
   'moon': '<path d="M13 9.6A5.5 5.5 0 1 1 6.4 3a4.4 4.4 0 0 0 6.6 6.6z"/>',
   'pause': '<rect x="4" y="3" width="2.6" height="10" rx=".6"/><rect x="9.4" y="3" width="2.6" height="10" rx=".6"/>',
   'chev': '<path d="M6 3.5 10.5 8 6 12.5"/>',
+  'chevl': '<path d="M10 3.5 5.5 8 10 12.5"/>',
+  'zoom': '<circle cx="6.8" cy="6.8" r="4.3"/><path d="M10 10l3.8 3.8M6.8 5v3.6M5 6.8h3.6"/>',
   'check': '<path d="M3.5 8.5 6.5 11.5 12.5 4.5"/>',
   'skip': '<path d="M4 3.5v9l6-4.5z" fill="currentColor" stroke="none"/><path d="M12.5 3.5v9"/>',
   'signal': '<path d="M3 13v-2M6.3 13V9M9.7 13V6.5M13 13V4"/>',
@@ -52,6 +54,13 @@
 <span class="lu-thumb {{ orientation or 'l' }}{% if cls %} {{ cls }}{% endif %}" style="--ar:{{ ar[0] }}/{{ ar[1] }};--arw:{{ ar[0] }};--arh:{{ ar[1] }}" title="{{ title if title is not none else name }}" data-gamut="{{ display.gamut|default('color', true) if display else 'color' }}" data-grey-levels="{{ display.grey_levels|default(0) if display else 0 }}">
 {%- if url %}<img src="{{ url }}" alt="" width="{{ ar[0] }}" height="{{ ar[1] }}" loading="{{ 'eager' if priority else 'lazy' }}" decoding="async"{% if priority %} fetchpriority="high"{% endif %}>{% else %}<span class="lu-thumb-ph" aria-hidden="true">{{ '!' if 'missing' in cls else (name or '?')[:1] }}</span>{% endif -%}{{ extra|safe }}
 </span>
+{%- endmacro %}
+
+{#- The little zoom icon over a thumbnail's top right corner (opens the
+   lightbox, static/lineups_lightbox.js). ``what`` is its target, "step:<lineup>:<index>"
+   or "head:<display>". Hidden until the script runs. -#}
+{% macro zoom_btn(what, label) -%}
+<button type="button" class="lu-zoom" data-zoom="{{ what }}" aria-haspopup="dialog" aria-label="{{ label }}" title="{{ label }}">{{ ico('zoom') }}</button>
 {%- endmacro %}
 
 {% macro im(icon, value, title, cls='') -%}
@@ -192,8 +201,12 @@
 <li class="lu-step{% if cls %} {{ cls }}{% endif %}{% if s.missing %} is-missing{% endif %}{% if s.off_display %} is-offdisplay{% endif %}" data-step="{{ s.index }}"{% if s.missing %} title="This dashboard was deleted; remove it from the lineup"{% elif s.off_display %} title="{{ s.off_display_note }}"{% endif %}><figure><span class="lu-slot">
 {%- if s.pill %}<span class="lu-pill p-{{ s.pill.kind }}" title="{{ s.pill.title }}">{% if s.pill.kind == 'now' %}{{ ico('play') }}{% endif %}{{ s.pill.label }}</span>{% endif -%}
 </span>
-<span class="lu-tile{% if s.item_count > 1 %} stacked{% endif %}">{{ thumb(s.name, s.thumb_url, s.aspect, d.orientation if d.orientation else s.orientation, cls='missing' if s.missing else ('offdisplay' if s.off_display else ''), display=d) }}<span class="lu-scrim" aria-hidden="true"></span>
-{%- if d.id and l.actions.push_step_url and not s.missing and not s.off_display %}<form method="post" action="{{ l.actions.push_step_url }}" class="lu-push-form"><input type="hidden" name="index" value="{{ s.index }}"><input type="hidden" name="display_id" value="{{ d.id }}"><input type="hidden" name="page_id" value="{{ s.dashboard_id }}"><input type="hidden" name="composition_digest" value="{{ s.composition_digest or '' }}"><button type="submit" class="lu-push-ov" data-push="{{ l.id }}:{{ s.index }}" title="{{ s.push_title }}" aria-label="{{ s.push_title }}"><i>{{ ico('send') }}</i><span>Push now</span></button></form>{% endif -%}
+{%- set can_push = d.id and l.actions.push_step_url and not s.missing and not s.off_display -%}
+{%- set can_pick = can_push and (s.pick_items or s.draw_items) and l.actions.step_item_url -%}
+{%- set zoom_html -%}{% if s.thumb_url and not s.missing and not s.off_display %}{{ zoom_btn('step:' ~ l.id ~ ':' ~ s.index, 'Zoom ' ~ s.name) }}{% endif %}{%- endset -%}
+<span class="lu-tile{% if s.item_count > 1 %} stacked{% endif %}{% if can_pick %} has-items{% endif %}">{{ thumb(s.name, s.thumb_url, s.aspect, d.orientation if d.orientation else s.orientation, cls='missing' if s.missing else ('offdisplay' if s.off_display else ''), display=d, extra=zoom_html) }}<span class="lu-scrim" aria-hidden="true"></span>
+{%- if can_push %}<form method="post" action="{{ l.actions.push_step_url }}" class="lu-push-form"><input type="hidden" name="index" value="{{ s.index }}"><input type="hidden" name="display_id" value="{{ d.id }}"><input type="hidden" name="page_id" value="{{ s.dashboard_id }}"><input type="hidden" name="composition_digest" value="{{ s.composition_digest or '' }}"><button type="submit" class="lu-push-ov" data-push="{{ l.id }}:{{ s.index }}" title="{{ s.push_title }}" aria-label="{{ s.push_title }}"><i>{{ ico('send') }}</i><span>Push now</span></button></form>{% endif -%}
+{%- if can_pick %}<span class="lu-items" role="group" aria-label="{{ ('Draw another ' ~ s.name ~ ' picture') if s.draw_items else ('Choose which ' ~ s.name ~ ' item to push') }}"><button type="button" class="lu-it" data-item="{{ l.id }}:{{ s.index }}:-1" aria-label="{{ 'Previous picture' if s.draw_items else 'Previous item' }}" title="{{ 'Previous picture' if s.draw_items else 'Previous item' }}"{% if s.draw_items %} disabled{% endif %}>{{ ico('chevl') }}</button><span class="lu-it-pos" aria-hidden="true"></span><button type="button" class="lu-it" data-item="{{ l.id }}:{{ s.index }}:1" aria-label="{{ 'Draw the next picture' if s.draw_items else 'Next item' }}" title="{{ 'Draw the next picture' if s.draw_items else 'Next item' }}">{{ ico('chev') }}</button></span>{% endif -%}
 <span class="lu-pushed-msg" aria-hidden="true"></span>
 {%- if s.item_count > 1 %}<button type="button" class="lu-count" data-peek="{{ l.id }}:{{ s.index }}" aria-haspopup="dialog" aria-expanded="false" title="{{ s.item_count }} items in this step. Show them">×{{ s.item_count }}</button>{% endif -%}
 </span>
@@ -243,9 +256,9 @@
 {%- set ph = d.placeholder -%}
 {%- set qt = d.queued_thumb -%}
 {#- The header thumb is the glass, always; what waits for the frame is the small thumb on its corner. -#}
-{%- set top_html -%}{% if op and not (ph and ph.state == 'delivering') %}{{ thumb(op.name, op.thumb_url, op.aspect, op.orientation, priority=(vm.displays[0].id == d.id), display=d) }}{% elif fr and fr.thumb_url %}{{ thumb(fr.label, fr.thumb_url, (d.width or 16) ~ '/' ~ (d.height or 10), d.orientation, title=fr.title, priority=(vm.displays[0].id == d.id), display=d) }}{% else %}<span class="lu-thumb {{ d.orientation or 'l' }} empty note-{{ ph.state }}" style="--ar:{{ d.width or 16 }}/{{ d.height or 10 }};--arw:{{ d.width or 16 }};--arh:{{ d.height or 10 }}" role="img" aria-label="{{ ph.title }}" title="{{ ph.title }}"><span class="lu-thumb-note">{{ ico({'delivering': 'send', 'unavailable': 'info'}.get(ph.state, 'screen')) }}<b>{{ ph.label }}</b>{% if ph.sub %}<small>{{ ph.sub }}</small>{% endif %}</span></span>{% endif %}{%- endset -%}
-<figure class="lu-now-thumb" title="{{ ph.title if ph and ph.state == 'delivering' else ('On screen: ' ~ op.name if op else (fr.title if fr else ph.title)) }}">{% if qt %}<span class="lu-now-wrap">{{ top_html }}<span class="lu-qthumb" role="group" aria-label="{{ qt.title }}" title="{{ qt.title }}">{{ thumb(qt.name, qt.thumb_url, qt.aspect, qt.orientation, display=d) }}<span class="lu-qtag">{{ ico('clock') }}<span>{{ qt.label }}</span></span></span></span>{% else %}{{ top_html }}{% endif %}</figure>
-<div class="lu-ds-name-row"><div class="lu-ds-title"><h2>{{ d.name }}</h2>{% if d.settings_url %}<a class="lu-gear" href="{{ d.settings_url }}" title="{{ d.name }} settings" aria-label="{{ d.name }} settings">{{ ico('gear') }}</a>{% endif %}</div>
+{%- set zoom_h = zoom_btn('head:' ~ d.id, 'Zoom what ' ~ d.name ~ ' is showing') -%}
+{%- set top_html -%}{% if op and not (ph and ph.state == 'delivering') %}{{ thumb(op.name, op.thumb_url, op.aspect, op.orientation, priority=(vm.displays[0].id == d.id), display=d, extra=zoom_h if op.thumb_url else '') }}{% elif fr and fr.thumb_url %}{{ thumb(fr.label, fr.thumb_url, (d.width or 16) ~ '/' ~ (d.height or 10), d.orientation, title=fr.title, priority=(vm.displays[0].id == d.id), display=d, extra=zoom_h) }}{% else %}<span class="lu-thumb {{ d.orientation or 'l' }} empty note-{{ ph.state }}" style="--ar:{{ d.width or 16 }}/{{ d.height or 10 }};--arw:{{ d.width or 16 }};--arh:{{ d.height or 10 }}" role="img" aria-label="{{ ph.title }}" title="{{ ph.title }}"><span class="lu-thumb-note">{{ ico({'delivering': 'send', 'unavailable': 'info'}.get(ph.state, 'screen')) }}<b>{{ ph.label }}</b>{% if ph.sub %}<small>{{ ph.sub }}</small>{% endif %}</span></span>{% endif %}{%- endset -%}
+<figure class="lu-now-thumb" title="{{ ph.title if ph and ph.state == 'delivering' else ('On screen: ' ~ op.name if op else (fr.title if fr else ph.title)) }}">{% if qt %}<span class="lu-now-wrap">{{ top_html }}<span class="lu-qthumb" role="group" aria-label="{{ qt.title }}" title="{{ qt.title }}">{{ thumb(qt.name, qt.thumb_url, qt.aspect, qt.orientation, display=d) }}<span class="lu-qtag">{{ ico('clock') }}<span>{{ qt.label }}</span></span></span></span>{% else %}{{ top_html }}{% endif %}</figure><div class="lu-ds-name-row"><div class="lu-ds-title"><h2>{{ d.name }}</h2>{% if d.settings_url %}<a class="lu-gear" href="{{ d.settings_url }}" title="{{ d.name }} settings" aria-label="{{ d.name }} settings">{{ ico('gear') }}</a>{% endif %}</div>
 <span class="lu-ds-tags">
 {%- set link_icon = {'connected': 'signal', 'sleeps': 'clock'}.get(d.link.mode, 'info') -%}
 <span class="lu-im" title="{{ d.link.title }}">{{ ico(link_icon) }}<span>{{ d.link.label }}</span></span>

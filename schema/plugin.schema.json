@@ -227,6 +227,15 @@
         }
       }
     },
+    "lineups": {
+      "type": "object",
+      "description": "How the Lineups page can step through this widget's items. pin_option names a cell option the host sets to an item's key to render that one item (the server module then provides lineup_items(options), a list of {key, label, version?}); draw says the widget's output differs from one render to the next and has no way to name an item, so the arrows draw the dashboard again. The host also sets hidden options _draw (a per-drawing token) and _browse (turns past the current one) on a drawing render, and sets a sequential mode to random so a preview never moves the real cursor.",
+      "additionalProperties": false,
+      "properties": {
+        "pin_option": { "type": "string", "minLength": 1 },
+        "draw": { "type": "boolean" }
+      }
+    },
     "updates": {
       "type": "object",
       "description": "Declares host-owned update triggers this widget supports. A declaration only makes the matching per-placement opt-in available; it never refreshes a dashboard by itself.",

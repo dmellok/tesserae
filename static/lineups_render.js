@@ -329,7 +329,20 @@
     );
   }
 
-  function stepHtml(d, l, s) {
+  // The little zoom icon over a thumbnail's top right corner; what is "step:<lineup>:<index>"
+  // or "head:<display>" (macro zoom_btn in templates/_lineups.html).
+  function zoomBtn(what, label) {
+    return `<button type="button" class="lu-zoom" data-zoom="${esc(what)}" aria-haspopup="dialog" aria-label="${esc(label)}" title="${esc(label)}">${ico("zoom")}</button>`;
+  }
+
+  // ``ui.itemChoice(d, l, s)`` is the item the person picked with the arrows on this step
+  // (lineups.js), or null: {key, idx, state: "loading" | "ready" | "error" | "busy", thumb_url}.
+  function stepHtml(d, l, s, ui) {
+    const choice = (ui && ui.itemChoice && ui.itemChoice(d, l, s)) || null;
+    const canPush = !!(d.id && l.actions.push_step_url && !s.missing && !s.off_display);
+    const draw = !!s.draw_items;
+    const canPick = canPush && (!!s.pick_items || draw) && !!l.actions.step_item_url;
+    const picked = choice && choice.state === "ready" ? choice.thumb_url : "";
     const cls = s.next
       ? "is-next"
       : s.current && !s.on_screen && s.pill
@@ -340,10 +353,14 @@
     const pill = s.pill
       ? `<span class="lu-pill p-${esc(s.pill.kind)}" title="${esc(s.pill.title)}">${s.pill.kind === "now" ? ico("play") : ""}${esc(s.pill.label)}</span>`
       : "";
-    const push =
-      d.id && l.actions.push_step_url && !s.missing && !s.off_display
-        ? `<form method="post" action="${esc(l.actions.push_step_url)}" class="lu-push-form"><input type="hidden" name="index" value="${s.index}"><input type="hidden" name="display_id" value="${esc(d.id)}"><input type="hidden" name="page_id" value="${esc(s.dashboard_id)}"><input type="hidden" name="composition_digest" value="${esc(s.composition_digest || "")}"><button type="submit" class="lu-push-ov" data-push="${esc(l.id)}:${s.index}" title="${esc(s.push_title)}" aria-label="${esc(s.push_title)}"><i>${ico("send")}</i><span>Push now</span></button></form>`
-        : "";
+    const push = canPush
+      ? `<form method="post" action="${esc(l.actions.push_step_url)}" class="lu-push-form"><input type="hidden" name="index" value="${s.index}"><input type="hidden" name="display_id" value="${esc(d.id)}"><input type="hidden" name="page_id" value="${esc(s.dashboard_id)}"><input type="hidden" name="composition_digest" value="${esc(choice ? "" : s.composition_digest || "")}">${choice ? `<input type="hidden" name="item" value="${esc(choice.key)}">` : ""}<button type="submit" class="lu-push-ov" data-push="${esc(l.id)}:${s.index}" title="${esc(s.push_title)}" aria-label="${esc(s.push_title)}"><i>${ico("send")}</i><span>Push now</span></button></form>`
+      : "";
+    const prevLabel = draw ? "Previous picture" : "Previous item";
+    const nextLabel = draw ? "Draw the next picture" : "Next item";
+    const items = canPick
+      ? `<span class="lu-items" role="group" aria-label="${draw ? `Draw another ${esc(s.name)} picture` : `Choose which ${esc(s.name)} item to push`}"><button type="button" class="lu-it" data-item="${esc(l.id)}:${s.index}:-1" aria-label="${prevLabel}" title="${prevLabel}"${draw && !choice ? " disabled" : ""}>${ico("chevl")}</button><span class="lu-it-pos" aria-hidden="true">${choice && !draw ? `${choice.idx + 1}/${s.items.length}` : ""}</span><button type="button" class="lu-it" data-item="${esc(l.id)}:${s.index}:1" aria-label="${nextLabel}" title="${nextLabel}">${ico("chev")}</button></span>`
+      : "";
     const count =
       s.item_count > 1
         ? `<button type="button" class="lu-count" data-peek="${esc(l.id)}:${s.index}" aria-haspopup="dialog" aria-expanded="false" title="${s.item_count} items in this step. Show them">×${s.item_count}</button>`
@@ -366,7 +383,7 @@
           : "";
     return (
       `<li class="lu-step${cls ? " " + cls : ""}${s.missing ? " is-missing" : ""}${s.off_display ? " is-offdisplay" : ""}" data-step="${s.index}"${s.missing ? ' title="This dashboard was deleted; remove it from the lineup"' : s.off_display ? ` title="${esc(s.off_display_note)}"` : ""}><figure><span class="lu-slot">${pill}</span>` +
-      `<span class="lu-tile${s.item_count > 1 ? " stacked" : ""}">${thumb(s.name, s.thumb_url, s.aspect, d.orientation || s.orientation, s.missing ? "missing" : s.off_display ? "offdisplay" : "", null, false, d)}<span class="lu-scrim" aria-hidden="true"></span>${push}<span class="lu-pushed-msg" aria-hidden="true"></span>${count}</span>` +
+      `<span class="lu-tile${s.item_count > 1 ? " stacked" : ""}${canPick ? " has-items" : ""}${choice && choice.state === "loading" ? " is-loading" : ""}${choice && (choice.state === "error" || choice.state === "busy") ? " is-itemfail" : ""}">${thumb(s.name, picked || s.thumb_url, s.aspect, d.orientation || s.orientation, s.missing ? "missing" : s.off_display ? "offdisplay" : "", null, false, d, s.thumb_url && !s.missing && !s.off_display ? zoomBtn(`step:${l.id}:${s.index}`, `Zoom ${s.name}`) : "")}<span class="lu-scrim" aria-hidden="true"></span>${push}${items}<span class="lu-pushed-msg" aria-hidden="true"></span>${count}</span>` +
       `<figcaption><span class="lu-step-name">${esc(s.name)}</span><span class="lu-step-meta">${esc(s.position)}${cond}</span>${off}</figcaption></figure>${sep}</li>`
     );
   }
@@ -398,7 +415,7 @@
       `<div class="lu-row-title"><span class="lu-row-name">${esc(l.name)}${edot}</span><span class="lu-row-meta" title="${esc(l.mode_label)}, ${esc(l.days_text)}">${meta}</span>${(l.warnings || []).map((w) => `<span class="lu-row-warning">${ico("info")}${esc(w)}</span>`).join("")}${l.display_removed ? `<span class="lu-row-warning">${ico("info")}Display removed</span>` : ""}${rowErr ? `<span class="lu-row-err" role="alert">${ico("info")}${esc(rowErr)}</span>` : ""}</div>` +
       `<div class="lu-row-state">${rowState(l)}</div>${rowActions(l, d.id)}` +
       `<button class="lu-fold" type="button" aria-expanded="${folded ? "false" : "true"}" aria-controls="lu-body-${esc(uid)}" aria-label="${esc(l.name)}: show or hide dashboards" data-fold="${esc(l.id)}">${ico("caret")}</button></div>` +
-      `<div class="lu-row-body" id="lu-body-${esc(uid)}"><div class="lu-strip-scroll" tabindex="0" role="region" aria-label="Dashboards in ${esc(l.name)}; scrolls sideways"><ol class="lu-strip${l.status === "live" ? " has-now" : ""} ${d.orientation || "l"}">${l.steps.map((s) => stepHtml(d, l, s)).join("")}</ol></div></div></li>`
+      `<div class="lu-row-body" id="lu-body-${esc(uid)}"><div class="lu-strip-scroll" tabindex="0" role="region" aria-label="Dashboards in ${esc(l.name)}; scrolls sideways"><ol class="lu-strip${l.status === "live" ? " has-now" : ""} ${d.orientation || "l"}">${l.steps.map((s) => stepHtml(d, l, s, ui)).join("")}</ol></div></div></li>`
     );
   }
 
@@ -417,6 +434,7 @@
     const qt = d.queued_thumb;
     const phIcon = { delivering: "send", unavailable: "info" };
     const delivering = !!ph && ph.state === "delivering";
+    const zoomH = zoomBtn(`head:${d.id}`, `Zoom what ${d.name} is showing`);
     const thumbHtml =
       op && !delivering
         ? thumb(
@@ -427,7 +445,8 @@
             "",
             null,
             vm.displays[0]?.id === d.id,
-            d
+            d,
+            op.thumb_url ? zoomH : ""
           )
         : fr && fr.thumb_url
           ? thumb(
@@ -438,7 +457,8 @@
               "",
               fr.title,
               vm.displays[0]?.id === d.id,
-              d
+              d,
+              zoomH
             )
           : `<span class="lu-thumb ${d.orientation || "l"} empty note-${esc(ph.state)}" style="--ar:${d.width || 16}/${d.height || 10};--arw:${d.width || 16};--arh:${d.height || 10}" role="img" aria-label="${esc(ph.title)}" title="${esc(ph.title)}"><span class="lu-thumb-note">${ico(phIcon[ph.state] || "screen")}<b>${esc(ph.label)}</b>${ph.sub ? `<small>${esc(ph.sub)}</small>` : ""}</span></span>`;
     let tags = `<span class="lu-im" title="${esc(d.link.title)}">${ico(linkIcon)}<span>${esc(d.link.label)}</span></span>`;
@@ -522,13 +542,15 @@
 
   /* ---------------------------------------------------------------- peek */
   function peek(d, l, s) {
-    // /push-step has no item selection support. The gallery is a viewer.
+    // A viewer: items are chosen with the arrows on the tile or in the lightbox.
     const n = s.item_count;
     const items = [];
     for (let k = 0; k < n; k++) {
       const it = (s.items || [])[k];
       const label = it && it.label ? it.label : `${s.name} ${k + 1} of ${n}`;
-      const url = (it && it.thumb_url) || s.thumb_url;
+      // An item that can be chosen but has no picture of its own draws
+      // its initial, never the step's picture standing in for it.
+      const url = it && it.key ? it.thumb_url : (it && it.thumb_url) || s.thumb_url;
       items.push(
         `<li class="lu-pk-item">${thumb(s.name, url, s.aspect, d.orientation || s.orientation, "", label, false, d)}` +
           "</li>"
