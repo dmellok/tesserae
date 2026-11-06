@@ -735,3 +735,50 @@ def test_the_firmware_vital_has_no_update_tag_without_an_update(app: Flask) -> N
     dev = _add(client)
     rail = _rail_html(client.get(f"/settings/devices/{dev}").get_data(as_text=True))
     assert "dx-v-badge" not in rail
+
+
+def _lineups_view_for_rail(*, showing: str, next_id: str) -> object:
+    from types import SimpleNamespace as NS
+
+    step = NS(dashboard_id=next_id, next=True, thumb_url="/next.webp", name="Next one")
+    live = NS(
+        id="all_day",
+        name="All day",
+        status="live",
+        enabled=True,
+        next_run=None,
+        steps=[step],
+        window=NS(is_point=False, end="24:00", end_min=1440),
+    )
+    display = NS(
+        id="door",
+        lineups=[live],
+        on_screen=NS(dashboard_id=showing),
+        next_update=NS(at_label="~1:15 PM"),
+    )
+    return NS(displays=[display], time_cycle="h12")
+
+
+def test_the_next_thumbnail_is_left_out_when_the_next_step_is_the_same_dashboard(
+    app: Flask, monkeypatch
+) -> None:
+    from app.settings import index_routes
+
+    monkeypatch.setattr(
+        index_routes,
+        "_lineups_view",
+        lambda: _lineups_view_for_rail(showing="photos", next_id="photos"),
+    )
+    with app.test_request_context():
+        line = index_routes._now_line_for("door")
+    assert line is not None and "next_thumb" not in line
+
+    monkeypatch.setattr(
+        index_routes,
+        "_lineups_view",
+        lambda: _lineups_view_for_rail(showing="photos", next_id="news"),
+    )
+    with app.test_request_context():
+        line = index_routes._now_line_for("door")
+    assert line is not None and line["next_thumb"] == "/next.webp"
+    assert line["next_when"] == "~1:15 PM" and "until" in line["meta"]

@@ -1585,6 +1585,12 @@ def _now_line_for(device_id: str) -> dict[str, Any] | None:
     if next_step is None and nxt is not None and nxt.steps:
         next_step = nxt.steps[0]
         next_when = nxt.next_run.main if nxt.next_run is not None else ""
+    # A step on the dashboard already showing has no picture of its own yet: its
+    # thumbnail is what is on the frame now, not what comes next (an album draws
+    # its next photo only when the step fires).
+    showing = display.on_screen.dashboard_id if display and display.on_screen else None
+    if next_step is not None and next_step.dashboard_id == showing:
+        next_step = None
     upcoming: dict[str, Any] = (
         {
             "next_thumb": next_step.thumb_url,
