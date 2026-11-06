@@ -3418,6 +3418,7 @@ def test_tile_arrows_and_zoom_are_there_on_hover_and_keyboard_focus(live: str) -
         assert items.evaluate("e => getComputedStyle(e).opacity") == "0"
         tile.hover()
         page.wait_for_timeout(250)
+        items.evaluate("e => e.getAnimations().forEach((a) => a.finish())")
         assert items.evaluate("e => getComputedStyle(e).opacity") == "1"
         # Under Push now, inside the picture.
         push = tile.locator(".lu-push-ov").bounding_box()
@@ -3435,6 +3436,7 @@ def test_tile_arrows_and_zoom_are_there_on_hover_and_keyboard_focus(live: str) -
         )
         page.mouse.move(5, 5)
         page.locator(f"{ART} [data-item='dinner:1:1']").focus()
+        items.evaluate("e => e.getAnimations().forEach((a) => a.finish())")
         assert items.evaluate("e => getComputedStyle(e).opacity") == "1"
         browser.close()
 
