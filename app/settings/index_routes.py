@@ -1615,12 +1615,12 @@ def _now_line_for(device_id: str) -> dict[str, Any] | None:
 
 
 def _battery_card_or_none(device_id: str) -> dict[str, Any] | None:
-    """The Batteries page's chart card for this device (last 7 days), for the
+    """The Batteries page's chart card for this device (default range), for the
     Power section; ``None`` without history or when it can't be built."""
     from app.device_battery_routes import device_card
 
     try:
-        return device_card(device_id, window_days=7)
+        return device_card(device_id)
     except Exception:
         current_app.logger.debug("devices: no battery card for %s", device_id, exc_info=True)
         return None

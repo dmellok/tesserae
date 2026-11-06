@@ -665,13 +665,14 @@ def test_any_device_gets_predictions(history: BatteryHistory) -> None:
     assert card["wake_stats"]["total"] == 12
 
 
+@pytest.mark.parametrize("hours", [6, 12])
 def test_a_short_chart_window_still_predicts_from_a_week_of_readings(
-    history: BatteryHistory,
+    history: BatteryHistory, hours: int
 ) -> None:
     # A slow drain: a percent a day, so the last 12 hours alone look flat.
     for hour in range(0, 7 * 24, 6):
         history.record("slow", pct=83 + hour // 24, timestamp=NOW - hour * 3600)
-    card = bc.build_battery_chart("slow", history=history, window_hours=12)
+    card = bc.build_battery_chart("slow", history=history, window_hours=hours)
     assert card["prediction"]["slope_per_day"] < -0.5
     assert card["prediction"]["days_to_empty"] is not None
 
@@ -771,3 +772,22 @@ def test_builder_takes_the_window_in_hours_and_days(history: BatteryHistory) -> 
     assert 0 < half["samples"] < day["samples"]
     assert [r["hours"] for r in half["ranges"] if r["pressed"]] == [12]
     assert not any(r["pressed"] for r in default["ranges"][:2])
+
+
+def test_ranges_start_at_six_hours() -> None:
+    assert [label for _, label in bc.RANGES] == ["6h", "12h", "24h", "7d", "30d"]
+    assert bc.MAX_WINDOW_HOURS == 720
+    assert bc.DEFAULT_WINDOW_HOURS == 168
+
+
+def test_a_six_hour_chart_is_consistent(history: BatteryHistory) -> None:
+    """Samples, wakes, wake rate and gaps all follow the 6 hour window."""
+    for i in range(0, 12 * 3600, 900):  # every 15 minutes for 12 hours
+        history.record(DEV, pct=90 - i // 3600, timestamp=NOW - 12 * 3600 + i)
+    card = bc.build_battery_chart(DEV, history=history, window_hours=6)
+    assert card["window_hours"] == 6 and card["window_label"] == "6 hours"
+    assert [r["hours"] for r in card["ranges"] if r["pressed"]] == [6]
+    assert 0 < card["samples"] < 6 * 4 + 2
+    assert card["wake_stats"]["total"] == card["samples"]
+    # 4 wakes an hour is 96 a day, not diluted by a longer window.
+    assert 80 <= card["wake_stats"]["per_day"] <= 110

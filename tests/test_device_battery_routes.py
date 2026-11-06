@@ -37,9 +37,8 @@ def test_index_renders_empty_state_with_no_history(app: Flask) -> None:
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert "No battery history yet" in body
-    # Window chips still render so the user can switch windows even
-    # before any data lands.
-    assert "7d" in body and "30d" in body
+    # The range switch lives on each chart; the page has none of its own.
+    assert "History window" not in body
 
 
 def test_index_renders_card_with_history_and_prediction(app: Flask, tmp_path: Path) -> None:
@@ -56,7 +55,7 @@ def test_index_renders_card_with_history_and_prediction(app: Flask, tmp_path: Pa
     now = time.time()
     for i in range(10):
         store.record("esp32_attic", pct=100 - i * 5, timestamp=now - (10 - i) * 86400 / 2)
-    resp = client.get("/devices/battery?window=7")
+    resp = client.get("/devices/battery")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert "esp32_attic" in body
@@ -84,7 +83,7 @@ def test_index_labels_live_charge_and_historical_drain_separately(app: Flask) ->
     for i, pct in enumerate((76, 77, 78, 79, 80, 81, 82)):
         store.record("e1004", pct=pct, timestamp=now - (6 - i) * 5 * 60)
 
-    body = client.get("/devices/battery?window=7").get_data(as_text=True)
+    body = client.get("/devices/battery").get_data(as_text=True)
     assert '<div class="dx-stat-label">Charging</div>' in body
     assert '<div class="dx-stat-label">Charge rate</div>' in body
     assert '<div class="dx-stat-label">Full in</div>' in body
@@ -108,7 +107,7 @@ def test_index_hides_orphan_history_for_unregistered_devices(app: Flask, tmp_pat
         store.record("ghost_device", pct=80 - i * 2, timestamp=now - (6 - i) * 86400)
     client = app.test_client()
     _sign_in(client)
-    body = client.get("/devices/battery?window=7").get_data(as_text=True)
+    body = client.get("/devices/battery").get_data(as_text=True)
     assert "ghost_device" not in body
 
 
@@ -153,14 +152,16 @@ def test_series_json_exposes_phase_aware_charge_fields(app: Flask) -> None:
     assert prediction["days_to_empty"] is None
 
 
-def test_window_query_param_clamps(app: Flask) -> None:
+@pytest.mark.parametrize("query", ["window=30", "window=999", "window=junk", "window=0", "window="])
+def test_old_window_links_still_load_the_page(app: Flask, query: str) -> None:
+    """The page-level window switch is gone; a bookmark to ``?window=N`` loads
+    the page as usual, with no switch and no error."""
     client = app.test_client()
     _sign_in(client)
-    resp = client.get("/devices/battery?window=999")
+    resp = client.get(f"/devices/battery?{query}")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    # Clamped to 90 (WINDOW_DAYS_MAX); chip for 90 is marked active.
-    assert "90d" in body
+    assert "History window" not in body and "seg-item" not in body
 
 
 def test_topbar_battery_indicator_links_to_admin_page(app: Flask) -> None:
@@ -434,7 +435,7 @@ def test_clear_history_button_renders_only_for_devices_with_samples(
     now = time.time()
     for i in range(4):
         store.record("esp32_attic", pct=80 - i * 5, timestamp=now - (4 - i) * 86400 / 2)
-    body = client.get("/devices/battery?window=7").get_data(as_text=True)
+    body = client.get("/devices/battery").get_data(as_text=True)
     assert "Clear battery history" in body
 
 
@@ -459,7 +460,7 @@ def test_visionect_card_shows_predictions_like_any_other(app: Flask) -> None:
     for dev in ("hall_frame", "attic_esp"):
         for i in range(10):
             store.record(dev, pct=100 - i * 5, timestamp=now - (10 - i) * 86400 / 2)
-    body = client.get("/devices/battery?window=7").get_data(as_text=True)
+    body = client.get("/devices/battery").get_data(as_text=True)
 
     def card(device_id: str) -> str:
         start = body.index(f'data-lf-text="{device_id} {device_id}"')
@@ -491,7 +492,7 @@ def test_cards_embed_wake_dots_with_reasons(app: Flask) -> None:
         status="ok",
         extra={"parsed": {"connect_reason": "by server request"}},
     )
-    body = client.get("/devices/battery?window=7").get_data(as_text=True)
+    body = client.get("/devices/battery").get_data(as_text=True)
     assert "data-wakes=" in body
     assert "by server request" in body  # the raw reason rides along
     assert "Scheduled check-in" in body
@@ -542,11 +543,30 @@ def test_card_json_returns_the_builder_shape_for_the_asked_range(app: Flask) -> 
     assert "dx-wake-legend" in half["legend_html"]
 
 
+def test_card_json_serves_the_six_hour_range(app: Flask) -> None:
+    client = _seeded(app)
+    six = client.get("/devices/battery/attic/card.json?hours=6").get_json()
+    assert six["window_hours"] == 6 and six["window_label"] == "6 hours"
+    assert [r["label"] for r in six["ranges"]] == ["6h", "12h", "24h", "7d", "30d"]
+    assert [r["label"] for r in six["ranges"] if r["pressed"]] == ["6h"]
+    assert six["prediction"] is not None  # still fitted on at least a week
+
+
+def test_each_chart_has_its_own_range_switch_and_the_page_has_none(app: Flask) -> None:
+    client = _seeded(app)
+    body = client.get("/devices/battery").get_data(as_text=True)
+    assert body.count('class="dx-battery-range"') == body.count("data-battery-chart=")
+    assert body.count('class="dx-battery-range"') >= 1
+    # A chart with nothing remembered opens on 7 days.
+    assert 'data-window-hours="168"' in body
+    assert "dx-filter-strip" not in body
+
+
 def test_card_json_clamps_the_range_and_404s_unknown_devices(app: Flask) -> None:
     client = _seeded(app)
     assert (
         client.get("/devices/battery/attic/card.json?hours=99999").get_json()["window_hours"]
-        == 90 * 24
+        == 30 * 24
     )
     assert client.get("/devices/battery/attic/card.json?hours=0").get_json()["window_hours"] == 1
     assert (
