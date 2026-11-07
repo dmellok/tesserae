@@ -1587,7 +1587,14 @@ def kind_protocol(kind: Device) -> str:
 # other protocols with topics on their manifest (KOReader, PicPak) ship
 # REST-only clients too.
 _MQTT_CAPABLE_PROTOCOLS = frozenset(
-    {"esp32_client", "esp32_bw_client", "pi_bin_client", "pi_png_client", "pico_bin_client"}
+    {
+        "esp32_client",
+        "esp32_bw_client",
+        "pi_client",
+        "pi_bin_client",
+        "pi_png_client",
+        "pico_bin_client",
+    }
 )
 _NATIVE_FIRMWARE_PROTOCOLS = frozenset({"esp32_client", "esp32_bw_client"})
 

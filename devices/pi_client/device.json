@@ -1,0 +1,138 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Raspberry Pi client",
+  "icon": "monitor",
+  "version": "1.0.0",
+  "description": "Raspberry Pi running the unified tesserae-device-pi client (dmellok/tesserae-device-pi) on a Pimoroni Inky panel. Pairs over REST with a claim code (MQTT and the cloud relay also work) and reports the panel it detected, so one kind covers every Inky model: a Spectra 6 Impression that advertises its gamut (canonically waveshare_e6) is served the panel-native 4-bpp .bin (packed on the server, painted with no Pi-side quantise), every other panel the PNG the Pi quantises itself. Mains-powered, so it can stay awake and pick a Send up within seconds.",
+  "renderers": [
+    "pi_png",
+    "pi_bin"
+  ],
+  "colour_depths": {
+    "waveshare_e6": "pi_bin"
+  },
+  "colour_depth_default": "waveshare_e6",
+  "status_topic": "tesserae/pi/status",
+  "panel": {
+    "w": 1424,
+    "h": 1200,
+    "orientation": "landscape",
+    "name": "Inky Impression 13.3″"
+  },
+  "config_schema": {
+    "sleep_interval_s": {
+      "type": "int",
+      "label": "Sleep interval",
+      "default": 60,
+      "min": 5,
+      "max": 604800,
+      "presets": [
+        {
+          "value": 60,
+          "label": "1 minute"
+        },
+        {
+          "value": 300,
+          "label": "5 minutes"
+        },
+        {
+          "value": 900,
+          "label": "15 minutes"
+        },
+        {
+          "value": 1800,
+          "label": "30 minutes"
+        },
+        {
+          "value": 3600,
+          "label": "1 hour"
+        },
+        {
+          "value": 21600,
+          "label": "6 hours"
+        },
+        {
+          "value": 43200,
+          "label": "12 hours"
+        },
+        {
+          "value": 86400,
+          "label": "1 day"
+        }
+      ],
+      "help": "How long the client sleeps between frame fetches when polling via REST. MQTT-driven instances ignore this value (they wake on retained-frame publishes). Custom value is in seconds."
+    },
+    "always_on": {
+      "type": "boolean",
+      "label": "Stay awake",
+      "default": true,
+      "help": "Keep polling on the awake interval below instead of sleeping between frames, so a Send, a schedule or a tap lands within seconds. A Pi is mains-powered, so this is on by default; turn it off for a Pi on a battery HAT."
+    },
+    "awake_poll_s": {
+      "type": "int",
+      "label": "Awake poll interval",
+      "default": 15,
+      "min": 5,
+      "max": 300,
+      "presets": [
+        {
+          "value": 5,
+          "label": "5 seconds"
+        },
+        {
+          "value": 10,
+          "label": "10 seconds"
+        },
+        {
+          "value": 15,
+          "label": "15 seconds"
+        },
+        {
+          "value": 30,
+          "label": "30 seconds"
+        },
+        {
+          "value": 60,
+          "label": "1 minute"
+        }
+      ],
+      "help": "How often to re-check for a new frame while staying awake. Ignored unless Stay awake is on. Unchanged content answers 304 without a panel refresh, so a short interval costs one small request rather than an e-paper repaint."
+    },
+    "button_wake_s": {
+      "type": "int",
+      "label": "Button wake window",
+      "default": 0,
+      "min": 0,
+      "max": 60,
+      "presets": [
+        {
+          "value": 0,
+          "label": "Off (sleep immediately)"
+        },
+        {
+          "value": 2,
+          "label": "2 seconds"
+        },
+        {
+          "value": 5,
+          "label": "5 seconds"
+        },
+        {
+          "value": 10,
+          "label": "10 seconds"
+        },
+        {
+          "value": 30,
+          "label": "30 seconds"
+        }
+      ],
+      "help": "After a button press changes the page, stay awake this many seconds to catch rapid repeat presses before deep-sleeping, so scrolling several pages doesn't pay a fresh wake and Wi-Fi cycle per press. 0 sleeps immediately (best battery). Applies only to button wakes, not scheduled refreshes or rotation."
+    },
+    "touch_enabled": {
+      "type": "boolean",
+      "label": "Touch input",
+      "default": false,
+      "help": "For a Pi with a touchscreen: send taps on buttons, switches, sliders and steppers on the dashboard back to Tesserae."
+    }
+  }
+}

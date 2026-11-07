@@ -59,6 +59,7 @@ The bundled client kinds Tesserae knows how to talk to. A flashed client announc
 | `opendisplay` | 800×480 | `pi_png` | An OpenDisplay BLE e-paper tag, driven by the tesserae-opendisplay bridge. |
 | `opendisplay_ha` | 800×480 | `pi_png` | An OpenDisplay BLE e-paper tag driven through Home Assistant. |
 | `pi_bin_client` | 1424×1200 | `pi_bin` | Raspberry-Pi-side client that consumes the 4-bpp .bin frame. |
+| `pi_client` | 1424×1200 | `pi_png`, `pi_bin` | Raspberry Pi running the unified tesserae-device-pi client (dmellok/tesserae-device-pi) on a Pimoroni Inky panel. |
 | `pi_png_client` | 1424×1200 | `pi_png` | Raspberry-Pi-side client that consumes the PNG frame. |
 | `pico_bin_client` | 1600×1200 | `pico_bin` | Battery-powered Pico Plus 2 firmware (RP2350) driving a Pimoroni Inky-style Spectra 6 panel over SPI. |
 | `picpak_client` | 400×300 | `esp32_bin` | Battery-powered PicPak 4.2" 4-colour BWRY e-paper frame. |

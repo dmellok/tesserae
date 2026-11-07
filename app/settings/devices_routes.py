@@ -104,6 +104,7 @@ def _dev_seed_kinds() -> list[tuple[str, str, str]]:
     """
     return [
         ("esp32_client", "dev_esp32", "Dev ESP32"),
+        ("pi_client", "dev_pi", "Dev Pi"),
         ("pi_bin_client", "dev_pi_bin", "Dev Pi (bin)"),
         ("pi_png_client", "dev_pi_png", "Dev Pi (png)"),
         ("picpak_client", "dev_picpak", "Dev PicPak"),

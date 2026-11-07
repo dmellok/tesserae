@@ -8,7 +8,7 @@ strip with one-click register buttons.
 Clients participating in discovery embed a few well-known keys in
 their heartbeat JSON (see `PROMPTS/updates/*_discovery.md`):
 
-* ``kind``, the Tesserae device kind id (``pi_bin_client`` /
+* ``kind``, the Tesserae device kind id (``pi_client`` / ``pi_bin_client`` /
   ``pi_png_client`` / ``esp32_client`` / ``pico_bin_client``). Tells
   the UI which kind to pre-select in the Add-device form.
 * ``panel_w`` / ``panel_h``, pixel dims the client expects to paint,
