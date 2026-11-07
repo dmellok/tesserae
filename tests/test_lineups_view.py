@@ -2697,20 +2697,29 @@ def test_pushing_a_step_from_a_lineup_marks_that_lineup_live_even_from_another_d
 ) -> None:
     fake = _FakePush()
     app.config["PUSH_MANAGER"] = fake
-    assert _status_of(other_day, "elsewhen") != "live"
+
+    def lineups() -> dict[str, str]:
+        return {
+            lu["id"]: lu["status"]
+            for d in other_day.get("/decks/view.json").get_json()["displays"]
+            for lu in d["lineups"]
+        }
+
+    # The seeded weekend / night lineups follow the real clock and may be
+    # live by schedule; what matters is that the push changes none of them.
+    before = lineups()
+    assert before["elsewhen"] != "live"
     resp = other_day.post("/decks/elsewhen/push-step", json={"index": 1, "display_id": "panel"})
     assert resp.status_code == 200, resp.get_json()
     rec = app.config["DECK_NAV_STORE"].get("panel")
     assert rec and rec["deck_id"] == "elsewhen" and rec["page_id"] == "art"
     assert _status_of(other_day, "elsewhen") == "live"
     # ... and only that lineup.
-    lineups = {
-        lu["id"]: lu["status"]
-        for d in other_day.get("/decks/view.json").get_json()["displays"]
-        for lu in d["lineups"]
+    after = lineups()
+    assert after["elsewhen"] == "live"
+    assert {k: v for k, v in after.items() if k != "elsewhen"} == {
+        k: v for k, v in before.items() if k != "elsewhen"
     }
-    assert lineups["elsewhen"] == "live"
-    assert lineups["weekend"] != "live" and lineups["night"] != "live"
 
 
 def test_a_failed_step_push_marks_nothing(other_day: Any, app: Flask) -> None:
