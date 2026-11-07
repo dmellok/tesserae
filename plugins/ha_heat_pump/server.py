@@ -9,6 +9,8 @@ from typing import Any
 
 from flask import current_app
 
+from app.tz_resolve import app_timezone
+
 
 def _core() -> Any:
     plugin = current_app.config["PLUGIN_REGISTRY"].get("ha_core")
@@ -56,15 +58,23 @@ def _entity_data(states: list[dict[str, Any]], entity_id: Any, core: Any) -> dic
     state = _lookup(states, entity_id)
     raw_value = _available_state(state)
     attrs = (state.get("attributes") or {}) if state else {}
+    value = _numeric(raw_value)
     return {
         "name": core.friendly_name(state) if state else str(entity_id or ""),
-        "value": _numeric(raw_value),
+        "value": value,
         "unit": str(attrs.get("unit_of_measurement") or ""),
-        "available": raw_value is not None,
+        "available": value is not None,
     }
 
 
-def _yesterday_data(states: list[dict[str, Any]], entity_id: Any, core: Any) -> dict[str, Any]:
+def _yesterday_data(
+    states: list[dict[str, Any]],
+    entity_id: Any,
+    core: Any,
+    now: datetime,
+    *,
+    fetch_history: bool,
+) -> dict[str, Any]:
     current = _entity_data(states, entity_id, core)
     result = {**current, "value": None, "available": False, "error": None}
     if not isinstance(entity_id, str) or not entity_id:
@@ -77,13 +87,15 @@ def _yesterday_data(states: list[dict[str, Any]], entity_id: Any, core: Any) -> 
         result.update(value=previous_period, available=True)
         return result
 
+    if not fetch_history:
+        return result
+
     try:
         history = core.history(entity_id, hours=48)
     except Exception as err:
         result["error"] = core.coerce_error(err)
         return result
 
-    now = datetime.now().astimezone()
     yesterday = now.date() - timedelta(days=1)
     previous_day: list[tuple[datetime, float]] = []
     for sample in history:
@@ -96,7 +108,7 @@ def _yesterday_data(states: list[dict[str, Any]], entity_id: Any, core: Any) -> 
         except ValueError:
             continue
         if changed_at.tzinfo is None:
-            changed_at = changed_at.astimezone()
+            changed_at = changed_at.replace(tzinfo=now.tzinfo)
         local_time = changed_at.astimezone(now.tzinfo)
         if local_time.date() == yesterday:
             previous_day.append((local_time, value))
@@ -165,6 +177,13 @@ def fetch(
     else:
         compressor_active = None
 
+    now = datetime.now(app_timezone())
+    show_yesterday = str(options.get("show_yesterday", True)).lower() not in {
+        "false",
+        "0",
+        "off",
+        "no",
+    }
     energy = {}
     for key, option in (
         ("daily_total", "daily_energy_entity"),
@@ -173,11 +192,13 @@ def fetch(
     ):
         entity_id = options.get(option)
         energy[key] = _entity_data(states, entity_id, core)
-        energy[f"{key}_yesterday"] = _yesterday_data(states, entity_id, core)
+        energy[f"{key}_yesterday"] = _yesterday_data(
+            states, entity_id, core, now, fetch_history=show_yesterday
+        )
 
     return {
         "place": str(options.get("label") or "Heat pump"),
-        "time": datetime.now().strftime("%H:%M"),
+        "time": now.strftime("%H:%M"),
         "compressor": {
             "active": compressor_active,
             "state": compressor_status,

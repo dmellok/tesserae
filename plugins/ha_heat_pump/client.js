@@ -8,9 +8,11 @@ function escapeHtml(value) {
   })[character]);
 }
 
-function formatReading(reading, fallbackUnit = "") {
+function formatReading(reading, fallbackUnit = "", t) {
   const value = reading?.value;
-  if (value === null || value === undefined || !Number.isFinite(Number(value))) return "N/A";
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) {
+    return escapeHtml(t("not_available", "N/A"));
+  }
   const unit = reading.unit || fallbackUnit;
   const formatted = new Intl.NumberFormat(undefined, {
     maximumFractionDigits: 1,
@@ -26,20 +28,20 @@ function energyReading(label, current, yesterday, index, t, showYesterday) {
   const yesterdayMarkup = !showYesterday
     ? ""
     : hasYesterday
-    ? `<span class="hp-yesterday">${escapeHtml(t("yesterday", "Yesterday"))}: ${formatReading(yesterday, "kWh")}</span>`
+    ? `<span class="hp-yesterday">${escapeHtml(t("yesterday", "Yesterday"))}: ${formatReading(yesterday, "kWh", t)}</span>`
     : yesterday?.error
       ? `<span class="hp-yesterday">${escapeHtml(t("history_unavailable", "Yesterday unavailable"))}</span>`
     : "";
   return `
     <div class="hp-energy-card hp-energy-${index}">
       <span class="hp-energy-label">${escapeHtml(label)}</span>
-      <strong>${formatReading(current, "kWh")}</strong>
+      <strong>${formatReading(current, "kWh", t)}</strong>
       ${yesterdayMarkup}
     </div>`;
 }
 
 function modeLabel(value, t) {
-  if (!value) return "N/A";
+  if (!value) return escapeHtml(t("not_available", "N/A"));
   const normalized = String(value).toLowerCase();
   const key = `mode_${normalized}`;
   return escapeHtml(t(key, normalized.replaceAll("_", " ")));
@@ -160,7 +162,7 @@ export default function render(shadow, ctx) {
             <span class="hp-reading-label">${escapeHtml(t("heating_temperature", "Heating"))}</span>
             ${modeIndicator(heatingMode.mode, t("heating_mode", "Heating mode"), t)}
           </div>
-          <strong class="hp-reading-value">${formatReading(heating, "°C")}</strong>
+          <strong class="hp-reading-value">${formatReading(heating, "°C", t)}</strong>
         </div>
         ${size === "lg" || (fragment === "heating" && showTemperatureGauge) ? temperatureGauge(heating, t("heating_temperature", "Heating"), "--accent-1") : ""}
       </div>`);
@@ -174,7 +176,7 @@ export default function render(shadow, ctx) {
             <span class="hp-reading-label">${escapeHtml(size === "xs" ? t("water", "Water") : t("hot_water_temperature", "Hot water"))}</span>
             ${modeIndicator(hotWaterMode.mode, t("hot_water_mode", "Hot-water mode"), t)}
           </div>
-          <strong class="hp-reading-value">${formatReading(hotWater, "°C")}</strong>
+          <strong class="hp-reading-value">${formatReading(hotWater, "°C", t)}</strong>
         </div>
         ${size === "lg" || (fragment === "hot_water" && showTemperatureGauge) ? temperatureGauge(hotWater, t("hot_water_temperature", "Hot water"), "--accent-2") : ""}
       </div>`);
@@ -324,7 +326,7 @@ export default function render(shadow, ctx) {
       </div>
       <div class="hp-hero-spf">
         <span class="hp-hero-label">${escapeHtml(t("overall_spf", "Overall SPF"))}</span>
-        <strong class="hp-hero-spf-value">${formatReading(overallSpf)}</strong>
+        <strong class="hp-hero-spf-value">${formatReading(overallSpf, "", t)}</strong>
       </div>
     </div>`;
   const powerMarkup = `
@@ -332,13 +334,13 @@ export default function render(shadow, ctx) {
       <i class="ph-bold ph-lightning" aria-hidden="true"></i>
       <div class="hp-power-lockup">
         <span class="hp-energy-label">${escapeHtml(t("current_consumption", "Current consumption"))}</span>
-        <strong class="hp-power-value">${formatReading(power, "W")}</strong>
+        <strong class="hp-power-value">${formatReading(power, "W", t)}</strong>
       </div>
     </div>`;
   const energyMarkup = `
     <div class="hp-daily-total">
       <span class="hp-energy-label">${escapeHtml(t("electricity_today", "Electricity today"))}</span>
-      <strong class="hp-daily-total-value">${formatReading(dailyTotal, "kWh")}</strong>
+      <strong class="hp-daily-total-value">${formatReading(dailyTotal, "kWh", t)}</strong>
     </div>
     <div class="hp-energy-details" aria-label="${escapeHtml(t("energy_details", "Daily electricity use"))}">
       ${details}

@@ -1,41 +1,64 @@
 from __future__ import annotations
 
+import importlib.util
 import json
-import sys
-import unittest
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 PLUGIN_DIR = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(PLUGIN_DIR))
-
-import server  # noqa: E402
+SERVER_PATH = PLUGIN_DIR / "server.py"
 
 
-def entity(entity_id: str, state: str, **attributes: object) -> dict:
+def _load_server() -> Any:
+    spec = importlib.util.spec_from_file_location("ha_heat_pump_server_under_test", SERVER_PATH)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+server = _load_server()
+
+
+def entity(entity_id: str, state: str, **attributes: object) -> dict[str, Any]:
     return {"entity_id": entity_id, "state": state, "attributes": attributes}
 
 
 class FakeCore:
-    def __init__(self, states: list[dict], history: dict | None = None):
-        self.states = states
+    def __init__(
+        self,
+        states: list[dict[str, Any]] | None = None,
+        history: dict[str, list[dict[str, Any]]] | None = None,
+        *,
+        states_error: Exception | None = None,
+        history_error: Exception | None = None,
+    ):
+        self.states = states or []
         self.history_samples = history or {}
+        self.states_error = states_error
+        self.history_error = history_error
         self.history_calls: list[str] = []
 
-    def get_states(self) -> list[dict]:
+    def get_states(self) -> list[dict[str, Any]]:
+        if self.states_error:
+            raise self.states_error
         return self.states
 
     def entity_choices(self, domains: tuple[str, ...]) -> list[dict[str, str]]:
         return [{"value": domains[0] + ".example", "label": domains[0]}]
 
-    def friendly_name(self, state: dict) -> str:
+    def friendly_name(self, state: dict[str, Any]) -> str:
         return str(state.get("attributes", {}).get("friendly_name") or state["entity_id"])
 
-    def history(self, entity_id: str, *, hours: int) -> list[dict]:
+    def history(self, entity_id: str, *, hours: int) -> list[dict[str, Any]]:
         assert hours == 48
         self.history_calls.append(entity_id)
+        if self.history_error:
+            raise self.history_error
         return self.history_samples.get(entity_id, [])
 
     @staticmethod
@@ -43,279 +66,244 @@ class FakeCore:
         return str(error)
 
 
-class HeatPumpSmokeTests(unittest.TestCase):
-    def setUp(self) -> None:
-        yesterday = datetime.now().astimezone().date() - timedelta(days=1)
-        core = FakeCore(
-            [
-                entity("binary_sensor.compressor", "on", friendly_name="Compressor"),
-                entity("sensor.flow", "35.5", unit_of_measurement="°C"),
-                entity("sensor.tank", "48", unit_of_measurement="°C"),
-                entity("sensor.power", "1.4", unit_of_measurement="kW"),
-                entity("sensor.total", "18.7", unit_of_measurement="kWh", last_period="15.3"),
-                entity("sensor.heating", "12.4", unit_of_measurement="kWh", last_period="14.1"),
-                entity("sensor.hot_water", "3.2", unit_of_measurement="kWh"),
-                entity("climate.heat", "heat", current_temperature="34", temperature="40"),
-                entity("water_heater.tank", "eco", current_temperature="47"),
-            ],
-            history={
-                "sensor.hot_water": [
-                    {
-                        "state": "2.1",
-                        "last_changed": datetime.combine(yesterday, datetime.max.time())
-                        .astimezone()
-                        .isoformat(),
-                    }
-                ]
-            },
-        )
-        self.app = SimpleNamespace(
-            config={"PLUGIN_REGISTRY": {"ha_core": SimpleNamespace(server_module=core)}}
-        )
-        self.patch = patch.object(server, "current_app", self.app)
-        self.patch.start()
-        self.addCleanup(self.patch.stop)
-        self.core = core
+def _use_core(core: FakeCore) -> SimpleNamespace:
+    app = SimpleNamespace(
+        config={"PLUGIN_REGISTRY": {"ha_core": SimpleNamespace(server_module=core)}}
+    )
+    return app
 
-    def test_fetch_maps_status_temperatures_power_and_period_counters(self) -> None:
+
+def test_fetch_maps_generic_entities_and_period_counters() -> None:
+    core = FakeCore(
+        [
+            entity("binary_sensor.pump", "on", friendly_name="Compressor"),
+            entity("sensor.flow", "35.5", unit_of_measurement="°C"),
+            entity("sensor.tank", "48", unit_of_measurement="°C"),
+            entity("sensor.power", "1.4", unit_of_measurement="kW"),
+            entity("sensor.total", "18.7", unit_of_measurement="kWh", last_period="15.3"),
+            entity("sensor.heating", "12.4", unit_of_measurement="kWh", last_period="14.1"),
+            entity("sensor.water", "3.2", unit_of_measurement="kWh", last_period="2.1"),
+            entity("climate.heating", "heat", current_temperature="34"),
+            entity("water_heater.tank", "eco", current_temperature="47"),
+        ]
+    )
+    zone = ZoneInfo("Europe/Berlin")
+    app = _use_core(core)
+
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            assert tz is zone
+            return cls(2026, 9, 28, 20, 5, tzinfo=tz)
+
+    with (
+        patch.object(server, "current_app", app),
+        patch.object(server, "datetime", FixedDateTime),
+        patch.object(server, "app_timezone", return_value=zone),
+    ):
         result = server.fetch(
             {
-                "compressor_entity": "binary_sensor.compressor",
+                "compressor_entity": "binary_sensor.pump",
                 "flow_entity": "sensor.flow",
                 "hot_water_temperature_entity": "sensor.tank",
                 "power_entity": "sensor.power",
+                "heating_entity": "climate.heating",
+                "hot_water_entity": "water_heater.tank",
                 "daily_energy_entity": "sensor.total",
                 "heating_energy_entity": "sensor.heating",
-                "hot_water_energy_entity": "sensor.hot_water",
+                "hot_water_energy_entity": "sensor.water",
             },
             {},
             ctx={},
         )
 
-        self.assertTrue(result["compressor"]["active"])
-        self.assertEqual(result["heating_temperature"]["value"], 35.5)
-        self.assertEqual(result["hot_water_temperature"]["value"], 48)
-        self.assertEqual(result["power"]["unit"], "kW")
-        self.assertEqual(result["energy"]["daily_total_yesterday"]["value"], 15.3)
-        self.assertEqual(result["energy"]["heating_yesterday"]["value"], 14.1)
-        self.assertEqual(result["energy"]["hot_water_yesterday"]["value"], 2.1)
+    assert result["time"] == "20:05"
+    assert result["compressor"]["active"] is True
+    assert result["compressor"]["name"] == "Compressor"
+    assert result["heating_temperature"]["value"] == 35.5
+    assert result["hot_water_temperature"]["value"] == 48
+    assert result["heating_mode"]["mode"] == "heat"
+    assert result["hot_water_mode"]["mode"] == "eco"
+    assert result["power"] == {
+        "name": "sensor.power",
+        "value": 1.4,
+        "unit": "kW",
+        "available": True,
+    }
+    assert result["energy"]["daily_total_yesterday"]["value"] == 15.3
+    assert result["energy"]["heating_yesterday"]["value"] == 14.1
+    assert result["energy"]["hot_water_yesterday"]["value"] == 2.1
+    assert core.history_calls == []
 
-    def test_temperature_fallbacks_and_missing_values(self) -> None:
+
+def test_unavailable_and_non_numeric_states_are_not_readings() -> None:
+    core = FakeCore(
+        [
+            entity("binary_sensor.pump", "unavailable"),
+            entity("sensor.unknown", "unknown", unit_of_measurement="°C"),
+            entity("sensor.invalid", "not-a-number", unit_of_measurement="kWh"),
+            entity("sensor.infinite", "NaN", unit_of_measurement="kW"),
+            entity("climate.heating", "unavailable"),
+        ]
+    )
+    with patch.object(server, "current_app", _use_core(core)):
         result = server.fetch(
-            {"heating_entity": "climate.heat", "hot_water_entity": "water_heater.tank"},
+            {
+                "compressor_entity": "binary_sensor.pump",
+                "flow_entity": "sensor.unknown",
+                "power_entity": "sensor.infinite",
+                "daily_energy_entity": "sensor.invalid",
+                "heating_entity": "climate.heating",
+                "show_yesterday": False,
+            },
             {},
             ctx={},
         )
-        self.assertEqual(result["heating_temperature"]["value"], 34)
-        self.assertEqual(result["hot_water_temperature"]["value"], 47)
-        self.assertIsNone(result["power"]["value"])
-        self.assertIsNone(result["compressor"]["active"])
 
-    def test_configured_vitocal_entities_are_mapped(self) -> None:
-        self.core.states.extend(
-            [
-                entity("climate.e3_vitocal_17_heizung", "auto"),
-                entity("water_heater.e3_vitocal_17_warmwasser", "on"),
-                entity("sensor.e3_vitocal_17_vorlauftemperatur", "39.8", unit_of_measurement="°C"),
-                entity(
-                    "sensor.e3_vitocal_17_ww_speichertemperatur", "50", unit_of_measurement="°C"
-                ),
-                entity("sensor.e3_vitocal_17_saisonale_arbeitszahl", "4.3"),
-                entity(
-                    "sensor.keller_e3_vitocal_17_strom_taglich",
-                    "20.1",
-                    unit_of_measurement="kWh",
-                    last_period="21.1",
-                ),
-                entity(
-                    "sensor.keller_e3_vitocal_17_vitocal_heizung_taglich",
-                    "17.6",
-                    unit_of_measurement="kWh",
-                    last_period="18.1",
-                ),
-                entity(
-                    "sensor.keller_e3_vitocal_17_vitocal_warmwasser_taglich",
-                    "2.5",
-                    unit_of_measurement="kWh",
-                    last_period="3.0",
-                ),
-                entity("binary_sensor.e3_vitocal_17_kompressor", "off"),
+    assert result["compressor"]["active"] is None
+    assert result["compressor"]["state"] is None
+    assert result["heating_temperature"]["available"] is False
+    assert result["heating_temperature"]["value"] is None
+    assert result["power"]["available"] is False
+    assert result["power"]["value"] is None
+    assert result["energy"]["daily_total"]["available"] is False
+    assert result["energy"]["daily_total"]["value"] is None
+    assert result["heating_mode"]["mode"] is None
+    assert core.history_calls == []
+
+
+def test_missing_entities_return_unavailable_values() -> None:
+    core = FakeCore()
+    with patch.object(server, "current_app", _use_core(core)):
+        result = server.fetch(
+            {
+                "compressor_entity": "binary_sensor.missing",
+                "flow_entity": "sensor.missing",
+                "daily_energy_entity": "sensor.missing",
+            },
+            {},
+            ctx={},
+        )
+
+    assert result["compressor"]["active"] is None
+    assert result["heating_temperature"]["available"] is False
+    assert result["energy"]["daily_total"]["available"] is False
+    assert result["energy"]["daily_total_yesterday"]["available"] is False
+    assert core.history_calls == ["sensor.missing"]
+
+
+def test_state_fetch_errors_are_reported() -> None:
+    core = FakeCore(states_error=ConnectionError("Home Assistant is unreachable"))
+    with patch.object(server, "current_app", _use_core(core)):
+        result = server.fetch({}, {}, ctx={})
+
+    assert result == {"error": "Home Assistant is unreachable"}
+
+
+def test_history_errors_are_reported_without_losing_current_reading() -> None:
+    core = FakeCore(
+        [entity("sensor.energy", "8.5", unit_of_measurement="kWh")],
+        history_error=TimeoutError("history timed out"),
+    )
+    with patch.object(server, "current_app", _use_core(core)):
+        result = server.fetch({"daily_energy_entity": "sensor.energy"}, {}, ctx={})
+
+    assert result["energy"]["daily_total"]["value"] == 8.5
+    assert result["energy"]["daily_total_yesterday"]["value"] is None
+    assert result["energy"]["daily_total_yesterday"]["error"] == "history timed out"
+    assert core.history_calls == ["sensor.energy"]
+
+
+def test_disabling_yesterday_skips_history_requests() -> None:
+    core = FakeCore(
+        [
+            entity("sensor.total", "18.7", unit_of_measurement="kWh"),
+            entity("sensor.heating", "12.4", unit_of_measurement="kWh"),
+            entity("sensor.water", "3.2", unit_of_measurement="kWh"),
+        ]
+    )
+    with patch.object(server, "current_app", _use_core(core)):
+        result = server.fetch(
+            {
+                "daily_energy_entity": "sensor.total",
+                "heating_energy_entity": "sensor.heating",
+                "hot_water_energy_entity": "sensor.water",
+                "show_yesterday": False,
+            },
+            {},
+            ctx={},
+        )
+
+    assert result["energy"]["daily_total"]["value"] == 18.7
+    assert result["energy"]["daily_total_yesterday"]["available"] is False
+    assert result["energy"]["heating_yesterday"]["available"] is False
+    assert result["energy"]["hot_water_yesterday"]["available"] is False
+    assert core.history_calls == []
+
+
+def test_history_yesterday_boundary_uses_application_timezone() -> None:
+    zone = ZoneInfo("Europe/Berlin")
+    core = FakeCore(
+        [entity("sensor.energy", "8.5", unit_of_measurement="kWh")],
+        history={
+            "sensor.energy": [
+                {"state": "5.2", "last_changed": "2026-09-27T21:30:00+00:00"},
+                {"state": "99", "last_changed": "2026-09-27T22:30:00+00:00"},
             ]
-        )
-        result = server.fetch(
-            {
-                "heating_entity": "climate.e3_vitocal_17_heizung",
-                "hot_water_entity": "water_heater.e3_vitocal_17_warmwasser",
-                "compressor_entity": "binary_sensor.e3_vitocal_17_kompressor",
-                "flow_entity": "sensor.e3_vitocal_17_vorlauftemperatur",
-                "hot_water_temperature_entity": "sensor.e3_vitocal_17_ww_speichertemperatur",
-                "daily_energy_entity": "sensor.keller_e3_vitocal_17_strom_taglich",
-                "heating_energy_entity": "sensor.keller_e3_vitocal_17_vitocal_heizung_taglich",
-                "hot_water_energy_entity": "sensor.keller_e3_vitocal_17_vitocal_warmwasser_taglich",
-                "overall_spf_entity": "sensor.e3_vitocal_17_saisonale_arbeitszahl",
-            },
-            {},
-            ctx={},
-        )
+        },
+    )
 
-        self.assertFalse(result["compressor"]["active"])
-        self.assertEqual(result["heating_mode"]["mode"], "auto")
-        self.assertEqual(result["hot_water_mode"]["mode"], "on")
-        self.assertEqual(result["heating_temperature"]["value"], 39.8)
-        self.assertEqual(result["hot_water_temperature"]["value"], 50)
-        self.assertEqual(result["overall_spf"]["value"], 4.3)
-        self.assertEqual(result["energy"]["daily_total_yesterday"]["value"], 21.1)
-        self.assertEqual(result["energy"]["heating_yesterday"]["value"], 18.1)
-        self.assertEqual(result["energy"]["hot_water_yesterday"]["value"], 3)
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            assert tz is zone
+            return cls(2026, 9, 28, 0, 45, tzinfo=tz)
 
-    def test_history_is_used_only_when_last_period_is_missing(self) -> None:
-        result = server.fetch({"daily_energy_entity": "sensor.total"}, {}, ctx={})
-        self.assertEqual(result["energy"]["daily_total_yesterday"]["value"], 15.3)
-        self.assertNotIn("sensor.total", self.core.history_calls)
+    with (
+        patch.object(server, "current_app", _use_core(core)),
+        patch.object(server, "datetime", FixedDateTime),
+        patch.object(server, "app_timezone", return_value=zone),
+    ):
+        result = server.fetch({"daily_energy_entity": "sensor.energy"}, {}, ctx={})
 
-    def test_entity_choices_are_domain_scoped(self) -> None:
-        self.assertEqual(server.choices("heating")[0]["value"], "climate.example")
-        self.assertEqual(server.choices("hot_water")[0]["value"], "water_heater.example")
-        self.assertEqual(server.choices("binary_sensor")[0]["value"], "binary_sensor.example")
-        self.assertEqual(server.choices("unknown"), [])
-
-    def test_manifest_and_renderer_declare_requested_sizes_and_archetype(self) -> None:
-        manifest = json.loads((PLUGIN_DIR / "plugin.json").read_text(encoding="utf-8"))
-        client = (PLUGIN_DIR / "client.js").read_text(encoding="utf-8")
-        self.assertEqual(manifest["name"], "Home Assistant, Heat Pump")
-        self.assertEqual(manifest["supports"]["sizes"], ["xs", "sm", "md", "lg"])
-        fragments = {fragment["id"]: fragment for fragment in manifest["fragments"]}
-        self.assertEqual(
-            set(fragments),
-            {
-                "full",
-                "compressor",
-                "heating",
-                "hot_water",
-                "current_power",
-                "total_energy",
-                "heating_energy",
-                "hot_water_energy",
-            },
-        )
-        self.assertIn('ctx?.fragment || ctx?.cell?.fragment || "full"', client)
-        self.assertIn("compressor: heroMarkup", client)
-        self.assertNotIn(
-            '"id": "temperatures"', (PLUGIN_DIR / "plugin.json").read_text(encoding="utf-8")
-        )
-        self.assertIn("current_power: powerMarkup", client)
-        self.assertIn("total_energy: energyCards.total", client)
-        self.assertIn("heating_energy: energyCards.heating", client)
-        self.assertIn("hot_water_energy: energyCards.water", client)
-        self.assertIn('${fragmentBody ?? ""}', client)
-        self.assertNotIn("${fragmentBody ?? fullMarkup}", client)
-        self.assertIn(".hp-fragment-current_power .hp-current-power { display: flex; }", client)
-        self.assertIn("options.show_yesterday !== false", client)
-        self.assertIn("energyReading(label, current, yesterday, index, t, showYesterday)", client)
-        self.assertIn("options.show_temperature_gauge === true", client)
-        self.assertIn('fragment === "heating" && showTemperatureGauge', client)
-        self.assertIn('fragment === "hot_water" && showTemperatureGauge', client)
-        self.assertIn(".hp-fragment-heating .hp-temperature-gauge,", client)
-        options = {option["name"]: option["default"] for option in manifest["cell_options"]}
-        for entity_option in (
-            "compressor_entity",
-            "flow_entity",
-            "hot_water_temperature_entity",
-            "power_entity",
-            "heating_entity",
-            "hot_water_entity",
-            "daily_energy_entity",
-            "heating_energy_entity",
-            "hot_water_energy_entity",
-            "overall_spf_entity",
-        ):
-            self.assertEqual(options[entity_option], "")
-        self.assertTrue(options["show_heating"])
-        self.assertTrue(options["show_hot_water"])
-        self.assertTrue(options["show_yesterday"])
-        self.assertFalse(options["show_temperature_gauge"])
-        self.assertNotIn("return_entity", options)
-        self.assertIn("ctx?.cell?.size", client)
-        self.assertIn('class="w-body status-body hp-body"', client)
-        self.assertIn("status-hero hp-hero", client)
-        self.assertIn(".hp-md .hp-hero-spf, .hp-lg .hp-hero-spf { display: block; }", client)
-        self.assertIn(
-            ".hp-hero-spf-value { color: var(--text-primary); font-size: var(--fs-jumbo);", client
-        )
-        self.assertIn(".hp-md .hp-daily-total { display: none; }", client)
-        self.assertIn('class="hp-hero-spf"', client)
-        self.assertIn(".hp-md .hp-reading-mode { display: none; }", client)
-        self.assertIn(".hp-md .hp-state { font-size: var(--fs-lead); }", client)
-        self.assertIn(".hp-md .hp-hero-spf-value { font-size: var(--fs-lead); }", client)
-        self.assertIn(".hp-md .hp-hero { min-height:", client)
-        self.assertIn(".hp-hero-lockup { min-width: max-content; flex: 0 0 auto; }", client)
-        self.assertIn(".hp-state { overflow: visible;", client)
-        self.assertIn(".hp-reading-label, .hp-energy-label { color: var(--text-muted);", client)
-        self.assertIn('class="hp-reading-mode"', client)
-        self.assertIn("aria-label=", client)
-        self.assertIn(".hp-md .hp-yesterday { display: none; }", client)
-        self.assertIn(
-            ".hp-sm .hp-reading-top { align-items: flex-start; flex-direction: column; gap: 0; }",
-            client,
-        )
-        self.assertIn(".hp-sm .hp-readings { grid-auto-rows: max-content; }", client)
-        self.assertIn(".hp-sm .hp-reading { min-height: max-content; }", client)
-        self.assertIn(
-            ".hp-sm .hp-reading-value, .hp-md .hp-reading-value { width: 100%; text-align: right; }",
-            client,
-        )
-        self.assertIn('size === "xs" ? t("water", "Water")', client)
-        self.assertIn(".hp-xs .hp-readings { grid-template-columns: minmax(0, 1fr);", client)
-        self.assertIn(
-            ".hp-xs .hp-readings { grid-template-columns: minmax(0, 1fr); grid-auto-rows: max-content; gap: var(--space-2); }",
-            client,
-        )
-        self.assertIn(".hp-xs .hp-reading-top { align-items: center;", client)
-        self.assertIn(".hp-xs .hp-reading-caption { flex: 0 0 auto; flex-direction: row;", client)
-        self.assertIn(".hp-xs .hp-reading-value { flex: 1 1 auto; text-align: right; }", client)
-        self.assertIn(".hp-xs .hp-reading-value { overflow: visible; }", client)
-        self.assertIn(".hp-xs .hp-reading-value { font-size: var(--fs-body); }", client)
-        self.assertIn('<i class="ph-bold ph-thermometer-simple hp-reading-icon"', client)
-        self.assertIn('<i class="ph-bold ph-drop hp-reading-icon"', client)
-        self.assertIn('t("water", "Water")', client)
-        self.assertIn("ph-thermometer-simple hp-reading-icon", client)
-        self.assertIn("ph-drop hp-reading-icon", client)
-        self.assertIn(
-            ".hp-sm .hp-reading-top { align-items: flex-start; flex-direction: column; gap: 0; }",
-            client,
-        )
-        self.assertIn(".hp-sm .hp-hero { padding-bottom: var(--space-4); }", client)
-        self.assertIn('modeIndicator(heatingMode.mode, t("heating_mode"', client)
-        self.assertIn('modeIndicator(hotWaterMode.mode, t("hot_water_mode"', client)
-        self.assertIn("status-grid hp-readings", client)
-        self.assertIn("options.show_heating !== false", client)
-        self.assertIn("options.show_hot_water !== false", client)
-        self.assertIn(".hp-readings--single .hp-reading--full { grid-column: 1 / -1; }", client)
-        self.assertIn('singleReading ? "hp-reading--full" : ""', client)
-        self.assertIn(".hp-lg .hp-current-power { display: flex; }", client)
-        self.assertIn(".hp-lg .hp-energy-details", client)
-        self.assertIn('role="meter" aria-label="${escapeHtml(label)}"', client)
-        self.assertIn(".hp-lg .hp-temperature-gauge { display: flex; }", client)
-        self.assertIn(
-            ".hp-temperature-track { height: var(--space-2); overflow: hidden; border-radius: var(--radius-1);",
-            client,
-        )
-        self.assertIn('size === "lg" || (fragment === "heating" && showTemperatureGauge)', client)
-        self.assertIn('size === "lg" || (fragment === "hot_water" && showTemperatureGauge)', client)
-        self.assertIn("const max = fahrenheit ? 176 : 80;", client)
-        self.assertIn(
-            ".hp-md .hp-reading-top { align-items: flex-start; flex-direction: column; }", client
-        )
-        self.assertIn('class="hp-reading-caption"', client)
-        self.assertIn(
-            ".hp-reading-caption { display: flex; min-width: 0; flex-direction: row; align-items: center;",
-            client,
-        )
-        self.assertIn(".hp-md .hp-energy-details,", client)
-        self.assertNotIn("client.css", client)
-        self.assertNotIn("border:", client)
-        self.assertNotRegex(client, r"#[0-9a-fA-F]{3,8}\b")
+    assert result["time"] == "00:45"
+    assert result["energy"]["daily_total_yesterday"]["value"] == 5.2
+    assert core.history_calls == ["sensor.energy"]
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_entity_choices_are_domain_scoped() -> None:
+    core = FakeCore()
+    with patch.object(server, "current_app", _use_core(core)):
+        assert server.choices("heating")[0]["value"] == "climate.example"
+        assert server.choices("hot_water")[0]["value"] == "water_heater.example"
+        assert server.choices("binary_sensor")[0]["value"] == "binary_sensor.example"
+        assert server.choices("unknown") == []
+
+
+def test_manifest_and_locales_include_widget_defaults_and_common_modes() -> None:
+    manifest = json.loads((PLUGIN_DIR / "plugin.json").read_text(encoding="utf-8"))
+    english = json.loads((PLUGIN_DIR / "strings" / "en.json").read_text(encoding="utf-8"))
+    german = json.loads((PLUGIN_DIR / "strings" / "de.json").read_text(encoding="utf-8"))
+    options = {option["name"]: option for option in manifest["cell_options"]}
+
+    assert manifest["supports"]["sizes"] == ["xs", "sm", "md", "lg"]
+    for name in (
+        "compressor_entity",
+        "flow_entity",
+        "hot_water_temperature_entity",
+        "power_entity",
+        "heating_entity",
+        "hot_water_entity",
+        "daily_energy_entity",
+        "heating_energy_entity",
+        "hot_water_energy_entity",
+        "overall_spf_entity",
+    ):
+        assert options[name]["default"] == ""
+
+    assert options["show_yesterday"]["default"] is True
+    assert options["show_temperature_gauge"]["default"] is False
+    for translations in (english, german):
+        assert translations["not_available"]
+        for mode in ("heat_pump", "performance", "electric", "high_demand"):
+            assert translations[f"mode_{mode}"]

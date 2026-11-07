@@ -4,6 +4,7 @@
   "running": "Läuft",
   "idle": "Leerlauf",
   "status_unavailable": "Status nicht verfügbar",
+  "not_available": "Nicht verfügbar",
   "heating_temperature": "Heizung",
   "hot_water_temperature": "Warmwasser",
   "water": "Wasser",
@@ -23,5 +24,9 @@
   "mode_on": "Ein",
   "mode_off": "Aus",
   "mode_heat": "Heizen",
-  "mode_eco": "Eco"
+  "mode_eco": "Eco",
+  "mode_heat_pump": "Wärmepumpe",
+  "mode_performance": "Leistung",
+  "mode_electric": "Elektrisch",
+  "mode_high_demand": "Hoher Bedarf"
 }
