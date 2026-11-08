@@ -167,6 +167,8 @@ module = [
     "app.renderer",
     "app.render_signing",
     "app.visionect",
+    "app.samsung_frame",
+    "app.samsung_frame_art",
 ]
 strict = true
 

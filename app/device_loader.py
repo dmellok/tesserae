@@ -555,6 +555,20 @@ def has_touch(device: Any) -> bool:
     return isinstance(manifest, dict) and manifest.get("touch") is True
 
 
+def has_battery(device: Any) -> bool:
+    """Whether the device may run on a battery. ``"battery": false`` in its
+    kind's manifest says it is mains powered; absent means it may."""
+    manifest = getattr(device, "manifest", None)
+    return not (isinstance(manifest, dict) and manifest.get("battery") is False)
+
+
+def uses_renderer_settings(device: Any) -> bool:
+    """Whether the per-device renderer settings reach the display.
+    ``"renderer_settings": false`` says the kind sends the composition itself."""
+    manifest = getattr(device, "manifest", None)
+    return not (isinstance(manifest, dict) and manifest.get("renderer_settings") is False)
+
+
 def takes_input(device: Any) -> bool:
     """Whether the device can produce any input event (a button or a tap)."""
     return has_buttons(device) or has_touch(device)

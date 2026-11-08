@@ -1029,6 +1029,15 @@ def _rebuild_transport(
     except Exception:
         logger.exception("wiring OpenDisplay-HA publisher")
 
+    # Samsung The Frame publisher: same reason, the listener lives on the
+    # replaced PUSH_MANAGER.
+    try:
+        from app import samsung_frame
+
+        samsung_frame.register(app)
+    except Exception:
+        logger.exception("wiring Samsung Frame publisher")
+
     # Visionect signs: the configured TCP listener survives rebuilds (the signs
     # hold their sockets open); register() re-attaches it to the fresh
     # PUSH_MANAGER and starts / stops it as visionect devices come and go.

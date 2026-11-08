@@ -1,0 +1,201 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Samsung The Frame (Art Mode)",
+  "icon": "frame-corners",
+  "version": "0.1.0",
+  "description": "Samsung The Frame TV, shown through its own Art Mode. Tesserae renders the page at 4K, uploads it to the Art app's My Photos over the TV's local network API and makes it the current artwork, then deletes its older uploads so only a few frames use the TV's storage. Art Mode keeps doing the display: it starts when the TV is switched off, follows the room light with its brightness sensor and draws the mat chosen below. Enter the TV's address, save, then press Allow on the TV the first time Tesserae connects. No developer mode or app install on the TV.",
+  "renderers": [
+    "pi_png"
+  ],
+  "transport": "push",
+  "panel": {
+    "w": 3840,
+    "h": 2160,
+    "orientation": "landscape",
+    "name": "The Frame 4K (3840x2160)",
+    "gamut": "rgb24"
+  },
+  "buttons": false,
+  "battery": false,
+  "renderer_settings": false,
+  "config_schema": {
+    "host": {
+      "type": "string",
+      "label": "TV address",
+      "default": "",
+      "placeholder": "192.168.1.50",
+      "help": "The TV's IP address or host name on your network. Give the TV a fixed address in your router so it doesn't move."
+    },
+    "matte_style": {
+      "type": "select",
+      "label": "Mat",
+      "default": "none",
+      "choices": [
+        {
+          "value": "none",
+          "label": "No mat"
+        },
+        {
+          "value": "modernthin",
+          "label": "Modern thin"
+        },
+        {
+          "value": "modern",
+          "label": "Modern"
+        },
+        {
+          "value": "modernwide",
+          "label": "Modern wide"
+        },
+        {
+          "value": "flexible",
+          "label": "Flexible"
+        },
+        {
+          "value": "shadowbox",
+          "label": "Shadow box"
+        },
+        {
+          "value": "panoramic",
+          "label": "Panoramic"
+        },
+        {
+          "value": "triptych",
+          "label": "Triptych"
+        },
+        {
+          "value": "mix",
+          "label": "Mix"
+        },
+        {
+          "value": "squares",
+          "label": "Squares"
+        }
+      ],
+      "help": "The frame-style border Art Mode draws around each picture, as in the TV's own Art settings."
+    },
+    "matte_colour": {
+      "type": "select",
+      "label": "Mat colour",
+      "default": "polar",
+      "choices": [
+        {
+          "value": "polar",
+          "label": "Polar"
+        },
+        {
+          "value": "warm",
+          "label": "Warm"
+        },
+        {
+          "value": "antique",
+          "label": "Antique"
+        },
+        {
+          "value": "neutral",
+          "label": "Neutral"
+        },
+        {
+          "value": "sand",
+          "label": "Sand"
+        },
+        {
+          "value": "black",
+          "label": "Black"
+        },
+        {
+          "value": "seafoam",
+          "label": "Seafoam"
+        },
+        {
+          "value": "sage",
+          "label": "Sage"
+        },
+        {
+          "value": "burgandy",
+          "label": "Burgundy"
+        },
+        {
+          "value": "navy",
+          "label": "Navy"
+        },
+        {
+          "value": "apricot",
+          "label": "Apricot"
+        },
+        {
+          "value": "byzantine",
+          "label": "Byzantine"
+        },
+        {
+          "value": "lavender",
+          "label": "Lavender"
+        },
+        {
+          "value": "redorange",
+          "label": "Red orange"
+        },
+        {
+          "value": "skyblue",
+          "label": "Sky blue"
+        },
+        {
+          "value": "turquoise",
+          "label": "Turquoise"
+        }
+      ],
+      "help": "Colour of the mat. Ignored with No mat."
+    },
+    "take_over_slideshow": {
+      "type": "select",
+      "label": "TV's own slideshow",
+      "default": "off",
+      "choices": [
+        {
+          "value": "off",
+          "label": "Turned off by Tesserae"
+        },
+        {
+          "value": "keep",
+          "label": "Left as set on the TV"
+        }
+      ],
+      "help": "The TV's slideshow would replace Tesserae's picture on its own timer. Turned off, the page schedule decides what shows; your other Art Mode photos stay on the TV."
+    },
+    "keep_on_tv": {
+      "type": "select",
+      "label": "Frames kept on the TV",
+      "default": "2",
+      "choices": [
+        {
+          "value": "1",
+          "label": "1"
+        },
+        {
+          "value": "2",
+          "label": "2"
+        },
+        {
+          "value": "3",
+          "label": "3"
+        },
+        {
+          "value": "5",
+          "label": "5"
+        },
+        {
+          "value": "10",
+          "label": "10"
+        }
+      ],
+      "help": "How many of Tesserae's uploads stay in My Photos. The newest is shown; older ones are deleted. Two keeps the previous frame as a fallback while the next one uploads."
+    },
+    "token": {
+      "type": "string",
+      "label": "Pairing token",
+      "default": "",
+      "secret": true,
+      "help": "Filled in by Tesserae after you press Allow on the TV. Clear it to pair again."
+    }
+  }
+}

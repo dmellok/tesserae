@@ -270,7 +270,11 @@ def devices_add() -> Response:
     # a digital sign, a browser tab, anything that only fetches an image URL
     # (discussion #240). Pairing is still the right default for firmware that
     # can run the handshake; this is the escape hatch for what cannot.
-    if (form.get("transport") or "").strip().lower() == "rest":
+    # Push kinds (a Samsung Frame, say) reached from the REST tab's kind list
+    # keep their own transport.
+    if (
+        form.get("transport") or ""
+    ).strip().lower() == "rest" and result.device.transport != "push":
         _make_rest_instance(result.device)
     # TRMNL-style clients need their access token displayed once so the
     # user can paste it into the client config. Stash in session and let

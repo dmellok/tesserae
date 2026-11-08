@@ -337,6 +337,9 @@
         {% set t_fields = (section.fields or [])|rejectattr('type', 'in', ['string', 'ha_device_picker', 'select'])|list %}
         {% set awake_spec = t_fields|selectattr('name', 'equalto', 'awake_poll_s')|first %}
         {% set has_always_on = t_fields|selectattr('name', 'equalto', 'always_on')|list|length > 0 %}
+        {#- A display with nothing to time (a TV that is pushed to) gets no Timing group. -#}
+        {% set _has_timing = t_fields or sign or section.refresh_mode_capable or section.wake_align_capable %}
+        {% if _has_timing %}
         <div class="dx-grp" id="timing" data-devsub>
           <div class="dx-grp-head"><h3 class="dx-grp-title">Timing</h3></div>
           <div class="dx-fg">
@@ -383,6 +386,7 @@
           </details>
           {% endif %}
         </div>
+        {% endif %}
 
         {# Quiet hours: the override's switch heads the fields it governs;
            off hides them (and disables them, so they are not posted). #}

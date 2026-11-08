@@ -63,6 +63,7 @@ The bundled client kinds Tesserae knows how to talk to. A flashed client announc
 | `pi_png_client` | 1424×1200 | `pi_png` | Raspberry-Pi-side client that consumes the PNG frame. |
 | `pico_bin_client` | 1600×1200 | `pico_bin` | Battery-powered Pico Plus 2 firmware (RP2350) driving a Pimoroni Inky-style Spectra 6 panel over SPI. |
 | `picpak_client` | 400×300 | `esp32_bin` | Battery-powered PicPak 4.2" 4-colour BWRY e-paper frame. |
+| `samsung_frame` | 3840×2160 | `pi_png` | Samsung The Frame TV, shown through its own Art Mode. |
 | `trmnl_client` | 800×480 | `trmnl_png`, `trmnl_png_gray16`, `trmnl_png_gray4` | HTTP-polled e-paper client compatible with the TRMNL BYOS protocol. |
 | `visionect` | 1440×2560 | `trmnl_png_gray16` | A Visionect e-paper frame (Place & Play 32", Joan, the 13" boards) driven directly, with no Visionect Software Suite. |
 
