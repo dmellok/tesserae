@@ -101,7 +101,7 @@ Some panels have quirks worth knowing about.
 
 | Symptom | Likely cause + fix |
 |---|---|
-| Device doesn't appear in Discovered after 2 minutes. | Check the Wi-Fi credentials were accepted (device should be off the soft-AP now). Verify the Tesserae server URL is reachable from the device's network: `curl http://<server>:8765/api/healthz` from another machine on the same LAN. |
+| Device doesn't appear in Discovered after 2 minutes. | Check the Wi-Fi credentials were accepted (device should be off the soft-AP now). Verify the Tesserae server URL is reachable from the device's network: `curl http://<server>:8765/healthz` from another machine on the same LAN. |
 | Discovered card says the wrong kind (e.g. `esp32_client` instead of `seeed_reterminal_e1002`). | The firmware kind string doesn't match the hardware catalog. Update to the latest firmware from tesserae.ink/flash. |
 | Panel refreshes but shows garbage / stripes. | Frame size mismatch. Check that Tesserae's server version is at least v0.64.60 (the E-series manifests need to be present). Settings → Devices → your card → Debug shows the running version. |
 | Web flasher won't connect. | Firefox / Safari don't support Web Serial. Use Chrome or Edge. Also make sure you're using a data-capable USB cable and port. |

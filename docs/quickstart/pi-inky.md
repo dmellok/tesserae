@@ -32,7 +32,7 @@ In **Settings → Devices**, your Pi appears under **Discovered** within a few s
 If your Pi doesn't appear:
 
 - Check `journalctl -u tesserae-device-pi -f` on the Pi for connection errors.
-- Confirm the Pi can reach your Tesserae server's URL (`curl http://<server>:8765/api/healthz` from the Pi).
+- Confirm the Pi can reach your Tesserae server's URL (`curl http://<server>:8765/healthz` from the Pi).
 
 ## 03 — Keep it up to date
 

@@ -105,7 +105,7 @@ For battery-powered Pi setups (rare but possible), **smart sync** keeps the pane
 | Pi doesn't appear under Discovered after 10 minutes. | SSH into the Pi (`ssh tesserae@<pi-ip>`), check `journalctl -u tesserae-device-pi -f`. Common: `server_url` in meta-data is unreachable, or SPI didn't enable. |
 | Service log says `No EEPROM detected!` | I²C didn't enable. SSH in and run `sudo raspi-config nonint do_i2c 0 && sudo reboot`. |
 | Service log says `Chip Select … currently claimed by spi0 CS0` | The `dtoverlay=spi0-0cs` line is missing from `/boot/firmware/config.txt`. Add it manually and reboot. |
-| Service log says `connection refused` to the server URL | Tesserae server isn't reachable from the Pi's network. Verify `curl http://<server>:8765/api/healthz` from the Pi. |
+| Service log says `connection refused` to the server URL | Tesserae server isn't reachable from the Pi's network. Verify `curl http://<server>:8765/healthz` from the Pi. |
 | `config.toml` contains literal `{{ ds.meta_data.server_url }}` | The jinja template didn't render, usually because `user-data` is missing the `## template: jinja` first line. Re-download `pi-client-cloud-init.yaml` from the repo and copy it in fresh. |
 | Pi reboots forever / never finishes cloud-init | Watch progress: `tail -f /var/log/cloud-init-output.log` on the Pi (after SSH-ing in once first boot reaches a login prompt). |
 
