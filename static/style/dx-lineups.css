@@ -1834,6 +1834,8 @@ main.page.lu-page {
   color: color-mix(in oklab, var(--t-fg) 30%, transparent);
   cursor: pointer;
   text-align: center;
+  position: relative;
+  --lu-dt-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3E%3Cpath d='M1 4.3 3.1 6.3 7 1.8' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 :root[data-ui="paper"] .lu .lu-days .lu-dt {
   border-radius: 2px;
@@ -1852,6 +1854,79 @@ main.page.lu-page {
 }
 .lu .lu-days .lu-dt.is-edited {
   box-shadow: inset 0 0 0 1px var(--t-warn);
+}
+/* On or off, said with a mark and not only a shade: a check on a day that runs, shown
+   while the group is hovered or focused and on a day just changed (an x when it was
+   just turned off); the clicked tile shows its mark in place of the letter for a moment. */
+.lu .lu-days .lu-dt::before,
+.lu .lu-days .lu-dt::after {
+  content: "";
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease-out;
+}
+.lu .lu-days .lu-dt::before {
+  top: -4px;
+  right: -4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--t-fg);
+}
+.lu .lu-days .lu-dt::after {
+  top: -4px;
+  right: -4px;
+  width: 10px;
+  height: 10px;
+  background: var(--t-surface);
+  -webkit-mask: var(--lu-dt-mark) center / 7px 7px no-repeat;
+  mask: var(--lu-dt-mark) center / 7px 7px no-repeat;
+}
+.lu .lu-days .lu-dt:not(.on) {
+  --lu-dt-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3E%3Cpath d='M1.6 1.6 6.4 6.4M6.4 1.6 1.6 6.4' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.lu .lu-days:is(:hover, :focus-within) .lu-dt.on::before,
+.lu .lu-days:is(:hover, :focus-within) .lu-dt.on::after,
+.lu .lu-days .lu-dt.is-edited::before,
+.lu .lu-days .lu-dt.is-edited::after {
+  opacity: 1;
+}
+/* A day turned off shows an outlined x, so it never reads as a check. */
+.lu .lu-days .lu-dt:not(.on)::before {
+  background: var(--t-surface);
+  box-shadow: inset 0 0 0 1px var(--t-fg-soft);
+}
+.lu .lu-days .lu-dt:not(.on)::after {
+  background: var(--t-fg);
+}
+/* Just clicked: the mark replaces the letter for a moment, large enough to read. */
+.lu .lu-days .lu-dt.just-on,
+.lu .lu-days .lu-dt.just-off {
+  color: transparent;
+}
+.lu .lu-days .lu-dt.just-on::before,
+.lu .lu-days .lu-dt.just-off::before {
+  inset: 0;
+  width: auto;
+  height: auto;
+  border-radius: 3px;
+  opacity: 1;
+}
+.lu .lu-days .lu-dt.just-on::after,
+.lu .lu-days .lu-dt.just-off::after {
+  inset: 0;
+  width: auto;
+  height: auto;
+  opacity: 1;
+  -webkit-mask-size: 11px 11px;
+  mask-size: 11px 11px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lu .lu-days .lu-dt::before,
+  .lu .lu-days .lu-dt::after {
+    transition: none;
+  }
 }
 @container lu-ds (max-width: 560px) {
   .lu .lu-days {

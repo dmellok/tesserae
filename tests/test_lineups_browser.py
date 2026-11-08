@@ -4080,3 +4080,101 @@ def test_a_displays_plus_starts_a_lineup_for_that_display(real: tuple[str, Flask
         assert len(made) == 1 and made[0].device_ids == ["hall"], made
         assert errors == []
         browser.close()
+
+
+# -- day tiles say on or off with a mark ---------------------------------------------
+
+SHOTS = Path(os.environ.get("LINEUPS_SHOTS", "/tmp/lineups-shots"))
+
+
+def _mark(page: Any, sel: str) -> dict[str, Any]:
+    """The check/x badge a day tile draws: its opacity and the mask (check or x)."""
+    return page.eval_on_selector(
+        sel,
+        """el => {
+            const b = getComputedStyle(el, '::before'), a = getComputedStyle(el, '::after');
+            return {opacity: Number(a.opacity), bg: b.backgroundColor,
+                    mask: (a.webkitMaskImage || a.maskImage || ''), letter: getComputedStyle(el).color};
+        }""",
+    )
+
+
+@pytest.mark.parametrize("scheme", ["dark", "light"])
+def test_day_tiles_show_a_check_on_and_an_x_off_while_toggling(live: str, scheme: str) -> None:
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser, page, _ = _open(p, live, scheme=scheme)
+        page.locator("#lu-row-dinner").scroll_into_view_if_needed()
+        mon = '[data-toggle-day="dinner:0"]'
+        thu = '[data-toggle-day="dinner:3"]'
+        # At rest nothing is drawn on the tiles beyond their shade.
+        page.mouse.move(2, 2)
+        assert _mark(page, mon)["opacity"] == 0
+        # Hovering the group puts a check on the days that run, not on those that do not.
+        page.hover(mon)
+        page.wait_for_timeout(250)
+        assert _mark(page, mon)["opacity"] == 1
+        assert (
+            "M1 4.3" in _mark(page, mon)["mask"].replace("%20", " ")
+            or "path" in _mark(page, mon)["mask"]
+        )
+        assert _mark(page, thu)["opacity"] == 0
+        # Clicking an off day turns it on: its mark replaces the letter, aria-pressed follows.
+        page.locator(thu).click()
+        assert page.locator(thu).get_attribute("aria-pressed") == "true"
+        assert "just-on" in (page.locator(thu).get_attribute("class") or "")
+        page.wait_for_timeout(250)
+        assert _mark(page, thu)["opacity"] == 1
+        assert _mark(page, thu)["letter"] == "rgba(0, 0, 0, 0)"
+        page.locator("#lu-row-dinner .lu-row-title").screenshot(
+            path=str(SHOTS / f"item1-day-just-on-{scheme}.png")
+        )
+        # Clicking it again turns it off: an x, aria-pressed false, no check.
+        page.locator(thu).click()
+        assert page.locator(thu).get_attribute("aria-pressed") == "false"
+        assert "just-off" in (page.locator(thu).get_attribute("class") or "")
+        page.wait_for_timeout(250)
+        off = _mark(page, thu)
+        assert off["opacity"] == 1
+        assert "M1.6 1.6" in off["mask"].replace("%20", " ") or "M1.6" in off["mask"]
+        page.locator("#lu-row-dinner .lu-row-title").screenshot(
+            path=str(SHOTS / f"item1-day-just-off-{scheme}.png")
+        )
+        # The mark is a moment; the day turned back to its saved state shows nothing at rest.
+        page.mouse.move(2, 2)
+        page.wait_for_function(
+            "() => !document.querySelector('[data-toggle-day=\"dinner:3\"]').classList.contains('just-off')"
+        )
+        page.wait_for_timeout(250)
+        assert _mark(page, thu)["opacity"] == 0
+        # A day left changed (unsaved) keeps its mark: a check for one turned on.
+        page.locator(thu).click()
+        page.mouse.move(2, 2)
+        page.wait_for_function(
+            "() => !document.querySelector('[data-toggle-day=\"dinner:3\"]').classList.contains('just-on')"
+        )
+        page.wait_for_timeout(250)
+        assert "is-edited" in (page.locator(thu).get_attribute("class") or "")
+        assert _mark(page, thu)["opacity"] == 1
+        assert page._lu_errors == []
+        browser.close()
+
+
+def test_day_tile_marks_show_on_a_dimmed_row_and_keep_the_today_underline(live: str) -> None:
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser, page, _ = _open(p, live)
+        row = page.locator("#lu-row-monday")  # not running today: a greyed row
+        assert "is-off" in (row.get_attribute("class") or "")
+        tile = '[data-toggle-day="monday:0"]'
+        page.hover(tile)
+        page.wait_for_timeout(250)
+        assert _mark(page, tile)["opacity"] == 1
+        # The underline for today is a shadow on the tile and is still there.
+        today = page.locator("#lu-row-monday .lu-dt.is-today")
+        assert today.count() == 1
+        assert "inset" in today.evaluate("el => getComputedStyle(el).boxShadow")
+        row.locator(".lu-row-title").screenshot(path=str(SHOTS / "item1-day-dimmed-row.png"))
+        browser.close()

@@ -104,6 +104,7 @@
     flash: {}, // display id -> {msg, err}
     saving: {},
     rowErr: {}, // lineup id -> the server's reason an edit was refused
+    dayFlash: {}, // lineup id -> {day, timer}: the day tile just clicked shows its new state
     // display id -> Set of weekdays opened in the Timeline view (default: none)
     tlOpen: Object.fromEntries(
       Object.entries(tlStored).map(([k, v]) => [
@@ -313,6 +314,7 @@
     },
     folded: isFolded,
     rowError: (l) => st.rowErr[l.id] || "",
+    dayFlash: (id) => st.dayFlash[id] || null,
     tlOpen: (d, i) => !!(st.tlOpen[d.id] && st.tlOpen[d.id].has(i)),
     isNew: (l) => l.id === newId,
     collapsed: (d) => collapsed.has(d.id),
@@ -1578,7 +1580,26 @@
       days[day] = true;
     }
     const p = (st.pending[d.id] && st.pending[d.id][lid]) || origOf(found.l);
+    flashDay(lid, day, days[day]);
     applyEdit(d, found.l, { start_min: p.start_min, end_min: p.end_min, days });
+    say(`${R.DAYS[day]} ${days[day] ? "on" : "off"} for ${l.name}.`);
+  }
+  // The tile just clicked shows a check (now on) or an x (now off) in place of its
+  // letter for a moment; it survives a redraw and clears itself.
+  const DAY_FLASH_MS = 1400;
+  function flashDay(lid, day, on) {
+    const old = st.dayFlash[lid];
+    if (old) clearTimeout(old.timer);
+    st.dayFlash[lid] = {
+      day,
+      on,
+      timer: setTimeout(() => {
+        delete st.dayFlash[lid];
+        host
+          .querySelectorAll(`[data-toggle-day^="${CSS.escape(lid)}:"]`)
+          .forEach((b) => b.classList.remove("just-on", "just-off"));
+      }, DAY_FLASH_MS),
+    };
   }
 
   /* ------------------------------------------------------------ window editor */

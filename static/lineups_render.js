@@ -298,11 +298,13 @@
     return s;
   }
 
-  function dayTiles(l) {
+  function dayTiles(l, ui) {
+    const flash = ui && ui.dayFlash ? ui.dayFlash(l.id) : null;
     const tiles = LETTER.map((c, i) => {
       const on = !!l.days[i];
       const edited = l.pending_days && l.pending_days.includes(i);
-      return `<button type="button" class="lu-dt${on ? " on" : ""}${i === l.today_index ? " is-today" : ""}${edited ? " is-edited" : ""}" data-toggle-day="${esc(l.id)}:${i}" aria-pressed="${on ? "true" : "false"}" title="${DAYS[i]}: ${on ? "runs. Click to remove" : "off. Click to add"}">${c}</button>`;
+      const just = flash && flash.day === i ? ` just-${on ? "on" : "off"}` : "";
+      return `<button type="button" class="lu-dt${on ? " on" : ""}${i === l.today_index ? " is-today" : ""}${edited ? " is-edited" : ""}${just}" data-toggle-day="${esc(l.id)}:${i}" aria-pressed="${on ? "true" : "false"}" title="${DAYS[i]}: ${on ? "runs. Click to remove" : "off. Click to add"}">${c}</button>`;
     }).join("");
     return `<span class="lu-days" role="group" aria-label="Days ${esc(l.name)} runs">${tiles}</span>`;
   }
@@ -408,7 +410,7 @@
     const folded = !isNew && (ui && ui.folded ? ui.folded(l) : l.folded);
     const rowErr = ui && ui.rowError ? ui.rowError(l) : "";
     const edot = l.pending ? '<i class="lu-edot" title="Unsaved change"></i>' : "";
-    const meta = `${l.window ? dayTiles(l) : ""}${rowChips(l)}`;
+    const meta = `${l.window ? dayTiles(l, ui) : ""}${rowChips(l)}`;
     return (
       `<li class="lu-row ${STATE_CLS[l.status] || "is-off"}${folded ? " is-folded" : ""}${isNew ? " is-new" : ""}" id="lu-row-${esc(uid)}" data-lineup="${esc(l.id)}" data-display="${esc(d.id)}" data-kind="${esc(l.kind)}" data-status="${esc(l.status)}">` +
       `<div class="lu-row-head"><span class="lu-row-tag"><span class="lu-tag-st ${TAG_CLS[l.status] || "off"}">${l.status === "live" ? '<i class="lu-dot pulse"></i>' : ""}${esc(l.status_label)}</span></span>` +
