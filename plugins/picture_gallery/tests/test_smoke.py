@@ -427,3 +427,10 @@ def test_an_image_the_cells_size_is_served_untouched(app: Flask, client: FlaskCl
     small = (folder / "small.jpg").read_bytes()
     data, _ = _get_image(client, "/plugins/picture_gallery/folders/x/small.jpg?w=800&h=480")
     assert data == small
+
+
+def test_manifest_lets_lineups_draw_another_image() -> None:
+    import json
+
+    manifest = json.loads((Path(__file__).resolve().parents[1] / "plugin.json").read_text())
+    assert manifest["lineups"] == {"draw": True}

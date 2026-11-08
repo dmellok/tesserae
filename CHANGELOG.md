@@ -6,6 +6,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- Lineups: the arrows on a Gallery step draw another image.
+
 ### Changed
 
 - Gallery: a photo bigger than its cell is sent at the cell's size, not as the whole upload; one already the cell's size (pre-dithered artwork) is sent untouched.
