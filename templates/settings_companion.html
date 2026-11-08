@@ -224,7 +224,7 @@
       {% if companion_pairing_reveal.note %}
       <p class="field-help">Note: {{ companion_pairing_reveal.note }}</p>
       {% endif %}
-      <p class="field-help">Server URL: <code>http://{{ request.host }}</code></p>
+      <p class="field-help">Server URL: <code>{{ device_base_url() }}</code></p>
     </div>
     <footer class="modal-foot">
       <button type="button" class="button ghost" data-modal-close>Done</button>

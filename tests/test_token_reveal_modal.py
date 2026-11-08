@@ -76,3 +76,17 @@ def test_add_device_kinds_are_listed_by_name(app: Flask) -> None:
     ]
     assert len(labels) > 3
     assert labels == sorted(labels, key=str.casefold)
+
+
+def test_pairing_code_modal_uses_the_device_facing_address(app: Flask) -> None:
+    """Under Home Assistant ingress the browser's host is HA's own address,
+    so the pairing pop-up printed that instead of Tesserae's (#460)."""
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess["_rest_pairing_reveal"] = {"code": "123456", "expires_at": 0, "note": ""}
+    html = client.get("/settings/devices", follow_redirects=True).get_data(as_text=True)
+    modal = html.split('aria-labelledby="pair-reveal-title"', 1)[1].split("</footer>", 1)[0]
+    assert "123456" in modal
+    assert "Server URL: <code>http://192.168.0.10:8765</code>" in modal
+    # The test client's request host, which the pop-up printed before.
+    assert "http://localhost" not in modal

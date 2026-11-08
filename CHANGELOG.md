@@ -6,6 +6,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Devices: the pairing code pop-up gives the address a device reaches Tesserae on, not the browser's. Under Home Assistant ingress it showed Home Assistant's own address (#460). The Companion pairing pop-up does the same.
+
 ## [0.506.0], 2026-11-09
 
 ### Added
