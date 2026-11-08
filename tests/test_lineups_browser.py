@@ -4218,14 +4218,10 @@ def test_day_tiles_show_a_check_on_and_an_x_off_while_toggling(live: str, scheme
         # At rest nothing is drawn on the tiles beyond their shade.
         page.mouse.move(2, 2)
         assert _mark(page, mon)["opacity"] == 0
-        # Hovering the group puts a check on the days that run, not on those that do not.
+        # Hovering adds nothing either: a running day's shade already says so.
         page.hover(mon)
         page.wait_for_timeout(250)
-        assert _mark(page, mon)["opacity"] == 1
-        assert (
-            "M1 4.3" in _mark(page, mon)["mask"].replace("%20", " ")
-            or "path" in _mark(page, mon)["mask"]
-        )
+        assert _mark(page, mon)["opacity"] == 0
         assert _mark(page, thu)["opacity"] == 0
         # Clicking an off day turns it on: its mark replaces the letter, aria-pressed follows.
         page.locator(thu).click()
@@ -4234,6 +4230,9 @@ def test_day_tiles_show_a_check_on_and_an_x_off_while_toggling(live: str, scheme
         page.wait_for_timeout(250)
         assert _mark(page, thu)["opacity"] == 1
         assert _mark(page, thu)["letter"] == "rgba(0, 0, 0, 0)"
+        assert "M1 4.3" in _mark(page, thu)["mask"].replace("%20", " ")
+        # The other running days stay plain while the group has focus.
+        assert _mark(page, mon)["opacity"] == 0
         page.locator("#lu-row-dinner .lu-row-title").screenshot(
             path=str(SHOTS / f"item1-day-just-on-{scheme}.png")
         )
@@ -4275,8 +4274,10 @@ def test_day_tile_marks_show_on_a_dimmed_row_and_keep_the_today_underline(live: 
         browser, page, _ = _open(p, live)
         row = page.locator("#lu-row-monday")  # not running today: a greyed row
         assert "is-off" in (row.get_attribute("class") or "")
+        # Every other day clashes there, so draw the just-clicked state directly: the
+        # mark must read on a greyed row too.
         tile = '[data-toggle-day="monday:0"]'
-        page.hover(tile)
+        page.locator(tile).evaluate("el => el.classList.add('just-on')")
         page.wait_for_timeout(250)
         assert _mark(page, tile)["opacity"] == 1
         # The underline for today is a shadow on the tile and is still there.
