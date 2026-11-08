@@ -1797,6 +1797,13 @@
       '<span class="lu-name-err" role="alert"></span>';
     const input = wrap.querySelector("input");
     const err = wrap.querySelector(".lu-name-err");
+    err.id = `lu-name-err-${l.id}`;
+    input.setAttribute("aria-describedby", err.id);
+    const showErr = (m) => {
+      err.textContent = m;
+      if (m) input.setAttribute("aria-invalid", "true");
+      else input.removeAttribute("aria-invalid");
+    };
     input.value = old;
     btn.replaceWith(wrap);
     input.focus();
@@ -1819,7 +1826,7 @@
           stop();
           say(`Name not changed: a lineup needs a name.`);
         } else {
-          err.textContent = "Enter a name";
+          showErr("Enter a name");
         }
         return;
       }
@@ -1843,7 +1850,7 @@
         } else {
           finished = false;
           input.disabled = false;
-          err.textContent = e.message;
+          showErr(e.message);
           input.focus();
         }
         say(`Not renamed: ${e.message}`);
@@ -1860,9 +1867,7 @@
         say("Name not changed.");
       }
     });
-    input.addEventListener("input", () => {
-      err.textContent = "";
-    });
+    input.addEventListener("input", () => showErr(""));
     input.addEventListener("blur", () => submit(true));
   }
 

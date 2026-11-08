@@ -4301,10 +4301,16 @@ def test_clicking_the_name_edits_it_and_enter_saves_everywhere(live: str) -> Non
     with sync_playwright() as p:
         browser, page, api = _open(p, live)
         folded = "is-folded" in (page.locator("#lu-row-night").get_attribute("class") or "")
+        head = page.locator("#lu-row-night .lu-row-head")
+        before = head.bounding_box()["height"]
+        meta = page.locator("#lu-row-night .lu-row-meta").bounding_box()["y"]
         page.locator('[data-name-edit="night"]').click()
         # Editing, not folding: a text field in place of the name, the row as it was.
         inp = page.locator("#lu-row-night .lu-name-edit input")
         assert inp.input_value() == "Night"
+        # In place: the row neither grows nor moves the day tiles under the name.
+        assert abs(head.bounding_box()["height"] - before) < 1
+        assert abs(page.locator("#lu-row-night .lu-row-meta").bounding_box()["y"] - meta) < 1
         assert page.evaluate("() => document.activeElement.matches('.lu-name-edit input')")
         assert (
             "is-folded" in (page.locator("#lu-row-night").get_attribute("class") or "")
@@ -4346,6 +4352,9 @@ def test_name_edit_escape_cancels_and_blur_saves_and_empty_is_refused(live: str)
         inp.fill("   ")
         inp.press("Enter")
         assert page.locator("#lu-row-night .lu-name-err").inner_text() == "Enter a name"
+        assert inp.get_attribute("aria-invalid") == "true"
+        err_id = inp.get_attribute("aria-describedby")
+        assert page.locator(f"#{err_id}").inner_text() == "Enter a name"
         assert inp.count() == 1
         assert [u for u, _ in api.posts if u.endswith("/name")] == []
         page.locator("#lu-row-night .lu-name-edit").screenshot(
