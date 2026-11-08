@@ -17,6 +17,7 @@ admin stop.
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 from app import firmware_check as fw_check
@@ -81,6 +82,30 @@ def freshen_release(
     return entry, None
 
 
+# A failed refresh repeats on every heartbeat of every auto-update device of
+# the kind, so each distinct failure is logged as a warning once per kind per
+# hour; the rest go to debug. Silent at debug level, a feed or GitHub outage
+# looked like "the server just isn't offering the update".
+_FRESHEN_WARN_INTERVAL_S = 3600.0
+_freshen_warned: dict[tuple[str, str], float] = {}
+
+
+def _warn_freshen_failed(kind_id: str, err: str, now: float | None = None) -> None:
+    now = time.monotonic() if now is None else now
+    key = (kind_id, err)
+    last = _freshen_warned.get(key)
+    if last is not None and now - last < _FRESHEN_WARN_INTERVAL_S:
+        logger.debug("auto-update: freshen failed for kind=%s: %s", kind_id, err)
+        return
+    _freshen_warned[key] = now
+    logger.warning(
+        "auto-update: could not use the newest %s release (%s); devices stay on the "
+        "release they were offered. Repeats are logged at debug for an hour.",
+        kind_id,
+        err,
+    )
+
+
 def maybe_auto_queue(app: Any, device: Any) -> None:
     """Heartbeat hook: when this device opted into automatic updates, make
     sure its kind's newest release is set and the device is in the offer
@@ -102,7 +127,7 @@ def maybe_auto_queue(app: Any, device: Any) -> None:
             )
             rel, err = freshen_release(store, kind_id, rel, carryover=sorted(auto_ids))
             if err:
-                logger.debug("auto-update: freshen failed for kind=%s: %s", kind_id, err)
+                _warn_freshen_failed(kind_id, err)
         if rel is None:
             return
         state = rel.get("state")
