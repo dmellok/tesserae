@@ -200,7 +200,8 @@ def test_row_in_sync_shows_one_digest_versioned_thumbnail(app: Flask, client) ->
     _push(app, _render("A", "compA"))
     _fetch(app)
     html = _devices_html(client)
-    assert 'src="/preview/door.png?v=compA"' in html
+    # A downscaled, content-addressed thumbnail, not the full composition.
+    assert 'src="/renders/compA.png?w=800"' in html
     assert "data-device-queued" not in html
     assert "Waiting for the frame" not in html
 
@@ -226,7 +227,7 @@ def test_row_queued_shows_the_glass_and_the_queued_image(app: Flask, client) -> 
 def test_row_never_fetched_shows_the_latest_render(app: Flask, client) -> None:
     _push(app, _render("A", "compA"))
     html = _devices_html(client)
-    assert 'src="/preview/door.png?v=compA"' in html
+    assert 'src="/renders/compA.png?w=800"' in html
     assert "Queued, not fetched yet" not in html
     assert "Waiting for the frame" not in html
 

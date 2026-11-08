@@ -14,6 +14,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 - Gallery: a photo bigger than its cell is sent at the cell's size, not as the whole upload; one already the cell's size (pre-dithered artwork) is sent untouched.
 
+### Fixed
+
+- Devices: a device's card shows an 800 px thumbnail of its latest picture rather than the full composition, which for a 4K display was about 10 MB.
+
 ## [0.506.0], 2026-11-09
 
 ### Added

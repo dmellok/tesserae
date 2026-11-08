@@ -1674,7 +1674,13 @@ def _device_overview(device: Device, section: dict[str, Any]) -> dict[str, Any]:
             comp = push_mgr.composition_for_digest(device.id, served_digest) or ""
         if comp:
             glass_url = url_for("renders", filename=f"{comp}.png", w=480)
-    thumb_url = glass_url or newest_url
+    # The card shows a thumbnail, not the composition itself: a 4K display's
+    # PNG is ~10 MB. The full image stays one click away (preview_url).
+    newest_comp = str((latest or {}).get("composition_digest") or "")
+    newest_thumb = (
+        url_for("renders", filename=f"{newest_comp}.png", w=800) if newest_comp else newest_url
+    )
+    thumb_url = glass_url or newest_thumb
     newest_is_artifact = bool(latest and not latest.get("composition_digest"))
     # What the frame does to take a picture: a pull display fetches it, a
     # Visionect sign is shown it (and ACKs).
