@@ -210,7 +210,7 @@
         {% endif %}
         {% if update_status is defined and update_status.available %}
         <a href="{{ url_for('auth.settings') }}" class="topbar-chip"
-           title="Tesserae update available{% if update_status.latest %} (v{{ update_status.latest }}){% endif %}">
+           title="Tesserae update available{% if update_status.label %} ({{ update_status.label }}{% if update_status.channel in ('edge', 'main') %} on main{% endif %}){% endif %}">
           <i class="ph-bold ph-arrow-circle-up" aria-hidden="true"></i><span>Update</span>
         </a>
         {% endif %}
@@ -366,15 +366,17 @@
       {% endif %}
       {% if update_status is defined and update_status.available %}
       {# Update-available badge. Shown only when the background version check
-         (app/version_check) found a newer release; links to the Settings
+         (app/version_check) found something newer: a release on stable, or
+         new commits on main for an edge / source build. Links to the Settings
          update section. Hidden entirely when online features are off. #}
+      {% set _upd_main = update_status.channel in ('edge', 'main') %}
       <a href="{{ url_for('auth.settings') }}"
          class="topbar-update"
-         title="Tesserae update available{% if update_status.latest %} (v{{ update_status.latest }}){% endif %}"
-         aria-label="Tesserae update available{% if update_status.latest %}: version {{ update_status.latest }}{% endif %}">
+         title="Tesserae update available{% if update_status.label %} ({{ update_status.label }}{% if _upd_main %} on main{% endif %}){% endif %}"
+         aria-label="Tesserae update available{% if update_status.label %}: {% if _upd_main %}{{ update_status.label }} on main{% else %}version {{ update_status.latest }}{% endif %}{% endif %}">
         <span class="topbar-update-dot" aria-hidden="true"></span>
         <i class="ph-bold ph-arrow-circle-up" aria-hidden="true"></i>
-        <span class="topbar-update-label">Update{% if update_status.latest %} · v{{ update_status.latest }}{% endif %}</span>
+        <span class="topbar-update-label">Update{% if update_status.label %} · {{ update_status.label }}{% endif %}</span>
       </a>
       {% endif %}
       {% if mcp_bridge_update %}
@@ -572,7 +574,7 @@
       {% if _update_due %}
       <a class="shell-notice" href="{{ url_for('auth.settings') }}">
         <i class="ph-bold ph-arrow-circle-up" aria-hidden="true"></i>
-        <span class="shell-notice-text"><b>Update available</b>{% if update_status.latest %} <span>v{{ update_status.latest }}</span>{% endif %}</span>
+        <span class="shell-notice-text"><b>Update available</b>{% if update_status.label %} <span>{{ update_status.label }}{% if update_status.channel in ('edge', 'main') %} on main{% endif %}</span>{% endif %}</span>
         <i class="ph ph-caret-right" aria-hidden="true"></i>
       </a>
       {% endif %}

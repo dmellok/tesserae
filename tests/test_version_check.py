@@ -28,7 +28,11 @@ def _app(online_on: bool) -> _App:
 
 
 @pytest.fixture(autouse=True)
-def _reset_cache() -> Any:
+def _reset_cache(monkeypatch: pytest.MonkeyPatch) -> Any:
+    # Pin the channel: a source checkout off a tag would otherwise report
+    # ``main`` and send these stable tests down the commit path.
+    monkeypatch.setattr(version_check, "_channel", lambda: "stable")
+    monkeypatch.delenv("TESSERAE_BUILD_SHA", raising=False)
     version_check.reset()
     yield
     version_check.reset()
@@ -64,6 +68,7 @@ def test_status_refreshes_and_reports_available(monkeypatch: pytest.MonkeyPatch)
     assert out["available"] is True
     assert out["latest"] == "0.140.0" and out["url"] == "https://gh/rel"
     assert out["channel"] == "stable" and out["behind"] == 3
+    assert out["label"] == "v0.140.0"
     # The install id is scoped (32-hex), not the raw config UUID.
     channel, current, install = calls[0]
     assert channel == "stable" and current == "0.130.0"
@@ -112,7 +117,115 @@ def test_header_shows_update_badge(client: Any, monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr(
         version_check,
         "status",
-        lambda app: {"available": True, "channel": "stable", "latest": "9.9.9", "url": "u"},
+        lambda app: {
+            "available": True,
+            "channel": "stable",
+            "latest": "9.9.9",
+            "url": "u",
+            "label": "v9.9.9",
+        },
     )
     html = client.get("/settings/about").get_data(as_text=True)
     assert "topbar-update" in html and "v9.9.9" in html
+
+
+_SHA = "31f23cb3b5d53a9d113a9b53ca5ebe8d780212a6"
+
+
+def _main_response(behind: int | None) -> dict[str, Any]:
+    return {
+        "channel": "main",
+        "latest": {"sha": "4e8ed82", "url": "https://gh/commit"},
+        "is_current": None if behind is None else behind == 0,
+        "commits_behind": behind,
+    }
+
+
+def test_edge_build_behind_main_reports_available(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An edge image sends its stamped build commit on the main channel and
+    lights the badge with the number of commits it is behind."""
+    calls: list[tuple[str, str | None]] = []
+
+    def fake_latest(
+        channel: str, current: str | None, install: str | None = None
+    ) -> dict[str, Any]:
+        calls.append((channel, current))
+        return _main_response(3)
+
+    monkeypatch.setattr(online, "latest_version", fake_latest)
+    monkeypatch.setattr(version_check, "_channel", lambda: "edge")
+    monkeypatch.setenv("TESSERAE_BUILD_SHA", _SHA)
+    app = _app(online_on=True)
+    version_check.status(app)
+    version_check.join_for_test()
+    out = version_check.status(app)
+
+    assert calls == [("main", _SHA)]
+    assert out["available"] is True and out["channel"] == "edge"
+    assert out["behind"] == 3 and out["latest"] == "4e8ed82"
+    assert out["label"] == "3 new commits"
+
+
+def test_edge_build_on_head_of_main_shows_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(online, "latest_version", lambda *a, **k: _main_response(0))
+    monkeypatch.setattr(version_check, "_channel", lambda: "edge")
+    monkeypatch.setenv("TESSERAE_BUILD_SHA", _SHA)
+    app = _app(online_on=True)
+    version_check.status(app)
+    version_check.join_for_test()
+    assert version_check.status(app)["available"] is False
+
+
+def test_edge_build_with_unknown_commit_shows_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A commit the API can't place (a fork, an unpushed build) comes back as
+    commits_behind None: no badge rather than a guess."""
+    monkeypatch.setattr(online, "latest_version", lambda *a, **k: _main_response(None))
+    monkeypatch.setattr(version_check, "_channel", lambda: "edge")
+    monkeypatch.setenv("TESSERAE_BUILD_SHA", _SHA)
+    app = _app(online_on=True)
+    version_check.status(app)
+    version_check.join_for_test()
+    assert version_check.status(app)["available"] is False
+
+
+def test_edge_build_without_commit_stamp_makes_no_call(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An edge image from before the build commit was stamped has nothing to
+    compare, so it neither asks the API nor shows a badge."""
+    called: list[Any] = []
+    monkeypatch.setattr(online, "latest_version", lambda *a, **k: called.append(a))
+    monkeypatch.setattr(version_check, "_channel", lambda: "edge")
+    monkeypatch.setattr(version_check, "_build_sha", lambda: "")
+    app = _app(online_on=True)
+    version_check.status(app)
+    version_check.join_for_test()
+    assert version_check.status(app)["available"] is False
+    assert called == []
+
+
+def test_single_commit_label_is_singular(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(online, "latest_version", lambda *a, **k: _main_response(1))
+    monkeypatch.setattr(version_check, "_channel", lambda: "main")
+    monkeypatch.setattr(version_check, "_build_sha", lambda: _SHA)
+    app = _app(online_on=True)
+    version_check.status(app)
+    version_check.join_for_test()
+    assert version_check.status(app)["label"] == "1 new commit"
+
+
+def test_header_shows_edge_update_badge(client: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        version_check,
+        "status",
+        lambda app: {
+            "available": True,
+            "channel": "edge",
+            "latest": "4e8ed82",
+            "url": "u",
+            "behind": 3,
+            "label": "3 new commits",
+        },
+    )
+    html = client.get("/settings/about").get_data(as_text=True)
+    assert "topbar-update" in html and "Update · 3 new commits" in html
+    assert "3 new commits on main" in html
+    assert "v4e8ed82" not in html

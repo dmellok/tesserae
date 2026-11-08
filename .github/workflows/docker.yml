@@ -115,8 +115,11 @@ jobs:
           # Stamp the release channel so the install heartbeat can report it:
           # tag builds are stable, everything else (main pushes, :latest,
           # the edge tag, the HA edge App) is edge.
+          # The build commit lets an edge install tell how far behind main it
+          # is, for its topbar update badge.
           build-args: |
             TESSERAE_CHANNEL=${{ startsWith(github.ref, 'refs/tags/') && 'stable' || 'edge' }}
+            TESSERAE_BUILD_SHA=${{ github.sha }}
           # PRs build but don't push, keeps Dockerfile drift caught
           # without polluting the registry.
           push: ${{ github.event_name != 'pull_request' }}

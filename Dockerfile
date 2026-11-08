@@ -159,6 +159,13 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh && \
 # need matching bridge mappings (or host networking); see the quickstart.
 EXPOSE 8765 11113
 
+# The commit the image was built from; docker.yml passes ``github.sha``. An
+# edge install compares it to the head of main for its topbar update badge
+# (app/version_check). Declared last on purpose: it changes on every push, and
+# anywhere earlier it would invalidate every cached layer below it.
+ARG TESSERAE_BUILD_SHA=""
+ENV TESSERAE_BUILD_SHA=${TESSERAE_BUILD_SHA}
+
 ENTRYPOINT ["docker-entrypoint.sh"]
 # `tesserae` is the console script declared in pyproject [project.scripts].
 # Defaults to waitress on 0.0.0.0:8765. No explicit --port here: an
