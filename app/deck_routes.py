@@ -48,6 +48,7 @@ from app.lineups_view import (
     Clash,
     DashboardInfo,
     DisplayInput,
+    DisplayShot,
     FrameInput,
     LineupInput,
     LineupKind,
@@ -208,6 +209,41 @@ def _page_shapes(pages: list[Any]) -> dict[str, tuple[int, int]]:
         if w > 0 and h > 0:
             out[p.id] = (w, h)
     return out
+
+
+def _shapes_differ(page: Any) -> bool:
+    """True when the displays a dashboard is bound to are not all of one ratio."""
+    from app.lineup_thumbs import shapes_differ
+
+    return shapes_differ(page, current_app.config.get("DEVICE_REGISTRY"))
+
+
+def _display_shots(
+    device: Any, width: int, height: int, pages: list[Any]
+) -> dict[str, DisplayShot]:
+    """The dashboards among ``pages`` that are bound to displays of different
+    shapes, as ``device`` shows them.
+
+    Such a dashboard has one shared preview, at the largest panel's size and
+    ratio, and the latest picture sent to any of its displays; on a display of
+    another ratio that is the wrong shape (a landscape photo on a portrait
+    panel's card). Each display gets its own picture instead: the last one sent
+    to it, else the dashboard drawn at its own panel size."""
+    if width <= 0 or height <= 0:
+        return {}
+    mine = [p for p in pages if device.id in p.device_ids and _shapes_differ(p)]
+    if not mine:
+        return {}
+    from app.composer import clamp_screenshot_dim
+    from app.lineup_thumbs import display_thumbs
+
+    thumbs = display_thumbs(
+        device.id, (clamp_screenshot_dim(width), clamp_screenshot_dim(height)), mine
+    )
+    return {
+        pid: DisplayShot(thumb_url=url, width=width, height=height, composition_digest=digest)
+        for pid, (url, digest) in thumbs.items()
+    }
 
 
 def _live_map() -> dict[str, tuple[str | None, str | None]]:
@@ -1566,6 +1602,8 @@ def _build_lineups_view(
         pending = _frame_pending(d)
         pending_thumb = _pending_thumb(d) if pending else ""
         w, h, spec = _device_size(d)
+        shown = {st.dashboard_id for lu in lineups for st in lu.steps} | {on_pid or ""}
+        shots = _display_shots(d, w, h, [p for p in used_pages if p.id in shown])
         published, published_known = _published_state(d)
         color = display_color_mode(
             d, current_app.config.get("RENDERER_REGISTRY"), current_app.config.get("SETTINGS_STORE")
@@ -1597,6 +1635,7 @@ def _build_lineups_view(
                 pending=pending,
                 pending_thumb_url=pending_thumb,
                 glass_thumb_url=_glass_thumb(d) if on_pid else "",
+                shots=shots,
             )
         )
     today = now.weekday()

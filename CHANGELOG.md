@@ -10,6 +10,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 - Thumbnails fill their frame-shaped box on every page, so no thin light line shows along an edge.
 - Dashboards: a dashboard shared by displays of different shapes shows, under each display, that display's own ratio, picture and size.
+- Lineups: a dashboard bound to displays of different shapes shows each display its own ratio and picture, not the largest panel's.
 
 ## [0.510.1], 2026-11-11
 
