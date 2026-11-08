@@ -6,6 +6,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.505.0], 2026-11-08
+
 ### Added
 
 - Buttons: a press can name its physical button (`button_key`) beside its action, and the device's button map binds that key first, so the four buttons on an Inky Impression can each show their own dashboard (`{"a": "page:Calendar", …, "d": "page:Family"}`) with tesserae-device-pi 0.9.3. Maps keyed by `left` / `right` / `refresh` work as before.
