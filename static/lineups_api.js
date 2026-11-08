@@ -73,6 +73,14 @@
         `${PREFIX}/decks/${encodeURIComponent(lineup.id)}/name`;
       return send("POST", url, { name });
     },
+    /** POST /decks/<id>/order {from, to, pages}: move the step at index `from` to `to`.
+        `pages` is the dashboard ids as this page has them; a lineup changed elsewhere is refused (409). */
+    moveStep(lineup, from, to, pages) {
+      const url =
+        (lineup.actions && lineup.actions.order_url) ||
+        `${PREFIX}/decks/${encodeURIComponent(lineup.id)}/order`;
+      return send("POST", url, { from, to, pages });
+    },
     /** POST /decks/<id>/bind-pages {page_ids, display_id, also}: bind off-display steps to
         the display they sit under, keeping their other displays (the click is the consent). */
     bindPages(lineup, pageIds, displayId) {

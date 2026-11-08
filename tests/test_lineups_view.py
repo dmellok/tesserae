@@ -3845,3 +3845,99 @@ def test_scheduler_runs_the_converted_lineup_as_a_window(client: Any, app: Flask
     sched = deck_to_schedule(_deck(app, "night"))
     assert sched.type == "interval"
     assert (sched.time_of_day_start, sched.time_of_day_end) == ("22:00", "23:30")
+
+
+def _three_steps(app: Flask) -> Any:
+    """Morning with three dashboards, the middle one given its own dwell."""
+    from app.state.deck_model import DeckPage
+
+    deck = _deck(app, "morning")
+    pages = [
+        DeckPage(page_id="news"),
+        DeckPage(page_id="art", dwell_minutes=45),
+        DeckPage(page_id="sky"),
+    ]
+    app.config["DECK_STORE"].upsert(deck.model_copy(update={"pages": pages}))
+    return _deck(app, "morning")
+
+
+def test_edit_order_moves_a_step_and_redraws(client: Any, app: Flask) -> None:
+    before = _three_steps(app)
+    resp = client.post(
+        "/decks/morning/order", json={"from": 2, "to": 0, "pages": ["news", "art", "sky"]}
+    )
+    assert resp.status_code == 200, resp.get_json()
+    deck = _deck(app, "morning")
+    assert deck.page_ids == ["sky", "news", "art"]
+    # Each step keeps its own dwell, and nothing else about the lineup changes.
+    assert next(p for p in deck.pages if p.page_id == "art").dwell_minutes == 45
+    assert deck.model_copy(update={"pages": before.pages}) == before
+    panel = next(d for d in resp.get_json()["displays"] if d["id"] == "panel")
+    morning = next(lu for lu in panel["lineups"] if lu["id"] == "morning")
+    assert [s["dashboard_id"] for s in morning["steps"]] == ["sky", "news", "art"]
+    assert [s["index"] for s in morning["steps"]] == [0, 1, 2]
+    assert [s["position"] for s in morning["steps"]] == ["1/3", "2/3", "3/3"]
+    assert morning["actions"]["order_url"] == "/decks/morning/order"
+    # Forward too: first step to the end.
+    resp = client.post("/decks/morning/order", json={"from": 0, "to": 2})
+    assert resp.status_code == 200
+    assert _deck(app, "morning").page_ids == ["news", "art", "sky"]
+
+
+def test_edit_order_same_place_changes_nothing(client: Any, app: Flask) -> None:
+    before = _three_steps(app)
+    resp = client.post("/decks/morning/order", json={"from": 1, "to": 1})
+    assert resp.status_code == 200 and _deck(app, "morning") == before
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {},
+        {"from": 0},
+        {"from": "0", "to": 1},
+        {"from": 0, "to": True},
+        {"from": 0, "to": 3},
+        {"from": -1, "to": 1},
+        {"from": 0, "to": 1, "pages": "news"},
+        {"from": 0, "to": 1, "pages": [1, 2, 3]},
+    ],
+)
+def test_edit_order_refuses_bad_input(client: Any, app: Flask, body: dict[str, Any]) -> None:
+    before = _three_steps(app)
+    resp = client.post("/decks/morning/order", json=body)
+    assert resp.status_code == 400 and resp.get_json()["ok"] is False
+    assert _deck(app, "morning") == before
+
+
+def test_edit_order_refuses_a_lineup_that_changed_elsewhere(client: Any, app: Flask) -> None:
+    before = _three_steps(app)
+    resp = client.post(
+        "/decks/morning/order", json={"from": 0, "to": 1, "pages": ["art", "news", "sky"]}
+    )
+    assert resp.status_code == 409 and "reload" in resp.get_json()["error"]
+    assert _deck(app, "morning") == before
+    assert client.post("/decks/nope/order", json={"from": 0, "to": 1}).status_code == 404
+
+
+def test_edit_order_keeps_a_navigable_deck_valid(client: Any, app: Flask) -> None:
+    """Links and the entry page address pages by id, so moving a step is safe."""
+    from app.state.deck_model import Deck, DeckLink, DeckPage
+
+    app.config["DECK_STORE"].upsert(
+        Deck(
+            id="nav",
+            name="Nav",
+            device_ids=["panel"],
+            pages=[
+                DeckPage(page_id="news", links=[DeckLink(target_page_id="art", button="right")]),
+                DeckPage(page_id="art"),
+            ],
+            entry_page_id="news",
+        )
+    )
+    resp = client.post("/decks/nav/order", json={"from": 0, "to": 1})
+    assert resp.status_code == 200, resp.get_json()
+    deck = _deck(app, "nav")
+    assert deck.page_ids == ["art", "news"] and deck.entry_page_id == "news"
+    assert deck.pages[1].links[0].target_page_id == "art"

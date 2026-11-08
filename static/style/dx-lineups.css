@@ -2267,6 +2267,46 @@ main.page.lu-page {
   align-items: flex-start;
   transition: opacity 150ms ease-out;
 }
+/* Reordering: grab a step by its picture or name; a bar shows where it will land. */
+.lu .lu-strip.is-sortable .lu-step {
+  position: relative;
+}
+.lu .lu-strip.is-sortable .lu-step img {
+  -webkit-user-drag: none;
+  user-select: none;
+}
+.lu .lu-strip.is-sortable .lu-step-name {
+  cursor: grab;
+}
+.lu .lu-step.is-dragging {
+  opacity: 0.35;
+}
+.lu .lu-strip.is-reordering .lu-step {
+  transition: none;
+}
+.lu .lu-step.drop-before::before,
+.lu .lu-step.drop-after::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  border-radius: 2px;
+  background: var(--lu-acc);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--lu-acc) 28%, transparent);
+  pointer-events: none;
+  z-index: 3;
+}
+.lu .lu-step.drop-before::before {
+  left: -2px;
+}
+.lu .lu-step.drop-after::after {
+  right: -2px;
+}
+/* While one is dragged every other step is shown plainly, whatever now/next dimming applies. */
+.lu .lu-strip.is-reordering .lu-step:not(.is-dragging) {
+  opacity: 1 !important;
+}
 .lu .lu-strip.has-now .lu-step:not(.is-now):not(:hover):not(:focus-within) {
   opacity: 0.55;
 }

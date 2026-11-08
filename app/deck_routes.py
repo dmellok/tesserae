@@ -1228,6 +1228,7 @@ def _lineup_input(
             window=url_for("decks.edit_window", deck_id=deck.id),
             days=url_for("decks.edit_days", deck_id=deck.id),
             name=url_for("decks.edit_name", deck_id=deck.id),
+            order=url_for("decks.edit_order", deck_id=deck.id),
             bind=url_for("decks.bind_pages", deck_id=deck.id),
         )
     return LineupInput(
@@ -2279,6 +2280,63 @@ def edit_name(deck_id: str) -> Response:
         except ValidationError as exc:
             raise _EditError(_first_error(exc), 400, deck_id) from exc
         return [renamed], renamed
+
+    try:
+        saved = _store().transaction(plan)
+    except _EditError as exc:
+        return _edit_error_json(exc)
+    page_devices = {p.id: list(p.device_ids) for p in _pages().list()}
+    return _edit_result([saved], [], page_devices, view_day)
+
+
+@bp.post("/<deck_id>/order")
+def edit_order(deck_id: str) -> Response:
+    """Move one step of a lineup. JSON ``{"from": 2, "to": 0}`` (zero-based
+    step indexes: the step at ``from`` ends up at ``to``), with the
+    dashboard ids as the caller saw them in ``"pages"`` when it has them: a
+    lineup that changed elsewhere since (a step added, removed or moved) is
+    refused with 409 rather than moving the wrong step. Only the order
+    changes: each step keeps its own dwell and conditions, and the warmed
+    frames and nav positions stay valid (they are per dashboard)."""
+    body = _json_body()
+    for key in ("from", "to"):
+        if not _is_int(body.get(key)):
+            return _edit_error_json(_EditError(f"'{key}' must be a step number.", 400, deck_id))
+    pages = body.get("pages")
+    if pages is not None and (
+        not isinstance(pages, list) or not all(isinstance(p, str) for p in pages)
+    ):
+        return _edit_error_json(
+            _EditError("'pages' must be a list of dashboard ids.", 400, deck_id)
+        )
+    src, dst = int(body["from"]), int(body["to"])
+    try:
+        view_day = _view_day(_body_view_day(body, day_alias=True))
+    except _EditError as exc:
+        return _edit_error_json(exc)
+
+    def plan(decks: dict[str, Deck]) -> tuple[list[Deck], Deck]:
+        current = decks.get(deck_id)
+        if current is None:
+            raise _EditError(f"No lineup with id {deck_id!r}.", 404, deck_id)
+        n = len(current.pages)
+        if pages is not None and pages != current.page_ids:
+            raise _EditError(
+                f"{current.name} changed since this page loaded; reload to reorder it.",
+                409,
+                deck_id,
+            )
+        if not (0 <= src < n and 0 <= dst < n):
+            raise _EditError(f"A step number must be 1 to {n}.", 400, deck_id)
+        if src == dst:
+            return [], current
+        moved = list(current.pages)
+        moved.insert(dst, moved.pop(src))
+        try:
+            reordered = _merged_deck(current, pages=moved)
+        except ValidationError as exc:
+            raise _EditError(_first_error(exc), 400, deck_id) from exc
+        return [reordered], reordered
 
     try:
         saved = _store().transaction(plan)

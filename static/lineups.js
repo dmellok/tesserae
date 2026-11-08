@@ -471,6 +471,7 @@
       html = host.innerHTML; // the server's empty state
     }
     replaceCards(html);
+    markSteps();
     followColdThumbs();
     lastRO = barReadOnly();
     root.classList.toggle("bar-ro", lastRO);
@@ -1623,17 +1624,7 @@
     try {
       const res = await API.saveEdits([edit]);
       generation++;
-      const fresh = res && Array.isArray(res.displays) ? res.displays : [];
-      vm.displays = vm.displays.map((x) => {
-        const updated = fresh.find((f) => f.id === x.id);
-        if (!updated) return x;
-        const copy = JSON.parse(JSON.stringify(updated));
-        copy.lineups.forEach((v) => {
-          delete v.pending;
-          delete v.pending_days;
-        });
-        return copy;
-      });
+      const fresh = adoptFresh(res);
       Object.keys(st.pending).forEach((did) => {
         delete st.pending[did][l.id];
         if (!Object.keys(st.pending[did]).length) delete st.pending[did];
@@ -1647,7 +1638,7 @@
           ? `${l.name} is now a single push at ${R.clock(s)}.`
           : `${l.name} now runs ${R.clockRange(s, e)}.`
       );
-      if (!fresh.length) scheduleRefresh(0);
+      if (!fresh) scheduleRefresh(0);
       render();
     } catch (err) {
       ui.busy(false);
@@ -1744,31 +1735,39 @@
 
   /* ------------------------------------------------------------ name editor */
   const NAME_MAX = 80;
+  // Swap in the server's fresh copy of the displays an edit touched (the page's own edits
+  // are drawn over them by render). Returns how many it replaced.
+  function adoptFresh(res) {
+    const fresh = res && Array.isArray(res.displays) ? res.displays : [];
+    vm.displays = vm.displays.map((x) => {
+      const updated = fresh.find((f) => f.id === x.id);
+      if (!updated) return x;
+      const copy = JSON.parse(JSON.stringify(updated));
+      copy.lineups.forEach((l) => {
+        delete l.pending;
+        delete l.pending_days;
+      });
+      return copy;
+    });
+    return fresh.length;
+  }
   // The renamed lineup, drawn at once everywhere its name shows (rows, day bar, timeline):
   // the server's fresh copy of the touched displays when it sent one, else the name patched
   // in, and a refresh to pick up the rest.
   function applyRenamed(id, name, res) {
-    const fresh = res && Array.isArray(res.displays) ? res.displays : [];
-    vm.displays = vm.displays.map((x) => {
-      const updated = fresh.find((f) => f.id === x.id);
-      if (updated) {
-        const copy = JSON.parse(JSON.stringify(updated));
-        copy.lineups.forEach((l) => {
-          delete l.pending;
-          delete l.pending_days;
-        });
-        return copy;
-      }
-      x.lineups.forEach((l) => {
-        if (l.id === id) l.name = name;
-      });
-      return x;
-    });
+    const n = adoptFresh(res);
+    if (!n) {
+      vm.displays.forEach((x) =>
+        x.lineups.forEach((l) => {
+          if (l.id === id) l.name = name;
+        })
+      );
+    }
     (vm.unassigned || []).forEach((l) => {
       if (l.id === id) l.name = name;
     });
     delete st.rowErr[id];
-    scheduleRefresh(fresh.length ? 800 : 0);
+    scheduleRefresh(n ? 800 : 0);
   }
   function openNameEdit(btn) {
     const found = lineupOf(btn.dataset.nameEdit, displayOf(btn));
@@ -1850,6 +1849,195 @@
     });
     input.addEventListener("blur", () => submit(true));
   }
+
+  /* ------------------------------------------------------------ step order */
+  // A lineup's dashboards drag left and right to reorder (HTML5 drag and drop, as the deck
+  // editor's rail does), or move with Alt+Left / Alt+Right on any control in the step. The
+  // drop saves at once; the server's copy of the lineup then redraws the n/N labels, the
+  // NOW and NEXT markers and the timeline. A drag ends without a click, so it neither
+  // zooms the picture nor folds the row.
+  let sdrag = null; // {lid, did, ol, scroll, li, from, to}
+  let moving = false;
+  const stepsOf = (ol) => [...ol.children].filter((x) => x.matches(".lu-step"));
+  const rowKey = (row) => ({ lid: row.dataset.lineup, did: row.dataset.display || undefined });
+  function markSteps() {
+    host.querySelectorAll(".lu-strip").forEach((ol) => {
+      const row = ol.closest(".lu-row");
+      const steps = stepsOf(ol);
+      const { lid, did } = row ? rowKey(row) : {};
+      const found = row ? lineupOf(lid, did) : null;
+      const sortable = !!found && steps.length > 1 && steps.length === found.l.steps.length;
+      ol.classList.toggle("is-sortable", sortable);
+      steps.forEach((li) => {
+        if (sortable) {
+          li.draggable = true;
+          li.setAttribute("aria-keyshortcuts", "Alt+ArrowLeft Alt+ArrowRight");
+          const name = li.querySelector(".lu-step-name");
+          if (name) name.title = "Drag to reorder, or Alt+Left and Alt+Right";
+        } else {
+          li.removeAttribute("draggable");
+          li.removeAttribute("aria-keyshortcuts");
+        }
+      });
+    });
+  }
+  function clearDrop() {
+    host
+      .querySelectorAll(".lu-step.drop-before, .lu-step.drop-after")
+      .forEach((x) => x.classList.remove("drop-before", "drop-after"));
+  }
+  function endStepDrag() {
+    if (sdrag) {
+      sdrag.li.classList.remove("is-dragging");
+      sdrag.ol.classList.remove("is-reordering");
+    }
+    clearDrop();
+    sdrag = null;
+  }
+  // Where a step moved to ends up, drawn once the server has answered.
+  async function moveStep(lid, did, from, to, keyboard) {
+    const found = lineupOf(lid, did);
+    if (!found || moving || from === to) return;
+    const l = found.l;
+    const n = l.steps.length;
+    if (!(to >= 0 && to < n)) return;
+    const name = l.steps[from].name;
+    const ids = l.steps.map((s) => s.dashboard_id);
+    const rowSel = `.lu-row[data-lineup="${CSS.escape(lid)}"]${did ? `[data-display="${CSS.escape(did)}"]` : ""}`;
+    const focusSel = keyboard
+      ? (document.activeElement &&
+          document.activeElement.matches("[data-zoom]") &&
+          "[data-zoom]") ||
+        ".lu-push-ov, .lu-zoom, button"
+      : "";
+    moving = true;
+    // The step sits in its new place at once; the redraw below makes it exact.
+    const row = host.querySelector(rowSel);
+    const ol = row && row.querySelector(".lu-strip");
+    if (ol) {
+      const steps = stepsOf(ol);
+      const li = steps[from];
+      const rest = steps.filter((x) => x !== li);
+      if (li) ol.insertBefore(li, rest[to] || null);
+      row.setAttribute("aria-busy", "true");
+    }
+    delete st.rowErr[lid];
+    try {
+      const res = await API.moveStep(l, from, to, ids);
+      generation++;
+      const fresh = adoptFresh(res);
+      if (!fresh) {
+        // Without the server's copy, order our own and ask for the rest.
+        vm.displays.forEach((x) =>
+          x.lineups.forEach((v) => {
+            if (v.id === lid) v.steps.splice(to, 0, v.steps.splice(from, 1)[0]);
+          })
+        );
+        scheduleRefresh(0);
+      }
+      moving = false;
+      render();
+      say(`Moved ${name} to position ${to + 1} of ${n}.`);
+      const moved = host.querySelector(`${rowSel} .lu-step[data-step="${to}"]`);
+      if (moved) {
+        moved.scrollIntoView({ block: "nearest", inline: "nearest" });
+        if (focusSel) {
+          const f = moved.querySelector(focusSel);
+          if (f) f.focus({ preventScroll: true });
+        }
+      }
+    } catch (err) {
+      moving = false;
+      st.rowErr[lid] = `Not reordered: ${err.message}`;
+      say(`Not reordered: ${err.message}`);
+      render();
+      if (err.status === 409) scheduleRefresh(0);
+    }
+  }
+
+  host.addEventListener("dragstart", (e) => {
+    const li = e.target.closest && e.target.closest(".lu-step[draggable='true']");
+    if (!li || moving) return;
+    const ol = li.parentElement;
+    const row = ol.closest(".lu-row");
+    if (!row || !ol.classList.contains("is-sortable")) return;
+    closePeek();
+    hideTip();
+    const { lid, did } = rowKey(row);
+    sdrag = {
+      lid,
+      did,
+      ol,
+      scroll: ol.closest(".lu-strip-scroll"),
+      li,
+      from: stepsOf(ol).indexOf(li),
+      to: null,
+    };
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", li.querySelector(".lu-step-name")?.textContent || "");
+    // The row stays as it is while a gesture is in flight (see busy()).
+    li.classList.add("is-dragging");
+    ol.classList.add("is-reordering");
+  });
+  host.addEventListener("dragover", (e) => {
+    if (!sdrag) return;
+    const sc = e.target.closest && e.target.closest(".lu-strip-scroll");
+    if (sc !== sdrag.scroll) {
+      sdrag.to = null;
+      clearDrop();
+      return;
+    }
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const steps = stepsOf(sdrag.ol);
+    let slot = steps.length;
+    for (let i = 0; i < steps.length; i++) {
+      const r = steps[i].getBoundingClientRect();
+      if (e.clientX < r.left + r.width / 2) {
+        slot = i;
+        break;
+      }
+    }
+    // Dropping before the step itself or right after it leaves it where it is.
+    const to = slot > sdrag.from ? slot - 1 : slot;
+    clearDrop();
+    sdrag.to = to === sdrag.from ? null : to;
+    if (sdrag.to !== null) {
+      if (slot < steps.length) steps[slot].classList.add("drop-before");
+      else steps[steps.length - 1].classList.add("drop-after");
+    }
+    // Near either edge the strip scrolls so a far slot can be reached.
+    const sr = sc.getBoundingClientRect();
+    if (e.clientX < sr.left + 56) sc.scrollLeft -= 18;
+    else if (e.clientX > sr.right - 56) sc.scrollLeft += 18;
+  });
+  host.addEventListener("drop", (e) => {
+    if (!sdrag) return;
+    e.preventDefault();
+    const { lid, did, from, to } = sdrag;
+    endStepDrag();
+    if (to !== null) moveStep(lid, did, from, to, false);
+  });
+  host.addEventListener("dragend", endStepDrag);
+  host.addEventListener("keydown", (e) => {
+    if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    const li = e.target.closest && e.target.closest(".lu-step[draggable='true']");
+    if (!li) return;
+    const ol = li.parentElement;
+    const row = ol.closest(".lu-row");
+    if (!row || !ol.classList.contains("is-sortable")) return;
+    e.preventDefault();
+    const steps = stepsOf(ol);
+    const from = steps.indexOf(li);
+    const to = Math.max(0, Math.min(steps.length - 1, from + (e.key === "ArrowLeft" ? -1 : 1)));
+    const { lid, did } = rowKey(row);
+    if (to === from) {
+      say(to === 0 ? "Already the first dashboard." : "Already the last dashboard.");
+      return;
+    }
+    moveStep(lid, did, from, to, true);
+  });
 
   /* ------------------------------------------------------------ bar drag */
   let drag = null;
@@ -2384,6 +2572,8 @@
     return (
       document.hidden ||
       !!drag ||
+      !!sdrag ||
+      moving ||
       (wizard && wizard.open) ||
       // A tile's "Queued · picks up ~3:48 PM" note is read before a redraw drops it.
       !!root.querySelector(
