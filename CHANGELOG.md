@@ -12,6 +12,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - Hardware: Pimoroni Badger 2040 W (296x128 black and white) and Badger 2350 (264x176, four greys), driven by the new tesserae-device-badger app inside each badge's stock launcher. Both pair from the Discovered strip, and A/B/C/up/down arrive as button wakes with their own keys. The Badger 2350 is confirmed on hardware; the 2040 W is not yet.
 - Docs: the README, the client install page and the compatibility matrix list the Inky Frame firmware (tesserae-device-inkyframe, Spectra 6 confirmed) and the Badger app.
 
+### Fixed
+
+- Firmware: when automatic updates cannot use the newest release (the descriptor did not download or verify), the server logs a warning naming the kind and the reason, once an hour, instead of only at debug level, where it looked like the update was simply not being offered.
+
 ## [0.505.0], 2026-11-08
 
 ### Added
@@ -184,7 +188,6 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
-- Firmware: when automatic updates cannot use the newest release (the descriptor did not download or verify), the server logs a warning naming the kind and the reason, once an hour, instead of only at debug level, where it looked like the update was simply not being offered.
 - Home Assistant, Entities: a door, window or motion sensor reads Closed / Open / Clear the way Home Assistant words it, instead of Off / On.
 - Visionect frames: a saved Wi-Fi password now reaches the frame, is masked on the device page instead of sent back to the browser, and is hidden in the frame log if the frame echoes it.
 - History: 12-hour times no longer overlap the thumbnail.
