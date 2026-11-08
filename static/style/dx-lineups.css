@@ -2320,8 +2320,25 @@ main.page.lu-page {
   -webkit-user-drag: none;
   user-select: none;
 }
-.lu .lu-strip.is-sortable .lu-step-name {
+.lu .lu-strip.is-sortable .lu-step figcaption {
   cursor: grab;
+}
+/* A grip beside the step's n/N while the pointer is on it says it can be moved. */
+@media (hover: hover) and (pointer: fine) {
+  .lu .lu-strip.is-sortable .lu-step .lu-step-meta::after {
+    content: "";
+    width: 7px;
+    height: 11px;
+    background: radial-gradient(circle, currentcolor 1px, transparent 1.3px) 0 0 / 3.5px 3.7px;
+    opacity: 0;
+    transition: opacity 120ms ease-out;
+  }
+  .lu .lu-strip.is-sortable .lu-step:is(:hover, :focus-within) .lu-step-meta::after {
+    opacity: 0.9;
+  }
+  .lu .lu-strip.is-reordering .lu-step .lu-step-meta::after {
+    opacity: 0;
+  }
 }
 .lu .lu-step.is-dragging {
   opacity: 0.35;
@@ -2329,24 +2346,47 @@ main.page.lu-page {
 .lu .lu-strip.is-reordering .lu-step {
   transition: none;
 }
-.lu .lu-step.drop-before::before,
-.lu .lu-step.drop-after::after {
+/* The landing bar stands beside the pictures, in the gap between two steps (over the
+   arrow), not on a picture's edge. */
+.lu .lu-strip.is-sortable .lu-step figure {
+  position: relative;
+}
+.lu .lu-step.drop-before > figure::before,
+.lu .lu-step.drop-after > figure::after {
   content: "";
   position: absolute;
-  top: 0;
-  bottom: 0;
+  top: calc(var(--slot-h, 27px) - 4px);
+  height: calc(var(--th) + 8px);
   width: 4px;
   border-radius: 2px;
   background: var(--lu-acc);
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--lu-acc) 28%, transparent);
   pointer-events: none;
-  z-index: 3;
+  z-index: 4;
 }
-.lu .lu-step.drop-before::before {
-  left: -2px;
+.lu .lu-step.drop-before > figure::before {
+  left: -19px;
 }
-.lu .lu-step.drop-after::after {
-  right: -2px;
+.lu .lu-step.drop-after > figure::after {
+  right: -12px;
+}
+/* Where a dropped step landed, for a moment. */
+.lu .lu-step.just-moved .lu-thumb {
+  animation: lu-step-landed 1s ease-out;
+}
+@keyframes lu-step-landed {
+  from {
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--t-fg) 55%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 3px transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lu .lu-step.just-moved .lu-thumb {
+    animation: none;
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--t-fg) 55%, transparent);
+  }
 }
 /* While one is dragged every other step is shown plainly, whatever now/next dimming applies. */
 .lu .lu-strip.is-reordering .lu-step:not(.is-dragging) {

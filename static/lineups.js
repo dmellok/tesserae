@@ -1890,14 +1890,16 @@
       const sortable = !!found && steps.length > 1 && steps.length === found.l.steps.length;
       ol.classList.toggle("is-sortable", sortable);
       steps.forEach((li) => {
+        // The shortcut is said where focus lands: the step's own buttons.
+        const keyed = [li, ...li.querySelectorAll("[data-zoom], .lu-push-ov")];
         if (sortable) {
           li.draggable = true;
-          li.setAttribute("aria-keyshortcuts", "Alt+ArrowLeft Alt+ArrowRight");
-          const name = li.querySelector(".lu-step-name");
-          if (name) name.title = "Drag to reorder, or Alt+Left and Alt+Right";
+          keyed.forEach((x) => x.setAttribute("aria-keyshortcuts", "Alt+ArrowLeft Alt+ArrowRight"));
+          const cap = li.querySelector("figcaption");
+          if (cap) cap.title = "Drag to reorder, or Alt+Left and Alt+Right";
         } else {
           li.removeAttribute("draggable");
-          li.removeAttribute("aria-keyshortcuts");
+          keyed.forEach((x) => x.removeAttribute("aria-keyshortcuts"));
         }
       });
     });
@@ -1961,6 +1963,8 @@
       say(`Moved ${name} to position ${to + 1} of ${n}.`);
       const moved = host.querySelector(`${rowSel} .lu-step[data-step="${to}"]`);
       if (moved) {
+        moved.classList.add("just-moved");
+        setTimeout(() => moved.classList.remove("just-moved"), 1000);
         moved.scrollIntoView({ block: "nearest", inline: "nearest" });
         if (focusSel) {
           const f = moved.querySelector(focusSel);
@@ -1972,6 +1976,10 @@
       st.rowErr[lid] = `Not reordered: ${err.message}`;
       say(`Not reordered: ${err.message}`);
       render();
+      // Back where it was, and so is the keyboard.
+      const back = focusSel && host.querySelector(`${rowSel} .lu-step[data-step="${from}"]`);
+      const f = back && back.querySelector(focusSel);
+      if (f) f.focus({ preventScroll: true });
       if (err.status === 409) scheduleRefresh(0);
     }
   }

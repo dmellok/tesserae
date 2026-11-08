@@ -2499,7 +2499,7 @@ def test_pending_markup_matches_direct_renderer(live: str, view: str) -> None:
             c.querySelectorAll('.is-sortable').forEach(x => x.classList.remove('is-sortable'));
             c.querySelectorAll('[draggable]').forEach(x => x.removeAttribute('draggable'));
             c.querySelectorAll('[aria-keyshortcuts]').forEach(x => x.removeAttribute('aria-keyshortcuts'));
-            c.querySelectorAll('.lu-step-name[title]').forEach(x => x.removeAttribute('title'));
+            c.querySelectorAll('.lu-step figcaption[title]').forEach(x => x.removeAttribute('title'));
             return c.outerHTML; };
           return [expected, [...document.querySelectorAll('.lu-ds')].map(plain)];
         }""")
@@ -4665,7 +4665,15 @@ def test_dragging_a_step_shows_a_drop_bar_and_saves_the_new_order(live: str) -> 
         )
         bar = page.locator("#lu-row-dinner .lu-step.drop-before")
         assert bar.evaluate("e => e.querySelector('.lu-step-name').textContent") == "Family"
-        assert bar.evaluate("e => getComputedStyle(e, '::before').width") == "4px"
+        # It stands in the gap before Family's picture, not on the picture's edge.
+        assert (
+            bar.evaluate("e => getComputedStyle(e.querySelector('figure'), '::before').width")
+            == "4px"
+        )
+        assert (
+            bar.evaluate("e => getComputedStyle(e.querySelector('figure'), '::before').left")
+            == "-19px"
+        )
         page.locator("#lu-row-dinner .lu-strip-scroll").screenshot(
             path=str(SHOTS / "item4-drop-bar.png")
         )
@@ -4754,9 +4762,16 @@ def test_alt_arrows_move_a_step_and_focus_follows(live: str) -> None:
         sent = [b for u, b in api.posts if u.endswith("/order")]
         assert (sent[-1]["from"], sent[-1]["to"]) == (1, 2)
         assert _strip(page, "dinner")[:3] == ["Newspaper", "Family", "Art"]
-        # Focus is on the moved step (now third), on the same kind of control.
+        # Focus is on the moved step (now third), on the same kind of control, which
+        # names the shortcut; the step is marked for a moment where it landed.
         page.wait_for_function(
             "() => document.activeElement.closest('.lu-step')?.dataset.step === '2' && document.activeElement.matches('[data-zoom]')"
+        )
+        assert page.evaluate("() => document.activeElement.getAttribute('aria-keyshortcuts')") == (
+            "Alt+ArrowLeft Alt+ArrowRight"
+        )
+        assert "just-moved" in (
+            page.locator('#lu-row-dinner .lu-step[data-step="2"]').get_attribute("class") or ""
         )
         page.keyboard.press("Alt+ArrowLeft")
         page.wait_for_function(
@@ -4792,6 +4807,15 @@ def test_a_refused_move_puts_the_order_back_and_says_why(live: str) -> None:
             "() => document.querySelector('#lu-row-dinner .lu-row-err')?.textContent.includes('Not reordered')"
         )
         assert "reload to reorder" in page.locator("#lu-row-dinner .lu-row-err").inner_text()
+        assert _strip(page, "dinner")[:3] == ["Newspaper", "Art", "Family"]
+        # By keyboard too, and the keyboard is back on the step it tried to move.
+        zoom = '#lu-row-dinner .lu-step[data-step="1"] [data-zoom]'
+        page.locator(zoom).focus()
+        page.keyboard.press("Alt+ArrowRight")
+        page.wait_for_function(
+            "() => document.activeElement.closest('.lu-step')?.dataset.step === '1'"
+            " && document.activeElement.matches('[data-zoom]')"
+        )
         assert _strip(page, "dinner")[:3] == ["Newspaper", "Art", "Family"]
         assert page._lu_errors == []
         browser.close()
@@ -4839,8 +4863,10 @@ def test_real_routes_reorder_moves_the_next_marker_and_the_labels(real: tuple[st
         nxt = "#lu-row-midday .lu-step:has(.lu-pill.p-next) .lu-step-name"
         assert page.locator(nxt).inner_text() == "News"
         _grab(page, "midday", 2, 0, "left")
+        # The step moves at once; the server's redraw then renumbers the steps.
         page.wait_for_function(
             "() => document.querySelector('#lu-row-midday .lu-step-name')?.textContent === 'Sky'"
+            " && document.querySelector('#lu-row-midday .lu-step-meta')?.textContent.startsWith('1/3')"
         )
         assert app.config["DECK_STORE"].get("midday").page_ids == ["sky", "news", "art"]
         assert _strip(page, "midday") == ["Sky", "News", "Art"]
