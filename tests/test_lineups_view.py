@@ -3698,3 +3698,46 @@ def test_step_item_reports_a_signature_and_push_sends_exactly_the_drawn_pixels(
     # A different nonce is a different picture, with its own file and signature.
     other = drawn.get(url.replace("0123456789ab", "ba9876543210"))
     assert other.status_code == 202 and submitted[-1]["cache_path"] != job["cache_path"]
+
+
+def test_edit_name_renames_in_place_and_redraws(client: Any, app: Flask) -> None:
+    before = _deck(app, "morning")
+    resp = client.post("/decks/morning/name", json={"name": "  Early   news "})
+    assert resp.status_code == 200, resp.get_json()
+    data = resp.get_json()
+    assert data["ok"] and data["ids"] == ["morning"]
+    deck = _deck(app, "morning")
+    assert deck.name == "Early news"
+    # Only the name changed.
+    assert deck.model_copy(update={"name": before.name}) == before
+    panel = next(d for d in data["displays"] if d["id"] == "panel")
+    assert next(lu for lu in panel["lineups"] if lu["id"] == "morning")["name"] == "Early news"
+    # The view-model names the route.
+    view = client.get("/decks/view.json").get_json()
+    lineup = next(lu for lu in view["displays"][0]["lineups"] if lu["id"] == "morning")
+    assert lineup["actions"]["name_url"] == "/decks/morning/name"
+
+
+@pytest.mark.parametrize(
+    "body",
+    [{}, {"name": ""}, {"name": "   "}, {"name": 5}, {"name": None}, {"name": "x" * 81}],
+)
+def test_edit_name_refuses_bad_names(client: Any, app: Flask, body: dict[str, Any]) -> None:
+    resp = client.post("/decks/morning/name", json=body)
+    assert resp.status_code == 400
+    assert resp.get_json()["ok"] is False and resp.get_json()["id"] == "morning"
+    assert _deck(app, "morning").name == "Morning"
+
+
+def test_edit_name_unknown_lineup_and_no_change(client: Any, app: Flask) -> None:
+    assert client.post("/decks/nope/name", json={"name": "X"}).status_code == 404
+    resp = client.post("/decks/morning/name", json={"name": "Morning"})
+    assert resp.status_code == 200 and _deck(app, "morning").name == "Morning"
+
+
+def test_edit_name_needs_a_signed_in_session(app: Flask) -> None:
+    _seed(app)
+    anon = app.test_client()
+    resp = anon.post("/decks/morning/name", json={"name": "Hacked"})
+    assert resp.status_code in (302, 401, 403)
+    assert _deck(app, "morning").name == "Morning"

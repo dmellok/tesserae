@@ -1632,7 +1632,7 @@ main.page.lu-page {
     );
   grid-template-areas: "tag title state actions fold";
 }
-.lu .lu-row-head :is(.lu-days, .lu-win, .lu-win-edit, .lu-row-actions) {
+.lu .lu-row-head :is(.lu-days, .lu-win, .lu-win-edit, .lu-name-edit, .lu-row-actions) {
   cursor: auto;
 }
 .lu .lu-fold {
@@ -1708,6 +1708,58 @@ main.page.lu-page {
   font-weight: 700;
   letter-spacing: -0.01em;
   overflow-wrap: anywhere;
+}
+/* The name is a button that turns into a text field; it looks like plain title text. */
+.lu .lu-row-name .lu-name {
+  all: unset;
+  display: inline;
+  box-sizing: border-box;
+  cursor: text;
+  border-radius: 4px;
+  overflow-wrap: anywhere;
+  text-decoration: underline dotted transparent;
+  text-underline-offset: 4px;
+  transition: text-decoration-color 120ms ease-out;
+}
+.lu .lu-row-name .lu-name:hover {
+  text-decoration-color: color-mix(in oklab, currentcolor 55%, transparent);
+}
+.lu .lu-row-name .lu-name:focus-visible {
+  outline: 2px solid var(--lu-acc);
+  outline-offset: 2px;
+}
+.lu .lu-name-edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.lu .lu-name-edit input {
+  height: 30px !important;
+  min-height: 0 !important;
+  width: min(100%, 26em);
+  padding: 0 6px;
+  border: 1px solid var(--t-border-strong);
+  border-radius: var(--lu-r);
+  background: var(--t-surface);
+  color: var(--t-fg);
+  font: 700 15.5px var(--t-font) !important;
+  letter-spacing: -0.01em;
+  box-shadow: none;
+}
+.lu .lu-name-edit input:focus {
+  outline: none;
+  border-color: var(--lu-acc);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--lu-acc) 25%, transparent);
+}
+.lu .lu-name-err {
+  color: var(--t-danger);
+  font: 12px var(--t-font);
+}
+.lu .lu-name-err:empty {
+  display: none;
 }
 .lu .lu-row-meta {
   display: flex;
@@ -3103,12 +3155,16 @@ main.page.lu-page {
   .lu input,
   .lu select,
   .lu .lu-tb-search input,
-  .lu .lu-win-edit input {
+  .lu .lu-win-edit input,
+  .lu .lu-name-edit input {
     font-size: 16px !important;
   }
   .lu .lu-win-edit input {
     height: 44px !important;
     width: 116px;
+  }
+  .lu .lu-name-edit input {
+    height: 44px !important;
   }
   .lu .lu-fold,
   .lu .lu-ibtn,
@@ -3125,6 +3181,12 @@ main.page.lu-page {
   .lu .lu-win {
     min-height: 44px;
     padding: 0 6px;
+  }
+  .lu .lu-row-name .lu-name {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    min-width: 44px;
   }
   .lu .lu-dp-label {
     height: 44px;

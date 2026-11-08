@@ -172,6 +172,7 @@ class LineupUrls:
     step_item: str = ""
     window: str = ""
     days: str = ""
+    name: str = ""
     bind: str = ""
 
 
@@ -689,6 +690,7 @@ class ActionsView(_Dict):
     can_push_step: bool
     bind_url: str = ""
     step_item_url: str = ""
+    name_url: str = ""
 
 
 @dataclass
@@ -2731,6 +2733,7 @@ def _lineup_view(
             can_push_step=bool(lineup.steps),
             bind_url=u.bind,
             step_item_url=u.step_item,
+            name_url=u.name,
         ),
         sort_minutes=sort_minutes,
         off_why=off_why,

@@ -1227,6 +1227,7 @@ def _lineup_input(
             step_item=url_for("decks.step_item", deck_id=deck.id),
             window=url_for("decks.edit_window", deck_id=deck.id),
             days=url_for("decks.edit_days", deck_id=deck.id),
+            name=url_for("decks.edit_name", deck_id=deck.id),
             bind=url_for("decks.bind_pages", deck_id=deck.id),
         )
     return LineupInput(
@@ -2035,6 +2036,9 @@ def _check_weekday(value: Any, what: str, deck_id: str | None) -> int:
     return int(value)
 
 
+#: The longest lineup name the inline rename takes.
+_NAME_MAX = 80
+
 _EDIT_FIELDS = frozenset({"id", "start", "end", "days", "toggle_day", "on"})
 
 
@@ -2185,6 +2189,48 @@ def edit_days(deck_id: str) -> Response:
     else:
         return _edit_error_json(_EditError("Send days or a day to toggle.", 400, deck_id))
     return _apply_edits([edit], _body_view_day(body, day_alias=False))
+
+
+@bp.post("/<deck_id>/name")
+def edit_name(deck_id: str) -> Response:
+    """Inline rename of a lineup. JSON ``{"name": "..."}``: trimmed, never
+    empty, one line, at most ``_NAME_MAX`` characters. Nothing else about the
+    lineup changes (so no warmed frame or nav position is dropped); the reply
+    is the same as the other edits: the touched displays, redrawn."""
+    body = _json_body()
+    raw = body.get("name")
+    if not isinstance(raw, str):
+        return _edit_error_json(_EditError("Name must be text.", 400, deck_id))
+    name = " ".join(raw.split())
+    if not name:
+        return _edit_error_json(_EditError("A lineup needs a name.", 400, deck_id))
+    if len(name) > _NAME_MAX:
+        return _edit_error_json(
+            _EditError(f"Keep the name to {_NAME_MAX} characters or fewer.", 400, deck_id)
+        )
+    try:
+        view_day = _view_day(_body_view_day(body, day_alias=True))
+    except _EditError as exc:
+        return _edit_error_json(exc)
+
+    def plan(decks: dict[str, Deck]) -> tuple[list[Deck], Deck]:
+        current = decks.get(deck_id)
+        if current is None:
+            raise _EditError(f"No lineup with id {deck_id!r}.", 404, deck_id)
+        if current.name == name:
+            return [], current
+        try:
+            renamed = _merged_deck(current, name=name)
+        except ValidationError as exc:
+            raise _EditError(_first_error(exc), 400, deck_id) from exc
+        return [renamed], renamed
+
+    try:
+        saved = _store().transaction(plan)
+    except _EditError as exc:
+        return _edit_error_json(exc)
+    page_devices = {p.id: list(p.device_ids) for p in _pages().list()}
+    return _edit_result([saved], [], page_devices, view_day)
 
 
 @bp.post("/edits")

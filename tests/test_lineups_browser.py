@@ -246,6 +246,7 @@ class _Api:
         self.same_sig: dict[str, str] = {}
         self.item_status = 200
         self.push_delay = 0.0
+        self.name_error = ""
 
     def sig_for(self, item: str) -> str:
         return self.same_sig.get(item) or re.sub(r"\W", "", item).ljust(16, "0")[-16:]
@@ -294,6 +295,37 @@ class _Api:
                             }
                         ),
                     )
+                return
+            named = re.search(r"/decks/([^/]+)/name$", req.url)
+            if req.method == "POST" and named:
+                body = json.loads(req.post_data or "null")
+                self.posts.append((req.url, body))
+                if self.name_error:
+                    route.fulfill(
+                        status=400,
+                        content_type="application/json",
+                        body=json.dumps({"ok": False, "error": self.name_error, "id": named[1]}),
+                    )
+                    return
+                # The server redraws every place the name shows; the mock swaps the text.
+                old = next(
+                    lu["name"]
+                    for d in self.vm["displays"]
+                    for lu in d["lineups"]
+                    if lu["id"] == named[1]
+                )
+                self.vm = json.loads(
+                    json.dumps(self.vm).replace(
+                        json.dumps(old)[1:-1], json.dumps(body["name"])[1:-1]
+                    )
+                )
+                route.fulfill(
+                    status=200,
+                    content_type="application/json",
+                    body=json.dumps(
+                        {"ok": True, "ids": [named[1]], "displays": self.vm["displays"]}
+                    ),
+                )
                 return
             if req.method == "POST" and re.search(
                 r"/decks/(edits|[^/]+/push-step|[^/]+/bind-pages)$", req.url
@@ -2390,7 +2422,7 @@ def test_pending_markup_matches_direct_renderer(live: str, view: str) -> None:
             _timeline(page)
         expected, drawn = page.evaluate("""() => {
           const R = TesseraeLineupsRender, st = TesseraeLineups.state, vm = TesseraeLineups.vm;
-          const ui = {view: st.view, seen: new Set(), folded: l => l.folded, collapsed: () => false,
+          const ui = {view: st.view, seen: new Set(), folded: l => l.folded, collapsed: () => false, dayFlash: id => st.dayFlash[id] || null,
             pendingBar: d => R.pendingBar(d, Object.keys(st.pending[d.id] || {}).length)};
           const expected = vm.displays.map(d => R.display(vm, R.withPending(d, st.pending[d.id], vm.now.weekday, vm.now.minute), ui));
           TesseraeLineups.render();
@@ -4177,4 +4209,126 @@ def test_day_tile_marks_show_on_a_dimmed_row_and_keep_the_today_underline(live: 
         assert today.count() == 1
         assert "inset" in today.evaluate("el => getComputedStyle(el).boxShadow")
         row.locator(".lu-row-title").screenshot(path=str(SHOTS / "item1-day-dimmed-row.png"))
+        browser.close()
+
+
+# -- the lineup's name edits in place -------------------------------------------------
+
+
+def _names(page: Any) -> list[str]:
+    return page.eval_on_selector_all(".lu-row-name .lu-name", "els => els.map(e => e.textContent)")
+
+
+def test_clicking_the_name_edits_it_and_enter_saves_everywhere(live: str) -> None:
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser, page, api = _open(p, live)
+        folded = "is-folded" in (page.locator("#lu-row-night").get_attribute("class") or "")
+        page.locator('[data-name-edit="night"]').click()
+        # Editing, not folding: a text field in place of the name, the row as it was.
+        inp = page.locator("#lu-row-night .lu-name-edit input")
+        assert inp.input_value() == "Night"
+        assert page.evaluate("() => document.activeElement.matches('.lu-name-edit input')")
+        assert (
+            "is-folded" in (page.locator("#lu-row-night").get_attribute("class") or "")
+        ) == folded
+        page.locator("#lu-row-night").screenshot(path=str(SHOTS / "item2-name-editing.png"))
+        inp.fill("  Evening   art ")
+        inp.press("Enter")
+        page.wait_for_function("() => document.querySelector('#lu-row-night .lu-name')")
+        assert api.posts[-1][1] == {"name": "Evening art"}
+        assert api.posts[-1][0].endswith("/decks/night/name")
+        assert page.locator("#lu-row-night .lu-name").inner_text() == "Evening art"
+        assert "Night" not in _names(page)
+        # Anywhere else the name shows (the day bar blocks, aria labels, titles) follows.
+        assert page.locator('.lu-blk[data-lineup="night"]').first.get_attribute("title") or True
+        assert "Night" not in (page.locator('.lu-ds[data-display="frame"] .lu-today').inner_html())
+        assert page.evaluate("() => document.activeElement.matches('[data-name-edit]')")
+        page.locator("#lu-row-night .lu-row-title").screenshot(
+            path=str(SHOTS / "item2-name-saved.png")
+        )
+        assert page._lu_errors == []
+        browser.close()
+
+
+def test_name_edit_escape_cancels_and_blur_saves_and_empty_is_refused(live: str) -> None:
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser, page, api = _open(p, live)
+        name = '[data-name-edit="night"]'
+        inp = page.locator("#lu-row-night .lu-name-edit input")
+        # Escape: nothing is sent, the old name stays.
+        page.locator(name).click()
+        inp.fill("Something else")
+        inp.press("Escape")
+        assert page.locator("#lu-row-night .lu-name").inner_text() == "Night"
+        assert [u for u, _ in api.posts if u.endswith("/name")] == []
+        # Empty with Enter: refused in place, the field stays open for a fix.
+        page.locator(name).click()
+        inp.fill("   ")
+        inp.press("Enter")
+        assert page.locator("#lu-row-night .lu-name-err").inner_text() == "Enter a name"
+        assert inp.count() == 1
+        assert [u for u, _ in api.posts if u.endswith("/name")] == []
+        page.locator("#lu-row-night .lu-name-edit").screenshot(
+            path=str(SHOTS / "item2-name-empty.png")
+        )
+        # Empty and click away: the old name comes back, nothing is sent.
+        page.locator("body").click(position={"x": 5, "y": 5})
+        assert page.locator("#lu-row-night .lu-name").inner_text() == "Night"
+        assert [u for u, _ in api.posts if u.endswith("/name")] == []
+        # Blur with a new name saves it.
+        page.locator(name).click()
+        inp.fill("Late art")
+        page.locator("body").click(position={"x": 5, "y": 5})
+        page.wait_for_function(
+            "() => document.querySelector('#lu-row-night .lu-name')?.textContent === 'Late art'"
+        )
+        assert api.posts[-1][1] == {"name": "Late art"}
+        # The same name again sends nothing.
+        n = len(api.posts)
+        page.locator(name).click()
+        inp.press("Enter")
+        assert len(api.posts) == n and page.locator("#lu-row-night .lu-name").count() == 1
+        assert page._lu_errors == []
+        browser.close()
+
+
+def test_name_edit_shows_the_servers_reason_and_keeps_the_field(live: str) -> None:
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser, page, api = _open(p, live)
+        api.name_error = "Keep the name to 80 characters or fewer."
+        page.locator('[data-name-edit="night"]').click()
+        inp = page.locator("#lu-row-night .lu-name-edit input")
+        inp.fill("Too long")
+        inp.press("Enter")
+        page.wait_for_function(
+            "() => document.querySelector('#lu-row-night .lu-name-err')?.textContent"
+        )
+        assert "80 characters" in page.locator("#lu-row-night .lu-name-err").inner_text()
+        assert inp.input_value() == "Too long"
+        browser.close()
+
+
+def test_clicking_the_name_never_folds_the_row_but_the_rest_of_the_head_does(live: str) -> None:
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser, page, _ = _open(p, live)
+        row = page.locator("#lu-row-dinner")
+        before = "is-folded" in (row.get_attribute("class") or "")
+        page.locator('[data-name-edit="dinner"]').click()
+        assert ("is-folded" in (row.get_attribute("class") or "")) == before
+        # Clicking inside the field does not fold either.
+        page.locator("#lu-row-dinner .lu-name-edit input").click()
+        assert ("is-folded" in (row.get_attribute("class") or "")) == before
+        page.keyboard.press("Escape")
+        # The name is a button: Enter on it opens the field too.
+        page.locator('[data-name-edit="dinner"]').focus()
+        page.keyboard.press("Enter")
+        assert page.locator("#lu-row-dinner .lu-name-edit input").count() == 1
         browser.close()

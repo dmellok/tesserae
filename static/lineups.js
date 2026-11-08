@@ -340,6 +340,7 @@
       "data-zoom",
       "data-item",
       "data-win-edit",
+      "data-name-edit",
       "data-undo",
       "data-save",
     ]) {
@@ -1658,6 +1659,115 @@
     wrap.querySelector("[data-win-ok]").addEventListener("click", apply);
   }
 
+  /* ------------------------------------------------------------ name editor */
+  const NAME_MAX = 80;
+  // The renamed lineup, drawn at once everywhere its name shows (rows, day bar, timeline):
+  // the server's fresh copy of the touched displays when it sent one, else the name patched
+  // in, and a refresh to pick up the rest.
+  function applyRenamed(id, name, res) {
+    const fresh = res && Array.isArray(res.displays) ? res.displays : [];
+    vm.displays = vm.displays.map((x) => {
+      const updated = fresh.find((f) => f.id === x.id);
+      if (updated) {
+        const copy = JSON.parse(JSON.stringify(updated));
+        copy.lineups.forEach((l) => {
+          delete l.pending;
+          delete l.pending_days;
+        });
+        return copy;
+      }
+      x.lineups.forEach((l) => {
+        if (l.id === id) l.name = name;
+      });
+      return x;
+    });
+    (vm.unassigned || []).forEach((l) => {
+      if (l.id === id) l.name = name;
+    });
+    delete st.rowErr[id];
+    scheduleRefresh(fresh.length ? 800 : 0);
+  }
+  function openNameEdit(btn) {
+    const found = lineupOf(btn.dataset.nameEdit, displayOf(btn));
+    if (!found) return;
+    const l = found.l;
+    const old = l.name;
+    const wrap = document.createElement("span");
+    wrap.className = "lu-name-edit";
+    wrap.innerHTML =
+      `<input type="text" maxlength="${NAME_MAX}" autocomplete="off" spellcheck="false" aria-label="Name of this lineup. Enter saves, Escape cancels">` +
+      '<span class="lu-name-err" role="alert"></span>';
+    const input = wrap.querySelector("input");
+    const err = wrap.querySelector(".lu-name-err");
+    input.value = old;
+    btn.replaceWith(wrap);
+    input.focus();
+    input.select();
+    let finished = false;
+    const focusName = () => {
+      const b = host.querySelector(`[data-name-edit="${CSS.escape(l.id)}"]`);
+      if (b) b.focus({ preventScroll: true });
+    };
+    const stop = (refocus) => {
+      finished = true;
+      render();
+      if (refocus) focusName();
+    };
+    const submit = async (fromBlur) => {
+      if (finished) return;
+      const name = input.value.replace(/\s+/g, " ").trim();
+      if (!name) {
+        if (fromBlur) {
+          stop();
+          say(`Name not changed: a lineup needs a name.`);
+        } else {
+          err.textContent = "Enter a name";
+        }
+        return;
+      }
+      if (name === old) {
+        stop(!fromBlur);
+        return;
+      }
+      finished = true;
+      input.disabled = true;
+      try {
+        const res = await API.setName(l, name);
+        applyRenamed(l.id, name, res);
+        generation++;
+        say(`Renamed ${old} to ${name}.`);
+        render();
+        if (!fromBlur) focusName();
+      } catch (e) {
+        if (fromBlur) {
+          st.rowErr[l.id] = `Not renamed: ${e.message}`;
+          render();
+        } else {
+          finished = false;
+          input.disabled = false;
+          err.textContent = e.message;
+          input.focus();
+        }
+        say(`Not renamed: ${e.message}`);
+      }
+    };
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        submit(false);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        stop(true);
+        say("Name not changed.");
+      }
+    });
+    input.addEventListener("input", () => {
+      err.textContent = "";
+    });
+    input.addEventListener("blur", () => submit(true));
+  }
+
   /* ------------------------------------------------------------ bar drag */
   let drag = null;
   let justDragged = false;
@@ -1935,7 +2045,7 @@
       if (justDragged || String(window.getSelection ? window.getSelection() : "") !== "") return;
       if (
         e.target.closest(
-          "input, select, textarea, label, .lu-win-edit, .lu-days, .lu-more, .lu-peek, .lu-today, .lu-row-actions"
+          "input, select, textarea, label, .lu-win-edit, .lu-name-edit, .lu-days, .lu-more, .lu-peek, .lu-today, .lu-row-actions"
         )
       )
         return;
@@ -2032,6 +2142,8 @@
       toggleDay(t);
     } else if (ds.winEdit) {
       openWinEdit(t);
+    } else if (ds.nameEdit) {
+      openNameEdit(t);
     } else if (ds.undo !== undefined && t.matches("[data-undo]")) {
       const ids = Object.keys(st.pending[ds.undo] || {});
       Object.keys(st.pending).forEach((did) => {
@@ -2192,7 +2304,7 @@
       (wizard && wizard.open) ||
       // A tile's "Queued · picks up ~3:48 PM" note is read before a redraw drops it.
       !!root.querySelector(
-        ".lu-peek, .lu-dp-pop, details.lu-more[open], .lu-win-edit, .lu-tile.push-queued"
+        ".lu-peek, .lu-dp-pop, details.lu-more[open], .lu-win-edit, .lu-name-edit, .lu-tile.push-queued"
       ) ||
       Object.values(st.saving).some(Boolean)
     );

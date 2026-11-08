@@ -66,6 +66,13 @@
         `${PREFIX}/decks/${encodeURIComponent(lineup.id)}/days`;
       return send("POST", url, { days });
     },
+    /** POST /decks/<id>/name {name}: rename a lineup. Replies like the other edits (the touched displays). */
+    setName(lineup, name) {
+      const url =
+        (lineup.actions && lineup.actions.name_url) ||
+        `${PREFIX}/decks/${encodeURIComponent(lineup.id)}/name`;
+      return send("POST", url, { name });
+    },
     /** POST /decks/<id>/bind-pages {page_ids, display_id, also}: bind off-display steps to
         the display they sit under, keeping their other displays (the click is the consent). */
     bindPages(lineup, pageIds, displayId) {
