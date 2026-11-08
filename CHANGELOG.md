@@ -17,6 +17,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- Custom layout: dragging an edge that one tall cell shares with two stacked cells moves the whole line, so the tall cell narrows as the stacked cells widen (#434). It used to move only the dragged cell, which grew over the tall one. The tall cell kept its old width underneath, so a calendar in it drew its events past the visible edge. A cell growing into a gap now stops at the next cell. An overlap made before this fix stays until that edge is dragged back.
 - Devices: the pairing code pop-up gives the address a device reaches Tesserae on, not the browser's. Under Home Assistant ingress it showed Home Assistant's own address (#460). The Companion pairing pop-up does the same.
 - Lineups and history thumbnails keep the display's exact shape, so a dark picture no longer shows a thin light line along one edge.
 - Devices: a device's card shows an 800 px thumbnail of its latest picture rather than the full composition, which for a 4K display was about 10 MB.
