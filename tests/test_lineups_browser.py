@@ -3998,3 +3998,85 @@ def test_grey_rows_carry_a_tag_saying_why(live: str, redraw: bool) -> None:
                 assert "colour" in r["title"], r
         assert page._lu_errors == []
         browser.close()
+
+
+def test_a_displays_plus_starts_a_lineup_for_that_display(real: tuple[str, Flask]) -> None:
+    """Each display header has a "+" beside its fold chevron that opens the setup wizard
+    (the page's one creation path) with that display chosen, and the lineup it creates
+    lands on that display. The "+" survives the page's redraws."""
+    from playwright.sync_api import sync_playwright
+
+    from app.state.deck_model import Deck, DeckPage
+    from app.state.page_store import Page
+
+    base, app = real
+    code = app.config["PAIRING_STORE"].issue(note="test").code
+    resp = app.test_client().post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+        data=json.dumps({"device_id": "hall", "kind": "esp32_client"}),
+    )
+    assert resp.status_code == 201
+    app.config["PAGE_STORE"].save(Page(id="free", name="Free"))  # on no display yet
+    app.config["DECK_STORE"].upsert(
+        Deck(
+            id="hall_loop", name="Hall loop", device_ids=["hall"], pages=[DeckPage(page_id="free")],
+            advance="timer", advance_interval_minutes=30,
+            advance_anchor="06:00", advance_end_at="09:00", advance_days_of_week=[0, 1, 2, 3, 4],
+        )
+    )  # fmt: skip
+    before = {d.id for d in app.config["DECK_STORE"].all()}
+    with sync_playwright() as p:
+        browser = _launch(p)
+        page = browser.new_page(viewport={"width": 1440, "height": 900})
+        errors: list[str] = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.route(re.compile(r".*/events/stream.*"), lambda r: r.fulfill(status=204, body=""))
+        page.goto(base + "/decks", wait_until="load")
+        page.wait_for_function(
+            "() => document.querySelector('[data-lu]').classList.contains('is-enhanced')"
+        )
+
+        def check_buttons() -> None:
+            adds = page.locator(".lu-ds .lu-ds-hdr .lu-ds-add")
+            assert adds.count() == page.locator(".lu-ds .lu-ds-hdr .lu-ds-fold").count() == 2
+            for i in range(2):
+                add, fold = adds.nth(i), page.locator(".lu-ds-fold").nth(i)
+                name = add.locator("xpath=ancestor::section").locator("h2").inner_text()
+                assert add.get_attribute("aria-label") == f"New lineup for {name}"
+                assert add.get_attribute("title") == f"New lineup for {name}"
+                a, f = add.bounding_box(), fold.bounding_box()
+                assert a and f and a["x"] + a["width"] <= f["x"] + 0.5  # beside the chevron
+                assert abs((a["y"] + a["height"] / 2) - (f["y"] + f["height"] / 2)) <= 2
+
+        check_buttons()
+        with page.expect_response(lambda r: "/decks/view.json" in r.url):
+            page.evaluate("() => window.TesseraeLineups.refresh()")
+        check_buttons()
+
+        # The button never folds its display.
+        page.locator('.lu-ds-add[data-wizard-display="hall"]').click()
+        wiz = page.locator("#timed-wizard")
+        assert wiz.evaluate("e => e.open")
+        assert (
+            page.locator(".lu-ds-hdr [data-collapse]").first.get_attribute("aria-expanded")
+            == "true"
+        )
+        assert wiz.locator("[data-wizard-device]").input_value() == "hall"
+        assert "New lineup for" in wiz.locator("#timed-wizard-title").inner_text()
+        # A single-dashboard mode would otherwise follow the dashboard's own display.
+        wiz.locator('[data-wizard-mode="interval"]').click()
+        wiz.locator("[data-wizard-forward]").click()
+        wiz.locator("[data-wizard-dash]").select_option("news")  # bound to "panel"
+        assert wiz.locator("[data-wizard-device]").input_value() == "hall"
+        wiz.locator("[data-wizard-dash]").select_option("free")
+        assert wiz.locator("[data-wizard-device]").input_value() == "hall"
+        wiz.locator("[data-wizard-forward]").click()
+        wiz.locator("[data-wizard-forward]").click()  # create
+        page.wait_for_function(
+            "() => document.querySelector('#timed-wizard [data-wizard-view=created]:not([hidden])')"
+        )
+        made = [d for d in app.config["DECK_STORE"].all() if d.id not in before]
+        assert len(made) == 1 and made[0].device_ids == ["hall"], made
+        assert errors == []
+        browser.close()

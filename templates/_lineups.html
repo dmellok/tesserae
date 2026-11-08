@@ -275,7 +275,7 @@
 <p class="lu-nextl" title="{{ d.next_line.title }}">{{ d.next_line.before }}{% if d.next_line.at %} <b>{{ d.next_line.at }}</b>{% endif %}{% if d.next_line.after %} {{ d.next_line.after }}{% endif %}</p>
 </div>
 <div class="lu-today"><div class="lu-today-bar">{{ day_track(d, d.day, editable_ids) }}{{ day_scale(d.day, vm.time_cycle) }}</div>{{ day_pick(d, d.day, vm.now.weekday) }}</div>
-<button class="lu-fold lu-ds-fold" type="button" data-collapse="{{ d.id }}" aria-expanded="true" aria-controls="lu-dsb-{{ d.id }}" aria-label="{{ d.name }}: collapse or expand">{{ ico('caret') }}</button>
+<span class="lu-ds-ctl"><button class="lu-ibtn lu-ds-add" type="button" data-open-timed-wizard data-wizard-display="{{ d.id }}" aria-haspopup="dialog" aria-label="New lineup for {{ d.name }}" title="New lineup for {{ d.name }}">{{ ico('plus') }}</button><button class="lu-fold lu-ds-fold" type="button" data-collapse="{{ d.id }}" aria-expanded="true" aria-controls="lu-dsb-{{ d.id }}" aria-label="{{ d.name }}: collapse or expand">{{ ico('caret') }}</button></span>
 </header>
 <div class="lu-ds-body" id="lu-dsb-{{ d.id }}">
 <div class="lu-sched">{% if d.lineups %}<ol class="lu-rows">{% for l in d.lineups %}{{ row(d, l, seen) }}{% endfor %}</ol>{% else %}<p class="lu-none">No lineups on this display yet.</p>{% endif %}</div>

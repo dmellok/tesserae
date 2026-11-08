@@ -380,7 +380,7 @@ main.page.lu-page {
 }
 .lu .lu-ds-hdr {
   display: grid;
-  grid-template-columns: auto minmax(0, 0.85fr) minmax(0, 1.15fr) var(--lu-fold-w);
+  grid-template-columns: auto minmax(0, 0.85fr) minmax(0, 1.15fr) auto;
   grid-template-areas: "thumb name bar chev" "thumb state bar chev";
   column-gap: 18px;
   row-gap: 12px;
@@ -400,7 +400,7 @@ main.page.lu-page {
 }
 @container lu-ds (max-width: 1000px) {
   .lu .lu-ds-hdr {
-    grid-template-columns: auto minmax(0, 1fr) var(--lu-fold-w);
+    grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas: "thumb name chev" "thumb state chev" "bar bar bar";
   }
   .lu .lu-ds-hdr .lu-today {
@@ -409,7 +409,7 @@ main.page.lu-page {
 }
 @container lu-ds (max-width: 560px) {
   .lu .lu-ds-hdr {
-    grid-template-columns: auto minmax(0, 1fr) var(--lu-fold-w);
+    grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas: "name name chev" "thumb state state" "bar bar bar";
     padding: 14px 8px 14px 16px;
     column-gap: 12px;
@@ -418,9 +418,20 @@ main.page.lu-page {
     --slot: 92px;
   }
 }
-.lu .lu-ds-hdr .lu-ds-fold {
+/* The display's "+" (a new lineup for it) sits beside its fold chevron. */
+.lu .lu-ds-hdr .lu-ds-ctl {
   grid-area: chev;
+  display: flex;
+  align-items: center;
+  justify-self: end;
+}
+.lu .lu-ds-hdr .lu-ds-fold {
   margin: 0;
+}
+.lu .lu-ds-hdr .lu-ds-add {
+  width: var(--lu-fold-w);
+  height: var(--lu-fold-w);
+  color: var(--t-muted);
 }
 .lu .lu-ds-hdr .lu-now-thumb {
   grid-area: thumb;
@@ -3297,7 +3308,7 @@ main.page.lu-page {
     column-gap: 6px;
   }
   .lu .lu-ds-hdr {
-    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.25fr) var(--lu-fold-w);
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.25fr) auto;
     column-gap: 12px;
   }
   .lu .lu-ds-tags {

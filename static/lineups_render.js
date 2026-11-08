@@ -485,7 +485,7 @@
       `<header class="lu-ds-hdr"><figure class="lu-now-thumb" title="${esc(delivering ? ph.title : op ? `On screen: ${op.name}` : fr ? fr.title : ph.title)}">${qt ? `<span class="lu-now-wrap">${thumbHtml}<span class="lu-qthumb" role="group" aria-label="${esc(qt.title)}" title="${esc(qt.title)}">${thumb(qt.name, qt.thumb_url, qt.aspect, qt.orientation, "", null, false, d)}<span class="lu-qtag">${ico("clock")}<span>${esc(qt.label)}</span></span></span></span>` : thumbHtml}</figure>` +
       `<div class="lu-ds-name-row"><div class="lu-ds-title"><h2>${esc(d.name)}</h2>${d.settings_url ? `<a class="lu-gear" href="${esc(d.settings_url)}" title="${esc(d.name)} settings" aria-label="${esc(d.name)} settings">${ico("gear")}</a>` : ""}</div><span class="lu-ds-tags">${tags}</span></div>` +
       `<div class="lu-ds-state">${show}${next}</div>${today}` +
-      `<button class="lu-fold lu-ds-fold" type="button" data-collapse="${esc(d.id)}" aria-expanded="${collapsed ? "false" : "true"}" aria-controls="lu-dsb-${esc(d.id)}" aria-label="${esc(d.name)}: collapse or expand">${ico("caret")}</button></header>`
+      `<span class="lu-ds-ctl"><button class="lu-ibtn lu-ds-add" type="button" data-open-timed-wizard data-wizard-display="${esc(d.id)}" aria-haspopup="dialog" aria-label="New lineup for ${esc(d.name)}" title="New lineup for ${esc(d.name)}">${ico("plus")}</button><button class="lu-fold lu-ds-fold" type="button" data-collapse="${esc(d.id)}" aria-expanded="${collapsed ? "false" : "true"}" aria-controls="lu-dsb-${esc(d.id)}" aria-label="${esc(d.name)}: collapse or expand">${ico("caret")}</button></span></header>`
     );
   }
 

@@ -4,8 +4,8 @@
 // created screen; deck mode creates the deck and hands off to the editor.
 (function () {
   const dialog = document.getElementById("timed-wizard");
-  const openers = Array.from(document.querySelectorAll("[data-open-timed-wizard]"));
-  if (!dialog || !openers.length || typeof dialog.showModal !== "function") return;
+  const OPENER = "[data-open-timed-wizard]";
+  if (!dialog || !document.querySelector(OPENER) || typeof dialog.showModal !== "function") return;
 
   const $ = (sel) => dialog.querySelector(sel);
   const $$ = (sel) => Array.from(dialog.querySelectorAll(sel));
@@ -49,7 +49,11 @@
     const d = DASHBOARDS.find((x) => x.id === dashId);
     return ((d && d.devices) || []).filter((id) => knownIds.includes(id));
   };
+  // A display's "+" on the Lineups page opens the wizard for that display
+  // (data-wizard-display); it stays chosen until the person picks another.
+  let preset = "";
   const defaultDeviceFor = (dashId) => {
+    if (preset) return preset;
     const bound = boundOf(dashId);
     if (bound.length === 1) return bound[0];
     if (bound.length > 1) return ALL_BOUND;
@@ -98,7 +102,7 @@
     step: hasSuggest ? -1 : 0, // -1 suggest · 0 behaviour · 1 details · 2 review · 3 created
     mode: null, // 'daily' | 'interval' | 'cycle' | 'deck'
     dash: DASHBOARDS.length ? DASHBOARDS[0].id : "",
-    device: deviceSel ? deviceSel.value : "", // multi-display installs start unpicked
+    device: preset || (deviceSel ? deviceSel.value : ""), // multi-display installs start unpicked
     time: "07:00",
     interval: 15,
     picks: [], // ordered dashboard ids
@@ -634,16 +638,24 @@
   };
 
   // ----- events ------------------------------------------------------------
-  openers.forEach((opener) =>
-    opener.addEventListener("click", () => {
-      state = initial();
-      createdUrl = null;
-      editorUrl = null;
-      syncInputs();
-      render(false);
-      dialog.showModal();
-    })
-  );
+  // Delegated: the Lineups page redraws its display headers (and their "+").
+  const title = $("#timed-wizard-title");
+  const baseTitle = title ? title.textContent : "";
+  document.addEventListener("click", (e) => {
+    const opener = e.target.closest(OPENER);
+    if (!opener) return;
+    const wanted = opener.dataset.wizardDisplay || "";
+    preset = deviceOptions.some((o) => o.value === wanted) ? wanted : "";
+    if (title) {
+      title.textContent = preset ? "New lineup for " + deviceName(preset) : baseTitle;
+    }
+    state = initial();
+    createdUrl = null;
+    editorUrl = null;
+    syncInputs();
+    render(false);
+    dialog.showModal();
+  });
 
   $("[data-wizard-close]").addEventListener("click", () => dialog.close());
   dialog.addEventListener("close", () => {
@@ -689,6 +701,8 @@
   if (deviceSel) {
     deviceSel.addEventListener("change", () => {
       state.device = deviceSel.value;
+      preset = ""; // an explicit choice wins over the display the wizard opened for
+      if (title) title.textContent = baseTitle;
       if (single()) {
         el.forward.disabled = !valid();
         return;
