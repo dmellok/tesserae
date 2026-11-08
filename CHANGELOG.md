@@ -6,10 +6,6 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
-### Fixed
-
-- Firmware: when automatic updates cannot use the newest release (the descriptor did not download or verify), the server logs a warning naming the kind and the reason, once an hour, instead of only at debug level, where it looked like the update was simply not being offered.
-
 ### Added
 
 - Settings → Logs: the server's own log as it's written. Pick a watch level (debug, info, warning or error and up), filter by text, follow live, download or clear. The record level can be lowered for the running server, so debug lines can be watched without a restart. It returns to the configured level on restart. Device tokens and pairing codes in a line are masked.
@@ -188,6 +184,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- Firmware: when automatic updates cannot use the newest release (the descriptor did not download or verify), the server logs a warning naming the kind and the reason, once an hour, instead of only at debug level, where it looked like the update was simply not being offered.
 - Home Assistant, Entities: a door, window or motion sensor reads Closed / Open / Clear the way Home Assistant words it, instead of Off / On.
 - Visionect frames: a saved Wi-Fi password now reaches the frame, is masked on the device page instead of sent back to the browser, and is hidden in the frame log if the frame echoes it.
 - History: 12-hour times no longer overlap the thumbnail.
