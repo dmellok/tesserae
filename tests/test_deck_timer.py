@@ -239,3 +239,27 @@ def test_promoted_advance_leaves_the_history_row_to_the_promote(tmp_path: Path) 
     assert log.list(type="push", source="deck", limit=5) == []
     # The internal advance event is still recorded.
     assert log.list(type="deck", limit=5)
+
+
+def test_a_reordered_rotation_sends_the_dashboard_now_in_its_slot(wiring) -> None:
+    """Steps reordered mid-window: the slot keeps its number but names another
+    dashboard. After ``resync_cycle`` the next tick sends that one; a display
+    already showing the right dashboard is left alone."""
+    scheduler, push, store, _nav = wiring
+    store.upsert(_deck(advance_min_hold_minutes=0))
+    scheduler._tick_once(datetime(2026, 6, 15, 0, 5, tzinfo=UTC))
+    assert push.push.call_args[0][0] == "a"
+    push.push.reset_mock()
+    # b moved to the front: 00:10 is still step 0, which is now b.
+    deck = store.get("d1")
+    store.upsert(deck.model_copy(update={"pages": list(reversed(deck.pages))}))
+    scheduler._tick_once(datetime(2026, 6, 15, 0, 10, tzinfo=UTC))
+    push.push.assert_not_called()  # the old behaviour: wait for 00:30
+    scheduler.resync_cycle("d1")
+    scheduler._tick_once(datetime(2026, 6, 15, 0, 11, tzinfo=UTC))
+    assert push.push.call_args[0][0] == "b"
+    # A reorder that leaves the slot's dashboard where it was repaints nothing.
+    push.push.reset_mock()
+    scheduler.resync_cycle("d1")
+    scheduler._tick_once(datetime(2026, 6, 15, 0, 12, tzinfo=UTC))
+    push.push.assert_not_called()

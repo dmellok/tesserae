@@ -2371,6 +2371,12 @@ def edit_order(deck_id: str) -> Response:
         saved = _store().transaction(plan)
     except _EditError as exc:
         return _edit_error_json(exc)
+    if saved.advance != "manual" and saved.advance_trigger == "cycle":
+        # A rotation mid-window keeps its step number, which now names another
+        # dashboard: let the next tick send it rather than wait for the boundary.
+        resync = getattr(current_app.config.get("SCHEDULER"), "resync_cycle", None)
+        if callable(resync):
+            resync(saved.id)
     page_devices = {p.id: list(p.device_ids) for p in _pages().list()}
     return _edit_result([saved], [], page_devices, view_day)
 

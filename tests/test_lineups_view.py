@@ -4100,3 +4100,12 @@ def test_a_migrated_schedule_turned_rotation_is_one_the_scheduler_runs(
     assert resp.status_code == 200, resp.get_json()
     assert _deck(app, "fma_day").legacy_kind is None
 
+
+def test_reordering_a_rotation_lets_the_scheduler_resend_its_slot(client: Any, app: Flask) -> None:
+    sched = app.config["SCHEDULER"]
+    sched._rotation_last_step["morning"] = 0
+    sched._rotation_last_step["night"] = 0
+    resp = client.post("/decks/morning/order", json={"from": 1, "to": 0})
+    assert resp.status_code == 200, resp.get_json()
+    assert "morning" not in sched._rotation_last_step
+    assert sched._rotation_last_step["night"] == 0
