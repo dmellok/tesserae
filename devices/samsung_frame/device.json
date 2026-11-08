@@ -207,14 +207,14 @@
       "choices": [
         {
           "value": "off",
-          "label": "Turned off by Tesserae"
+          "label": "Managed by Tesserae"
         },
         {
           "value": "keep",
-          "label": "Left as set on the TV"
+          "label": "Managed by the TV"
         }
       ],
-      "help": "The TV's slideshow would replace Tesserae's picture on its own timer. Turned off, the page schedule decides what shows; your other Art Mode photos stay on the TV."
+      "help": "The TV's slideshow can replace Tesserae's picture on its own timer. Managed by Tesserae, Tesserae turns the slideshow off, so the page schedule decides what shows and your other Art Mode photos stay on the TV. Managed by the TV, its slideshow setting is left as you set it on the TV."
     },
     "keep_on_tv": {
       "type": "select",
