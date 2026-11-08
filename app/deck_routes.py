@@ -1247,6 +1247,7 @@ def _lineup_input(
         priority=deck.advance_priority,
         last_fired=last_fired,
         explicit_display=bool(deck.device_ids),
+        end_hint=deck.advance_end_at if kind == "daily" else None,
     )
 
 
@@ -1871,33 +1872,44 @@ def _edited_deck(
 
     A daily push has no end: the scheduler fires it once, at its time, and
     never reads ``advance_end_at`` for it. Giving one an ``end`` therefore
-    makes it what "from 6 AM until 6:30 PM" means in the model: an interval
-    lineup, the same dashboard shown again every ``advance_interval_minutes``
-    inside that window. ``push`` is the way back: a one-dashboard interval
-    lineup becomes a daily push at its start time."""
+    makes it what "from 6 AM until 6:30 PM" means in the model. One
+    dashboard becomes an interval lineup, shown again every
+    ``advance_interval_minutes`` inside that window; several become a cycle
+    (a rotation) from the push time to the end, stepping through them every
+    ``advance_interval_minutes`` (or each page's own dwell). A daily push
+    only ever sends its first dashboard, so the cycle is also what makes the
+    others show. ``push`` is the way back: a one-dashboard interval lineup,
+    or any cycle, becomes a daily push at its start time."""
     kind = _lineup_kind(deck)
     changes: dict[str, Any] = {}
     if push:
-        if kind != "interval" or len(deck.pages) != 1:
+        if kind == "cycle" and deck.advance == "timer":
+            # (A "both" deck also moves on taps; only the cycle trigger runs it.)
+            raw_start = start if start is not _UNSET else deck.advance_anchor
+        elif kind == "interval" and len(deck.pages) == 1:
+            raw_start = start if start is not _UNSET else deck.advance_window_start
+        else:
             raise _EditError(
-                f"{deck.name} can only go back to a single push when it is one dashboard "
-                "shown through a window.",
+                f"{deck.name} can only go back to a single push when it is a rotation, "
+                "or one dashboard shown through a window.",
                 400,
                 deck.id,
             )
         if end is not _UNSET and end not in (None, ""):
             raise _EditError("A single push has no end time.", 400, deck.id)
-        raw_start = start if start is not _UNSET else deck.advance_window_start
         if raw_start in (None, ""):
             raise _EditError("A single push needs a start time.", 400, deck.id)
         s = _clean_time(raw_start, "Start", deck.id)
         if s == "24:00":
             raise _EditError("Start must be before 24:00.", 400, deck.id)
+        # A daily push never reads an end; one left behind would only make the
+        # companion app treat the lineup as one it cannot edit.
         changes.update(
             advance_trigger="daily",
             advance_fires_at=s,
             advance_window_start=None,
             advance_window_end=None,
+            advance_end_at=None,
         )
     elif start is not _UNSET or end is not _UNSET:
         if kind == "manual":
@@ -1915,14 +1927,30 @@ def _edited_deck(
                 e = _clean_time(raw_end, "End", deck.id)
                 if (parse_hhmm(e) or 0) <= (parse_hhmm(s) or 0):
                     raise _EditError("End must be after start.", 400, deck.id)
-                # A window to midnight is stored as no end (see the interval branch).
-                changes.update(
-                    advance_trigger="interval",
-                    advance_window_start=s,
-                    advance_window_end=None if e == "24:00" else e,
-                    advance_fires_at=None,
-                    advance_end_at=None,
-                )
+                # A window to midnight is stored as no end (see the interval
+                # and cycle branches).
+                stop = None if e == "24:00" else e
+                if len(deck.pages) > 1:
+                    changes.update(
+                        advance_trigger="cycle",
+                        advance_anchor=s,
+                        advance_end_at=stop,
+                        advance_fires_at=None,
+                        advance_window_start=None,
+                        advance_window_end=None,
+                    )
+                    if deck.legacy_kind == "schedule":
+                        # The scheduler skips a "both"-mode cycle still tagged as a
+                        # migrated schedule; the lineup is a rotation now.
+                        changes["legacy_kind"] = None
+                else:
+                    changes.update(
+                        advance_trigger="interval",
+                        advance_window_start=s,
+                        advance_window_end=stop,
+                        advance_fires_at=None,
+                        advance_end_at=None,
+                    )
         elif kind == "cycle":
             s = _clean_time(start if start is not _UNSET else deck.advance_anchor, "Start", deck.id)
             raw_end = end if end is not _UNSET else deck.advance_end_at
@@ -2213,8 +2241,9 @@ def edit_window(deck_id: str) -> Response:
     """Inline edit of a lineup's time window. JSON ``{"start": "HH:MM",
     "end": "HH:MM" | null}`` (``end`` ``24:00`` or null = until midnight
     for a rotation). A daily push given an ``end`` becomes an interval lineup
-    over that window; ``{"push": true}`` turns a one-dashboard window back
-    into a push at its start. Refuses (409) a window that meets another
+    over that window (one dashboard) or a rotation (several); ``{"push":
+    true}`` turns a one-dashboard window or a rotation back into a push at
+    its start. Refuses (409) a window that meets another
     lineup of the same display on a shared day; a window in quiet hours
     saves with a warning."""
     body = _json_body()

@@ -2028,9 +2028,13 @@ main.page.lu-page {
   align-items: center;
   gap: 4px;
 }
+/* "+ End time" on a push; on a window, a small x tucked against the end field. */
 .lu .lu-win-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   height: 26px;
-  padding: 0 8px;
+  padding: 0 8px 0 6px;
   border: 1px dashed var(--t-border-strong);
   border-radius: var(--lu-r);
   background: transparent;
@@ -2039,9 +2043,27 @@ main.page.lu-page {
   white-space: nowrap;
   cursor: pointer;
 }
+.lu .lu-win-end .lu-ico {
+  font-size: 12px;
+}
 .lu .lu-win-end:hover {
   border-style: solid;
   color: var(--t-fg);
+}
+.lu .lu-win-end.is-rm {
+  justify-content: center;
+  width: 22px;
+  margin-left: -2px;
+  padding: 0;
+  border: 0;
+  color: var(--t-muted);
+}
+.lu .lu-win-end.is-rm:hover {
+  color: var(--t-fg);
+  background: color-mix(in oklab, var(--t-fg) 7%, transparent);
+}
+.lu .lu-win-end.is-rm + [data-win-ok] {
+  margin-left: 4px;
 }
 .lu .lu-win-end:focus-visible {
   outline: 2px solid var(--lu-acc);
@@ -3249,6 +3271,9 @@ main.page.lu-page {
   .lu .lu-win-end {
     min-height: 44px;
     padding: 0 12px;
+  }
+  .lu .lu-win-end.is-rm {
+    min-width: 44px;
   }
   .lu .lu-row-name .lu-name {
     display: inline-flex;

@@ -201,6 +201,9 @@ class LineupInput:
     last_fired: float | None = None  # epoch of an interval lineup's last fire
     #: the lineup names its display(s), so a step bound elsewhere cannot show
     explicit_display: bool = False
+    #: a daily push's stored ``advance_end_at`` (the scheduler ignores it): what
+    #: "Add end time" offers first
+    end_hint: str | None = None
 
 
 @dataclass(frozen=True)
@@ -582,6 +585,7 @@ class WindowView(_Dict):
     overlaps_pause: bool
     pause_title: str | None
     editable: bool
+    end_hint: str | None = None  # a push's remembered end, offered by "Add end time"
 
 
 @dataclass
@@ -2488,6 +2492,7 @@ def _lineup_view(
                 else None
             ),
             editable=True,
+            end_hint=lineup.end_hint if point else None,
         )
 
     # -- next run ------------------------------------------------------------

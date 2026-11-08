@@ -1610,10 +1610,12 @@
     return m ? Number(m[1]) * 60 + Number(m[2]) : NaN;
   };
   // What an end time is in the model: a daily push has none (it fires once and the frame is
-  // held), so "Add end time" turns it into the same dashboard shown through a start-end
-  // window, and removing it turns a one-dashboard window back into a push. Those change the
-  // lineup's kind, which an unsaved edit cannot preview, so they save at once.
-  const canToggleEnd = (l) => l.window.is_point || (l.kind === "interval" && l.step_count === 1);
+  // held), so "Add end time" turns it into a start-end window: one dashboard shown again
+  // through it, or several taken in turn (a rotation). Removing the end turns either back
+  // into a push at its start. Those change the lineup's kind, which an unsaved edit cannot
+  // preview, so they save at once.
+  const canToggleEnd = (l) =>
+    l.window.is_point || l.kind === "cycle" || (l.kind === "interval" && l.step_count === 1);
   async function saveEndChange(d, l, s, e, ui) {
     const edit = { id: l.id, start: R.hhmm(s) };
     if (e === null) edit.push = true;
@@ -1660,9 +1662,7 @@
     wrap.innerHTML =
       `<input type="time" step="900" value="${l.window.start}" aria-label="Start">` +
       (point ? "" : endHtml(endVal)) +
-      (toggle
-        ? `<button type="button" class="lu-win-end" data-win-end aria-pressed="${!point}">${point ? "Add end time" : "Remove end time"}</button>`
-        : "") +
+      (toggle ? `<button type="button" class="lu-win-end" data-win-end></button>` : "") +
       `<button type="button" class="lu-ibtn sm" data-win-ok title="Apply (Enter)" aria-label="Apply">${R.ico("check")}</button><span class="lu-win-err" role="alert"></span>`;
     btn.replaceWith(wrap);
     wrap.querySelector("input").focus();
@@ -1673,18 +1673,34 @@
     // push's editor is the one start field it always was.
     const endIn = () => wrap.querySelector(".lu-win-endwrap input");
     let ended = !point;
+    // Without an end it offers one ("+ End time"); with one, a small x beside the end field
+    // takes it off. Its name says what it does next (a toggle's name would stay put).
+    const drawEndBtn = () => {
+      if (!endBtn) return;
+      const what = ended ? "Remove end time" : "Add end time";
+      endBtn.classList.toggle("is-rm", ended);
+      endBtn.innerHTML = ended ? R.ico("x") : `${R.ico("plus")}<span>End time</span>`;
+      endBtn.setAttribute("aria-label", what);
+      endBtn.title = what;
+    };
+    drawEndBtn();
+    // The end first offered: the one the push remembers, else an hour on, and never
+    // past the next lineup on the display when that leaves room.
+    const firstEnd = (s) => {
+      if (!Number.isFinite(s)) return "17:00";
+      const hint = T(l.window.end_hint);
+      let e = Number.isFinite(hint) && hint > s ? hint : s + 60;
+      const { hi } = room(effective(d), l, s, s);
+      if (hi - s >= SNAP) e = Math.min(e, hi);
+      return e >= DAY_MIN ? "23:59" : R.hhmm(e);
+    };
     if (endBtn)
       endBtn.addEventListener("click", () => {
         ended = !ended;
         err.textContent = "";
-        endBtn.textContent = ended ? "Remove end time" : "Add end time";
-        endBtn.setAttribute("aria-pressed", String(ended));
+        drawEndBtn();
         if (ended) {
-          const s = T(startIn.value);
-          startIn.insertAdjacentHTML(
-            "afterend",
-            endHtml(R.hhmm(Number.isFinite(s) ? Math.min(s + 60, DAY_MIN - 1) : 17 * 60))
-          );
+          startIn.insertAdjacentHTML("afterend", endHtml(firstEnd(T(startIn.value))));
           endIn().focus();
         } else {
           wrap.querySelector(".lu-win-endwrap").remove();

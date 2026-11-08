@@ -268,7 +268,7 @@ class _Api:
                     elif edit.get("end"):
                         eh, em = (int(x) for x in edit["end"].split(":"))
                         end = eh * 60 + em
-                        lu["kind"] = "interval"
+                        lu["kind"] = "cycle" if len(lu["steps"]) > 1 else "interval"
                     else:
                         continue
                     w["is_point"] = end is None
@@ -4426,9 +4426,13 @@ def test_a_push_gets_an_end_time_and_the_row_shows_the_range(live: str) -> None:
         # A push's editor is its start field and one button.
         assert _win_inputs(page, "night").count() == 1
         add = page.locator("#lu-row-night [data-win-end]")
-        assert add.inner_text() == "Add end time" and add.get_attribute("aria-pressed") == "false"
+        assert add.get_attribute("aria-label") == "Add end time"
+        assert add.inner_text().strip() == "End time"
+        # Its name says what it does next, so it is not also a pressed/unpressed toggle.
+        assert add.get_attribute("aria-pressed") is None
         add.click()
-        assert add.inner_text() == "Remove end time" and add.get_attribute("aria-pressed") == "true"
+        assert add.get_attribute("aria-label") == "Remove end time"
+        assert add.inner_text().strip() == ""  # a small x beside the end field
         assert _win_inputs(page, "night").count() == 2
         end = _win_inputs(page, "night").nth(1)
         assert end.input_value() == "23:00" and page.evaluate(
@@ -4467,9 +4471,10 @@ def test_the_end_time_comes_off_again_and_the_row_says_at(live: str) -> None:
         page.locator('[data-win-edit="night"]').click()
         assert _win_inputs(page, "night").count() == 2
         rm = page.locator("#lu-row-night [data-win-end]")
-        assert rm.inner_text() == "Remove end time"
+        assert rm.get_attribute("aria-label") == "Remove end time"
         rm.click()
-        assert _win_inputs(page, "night").count() == 1 and rm.inner_text() == "Add end time"
+        assert _win_inputs(page, "night").count() == 1
+        assert rm.get_attribute("aria-label") == "Add end time"
         page.locator("#lu-row-night .lu-win-edit").screenshot(
             path=str(SHOTS / "item3-remove-end-editor.png")
         )
@@ -4517,14 +4522,24 @@ def test_end_time_editor_refuses_bad_ends_and_shows_the_servers_reason(live: str
         browser.close()
 
 
-def test_a_rotation_has_no_end_time_to_add_or_remove(live: str) -> None:
+def test_a_rotation_loses_its_end_and_becomes_a_push(live: str) -> None:
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:
-        browser, page, _ = _open(p, live)
+        browser, page, api = _open(p, live)
         page.locator('[data-win-edit="dinner"]').click()
         assert _win_inputs(page, "dinner").count() == 2
-        assert page.locator("#lu-row-dinner [data-win-end]").count() == 0
+        rm = page.locator("#lu-row-dinner [data-win-end]")
+        assert rm.get_attribute("aria-label") == "Remove end time"
+        rm.click()
+        assert _win_inputs(page, "dinner").count() == 1
+        _win_inputs(page, "dinner").first.press("Enter")
+        page.wait_for_function(
+            "() => document.querySelector('#lu-row-dinner .lu-win')?.textContent === 'at 17:00'"
+        )
+        sent = [b for u, b in api.posts if u.endswith("/decks/edits")]
+        assert sent[-1]["edits"][0]["push"] is True
+        assert page._lu_errors == []
         browser.close()
 
 
@@ -4828,5 +4843,104 @@ def test_real_routes_reorder_moves_the_next_marker_and_the_labels(real: tuple[st
         # Reload: the same order, from the store.
         page.reload(wait_until="load")
         assert _strip(page, "midday") == ["Sky", "News", "Art"]
+        assert errors == []
+        browser.close()
+
+
+def test_real_routes_an_end_on_a_push_of_four_dashboards_makes_a_rotation(
+    real: tuple[str, Flask],
+) -> None:
+    """Alex's "Frame Modern Art (day)": a daily push of four dashboards at 06:00 that
+    remembers an 18:30 end, beside an 18:00 push on the same display. The end offered
+    first is the remembered one, kept clear of the 18:00 push; the lineup then runs as a
+    rotation 06:00-18:00 through all four, and Remove end time makes it a push again."""
+    from playwright.sync_api import sync_playwright
+
+    from app.state.deck_model import Deck, DeckPage
+    from app.state.page_store import Page
+
+    base, app = real
+    pages = ("monet", "kahlo", "hopper", "klee")
+    for pid in pages:
+        app.config["PAGE_STORE"].save(Page(id=pid, name=pid.title(), device_ids=["panel"]))
+    decks = app.config["DECK_STORE"]
+    # The fixture's weekday rotations would meet a 06:00-18:00 window; move them aside.
+    for gone in ("morning", "evening"):
+        decks.delete(gone)
+    decks.upsert(
+        Deck(
+            id="fma", name="Frame Modern Art (day)", device_ids=["panel"],
+            pages=[DeckPage(page_id=p) for p in pages],
+            advance="timer", advance_trigger="daily", advance_fires_at="06:00",
+            advance_end_at="18:30", advance_anchor="00:00",
+            advance_interval_minutes=30, refresh_interval_minutes=30,
+            advance_days_of_week=[0, 1, 2, 5, 6], advance_mode="scheduled",
+        )
+    )  # fmt: skip
+    decks.upsert(
+        Deck(
+            id="old", name="Frame Old Art (night)", device_ids=["panel"],
+            pages=[DeckPage(page_id="klee")],
+            advance="timer", advance_trigger="daily", advance_fires_at="18:00",
+        )
+    )  # fmt: skip
+    with sync_playwright() as p:
+        browser = _launch(p)
+        page = browser.new_page(viewport={"width": 1440, "height": 900})
+        errors: list[str] = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.route(re.compile(r".*/events/stream.*"), lambda r: r.fulfill(status=204, body=""))
+        page.goto(base + "/decks", wait_until="load")
+        page.wait_for_function(
+            "() => document.querySelector('[data-lu]').classList.contains('is-enhanced')"
+        )
+        assert page.locator("#lu-row-fma .lu-win").inner_text() == "at 06:00"
+        page.locator("#lu-row-fma .lu-win").click()
+        add = page.locator("#lu-row-fma [data-win-end]")
+        assert add.get_attribute("aria-label") == "Add end time"
+        add.click()
+        end = _win_inputs(page, "fma").nth(1)
+        # 18:30 is remembered, but the night push at 18:00 comes first.
+        assert end.input_value() == "18:00"
+        page.locator("#lu-row-fma .lu-row-head").screenshot(
+            path=str(SHOTS / "end-four-dashboards-editor.png")
+        )
+        # The remembered 18:30 itself runs over the night push: refused before saving.
+        end.fill("18:30")
+        end.press("Enter")
+        assert (
+            page.locator("#lu-row-fma .lu-win-err")
+            .inner_text()
+            .startswith("Overlaps Frame Old Art")
+        )
+        end.fill("18:00")
+        with page.expect_response(lambda r: r.url.endswith("/decks/edits")) as resp:
+            end.press("Enter")
+        assert resp.value.status == 200, resp.value.text()
+        page.wait_for_function(
+            "() => document.querySelector('#lu-row-fma .lu-win')?.textContent === '06:00–18:00'"
+        )
+        row = page.locator("#lu-row-fma")
+        assert row.get_attribute("data-kind") == "cycle"
+        assert row.locator(".lu-step").count() == 4
+        page.locator("#lu-row-fma").screenshot(path=str(SHOTS / "end-four-dashboards-row.png"))
+        deck = decks.get("fma")
+        assert deck.advance_trigger == "cycle"
+        assert (deck.advance_anchor, deck.advance_end_at) == ("06:00", "18:00")
+        assert deck.page_ids == list(pages) and deck.advance_days_of_week == [0, 1, 2, 5, 6]
+        # And back: a push at 06:00 again, its four dashboards kept.
+        page.locator("#lu-row-fma .lu-win").click()
+        rm = page.locator("#lu-row-fma [data-win-end]")
+        assert rm.get_attribute("aria-label") == "Remove end time"
+        rm.click()
+        with page.expect_response(lambda r: r.url.endswith("/decks/edits")) as resp:
+            _win_inputs(page, "fma").first.press("Enter")
+        assert resp.value.status == 200, resp.value.text()
+        page.wait_for_function(
+            "() => document.querySelector('#lu-row-fma .lu-win')?.textContent === 'at 06:00'"
+        )
+        deck = decks.get("fma")
+        assert deck.advance_trigger == "daily" and deck.advance_fires_at == "06:00"
+        assert deck.page_ids == list(pages)
         assert errors == []
         browser.close()

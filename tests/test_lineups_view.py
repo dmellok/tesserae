@@ -3821,11 +3821,24 @@ def test_an_end_that_meets_another_lineup_is_refused(client: Any, app: Flask) ->
     assert _deck(app, "night") == before
 
 
-def test_push_only_applies_to_one_dashboard_windows(client: Any, app: Flask) -> None:
-    # A rotation has several steps and its own start-end: it is not a push in waiting.
-    for deck_id in ("morning", "weekend"):
-        resp = client.post(f"/decks/{deck_id}/window", json={"push": True})
-        assert resp.status_code == 400, deck_id
+def test_push_only_applies_to_one_dashboard_windows_and_rotations(client: Any, app: Flask) -> None:
+    from app.state.deck_model import Deck, DeckPage
+
+    # An interval lineup of several dashboards is not a push in waiting.
+    app.config["DECK_STORE"].upsert(
+        Deck(
+            id="multi", name="Multi", device_ids=["panel"],
+            pages=[DeckPage(page_id="news"), DeckPage(page_id="art")],
+            advance="timer", advance_trigger="interval",
+            advance_window_start="10:00", advance_window_end="11:00",
+        )
+    )  # fmt: skip
+    assert client.post("/decks/multi/window", json={"push": True}).status_code == 400
+    # Nor is a cycle that also moves on taps: only its cycle trigger runs it.
+    both = _deck(app, "weekend").model_copy(update={"advance": "both"})
+    app.config["DECK_STORE"].upsert(both)
+    assert client.post("/decks/weekend/window", json={"push": True}).status_code == 400
+    assert _deck(app, "weekend").advance_trigger == "cycle"
     # A daily push has nothing to turn back.
     assert client.post("/decks/night/window", json={"push": True}).status_code == 400
     # push is a flag, not text, and cannot carry an end.
@@ -3941,3 +3954,149 @@ def test_edit_order_keeps_a_navigable_deck_valid(client: Any, app: Flask) -> Non
     deck = _deck(app, "nav")
     assert deck.page_ids == ["art", "news"] and deck.entry_page_id == "news"
     assert deck.pages[1].links[0].target_page_id == "art"
+
+
+# -- an end time on a push of several dashboards (a rotation over the window) -------
+
+
+def _frame_art(app: Flask, client: Any) -> None:
+    """Alex's "Frame Modern Art (day)": a daily push of four dashboards at 06:00 on
+    Mon, Tue, Wed, Sat and Sun, with an 18:30 end the scheduler never reads, on a
+    display of its own beside a night push at 18:00 (every day)."""
+    from app.state.deck_model import Deck, DeckPage
+    from app.state.page_store import Page
+
+    pages = ("monet", "kahlo", "hopper", "klee")
+    for pid in pages:
+        app.config["PAGE_STORE"].save(Page(id=pid, name=pid.title(), device_ids=["tv"]))
+    code = app.config["PAIRING_STORE"].issue(note="tv").code
+    resp = client.post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+        data=json.dumps({"device_id": "tv", "kind": "esp32_client"}),
+    )
+    assert resp.status_code == 201
+    store = app.config["DECK_STORE"]
+    store.upsert(
+        Deck(
+            id="fma_day", name="Frame Modern Art (day)", device_ids=["tv"],
+            pages=[DeckPage(page_id=p) for p in pages],
+            advance="timer", advance_trigger="daily", advance_fires_at="06:00",
+            advance_end_at="18:30", advance_anchor="00:00",
+            advance_interval_minutes=30, refresh_interval_minutes=30,
+            advance_days_of_week=[0, 1, 2, 5, 6], advance_mode="scheduled",
+        )
+    )  # fmt: skip
+    store.upsert(
+        Deck(
+            id="fma_night", name="Frame Old Art (night)", device_ids=["tv"],
+            pages=[DeckPage(page_id="klee")],
+            advance="timer", advance_trigger="daily", advance_fires_at="18:00",
+        )
+    )  # fmt: skip
+
+
+def _tv_lineup(client: Any, deck_id: str) -> dict[str, Any]:
+    view = client.get("/decks/view.json").get_json()
+    tv = next(d for d in view["displays"] if d["id"] == "tv")
+    return cast(dict[str, Any], next(lu for lu in tv["lineups"] if lu["id"] == deck_id))
+
+
+def test_a_push_of_several_dashboards_given_an_end_becomes_a_rotation(
+    client: Any, app: Flask
+) -> None:
+    _frame_art(app, client)
+    before = _deck(app, "fma_day")
+    lu = _tv_lineup(client, "fma_day")
+    # The push remembers an end it never used; the editor offers it first.
+    assert lu["window"]["label"] == "at 06:00" and lu["window"]["end_hint"] == "18:30"
+    resp = client.post("/decks/fma_day/window", json={"start": "06:00", "end": "18:00"})
+    assert resp.status_code == 200, resp.get_json()
+    deck = _deck(app, "fma_day")
+    assert deck.advance_trigger == "cycle"
+    assert (deck.advance_anchor, deck.advance_end_at) == ("06:00", "18:00")
+    assert deck.advance_fires_at is None
+    assert deck.advance_window_start is None and deck.advance_window_end is None
+    # Everything else is the lineup it was.
+    assert deck.page_ids == before.page_ids
+    assert deck.advance_days_of_week == [0, 1, 2, 5, 6]
+    assert deck.advance_interval_minutes == 30 and deck.refresh_interval_minutes == 30
+    assert deck.advance == "timer" and deck.advance_mode == "scheduled"
+    assert deck.device_ids == ["tv"] and deck.name == before.name
+    assert resp.get_json()["lineups"][0]["window"] == "06:00–18:00"
+    lu = _tv_lineup(client, "fma_day")
+    assert lu["kind"] == "cycle" and lu["window"]["label"] == "06:00–18:00"
+    assert lu["window"]["is_point"] is False and lu["window"]["end_hint"] is None
+    assert [s["dashboard_id"] for s in lu["steps"]] == list(before.page_ids)
+
+
+def test_the_rotation_steps_through_every_dashboard_inside_the_window(
+    client: Any, app: Flask
+) -> None:
+    """What the scheduler does with it: from the start, a new dashboard every
+    ``advance_interval_minutes``, round again, nothing outside the window or
+    on the days it is off."""
+    from app.scheduler import _compute_step_state, _deck_to_rotation
+
+    _frame_art(app, client)
+    client.post("/decks/fma_day/window", json={"start": "06:00", "end": "18:00"})
+    deck = _deck(app, "fma_day")
+    assert deck.id in {r.id for r in app.config["ROTATION_STORE"].all()}
+    rot = _deck_to_rotation(deck)
+    assert rot is not None
+
+    def step(day: int, hh: int, mm: int) -> int | None:
+        # 2026-10-26 is a Monday.
+        state = _compute_step_state(
+            rot, datetime(2026, 10, 26 + day, hh, mm, tzinfo=UTC), UTC, forced=None
+        )
+        return None if state is None else state.step_index
+
+    assert step(0, 5, 59) is None
+    assert [step(0, 6, 0), step(0, 6, 30), step(0, 7, 0), step(0, 7, 30)] == [0, 1, 2, 3]
+    assert step(0, 8, 0) == 0 and step(0, 17, 59) == 3
+    assert step(0, 18, 0) is None
+    assert step(3, 12, 0) is None  # Thursday: off
+    assert step(5, 6, 45) == 1  # Saturday
+
+
+def test_an_end_past_the_next_lineup_is_refused_and_changes_nothing(
+    client: Any, app: Flask
+) -> None:
+    _frame_art(app, client)
+    before = _deck(app, "fma_day")
+    # 18:30 runs over the 18:00 night push on the days they share.
+    resp = client.post("/decks/fma_day/window", json={"start": "06:00", "end": "18:30"})
+    assert resp.status_code == 409 and "Frame Old Art" in resp.get_json()["error"]
+    assert _deck(app, "fma_day") == before
+
+
+def test_the_rotation_goes_back_to_a_push_at_its_start(client: Any, app: Flask) -> None:
+    _frame_art(app, client)
+    client.post("/decks/fma_day/window", json={"start": "06:00", "end": "18:00"})
+    resp = client.post("/decks/fma_day/window", json={"push": True})
+    assert resp.status_code == 200, resp.get_json()
+    deck = _deck(app, "fma_day")
+    assert deck.advance_trigger == "daily" and deck.advance_fires_at == "06:00"
+    assert deck.advance_end_at is None
+    assert deck.page_ids == ["monet", "kahlo", "hopper", "klee"]
+    assert deck.advance_days_of_week == [0, 1, 2, 5, 6]
+    assert resp.get_json()["lineups"][0]["window"] == "at 06:00"
+    # Any rotation can: Morning (06:00-09:00 on weekdays) becomes a push at 06:00.
+    resp = client.post("/decks/morning/window", json={"push": True})
+    assert resp.status_code == 200, resp.get_json()
+    morning = _deck(app, "morning")
+    assert morning.advance_trigger == "daily" and morning.advance_fires_at == "06:00"
+    assert morning.page_ids == ["news", "art"]
+
+
+def test_a_migrated_schedule_turned_rotation_is_one_the_scheduler_runs(
+    client: Any, app: Flask
+) -> None:
+    _frame_art(app, client)
+    tagged = _deck(app, "fma_day").model_copy(update={"legacy_kind": "schedule"})
+    app.config["DECK_STORE"].upsert(tagged)
+    resp = client.post("/decks/fma_day/window", json={"start": "06:00", "end": "12:00"})
+    assert resp.status_code == 200, resp.get_json()
+    assert _deck(app, "fma_day").legacy_kind is None
+
