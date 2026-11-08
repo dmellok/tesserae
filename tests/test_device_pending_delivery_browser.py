@@ -120,7 +120,7 @@ def test_open_page_follows_a_push_and_a_fetch(live: tuple[str, Flask]) -> None:
                 page.click(".dx-devrow")
             img = page.locator(".dx-thumb img")
             img.wait_for(state="visible")
-            assert "/preview/door.png?v=compA" in img.get_attribute("src")
+            assert "/renders/compA.png?w=800" in img.get_attribute("src")
             assert page.locator("[data-device-queued]").count() == 0
 
             # A push lands while the page is open: the glass stays, the new
@@ -137,7 +137,7 @@ def test_open_page_follows_a_push_and_a_fetch(live: tuple[str, Flask]) -> None:
             _fetch(app)
             page.evaluate("document.dispatchEvent(new Event('visibilitychange'))")
             page.wait_for_function("!document.querySelector('[data-device-queued]')")
-            assert "/preview/door.png?v=compB" in page.locator(".dx-thumb img").get_attribute("src")
+            assert "/renders/compB.png?w=800" in page.locator(".dx-thumb img").get_attribute("src")
             assert page.locator("[data-device-queued-thumb]").count() == 0
         finally:
             browser.close()
