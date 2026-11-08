@@ -1484,6 +1484,12 @@ def _build_device_section(store: Any, device: Device) -> dict[str, Any] | None:
     section["lineup_names"] = _lineup_names_for(device.id, section["timetable_entries"])
     section["now_line"] = _now_line_for(device.id)
     section["lineup_rows"] = _lineup_rows_for(device.id) if is_instance else []
+    # A schedule is a timer deck, so one the Lineups list already has (a daily
+    # push, say) would show twice; the schedules list keeps the rest.
+    listed = {row["id"] for row in section["lineup_rows"]}
+    section["schedule_rows"] = [
+        e for e in section.get("timetable_entries") or [] if e.schedule_id not in listed
+    ]
     return section
 
 
