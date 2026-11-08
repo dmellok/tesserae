@@ -6401,3 +6401,166 @@ a.dx-qtile--link:focus-visible {
   outline: 2px solid var(--t-accent);
   outline-offset: 2px;
 }
+
+/* -- Settings → Logs (templates/logs.html) ------------------------------ */
+.lg-record {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--t-space-2);
+}
+.lg-record-label {
+  font-weight: 600;
+}
+.lg-record-note {
+  color: var(--t-muted);
+  font-size: var(--t-size-sm);
+  flex: 1 1 260px;
+}
+.lg-record-note code {
+  white-space: nowrap;
+}
+.lg-gap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--t-space-2);
+  margin: var(--t-space-3) 0 0;
+  padding: var(--t-space-2) var(--t-space-3);
+  border-radius: var(--t-radius-sm);
+  background: var(--t-warn-bg);
+  color: var(--t-fg);
+}
+.lg-gap .ph-warning {
+  color: var(--t-warn);
+}
+.lg-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--t-space-2);
+  margin-bottom: var(--t-space-3);
+}
+.lg-search {
+  flex: 1 1 220px;
+}
+.lg-follow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--t-size-sm);
+}
+.lg-count {
+  color: var(--t-muted);
+  font-size: var(--t-size-sm);
+  margin-right: auto;
+}
+.lg-view {
+  max-height: 65vh;
+  overflow: auto;
+  border: 1px solid var(--t-code-border);
+  border-radius: 10px;
+  background: var(--t-code-bg);
+  color: var(--t-code-fg);
+}
+.lg-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+  font-family: var(--t-font-mono);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.lg-line {
+  display: grid;
+  /* Fixed tracks so every row lines up: time, level, logger, message. */
+  grid-template-columns: 11.5ch 7.5ch 20ch 1fr;
+  column-gap: 10px;
+  padding: 1px 12px;
+}
+.lg-line[hidden] {
+  display: none;
+}
+.lg-line:hover {
+  background: color-mix(in oklab, var(--t-code-fg) 6%, transparent);
+}
+.lg-time,
+.lg-logger {
+  color: color-mix(in oklab, var(--t-code-fg) 60%, transparent);
+  white-space: nowrap;
+}
+.lg-logger {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lg-level {
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+.lg-msg {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.lg-line--debug .lg-level {
+  color: color-mix(in oklab, var(--t-code-fg) 50%, transparent);
+}
+.lg-line--debug .lg-msg {
+  color: color-mix(in oklab, var(--t-code-fg) 75%, transparent);
+}
+.lg-line--info .lg-level {
+  color: color-mix(in oklab, var(--t-code-fg) 70%, transparent);
+}
+.lg-line--warning .lg-level {
+  color: var(--t-pill-warn-fg);
+}
+.lg-line--warning {
+  background: color-mix(in oklab, var(--t-pill-warn-bg) 45%, transparent);
+}
+.lg-line--error .lg-level,
+.lg-line--critical .lg-level {
+  color: var(--t-pill-danger-fg);
+}
+.lg-line--error,
+.lg-line--critical {
+  background: color-mix(in oklab, var(--t-pill-danger-bg) 55%, transparent);
+}
+.lg-exc {
+  grid-column: 2 / -1;
+}
+.lg-exc summary {
+  cursor: pointer;
+  color: color-mix(in oklab, var(--t-code-fg) 70%, transparent);
+}
+.lg-exc pre {
+  margin: 4px 0;
+  white-space: pre-wrap;
+}
+.lg-empty {
+  margin: var(--t-space-4) 0;
+}
+.lg-jump {
+  position: sticky;
+  bottom: var(--t-space-3);
+  margin: var(--t-space-2) auto 0;
+  display: flex;
+}
+.lg-jump[hidden] {
+  display: none;
+}
+@media (max-width: 640px) {
+  .lg-line {
+    grid-template-columns: 7.5ch 1fr;
+  }
+  .lg-time {
+    grid-column: 1 / -1;
+  }
+  .lg-logger {
+    white-space: normal;
+  }
+  .lg-msg {
+    grid-column: 1 / -1;
+  }
+  .lg-exc {
+    grid-column: 1 / -1;
+  }
+}

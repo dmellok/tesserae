@@ -146,6 +146,11 @@ def _serve(argv: list[str] | None = None) -> None:
         level=level if level is not None else logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s, %(message)s",
     )
+    # Settings → Logs keeps the newest lines in memory; attach it before
+    # create_app so the startup lines are there too.
+    from app import log_buffer
+
+    log_buffer.install()
     # Honour HA's log_level option before create_app so its own startup
     # log lines respect it. apply_log_level is a no-op when there's no
     # options.json (i.e. not running as an HA Add-on).

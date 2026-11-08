@@ -61,6 +61,8 @@ tesserae [--dev] [--host HOST] [--port PORT] [--log-level LEVEL] [--reset-passwo
 | `TESSERAE_API_BASE` | `https://api.tesserae.ink` | Base URL for online features (template marketplace, community catalog). Only useful for development or a self-hosted API. |
 | `TESSERAE_FIRMWARE_API` | `https://api.tesserae.ink` | Base URL the firmware-update check queries. Development override. |
 
+To read the log without a terminal, open **Settings → Logs**. It shows the newest 2000 lines as they're written, filtered by a watch level you pick, with text search and a download. Its **Record level** changes what the server writes until the next restart. For a lasting change use `TESSERAE_LOG_LEVEL` or `--log-level`. Device tokens and pairing codes are masked on that page; the console output is unchanged.
+
 ### Set by the platform (not for operators)
 
 | Variable | Set by | Purpose |

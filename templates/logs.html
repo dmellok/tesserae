@@ -1,0 +1,105 @@
+{% extends "_base.html" %}
+{% from "_components.html" import section_card, settings_tabs %}
+{% block title %}Logs, Tesserae{% endblock %}
+
+{% set LEVEL_LABELS = {'debug': 'Debug', 'info': 'Info', 'warning': 'Warning', 'error': 'Error', 'critical': 'Critical'} %}
+{% set WATCH_LEVELS = ['debug', 'info', 'warning', 'error'] %}
+
+{% block main %}
+<header class="page-head">
+  <h1><i class="ph ph-scroll" aria-hidden="true"></i> Logs</h1>
+  <p class="lede">The server's own log output as it's written, the same lines the process prints to its console. The newest {{ capacity }} lines are kept in memory, and a restart clears them.</p>
+</header>
+
+{{ settings_tabs('logs') }}
+
+<nav class="dx-filter-strip" aria-label="Watch level">
+  <span class="seg" role="tablist">
+    {% for lvl in WATCH_LEVELS %}
+    {# Each level shows itself and everything more severe; the count says
+       how many kept lines that is. #}
+    <a href="?level={{ lvl }}" role="tab" class="seg-item lg-seg--{{ lvl }}{% if watch == lvl %} is-on{% endif %}"
+       aria-selected="{{ 'true' if watch == lvl else 'false' }}">
+      <span>{{ LEVEL_LABELS[lvl] }}{% if lvl != 'error' %} and up{% endif %}</span><span class="seg-count">{{ at_or_above[lvl] }}</span>
+    </a>
+    {% endfor %}
+  </span>
+</nav>
+
+{% call section_card(icon='gauge', title='Record level',
+                     description='What the server writes at all. The watch level above only filters this page; a line below the record level is never written, so it cannot be watched.',
+                     collapsible=False) %}
+  <form class="lg-record" data-record-form>
+    <label class="lg-record-label" for="lg-record-level">Record</label>
+    <select id="lg-record-level" class="dx-devtb-select" name="level" data-record-select>
+      {% for lvl in WATCH_LEVELS %}
+      <option value="{{ lvl }}"{% if record_level == lvl %} selected{% endif %}>{{ LEVEL_LABELS[lvl] }} and up</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-secondary" data-record-apply>Apply</button>
+    <span class="lg-record-note" data-record-note>
+      {% if record_level != startup_level %}Changed from {{ LEVEL_LABELS.get(startup_level, startup_level) }} until the server restarts.
+      {% else %}Set at startup. A change here lasts until the server restarts; for a lasting one use <code>TESSERAE_LOG_LEVEL</code> or <code>--log-level</code> (the add-on's <em>log_level</em> option under Home Assistant).{% endif %}
+    </span>
+  </form>
+  {% if watch_no < record_levelno %}
+  <p class="lg-gap" data-record-gap>
+    <i class="ph ph-warning" aria-hidden="true"></i>
+    You're watching {{ LEVEL_LABELS[watch] | lower }} lines, but the server records from {{ LEVEL_LABELS.get(record_level, record_level) | lower }} up, so none below that will appear.
+    <button type="button" class="btn btn-quiet" data-record-match="{{ watch }}">Record {{ LEVEL_LABELS[watch] | lower }} until restart</button>
+  </p>
+  {% endif %}
+{% endcall %}
+
+{% call section_card(icon='scroll', title='Server log',
+                     description='Oldest at the top, newest at the bottom. New lines stream in live; scroll up and following pauses until you scroll back down.',
+                     meta={'label': '', 'value': lines|length},
+                     collapsible=False) %}
+  <div class="lg-toolbar">
+    <span class="dx-listening" data-live-indicator data-state="connecting">
+      <span class="dx-listening-dot"></span>
+      <span class="dx-listening-label">Connecting…</span>
+    </span>
+    <label class="dx-devtb-search lg-search">
+      <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
+      <input type="search" placeholder="Filter by text or logger" aria-label="Filter log lines"
+             autocomplete="off" spellcheck="false" data-log-search>
+    </label>
+    <label class="lg-follow">
+      <input type="checkbox" data-log-follow checked> Follow
+    </label>
+    <span class="lg-count" data-log-count aria-live="polite">{{ lines|length }} line{{ '' if lines|length == 1 else 's' }}</span>
+    <a class="btn btn-secondary" href="{{ url_for('logs.download', level=watch) }}" data-log-download>
+      <i class="ph ph-download-simple" aria-hidden="true"></i> Download
+    </a>
+    <button type="button" class="btn btn-secondary" data-log-clear>
+      <i class="ph ph-eraser" aria-hidden="true"></i> Clear
+    </button>
+  </div>
+
+  <div class="lg-view" data-log-view tabindex="0" aria-label="Server log lines">
+    <ol class="lg-list" data-log-list data-last-seq="{{ last_seq }}" data-watch="{{ watch }}">
+      {% for ln in lines %}
+      <li class="lg-line lg-line--{{ ln.level }}" data-seq="{{ ln.seq }}"
+          data-text="{{ (ln.logger ~ ' ' ~ ln.message)|lower }}">
+        <time class="lg-time" datetime="{{ ln.ts }}" data-ts="{{ ln.ts }}">{{ ln.ts|fmt_time }}</time>
+        <span class="lg-level">{{ ln.level|upper }}</span>
+        <span class="lg-logger">{{ ln.logger }}</span>
+        <span class="lg-msg">{{ ln.message }}</span>
+        {% if ln.exc %}<details class="lg-exc"><summary>Traceback</summary><pre>{{ ln.exc }}</pre></details>{% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+    <div class="dx-empty lg-empty" data-log-empty{% if lines %} hidden{% endif %}>
+      <div class="dx-empty-icon"><i class="ph ph-scroll" aria-hidden="true"></i></div>
+      <p class="dx-empty-title">No {{ LEVEL_LABELS[watch] | lower }} or more severe lines yet</p>
+      <p class="dx-empty-help">New lines appear here as the server writes them.</p>
+    </div>
+  </div>
+  <button type="button" class="btn btn-secondary lg-jump" data-log-jump hidden>
+    <i class="ph ph-arrow-down" aria-hidden="true"></i> <span data-log-jump-label>New lines</span>
+  </button>
+{% endcall %}
+
+<script src="{{ url_for('static', filename='pages/logs.js') }}"></script>
+{% endblock %}

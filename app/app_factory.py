@@ -60,6 +60,7 @@ from app import (
     experiments,
     genai,
     history_routes,
+    logs_routes,
     onboarding,
     online,
     page_routes,
@@ -1275,6 +1276,7 @@ def create_app(
     device_battery_routes.register(app)
     stats_routes.register(app)
     events_routes.register(app)
+    logs_routes.register(app)
     touch_monitor_routes.register(app)
     page_routes.register(app)
     onboarding.register(app)
