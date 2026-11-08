@@ -130,14 +130,21 @@
 
   // Per-cell edge drag. Each cell renders its own 4 edge handles (top
   // / right / bottom / left, minus any on the panel boundary). At
-  // pointerdown, find the cells touching the dragged edge whose
-  // perpendicular range overlaps the dragged cell's perpendicular
-  // range, those are the "neighbors" that move with the edge so the
-  // layout stays tight where it lines up. Cells in OTHER rows / columns
-  // that don't touch the dragged cell are unaffected. If there's no
-  // neighbor on the other side, the cell simply grows / shrinks into
-  // the void (gap appears), which is what the user wants when cells
-  // aren't aligned.
+  // pointerdown, find every cell whose edge lies on the dragged line
+  // alongside the dragged cell: those move with the edge so the layout
+  // stays tight. Cells in other rows / columns that don't touch the
+  // dragged cell are unaffected. If there's no neighbour on the other
+  // side, the cell grows or shrinks into the void, up to the next cell.
+  //
+  // A neighbour only has to share part of the edge. One tall cell on
+  // the left and two stacked cells on the right share a single line, so
+  // dragging either right-hand cell's left edge moves the tall cell's
+  // right edge too, and the stacked cell next to it, since the tall cell
+  // can only change width as a whole. This used to need an exact match
+  // of the perpendicular range, so the stacked cell grew over the tall
+  // one instead and the tall cell kept drawing at its old width under
+  // it (#434). The search repeats until no more cells join, so the whole
+  // connected run of the line moves at once.
   //
   // Returns an ``edge`` object compatible with the rest of the drag
   // pipeline (applyEdgeAt / edgeLimits / collectChanges).
@@ -151,59 +158,66 @@
           : side === "bottom"
             ? cell.y + cell.h
             : cell.x;
-    // The dragged cell's perpendicular range, neighbours must match
-    // it EXACTLY to be moved by the drag. Loose "any overlap" caught
-    // too many cells in irregular layouts: a cell that extends a bit
-    // past the dragged cell on one side would get its full height
-    // changed by a drag of its partial neighbour, which surprised
-    // users. Exact-match keeps drag effects local to actual aligned
-    // neighbours and means isolated cells (or cells whose neighbour
-    // is shaped differently) just resize themselves into the void.
-    const pStart = isVertical ? cell.y : cell.x;
-    const pEnd = isVertical ? cell.y + cell.h : cell.x + cell.w;
-    const matchesPerp = (other) => {
-      const oStart = isVertical ? other.y : other.x;
-      const oEnd = isVertical ? other.y + other.h : other.x + other.w;
-      return oStart === pStart && oEnd === pEnd;
-    };
-    let touchSide;
-    if (side === "right") {
-      touchSide = cells.filter((c) => c.id !== cell.id && c.x === coord && matchesPerp(c));
-    } else if (side === "left") {
-      touchSide = cells.filter((c) => c.id !== cell.id && c.x + c.w === coord && matchesPerp(c));
-    } else if (side === "bottom") {
-      touchSide = cells.filter((c) => c.id !== cell.id && c.y === coord && matchesPerp(c));
-    } else {
-      // top
-      touchSide = cells.filter((c) => c.id !== cell.id && c.y + c.h === coord && matchesPerp(c));
+    const perp = (c) => (isVertical ? [c.y, c.y + c.h] : [c.x, c.x + c.w]);
+    // "before" cells end on the line (left of / above it), "after" cells
+    // start on it.
+    const endsOn = (c) => (isVertical ? c.x + c.w : c.y + c.h) === coord;
+    const startsOn = (c) => (isVertical ? c.x : c.y) === coord;
+    let [lo, hi] = perp(cell);
+    const picked = new Set([cell.id]);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      cells.forEach((c) => {
+        if (picked.has(c.id) || !(endsOn(c) || startsOn(c))) return;
+        const [s, e] = perp(c);
+        if (s < hi && e > lo) {
+          picked.add(c.id);
+          lo = Math.min(lo, s);
+          hi = Math.max(hi, e);
+          grew = true;
+        }
+      });
     }
+    const onLine = cells.filter((c) => picked.has(c.id));
+    const before = onLine.filter(endsOn);
+    const after = onLine.filter(startsOn);
     // Assemble into the edge.axis === "v" {left, right} / "h" {above,
-    // below} shape applyEdgeAt expects. ``cell`` is on the "current"
-    // side, the neighbors are on the "other" side.
-    if (isVertical) {
-      return side === "right"
-        ? { axis: "v", coord, left: [cell], right: touchSide, side }
-        : { axis: "v", coord, left: touchSide, right: [cell], side };
-    }
-    return side === "bottom"
-      ? { axis: "h", coord, above: [cell], below: touchSide, side }
-      : { axis: "h", coord, above: touchSide, below: [cell], side };
+    // below} shape applyEdgeAt expects.
+    if (isVertical) return { axis: "v", coord, left: before, right: after, side };
+    return { axis: "h", coord, above: before, below: after, side };
   }
 
   // Per-edge drag limits. Each side is clamped against the cells that
-  // contribute to it; if a side is empty (the cell has no neighbor on
-  // that side and is just growing / shrinking into the void), fall
-  // back to the panel boundary so the cell can fill the full available
-  // space without the drag refusing to engage.
+  // contribute to it, so none shrinks below the snap step; an empty
+  // side falls back to the panel boundary. A cell growing into the void
+  // also stops at the next cell in its way, so a drag never lays one
+  // cell over another. A cell it already overlaps doesn't stop it.
   function edgeLimits(edge) {
-    if (edge.axis === "h") {
-      const aboveStops = edge.above.length ? edge.above.map((c) => c.y) : [0];
-      const belowStops = edge.below.length ? edge.below.map((c) => c.y + c.h) : [panelH];
-      return [Math.max(...aboveStops) + FREEFORM_SNAP, Math.min(...belowStops) - FREEFORM_SNAP];
-    }
-    const leftStops = edge.left.length ? edge.left.map((c) => c.x) : [0];
-    const rightStops = edge.right.length ? edge.right.map((c) => c.x + c.w) : [panelW];
-    return [Math.max(...leftStops) + FREEFORM_SNAP, Math.min(...rightStops) - FREEFORM_SNAP];
+    const isH = edge.axis === "h";
+    const lower = isH ? edge.above : edge.left;
+    const upper = isH ? edge.below : edge.right;
+    const start = (c) => (isH ? c.y : c.x);
+    const end = (c) => (isH ? c.y + c.h : c.x + c.w);
+    const overlapsPerp = (a, b) =>
+      isH ? a.x < b.x + b.w && b.x < a.x + a.w : a.y < b.y + b.h && b.y < a.y + a.h;
+    const moving = new Set([...lower, ...upper].map((c) => c.id));
+    const others = cells.filter((c) => !moving.has(c.id));
+    let lo = (lower.length ? Math.max(...lower.map(start)) : 0) + FREEFORM_SNAP;
+    let hi = (upper.length ? Math.min(...upper.map(end)) : isH ? panelH : panelW) - FREEFORM_SNAP;
+    // Cells after the line grow back towards lower coords when it moves
+    // that way; cells before it grow forwards.
+    upper.forEach((u) => {
+      others.forEach((o) => {
+        if (overlapsPerp(o, u) && end(o) <= start(u)) lo = Math.max(lo, end(o));
+      });
+    });
+    lower.forEach((l) => {
+      others.forEach((o) => {
+        if (overlapsPerp(o, l) && start(o) >= end(l)) hi = Math.min(hi, start(o));
+      });
+    });
+    return [lo, hi];
   }
 
   // ---------------------------------------------------------------

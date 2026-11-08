@@ -6,6 +6,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Custom layout: dragging an edge that one tall cell shares with two stacked cells moves the whole line, so the tall cell narrows as the stacked cells widen (#434). It used to move only the dragged cell, which grew over the tall one. The tall cell kept its old width underneath, so a calendar in it drew its events past the visible edge. A cell growing into a gap now stops at the next cell. An overlap made before this fix stays until that edge is dragged back.
+
 ## [0.506.0], 2026-11-09
 
 ### Added
