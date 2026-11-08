@@ -171,6 +171,61 @@ def test_status_tags_ordering_and_day_sets() -> None:
     assert all(lu.folded for lu in frame.lineups if lu.status == "not_today")
 
 
+def _why(view: Any, display_id: str, lineup_id: str) -> tuple[str, str] | None:
+    why = _lineup(_display(view, display_id), lineup_id).off_why
+    return None if why is None else (why.label, why.title)
+
+
+def test_grey_rows_say_why_they_are_grey() -> None:
+    """Wednesday 18:12: dinner is live and night is later today (both colour);
+    breakfast ran this morning, weekend and monday are not due today."""
+    view = sample_view_model()
+    assert _why(view, "frame", "dinner") is None and _why(view, "frame", "night") is None
+    assert _why(view, "frame", "breakfast") is not None
+    assert _why(view, "frame", "breakfast")[0] == "Done for today"  # type: ignore[index]
+    assert _why(view, "frame", "weekend")[0] == "Not today"  # type: ignore[index]
+    assert _why(view, "frame", "monday")[0] == "Not today"  # type: ignore[index]
+    title = _why(view, "frame", "weekend")[1]  # type: ignore[index]
+    assert "grey" in title and "colour" in title
+    # Exactly the rows the page draws grey carry one.
+    for d in view.displays:
+        for lu in d.lineups:
+            assert (lu.off_why is not None) == (lu.status in ("not_today", "off"))
+    assert _lineup(_display(view, "frame"), "weekend").to_dict()["off_why"]["label"] == "Not today"
+
+
+def test_a_lineup_whose_window_has_ended_is_done_for_today() -> None:
+    displays, dashboards = sample_inputs()
+    late = SAMPLE_NOW.replace(hour=22, minute=50)
+    frame = _display(build_view(displays, dashboards, now=late), "frame")
+    dinner = _lineup(frame, "dinner")  # 17:00-20:00 on Mon-Wed, today is Wednesday
+    assert dinner.status == "not_today"
+    assert dinner.off_why is not None and dinner.off_why.label == "Done for today"
+    night = _lineup(frame, "night")  # a daily push at 22:00, sent
+    assert night.status == "not_today" and night.off_why is not None
+    assert night.off_why.label == "Done for today"
+    # Tomorrow's breakfast is the next run, but the lineup is not due *today*.
+    assert _lineup(frame, "monday").off_why.label == "Not today"  # type: ignore[union-attr]
+
+
+def test_off_and_by_hand_rows_name_their_reason() -> None:
+    displays, dashboards = sample_inputs()
+    frame_in = displays[0]
+    lineups = tuple(
+        replace(lu, enabled=False)
+        if lu.id == "night"
+        else replace(lu, kind="manual", start=None, end=None)
+        if lu.id == "weekend"
+        else lu
+        for lu in frame_in.lineups
+    )
+    displays[0] = replace(frame_in, lineups=lineups)
+    view = build_view(displays, dashboards, now=SAMPLE_NOW)
+    assert _why(view, "frame", "night")[0] == "Off"  # type: ignore[index]
+    assert _why(view, "frame", "weekend")[0] == "Not playing"  # type: ignore[index]
+    assert _lineup(_display(view, "frame"), "weekend").status_label == "By hand"
+
+
 def test_pause_overlap_flag_and_held_next_run() -> None:
     frame = _display(sample_view_model(), "frame")
     monday = _lineup(frame, "monday")

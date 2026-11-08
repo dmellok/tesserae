@@ -235,6 +235,7 @@
 <button class="lu-fold" type="button" aria-expanded="{{ 'false' if l.folded and not is_new else 'true' }}" aria-controls="lu-body-{{ uid }}" aria-label="{{ l.name }}: show or hide dashboards" data-fold="{{ l.id }}">{{ ico('caret') }}</button>
 </div>
 <div class="lu-row-body" id="lu-body-{{ uid }}">
+{%- if l.off_why %}<span class="lu-off-why" title="{{ l.off_why.title }}">{{ ico('info') }}{{ l.off_why.label }}</span>{% endif %}
 <div class="lu-strip-scroll" tabindex="0" role="region" aria-label="Dashboards in {{ l.name }}; scrolls sideways"><ol class="lu-strip{% if l.status == 'live' %} has-now{% endif %} {{ d.orientation or 'l' }}">
 {%- for s in l.steps %}{{ step(d, l, s) }}{% endfor -%}
 </ol></div>

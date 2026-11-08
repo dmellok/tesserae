@@ -415,7 +415,7 @@
       `<div class="lu-row-title"><span class="lu-row-name">${esc(l.name)}${edot}</span><span class="lu-row-meta" title="${esc(l.mode_label)}, ${esc(l.days_text)}">${meta}</span>${(l.warnings || []).map((w) => `<span class="lu-row-warning">${ico("info")}${esc(w)}</span>`).join("")}${l.display_removed ? `<span class="lu-row-warning">${ico("info")}Display removed</span>` : ""}${rowErr ? `<span class="lu-row-err" role="alert">${ico("info")}${esc(rowErr)}</span>` : ""}</div>` +
       `<div class="lu-row-state">${rowState(l)}</div>${rowActions(l, d.id)}` +
       `<button class="lu-fold" type="button" aria-expanded="${folded ? "false" : "true"}" aria-controls="lu-body-${esc(uid)}" aria-label="${esc(l.name)}: show or hide dashboards" data-fold="${esc(l.id)}">${ico("caret")}</button></div>` +
-      `<div class="lu-row-body" id="lu-body-${esc(uid)}"><div class="lu-strip-scroll" tabindex="0" role="region" aria-label="Dashboards in ${esc(l.name)}; scrolls sideways"><ol class="lu-strip${l.status === "live" ? " has-now" : ""} ${d.orientation || "l"}">${l.steps.map((s) => stepHtml(d, l, s, ui)).join("")}</ol></div></div></li>`
+      `<div class="lu-row-body" id="lu-body-${esc(uid)}">${l.off_why ? `<span class="lu-off-why" title="${esc(l.off_why.title)}">${ico("info")}${esc(l.off_why.label)}</span>` : ""}<div class="lu-strip-scroll" tabindex="0" role="region" aria-label="Dashboards in ${esc(l.name)}; scrolls sideways"><ol class="lu-strip${l.status === "live" ? " has-now" : ""} ${d.orientation || "l"}">${l.steps.map((s) => stepHtml(d, l, s, ui)).join("")}</ol></div></div></li>`
     );
   }
 

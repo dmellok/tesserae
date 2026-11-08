@@ -3962,3 +3962,39 @@ def test_long_day_tag_never_runs_under_the_row_title(live: str, width: int, fold
         assert page.evaluate("() => document.documentElement.scrollWidth - innerWidth") <= 0
         assert page._lu_errors == []
         browser.close()
+
+
+@pytest.mark.parametrize("redraw", [False, True])
+def test_grey_rows_carry_a_tag_saying_why(live: str, redraw: bool) -> None:
+    """Rows drawn grey wear a "why" tag over their thumbnails, from the server's markup
+    and from the client's redraw; rows that are live or later today wear none."""
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser, page, _api = _open(p, live, pics=True)
+        if redraw:
+            page.evaluate("() => TesseraeLineups.refresh()")
+            page.wait_for_selector(".lu-off-why", state="attached")
+        page.evaluate(
+            "() => document.querySelectorAll('.lu-row').forEach((r) => r.classList.remove('is-folded'))"
+        )
+        got = page.evaluate(
+            """() => [...document.querySelectorAll('.lu-row')].map((r) => {
+                const tag = r.querySelector('.lu-off-why');
+                const strip = getComputedStyle(r.querySelector('.lu-strip'));
+                return { id: r.dataset.lineup, status: r.dataset.status, why: tag && tag.textContent.trim(),
+                         title: tag && tag.title, grey: strip.filter !== 'none',
+                         tagOpacity: tag && getComputedStyle(tag).opacity, shown: !!tag && tag.getBoundingClientRect().height > 0 };
+            })"""
+        )
+        by_id = {r["id"]: r for r in got}
+        assert by_id["dinner"]["why"] is None and by_id["night"]["why"] is None
+        assert by_id["breakfast"]["why"] == "Done for today"
+        assert by_id["weekend"]["why"] == by_id["monday"]["why"] == "Not today"
+        for r in got:
+            assert (r["why"] is not None) == r["grey"] == (r["status"] in ("not_today", "off")), r
+            if r["why"]:
+                assert r["shown"] and r["tagOpacity"] == "1", r
+                assert "colour" in r["title"], r
+        assert page._lu_errors == []
+        browser.close()

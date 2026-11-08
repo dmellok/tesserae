@@ -624,6 +624,14 @@ class PillView(_Dict):
 
 
 @dataclass
+class OffWhyView(_Dict):
+    """Why a greyed row is greyed: its pictures are not in black and white."""
+
+    label: str  # "Not today", "Done for today", "Off", "Not playing"
+    title: str
+
+
+@dataclass
 class StepView(_Dict):
     index: int
     position: str  # "3/6" or "only"
@@ -716,6 +724,8 @@ class LineupView(_Dict):
     warnings: list[str] = field(default_factory=list)
     display_removed: bool = False
     missing_count: int = 0  # steps whose dashboard was deleted; not in step_count
+    # Set on the rows drawn grey (status not_today / off): the reason, as a tag.
+    off_why: OffWhyView | None = None
 
 
 @dataclass
@@ -2386,6 +2396,23 @@ def _next_update_view(
     )
 
 
+_GREY_NOTE = "Shown grey because it is not running now. Its pictures are in colour when it runs."
+
+
+def _off_why(status: LineupStatus, *, manual: bool, runs_today: bool) -> OffWhyView | None:
+    """The tag on a row drawn grey: a lineup that is off, by hand and idle, due
+    on another day, or due today but already finished (its window has ended)."""
+    if status == "off":
+        return OffWhyView("Off", f"Switched off; nothing runs until it is enabled. {_GREY_NOTE}")
+    if status != "not_today":
+        return None
+    if manual:
+        return OffWhyView("Not playing", f"Runs by hand and is not playing. {_GREY_NOTE}")
+    if runs_today:
+        return OffWhyView("Done for today", f"Today's run has ended. {_GREY_NOTE}")
+    return OffWhyView("Not today", f"It does not run today. {_GREY_NOTE}")
+
+
 def _lineup_sort_key(v: LineupView) -> tuple[int, int, str]:
     if v.status == "off":
         return (2, 0, v.name.lower())
@@ -2430,6 +2457,8 @@ def _lineup_view(
         status, status_label = "not_today", "By hand"
     else:
         status, status_label = "not_today", days_label(days_sorted)
+
+    off_why = _off_why(status, manual=lineup.kind == "manual", runs_today=today % 7 in lineup.days)
 
     # -- window ------------------------------------------------------------
     win = window_minutes(lineup)
@@ -2704,6 +2733,7 @@ def _lineup_view(
             step_item_url=u.step_item,
         ),
         sort_minutes=sort_minutes,
+        off_why=off_why,
     )
 
 
