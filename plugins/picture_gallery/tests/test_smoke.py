@@ -375,3 +375,55 @@ def test_a_device_id_never_reaches_the_filename_raw(app: Flask) -> None:
         assert " " not in path.name
         assert "passwd" not in path.name and "Kitchen" not in path.name
         assert path.parent == plugin.data_dir
+
+
+def test_fetch_asks_for_the_cell_size(app: Flask) -> None:
+    server = _load_server()
+    plugin = app.config["PLUGIN_REGISTRY"].get("picture_gallery")
+    _seed_image(plugin.data_dir, "cat.jpg")
+    ctx = {"data_dir": str(plugin.data_dir), "cell_w": 800, "cell_h": 480}
+    out = server.fetch({"folder": ""}, {}, ctx=ctx)
+    assert out["url"].endswith("/cat.jpg?w=800&h=480")
+
+
+def _get_image(client: FlaskClient, url: str) -> tuple[bytes, str]:
+    resp = client.get(url)
+    try:
+        assert resp.status_code == 200
+        return resp.get_data(), resp.headers["Content-Type"]
+    finally:
+        resp.close()
+
+
+def test_a_big_photo_is_sized_to_cover_the_cell(app: Flask, client: FlaskClient) -> None:
+    with client.session_transaction() as sess:
+        sess["authed"] = True
+    plugin = app.config["PLUGIN_REGISTRY"].get("picture_gallery")
+    _seed_image(plugin.data_dir / "x", "big.jpg", size=(4000, 3000))
+    data, ctype = _get_image(client, "/plugins/picture_gallery/folders/x/big.jpg?w=800&h=480")
+    assert ctype == "image/jpeg"
+    assert Image.open(io.BytesIO(data)).size == (800, 600)
+    # The sized copy is cached and served again.
+    again, _ = _get_image(client, "/plugins/picture_gallery/folders/x/big.jpg?w=800&h=480")
+    assert again == data
+    # Without a size the original comes back.
+    original, _ = _get_image(client, "/plugins/picture_gallery/folders/x/big.jpg")
+    assert Image.open(io.BytesIO(original)).size == (4000, 3000)
+
+
+def test_an_image_the_cells_size_is_served_untouched(app: Flask, client: FlaskClient) -> None:
+    with client.session_transaction() as sess:
+        sess["authed"] = True
+    plugin = app.config["PLUGIN_REGISTRY"].get("picture_gallery")
+    folder = plugin.data_dir / "x"
+    folder.mkdir(parents=True, exist_ok=True)
+    # Pre-dithered artwork for an 800 x 480 panel: exact pixels must survive.
+    Image.new("P", (800, 480)).save(folder / "art.png", format="PNG")
+    raw = (folder / "art.png").read_bytes()
+    data, _ = _get_image(client, "/plugins/picture_gallery/folders/x/art.png?w=800&h=480")
+    assert data == raw
+    # A smaller image is never enlarged either.
+    _seed_image(folder, "small.jpg", size=(400, 300))
+    small = (folder / "small.jpg").read_bytes()
+    data, _ = _get_image(client, "/plugins/picture_gallery/folders/x/small.jpg?w=800&h=480")
+    assert data == small

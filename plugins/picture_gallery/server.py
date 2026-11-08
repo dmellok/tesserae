@@ -56,6 +56,12 @@ ROOT_FOLDER_VALUE = "_root"
 META_FILE = ".folders.json"
 THUMB_DIR = ".thumb_cache"
 THUMB_SIZE = (320, 240)
+# A cell-sized copy of an image bigger than the cell it is drawn in (a phone
+# photo on an 800 x 480 tag). Never enlarged, and an image already the cell's
+# size (pre-dithered artwork) is served untouched.
+SIZED_DIR = ".sized"
+SIZED_JPEG_QUALITY = 90
+SIZED_MAX_EDGE = 8192
 RENDITION_DIR = ".render_cache"
 ORIENT_CACHE_FILE = ".orientation_cache.json"
 SQUARE_TOLERANCE = 0.05
@@ -189,6 +195,65 @@ def thumb_version(folder: str, filename: str) -> str:
     the file can't be resolved)."""
     source = resolve_image_path(folder, filename)
     return _thumb_version(source) if source is not None else "0"
+
+
+def _cell_size_query(ctx: dict[str, Any]) -> str:
+    """``?w=&h=`` for the cell being drawn, or "" when the host didn't say."""
+    try:
+        w = int(ctx.get("cell_w") or 0)
+        h = int(ctx.get("cell_h") or 0)
+    except (TypeError, ValueError):
+        return ""
+    return f"?w={w}&h={h}" if w > 0 and h > 0 else ""
+
+
+def _target_size(raw_w: str | None, raw_h: str | None) -> tuple[int, int] | None:
+    try:
+        w, h = int(raw_w or 0), int(raw_h or 0)
+    except ValueError:
+        return None
+    if w <= 0 or h <= 0:
+        return None
+    return min(w, SIZED_MAX_EDGE), min(h, SIZED_MAX_EDGE)
+
+
+def _sized_path(
+    data_dir: Path, folder_name: str, filename: str, source: Path, target: tuple[int, int]
+) -> Path:
+    stem = _thumb_path(data_dir, folder_name, filename, source).stem
+    return data_dir / SIZED_DIR / f"{stem}__{target[0]}x{target[1]}"
+
+
+def _ensure_sized(source: Path, dest_stem: Path, target: tuple[int, int]) -> Path | None:
+    """A copy of ``source`` just covering ``target``, or None to serve the
+    file itself: it is no bigger than the cell (so nothing to gain, and
+    pre-dithered artwork keeps its exact pixels) or Pillow can't read it."""
+    for suffix in (".jpg", ".png"):
+        if dest_stem.with_suffix(suffix).exists():
+            return dest_stem.with_suffix(suffix)
+    try:
+        with Image.open(source) as opened:
+            fmt = opened.format
+            img = ImageOps.exif_transpose(opened)
+            scale = max(target[0] / img.width, target[1] / img.height)
+            if scale > 0.98:
+                return None
+            size = (max(1, round(img.width * scale)), max(1, round(img.height * scale)))
+            img = img.resize(size, Image.Resampling.LANCZOS)
+            dest_stem.parent.mkdir(parents=True, exist_ok=True)
+            photo = fmt in ("JPEG", "MPO", "HEIF", "WEBP")
+            dest = dest_stem.with_suffix(".jpg" if photo else ".png")
+            tmp = dest.with_suffix(dest.suffix + ".tmp")
+            if photo:
+                img.convert("RGB").save(
+                    tmp, format="JPEG", quality=SIZED_JPEG_QUALITY, optimize=True
+                )
+            else:
+                img.save(tmp, format="PNG", optimize=True)
+            os.replace(tmp, dest)
+            return dest
+    except (OSError, Image.UnidentifiedImageError, ValueError, ZeroDivisionError):
+        return None
 
 
 def _ensure_thumbnail(source: Path, dest: Path) -> Path | None:
@@ -383,7 +448,8 @@ def fetch(
         match = next((p for p in images if p.name == pinned), None)
         if match is not None:
             return {
-                "url": f"/plugins/picture_gallery/folders/{folder_segment}/{match.name}",
+                "url": f"/plugins/picture_gallery/folders/{folder_segment}/{match.name}"
+                + _cell_size_query(ctx),
                 "filename": match.name,
                 "folder": folder_segment,
                 "count": len(images),
@@ -452,7 +518,8 @@ def fetch(
         chosen = random.choice(images)
 
     return {
-        "url": f"/plugins/picture_gallery/folders/{folder_segment}/{chosen.name}",
+        "url": f"/plugins/picture_gallery/folders/{folder_segment}/{chosen.name}"
+        + _cell_size_query(ctx),
         "filename": chosen.name,
         "folder": folder_segment,
         "count": len(images),
@@ -686,6 +753,20 @@ def blueprint() -> Blueprint:
         target_dir = _folder_path(folder, data_dir)
         if target_dir is None or not target_dir.exists() or not target_dir.is_dir():
             abort(404)
+        target = _target_size(request.args.get("w"), request.args.get("h"))
+        if target is not None:
+            source_str = safe_join(str(target_dir), filename)
+            source = Path(source_str) if source_str is not None else None
+            if (
+                source is not None
+                and source.is_file()
+                and source.suffix.lower() in ALLOWED_SUFFIXES
+            ):
+                sized = _ensure_sized(
+                    source, _sized_path(data_dir, folder, filename, source, target), target
+                )
+                if sized is not None:
+                    return send_file(sized, conditional=True)
         return send_from_directory(target_dir, filename)
 
     @bp.get("/folders/<folder>/<path:filename>/thumb")
