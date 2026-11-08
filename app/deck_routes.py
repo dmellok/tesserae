@@ -1857,12 +1857,48 @@ def _clean_time(raw: Any, what: str, deck_id: str | None = None) -> str:
     return f"{int(h):02d}:{int(m):02d}"
 
 
-def _edited_deck(deck: Deck, *, start: Any = _UNSET, end: Any = _UNSET, days: Any = None) -> Deck:
+def _edited_deck(
+    deck: Deck,
+    *,
+    start: Any = _UNSET,
+    end: Any = _UNSET,
+    days: Any = None,
+    push: bool = False,
+) -> Deck:
     """``deck`` with a new time window and/or weekday set, in the fields its
-    trigger runs on. Raises ``_EditError`` for input the deck can't take."""
+    trigger runs on. Raises ``_EditError`` for input the deck can't take.
+
+    A daily push has no end: the scheduler fires it once, at its time, and
+    never reads ``advance_end_at`` for it. Giving one an ``end`` therefore
+    makes it what "from 6 AM until 6:30 PM" means in the model: an interval
+    lineup, the same dashboard shown again every ``advance_interval_minutes``
+    inside that window. ``push`` is the way back: a one-dashboard interval
+    lineup becomes a daily push at its start time."""
     kind = _lineup_kind(deck)
     changes: dict[str, Any] = {}
-    if start is not _UNSET or end is not _UNSET:
+    if push:
+        if kind != "interval" or len(deck.pages) != 1:
+            raise _EditError(
+                f"{deck.name} can only go back to a single push when it is one dashboard "
+                "shown through a window.",
+                400,
+                deck.id,
+            )
+        if end is not _UNSET and end not in (None, ""):
+            raise _EditError("A single push has no end time.", 400, deck.id)
+        raw_start = start if start is not _UNSET else deck.advance_window_start
+        if raw_start in (None, ""):
+            raise _EditError("A single push needs a start time.", 400, deck.id)
+        s = _clean_time(raw_start, "Start", deck.id)
+        if s == "24:00":
+            raise _EditError("Start must be before 24:00.", 400, deck.id)
+        changes.update(
+            advance_trigger="daily",
+            advance_fires_at=s,
+            advance_window_start=None,
+            advance_window_end=None,
+        )
+    elif start is not _UNSET or end is not _UNSET:
         if kind == "manual":
             raise _EditError(f"{deck.name} runs by hand; it has no time window.", 400, deck.id)
         if kind == "daily":
@@ -1871,7 +1907,21 @@ def _edited_deck(deck: Deck, *, start: Any = _UNSET, end: Any = _UNSET, days: An
             )
             if s == "24:00":
                 raise _EditError("Start must be before 24:00.", 400, deck.id)
-            changes["advance_fires_at"] = s
+            raw_end = None if end is _UNSET else end
+            if raw_end in (None, ""):
+                changes["advance_fires_at"] = s
+            else:
+                e = _clean_time(raw_end, "End", deck.id)
+                if (parse_hhmm(e) or 0) <= (parse_hhmm(s) or 0):
+                    raise _EditError("End must be after start.", 400, deck.id)
+                # A window to midnight is stored as no end (see the interval branch).
+                changes.update(
+                    advance_trigger="interval",
+                    advance_window_start=s,
+                    advance_window_end=None if e == "24:00" else e,
+                    advance_fires_at=None,
+                    advance_end_at=None,
+                )
         elif kind == "cycle":
             s = _clean_time(start if start is not _UNSET else deck.advance_anchor, "Start", deck.id)
             raw_end = end if end is not _UNSET else deck.advance_end_at
@@ -2039,7 +2089,7 @@ def _check_weekday(value: Any, what: str, deck_id: str | None) -> int:
 #: The longest lineup name the inline rename takes.
 _NAME_MAX = 80
 
-_EDIT_FIELDS = frozenset({"id", "start", "end", "days", "toggle_day", "on"})
+_EDIT_FIELDS = frozenset({"id", "start", "end", "days", "toggle_day", "on", "push"})
 
 
 def _validated_edit(raw: Any, *, require_on: bool = False) -> dict[str, Any]:
@@ -2063,6 +2113,8 @@ def _validated_edit(raw: Any, *, require_on: bool = False) -> dict[str, Any]:
             raise _EditError("Days must be a list of weekdays 0 (Mon) to 6 (Sun).", 400, deck_id)
         for d in days:
             _check_weekday(d, "Each day", deck_id)
+    if "push" in raw and not isinstance(raw["push"], bool):
+        raise _EditError("'push' must be true or false.", 400, deck_id)
     if "toggle_day" in raw:
         if raw.get("days") is not None:
             raise _EditError("Send days or a day to toggle, not both.", 400, deck_id)
@@ -2134,6 +2186,7 @@ def _apply_edits(edits: list[Any], day: Any, *, require_on: bool = False) -> Res
                 start=edit.get("start", _UNSET),
                 end=edit.get("end", _UNSET),
                 days=days,
+                push=bool(edit.get("push")),
             )
             if deck_id not in order:
                 order.append(deck_id)
@@ -2158,15 +2211,17 @@ def _apply_edits(edits: list[Any], day: Any, *, require_on: bool = False) -> Res
 def edit_window(deck_id: str) -> Response:
     """Inline edit of a lineup's time window. JSON ``{"start": "HH:MM",
     "end": "HH:MM" | null}`` (``end`` ``24:00`` or null = until midnight
-    for a rotation; ignored for a daily push). Refuses (409) a window that
-    meets another lineup of the same display on a shared day; a window in
-    quiet hours saves with a warning."""
+    for a rotation). A daily push given an ``end`` becomes an interval lineup
+    over that window; ``{"push": true}`` turns a one-dashboard window back
+    into a push at its start. Refuses (409) a window that meets another
+    lineup of the same display on a shared day; a window in quiet hours
+    saves with a warning."""
     body = _json_body()
     edit: dict[str, Any] = {"id": deck_id}
-    for key in ("start", "end"):
+    for key in ("start", "end", "push"):
         if key in body:
             edit[key] = body[key]
-    if "start" not in edit and "end" not in edit:
+    if "start" not in edit and "end" not in edit and "push" not in edit:
         return _edit_error_json(_EditError("Send a start and/or end time.", 400, deck_id))
     return _apply_edits([edit], _body_view_day(body, day_alias=True))
 

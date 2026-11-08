@@ -247,6 +247,35 @@ class _Api:
         self.item_status = 200
         self.push_delay = 0.0
         self.name_error = ""
+        self.edits_error = ""
+
+    def _apply_end_changes(self, body: dict[str, Any]) -> None:
+        """What the server does with an end added to a push or taken off a window:
+        the lineup becomes an interval window, or a daily push, and says so."""
+        for edit in body.get("edits", []):
+            for d in self.vm["displays"]:
+                for lu in d["lineups"]:
+                    if lu["id"] != edit["id"]:
+                        continue
+                    w = lu["window"]
+                    h, m = (int(x) for x in edit["start"].split(":"))
+                    start = h * 60 + m
+                    w["start"], w["start_min"] = edit["start"], start
+                    if edit.get("push"):
+                        end = None
+                        lu["kind"] = "daily"
+                    elif edit.get("end"):
+                        eh, em = (int(x) for x in edit["end"].split(":"))
+                        end = eh * 60 + em
+                        lu["kind"] = "interval"
+                    else:
+                        continue
+                    w["is_point"] = end is None
+                    w["end"] = None if end is None else edit["end"]
+                    w["end_min"] = start if end is None else end
+                    w["label"] = (
+                        f"at {edit['start']}" if end is None else f"{edit['start']}–{edit['end']}"
+                    )
 
     def sig_for(self, item: str) -> str:
         return self.same_sig.get(item) or re.sub(r"\W", "", item).ljust(16, "0")[-16:]
@@ -331,6 +360,15 @@ class _Api:
                 r"/decks/(edits|[^/]+/push-step|[^/]+/bind-pages)$", req.url
             ):
                 self.posts.append((req.url, json.loads(req.post_data or "null")))
+                if req.url.endswith("/edits") and self.edits_error:
+                    route.fulfill(
+                        status=409,
+                        content_type="application/json",
+                        body=json.dumps({"ok": False, "error": self.edits_error, "id": None}),
+                    )
+                    return
+                if req.url.endswith("/edits"):
+                    self._apply_end_changes(self.posts[-1][1])
                 if self.push_delay and "push-step" in req.url:
                     time.sleep(self.push_delay)
                 reply: dict[str, Any] = (
@@ -4331,4 +4369,177 @@ def test_clicking_the_name_never_folds_the_row_but_the_rest_of_the_head_does(liv
         page.locator('[data-name-edit="dinner"]').focus()
         page.keyboard.press("Enter")
         assert page.locator("#lu-row-dinner .lu-name-edit input").count() == 1
+        browser.close()
+
+
+# -- add or remove a lineup's end time -----------------------------------------------
+
+
+def _win_inputs(page: Any, row: str) -> Any:
+    return page.locator(f"#lu-row-{row} .lu-win-edit input")
+
+
+def test_a_push_gets_an_end_time_and_the_row_shows_the_range(live: str) -> None:
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser, page, api = _open(p, live)
+        assert page.locator("#lu-row-night .lu-win").inner_text() == "at 22:00"
+        page.locator('[data-win-edit="night"]').click()
+        # A push's editor is its start field and one button.
+        assert _win_inputs(page, "night").count() == 1
+        add = page.locator("#lu-row-night [data-win-end]")
+        assert add.inner_text() == "Add end time" and add.get_attribute("aria-pressed") == "false"
+        add.click()
+        assert add.inner_text() == "Remove end time" and add.get_attribute("aria-pressed") == "true"
+        assert _win_inputs(page, "night").count() == 2
+        end = _win_inputs(page, "night").nth(1)
+        assert end.input_value() == "23:00" and page.evaluate(
+            "() => document.activeElement.getAttribute('aria-label') === 'End'"
+        )
+        page.locator("#lu-row-night .lu-win-edit").screenshot(
+            path=str(SHOTS / "item3-add-end-editor.png")
+        )
+        end.fill("23:30")
+        end.press("Enter")
+        page.wait_for_function(
+            "() => document.querySelector('#lu-row-night .lu-win')?.textContent === '22:00–23:30'"
+        )
+        sent = [b for u, b in api.posts if u.endswith("/decks/edits")]
+        assert sent == [{"edits": [{"id": "night", "start": "22:00", "end": "23:30"}]}]
+        page.locator("#lu-row-night .lu-row-state").screenshot(
+            path=str(SHOTS / "item3-range-label.png")
+        )
+        assert page._lu_errors == []
+        browser.close()
+
+
+def test_the_end_time_comes_off_again_and_the_row_says_at(live: str) -> None:
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser, page, api = _open(p, live)
+        page.locator('[data-win-edit="night"]').click()
+        page.locator("#lu-row-night [data-win-end]").click()
+        _win_inputs(page, "night").nth(1).fill("23:30")
+        page.locator("#lu-row-night [data-win-ok]").click()
+        page.wait_for_function(
+            "() => document.querySelector('#lu-row-night .lu-win')?.textContent === '22:00–23:30'"
+        )
+        # Now it has an end: the editor offers to remove it, and Apply sends a push.
+        page.locator('[data-win-edit="night"]').click()
+        assert _win_inputs(page, "night").count() == 2
+        rm = page.locator("#lu-row-night [data-win-end]")
+        assert rm.inner_text() == "Remove end time"
+        rm.click()
+        assert _win_inputs(page, "night").count() == 1 and rm.inner_text() == "Add end time"
+        page.locator("#lu-row-night .lu-win-edit").screenshot(
+            path=str(SHOTS / "item3-remove-end-editor.png")
+        )
+        _win_inputs(page, "night").first.press("Enter")
+        page.wait_for_function(
+            "() => document.querySelector('#lu-row-night .lu-win')?.textContent === 'at 22:00'"
+        )
+        sent = [b for u, b in api.posts if u.endswith("/decks/edits")]
+        assert sent[-1] == {"edits": [{"id": "night", "start": "22:00", "push": True}]}
+        assert page._lu_errors == []
+        browser.close()
+
+
+def test_end_time_editor_refuses_bad_ends_and_shows_the_servers_reason(live: str) -> None:
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser, page, api = _open(p, live)
+        page.locator('[data-win-edit="night"]').click()
+        page.locator("#lu-row-night [data-win-end]").click()
+        err = page.locator("#lu-row-night .lu-win-err")
+        # An end at the start (or before it) is refused where it is typed.
+        _win_inputs(page, "night").nth(1).fill("22:00")
+        _win_inputs(page, "night").nth(1).press("Enter")
+        assert err.inner_text() == "End must be after start"
+        # A window over another lineup (Dinner, Mon-Wed 17:00-20:00) is refused before saving.
+        _win_inputs(page, "night").nth(0).fill("18:00")
+        _win_inputs(page, "night").nth(1).fill("21:00")
+        _win_inputs(page, "night").nth(1).press("Enter")
+        assert err.inner_text().startswith("Overlaps Dinner")
+        assert [u for u, _ in api.posts if u.endswith("/decks/edits")] == []
+        # The server's refusal stays in the editor, which stays open for another try.
+        _win_inputs(page, "night").nth(0).fill("21:00")
+        _win_inputs(page, "night").nth(1).fill("23:00")
+        api.edits_error = "Overlaps Somebody on Mon (06:00–09:00)."
+        _win_inputs(page, "night").nth(1).press("Enter")
+        page.wait_for_function(
+            "() => document.querySelector('#lu-row-night .lu-win-err')?.textContent.includes('Somebody')"
+        )
+        assert _win_inputs(page, "night").count() == 2
+        assert _win_inputs(page, "night").nth(1).is_enabled()
+        # Escape closes it, nothing saved: still a push.
+        _win_inputs(page, "night").nth(1).press("Escape")
+        assert page.locator("#lu-row-night .lu-win").inner_text() == "at 22:00"
+        browser.close()
+
+
+def test_a_rotation_has_no_end_time_to_add_or_remove(live: str) -> None:
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser, page, _ = _open(p, live)
+        page.locator('[data-win-edit="dinner"]').click()
+        assert _win_inputs(page, "dinner").count() == 2
+        assert page.locator("#lu-row-dinner [data-win-end]").count() == 0
+        browser.close()
+
+
+def test_real_routes_add_and_remove_an_end_time(real: tuple[str, Flask]) -> None:
+    from playwright.sync_api import sync_playwright
+
+    from app.state.deck_model import Deck, DeckPage
+
+    base, app = real
+    app.config["DECK_STORE"].upsert(
+        Deck(
+            id="art", name="Frame art", device_ids=["panel"],
+            pages=[DeckPage(page_id="sky")],
+            advance="timer", advance_trigger="daily", advance_fires_at="21:00",
+        )
+    )  # fmt: skip
+    with sync_playwright() as p:
+        browser = _launch(p)
+        page = browser.new_page(viewport={"width": 1440, "height": 900})
+        errors: list[str] = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.route(re.compile(r".*/events/stream.*"), lambda r: r.fulfill(status=204, body=""))
+        page.goto(base + "/decks", wait_until="load")
+        page.wait_for_function(
+            "() => document.querySelector('[data-lu]').classList.contains('is-enhanced')"
+        )
+        assert page.locator("#lu-row-art .lu-win").inner_text() == "at 21:00"
+        page.locator("#lu-row-art .lu-win").click()
+        page.locator("#lu-row-art [data-win-end]").click()
+        _win_inputs(page, "art").nth(1).fill("23:30")
+        with page.expect_response(lambda r: r.url.endswith("/decks/edits")) as resp:
+            _win_inputs(page, "art").nth(1).press("Enter")
+        assert resp.value.status == 200, resp.value.text()
+        page.wait_for_function(
+            "() => document.querySelector('#lu-row-art .lu-win')?.textContent === '21:00–23:30'"
+        )
+        assert "Saved." in page.locator(".lu-pend-msg").first.inner_text()
+        deck = app.config["DECK_STORE"].get("art")
+        assert deck.advance_trigger == "interval"
+        assert (deck.advance_window_start, deck.advance_window_end) == ("21:00", "23:30")
+        # The page's own redraw agrees, and so does a reload.
+        page.reload(wait_until="load")
+        assert page.locator("#lu-row-art .lu-win").inner_text() == "21:00–23:30"
+        page.locator("#lu-row-art .lu-win").click()
+        page.locator("#lu-row-art [data-win-end]").click()
+        with page.expect_response(lambda r: r.url.endswith("/decks/edits")) as resp:
+            _win_inputs(page, "art").first.press("Enter")
+        assert resp.value.status == 200, resp.value.text()
+        page.wait_for_function(
+            "() => document.querySelector('#lu-row-art .lu-win')?.textContent === 'at 21:00'"
+        )
+        deck = app.config["DECK_STORE"].get("art")
+        assert deck.advance_trigger == "daily" and deck.advance_fires_at == "21:00"
+        assert errors == []
         browser.close()

@@ -3741,3 +3741,107 @@ def test_edit_name_needs_a_signed_in_session(app: Flask) -> None:
     resp = anon.post("/decks/morning/name", json={"name": "Hacked"})
     assert resp.status_code in (302, 401, 403)
     assert _deck(app, "morning").name == "Morning"
+
+
+def test_a_daily_push_given_an_end_becomes_a_window_and_back(client: Any, app: Flask) -> None:
+    before = _deck(app, "night")
+    assert before.advance_trigger == "daily"
+    resp = client.post("/decks/night/window", json={"start": "22:00", "end": "23:30"})
+    assert resp.status_code == 200, resp.get_json()
+    deck = _deck(app, "night")
+    # The model's start-end shape for one dashboard: an interval window.
+    assert deck.advance_trigger == "interval"
+    assert (deck.advance_window_start, deck.advance_window_end) == ("22:00", "23:30")
+    assert deck.advance_fires_at is None and deck.advance_end_at is None
+    assert [p.page_id for p in deck.pages] == ["sky"]
+    assert deck.advance_interval_minutes == before.advance_interval_minutes
+    assert deck.advance == "timer" and deck.device_ids == before.device_ids
+    assert resp.get_json()["lineups"][0]["window"] == "22:00–23:30"
+    view = client.get("/decks/view.json").get_json()
+    night = next(lu for lu in view["displays"][0]["lineups"] if lu["id"] == "night")
+    assert night["window"]["label"] == "22:00–23:30" and night["window"]["is_point"] is False
+    # And back to a push at the start time.
+    resp = client.post("/decks/night/window", json={"push": True})
+    assert resp.status_code == 200, resp.get_json()
+    deck = _deck(app, "night")
+    assert deck.advance_trigger == "daily" and deck.advance_fires_at == "22:00"
+    assert deck.advance_window_start is None and deck.advance_window_end is None
+    assert resp.get_json()["lineups"][0]["window"] == "at 22:00"
+
+
+def test_adding_an_end_runs_to_midnight_when_it_is_24_00(client: Any, app: Flask) -> None:
+    resp = client.post("/decks/night/window", json={"start": "21:30", "end": "24:00"})
+    assert resp.status_code == 200, resp.get_json()
+    deck = _deck(app, "night")
+    assert (deck.advance_window_start, deck.advance_window_end) == ("21:30", None)
+    assert resp.get_json()["lineups"][0]["window"] == "21:30–24:00"
+
+
+def test_the_end_goes_in_through_the_batch_save_too(client: Any, app: Flask) -> None:
+    resp = client.post(
+        "/decks/edits", json={"edits": [{"id": "night", "start": "22:15", "end": "23:45"}]}
+    )
+    assert resp.status_code == 200, resp.get_json()
+    assert _deck(app, "night").advance_window_end == "23:45"
+    resp = client.post("/decks/edits", json={"edits": [{"id": "night", "push": True}]})
+    assert resp.status_code == 200
+    assert _deck(app, "night").advance_fires_at == "22:15"
+
+
+def test_a_daily_push_with_no_end_still_ignores_one_left_null(client: Any, app: Flask) -> None:
+    resp = client.post("/decks/night/window", json={"start": "21:30", "end": None})
+    assert resp.status_code == 200
+    deck = _deck(app, "night")
+    assert deck.advance_trigger == "daily" and deck.advance_fires_at == "21:30"
+
+
+@pytest.mark.parametrize(
+    ("body", "text"),
+    [
+        ({"start": "22:00", "end": "22:00"}, "after start"),
+        ({"start": "22:00", "end": "21:00"}, "after start"),
+        ({"start": "22:00", "end": "late"}, "End must be a time"),
+        ({"start": "24:00", "end": "24:00"}, "before 24:00"),
+    ],
+)
+def test_a_bad_end_on_a_push_changes_nothing(
+    client: Any, app: Flask, body: dict[str, Any], text: str
+) -> None:
+    before = _deck(app, "night")
+    resp = client.post("/decks/night/window", json=body)
+    assert resp.status_code == 400 and text in resp.get_json()["error"]
+    assert _deck(app, "night") == before
+
+
+def test_an_end_that_meets_another_lineup_is_refused(client: Any, app: Flask) -> None:
+    before = _deck(app, "night")
+    # 17:30 to 23:00 on every day meets Evening (17:00-20:00 on weekdays).
+    resp = client.post("/decks/night/window", json={"start": "17:30", "end": "23:00"})
+    assert resp.status_code == 409 and "Evening" in resp.get_json()["error"]
+    assert _deck(app, "night") == before
+
+
+def test_push_only_applies_to_one_dashboard_windows(client: Any, app: Flask) -> None:
+    # A rotation has several steps and its own start-end: it is not a push in waiting.
+    for deck_id in ("morning", "weekend"):
+        resp = client.post(f"/decks/{deck_id}/window", json={"push": True})
+        assert resp.status_code == 400, deck_id
+    # A daily push has nothing to turn back.
+    assert client.post("/decks/night/window", json={"push": True}).status_code == 400
+    # push is a flag, not text, and cannot carry an end.
+    assert client.post("/decks/night/window", json={"push": "yes"}).status_code == 400
+    client.post("/decks/night/window", json={"start": "22:00", "end": "23:00"})
+    resp = client.post("/decks/night/window", json={"push": True, "end": "23:30"})
+    assert resp.status_code == 400 and "no end" in resp.get_json()["error"]
+    assert _deck(app, "night").advance_trigger == "interval"
+
+
+def test_scheduler_runs_the_converted_lineup_as_a_window(client: Any, app: Flask) -> None:
+    """The scheduler reads an interval lineup's window (and never a daily's end),
+    so the converted deck is what makes the end real."""
+    from app.state.deck_migration import deck_to_schedule
+
+    client.post("/decks/night/window", json={"start": "22:00", "end": "23:30"})
+    sched = deck_to_schedule(_deck(app, "night"))
+    assert sched.type == "interval"
+    assert (sched.time_of_day_start, sched.time_of_day_end) == ("22:00", "23:30")

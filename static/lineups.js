@@ -1608,34 +1608,107 @@
     const m = /^(\d{1,2}):(\d{2})/.exec(v || "");
     return m ? Number(m[1]) * 60 + Number(m[2]) : NaN;
   };
+  // What an end time is in the model: a daily push has none (it fires once and the frame is
+  // held), so "Add end time" turns it into the same dashboard shown through a start-end
+  // window, and removing it turns a one-dashboard window back into a push. Those change the
+  // lineup's kind, which an unsaved edit cannot preview, so they save at once.
+  const canToggleEnd = (l) => l.window.is_point || (l.kind === "interval" && l.step_count === 1);
+  async function saveEndChange(d, l, s, e, ui) {
+    const edit = { id: l.id, start: R.hhmm(s) };
+    if (e === null) edit.push = true;
+    else edit.end = R.endHhmm(e);
+    const pend = st.pending[d.id] && st.pending[d.id][l.id];
+    if (pend) edit.days = pend.days.map((on, i) => (on ? i : -1)).filter((i) => i >= 0);
+    ui.busy(true);
+    try {
+      const res = await API.saveEdits([edit]);
+      generation++;
+      const fresh = res && Array.isArray(res.displays) ? res.displays : [];
+      vm.displays = vm.displays.map((x) => {
+        const updated = fresh.find((f) => f.id === x.id);
+        if (!updated) return x;
+        const copy = JSON.parse(JSON.stringify(updated));
+        copy.lineups.forEach((v) => {
+          delete v.pending;
+          delete v.pending_days;
+        });
+        return copy;
+      });
+      Object.keys(st.pending).forEach((did) => {
+        delete st.pending[did][l.id];
+        if (!Object.keys(st.pending[did]).length) delete st.pending[did];
+      });
+      delete st.rowErr[l.id];
+      const notes = ["Saved."];
+      if (res && Array.isArray(res.warnings)) notes.push(...res.warnings);
+      st.flash[d.id] = { msg: notes.join(" ") };
+      say(
+        e === null
+          ? `${l.name} is now a single push at ${R.clock(s)}.`
+          : `${l.name} now runs ${R.clockRange(s, e)}.`
+      );
+      if (!fresh.length) scheduleRefresh(0);
+      render();
+    } catch (err) {
+      ui.busy(false);
+      ui.error(err.message);
+    }
+  }
   function openWinEdit(btn) {
     const found = lineupOf(btn.dataset.winEdit, displayOf(btn));
     if (!found || !found.d) return;
     const d = found.d;
     const l = effLineup(d, found.l.id);
     const point = l.window.is_point;
+    const toggle = canToggleEnd(l);
     const wrap = document.createElement("span");
     wrap.className = "lu-win-edit";
     const endVal = l.window.end === "24:00" ? "23:59" : l.window.end;
+    const endHtml = (v) =>
+      `<span class="lu-win-endwrap"><span>–</span><input type="time" step="900" value="${v}" aria-label="End"></span>`;
     wrap.innerHTML =
       `<input type="time" step="900" value="${l.window.start}" aria-label="Start">` +
-      (point
-        ? ""
-        : `<span>–</span><input type="time" step="900" value="${endVal}" aria-label="End">`) +
+      (point ? "" : endHtml(endVal)) +
+      (toggle
+        ? `<button type="button" class="lu-win-end" data-win-end aria-pressed="${!point}">${point ? "Add end time" : "Remove end time"}</button>`
+        : "") +
       `<button type="button" class="lu-ibtn sm" data-win-ok title="Apply (Enter)" aria-label="Apply">${R.ico("check")}</button><span class="lu-win-err" role="alert"></span>`;
     btn.replaceWith(wrap);
     wrap.querySelector("input").focus();
+    const endBtn = wrap.querySelector("[data-win-end]");
+    const err = wrap.querySelector(".lu-win-err");
+    const startIn = wrap.querySelector("input");
+    // The end field exists only while the editor says the lineup has an end, so a
+    // push's editor is the one start field it always was.
+    const endIn = () => wrap.querySelector(".lu-win-endwrap input");
+    let ended = !point;
+    if (endBtn)
+      endBtn.addEventListener("click", () => {
+        ended = !ended;
+        err.textContent = "";
+        endBtn.textContent = ended ? "Remove end time" : "Add end time";
+        endBtn.setAttribute("aria-pressed", String(ended));
+        if (ended) {
+          const s = T(startIn.value);
+          startIn.insertAdjacentHTML(
+            "afterend",
+            endHtml(R.hhmm(Number.isFinite(s) ? Math.min(s + 60, DAY_MIN - 1) : 17 * 60))
+          );
+          endIn().focus();
+        } else {
+          wrap.querySelector(".lu-win-endwrap").remove();
+          startIn.focus();
+        }
+      });
     const apply = () => {
-      const ins = wrap.querySelectorAll("input");
-      const s = T(ins[0].value);
-      let e = point ? s : T(ins[1].value);
-      if (!point && ins[1].value === "23:59") e = DAY_MIN;
-      const err = wrap.querySelector(".lu-win-err");
+      const s = T(startIn.value);
+      let e = ended ? T(endIn().value) : s;
+      if (ended && endIn().value === "23:59") e = DAY_MIN;
       if (!Number.isFinite(s) || !Number.isFinite(e)) {
         err.textContent = "Enter a time";
         return;
       }
-      if (!point && e - s < SNAP) {
+      if (ended && e - s < SNAP) {
         err.textContent = "End must be after start";
         return;
       }
@@ -1644,10 +1717,20 @@
         err.textContent = `Overlaps ${c.o.name}`;
         return;
       }
+      if (ended === point && toggle) {
+        // The end was added to a push, or taken off a window.
+        saveEndChange(d, l, s, ended ? e : null, {
+          busy: (on) => wrap.querySelectorAll("input, button").forEach((x) => (x.disabled = on)),
+          error: (m) => {
+            err.textContent = m;
+          },
+        });
+        return;
+      }
       commit(d, l.id, s, e);
     };
     wrap.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
+      if (e.key === "Enter" && !e.target.closest("[data-win-end]")) {
         e.preventDefault();
         apply();
       } else if (e.key === "Escape") {

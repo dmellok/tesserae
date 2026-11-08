@@ -2023,6 +2023,30 @@ main.page.lu-page {
   border-color: var(--lu-acc);
   box-shadow: 0 0 0 2px color-mix(in oklab, var(--lu-acc) 25%, transparent);
 }
+.lu .lu-win-endwrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.lu .lu-win-end {
+  height: 26px;
+  padding: 0 8px;
+  border: 1px dashed var(--t-border-strong);
+  border-radius: var(--lu-r);
+  background: transparent;
+  color: var(--t-fg-soft);
+  font: 12px var(--t-font-mono);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.lu .lu-win-end:hover {
+  border-style: solid;
+  color: var(--t-fg);
+}
+.lu .lu-win-end:focus-visible {
+  outline: 2px solid var(--lu-acc);
+  outline-offset: 1px;
+}
 .lu .lu-win-err {
   color: var(--t-danger);
   font: 12px var(--t-font);
@@ -3181,6 +3205,10 @@ main.page.lu-page {
   .lu .lu-win {
     min-height: 44px;
     padding: 0 6px;
+  }
+  .lu .lu-win-end {
+    min-height: 44px;
+    padding: 0 12px;
   }
   .lu .lu-row-name .lu-name {
     display: inline-flex;
