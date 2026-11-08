@@ -1594,7 +1594,11 @@ main.page.lu-page {
   row-gap: 6px;
   padding: 11px 8px 11px 16px;
   cursor: pointer;
-  grid-template-columns: 112px minmax(0, 1fr) minmax(220px, 290px) auto var(--lu-fold-w);
+  /* The tag column is at least 112px but grows to its label: "Mon Tue Wed Sat Sun"
+     is wider than that and must not run under the title. */
+  grid-template-columns: minmax(112px, max-content) minmax(0, 1fr) minmax(220px, 290px) auto var(
+      --lu-fold-w
+    );
   grid-template-areas: "tag title state actions fold";
 }
 .lu .lu-row-head :is(.lu-days, .lu-win, .lu-win-edit, .lu-row-actions) {

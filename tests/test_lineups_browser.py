@@ -3926,3 +3926,39 @@ def test_lightbox_draw_navigation_text_and_buttons(live: str) -> None:
         assert body["item"] == api.item_calls[0]["item"] and "composition_digest" not in body
         assert page.locator(".lu-lb-msg").inner_text() == "Pushed · lands now"
         browser.close()
+
+
+@pytest.mark.parametrize("width", [420, 700, 900, 1200, 1600])
+@pytest.mark.parametrize("folded", [True, False])
+def test_long_day_tag_never_runs_under_the_row_title(live: str, width: int, folded: bool) -> None:
+    """An irregular day set is tagged "Mon Tue Wed Sat Sun", wider than the tag column;
+    the row title and its day tiles stay clear of it at every width, folded or not."""
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser, page, _api = _open(p, live, width=width)
+        page.evaluate(
+            """(folded) => document.querySelectorAll('.lu-row').forEach((r) => {
+                r.classList.toggle('is-folded', folded);
+                const t = r.querySelector('.lu-tag-st');
+                if (r.dataset.status === 'not_today') t.textContent = 'Mon Tue Wed Sat Sun';
+            })""",
+            folded,
+        )
+        boxes = page.evaluate(
+            """() => [...document.querySelectorAll('.lu-row')].map((r) => {
+                const rect = (e) => { const b = e.getBoundingClientRect(); return [b.left, b.top, b.right, b.bottom]; };
+                const text = document.createRange(); text.selectNodeContents(r.querySelector('.lu-tag-st'));
+                const t = text.getBoundingClientRect();
+                return { id: r.dataset.lineup, tag: [t.left, t.top, t.right, t.bottom],
+                         title: rect(r.querySelector('.lu-row-title')), name: rect(r.querySelector('.lu-row-name')) };
+            })"""
+        )
+        assert len(boxes) >= 5
+        for b in boxes:
+            for other in (b["title"], b["name"]):
+                apart = b["tag"][2] <= other[0] + 0.5 or b["tag"][3] <= other[1] + 0.5
+                assert apart, (width, folded, b)
+        assert page.evaluate("() => document.documentElement.scrollWidth - innerWidth") <= 0
+        assert page._lu_errors == []
+        browser.close()
