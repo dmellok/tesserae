@@ -3315,7 +3315,12 @@ def editor_save() -> Response:
         adv_interval = max(1, min(10_080, int(form.get("advance_interval_minutes") or 30)))
     except ValueError:
         adv_interval = 30
-    adv_anchor = (form.get("advance_anchor") or "00:00").strip() or "00:00"
+    # A daily or interval lineup's editor has no anchor / stop controls (it
+    # runs on its fire time or window), so an absent field keeps what is stored.
+    if "advance_anchor" in form or existing is None:
+        adv_anchor = (form.get("advance_anchor") or "00:00").strip() or "00:00"
+    else:
+        adv_anchor = existing.advance_anchor
 
     # Advance parity fields (Tier A + B). A missing form field falls back to the
     # existing deck's value (the Advanced fold may omit some) then the model
@@ -3329,7 +3334,10 @@ def editor_save() -> Response:
         except ValueError:
             return default
 
-    adv_end_at = (form.get("advance_end_at") or "").strip() or None
+    if "advance_end_at" in form or existing is None:
+        adv_end_at = (form.get("advance_end_at") or "").strip() or None
+    else:
+        adv_end_at = existing.advance_end_at
     if "advance_days" in form:
         adv_dow = sorted({int(d) for d in form.getlist("advance_days") if d.isdigit()})
     elif existing is not None:
@@ -3376,6 +3384,11 @@ def editor_save() -> Response:
         "advance_mode": adv_mode,
         "advance_min_hold_minutes": adv_min_hold,
     }
+    # The trigger's own times, posted only by the editor of a daily or interval
+    # lineup; an empty one clears it (the model refuses an empty daily time).
+    for trigger_time in ("advance_fires_at", "advance_window_start", "advance_window_end"):
+        if trigger_time in form:
+            fields[trigger_time] = (form.get(trigger_time) or "").strip() or None
     try:
         # This form covers the cycle shape only, so an interval or daily deck
         # opened here would lose its trigger, window and fallback if the model

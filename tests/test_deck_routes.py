@@ -531,6 +531,106 @@ def test_editor_save_keeps_a_non_cycle_trigger(app: Flask) -> None:
     assert d.advance_fires_at == "08:00"
 
 
+def _daily_deck(app: Flask, fires_at: str = "06:00"):
+    client = app.test_client()
+    _sign_in(client)
+    _save_both_deck(client)
+    store = app.config["DECK_STORE"]
+    deck = store.all()[0]
+    store.upsert(
+        deck.model_copy(
+            update={
+                "advance": "timer",
+                "advance_trigger": "daily",
+                "advance_fires_at": fires_at,
+                "advance_anchor": "09:00",
+                "advance_end_at": "18:00",
+            }
+        )
+    )
+    return client, store, deck
+
+
+def test_editor_of_a_daily_lineup_edits_its_fire_time(app: Flask) -> None:
+    """A daily lineup runs on advance_fires_at. The editor must show that time,
+    and saving a new one (6 AM to 6 PM) must store it; the cycle's anchor and
+    stop, which a daily lineup ignores, stay as they were."""
+    client, store, deck = _daily_deck(app)
+    body = client.get(f"/decks/{deck.id}/edit").get_data(as_text=True)
+    assert 'name="advance_fires_at"' in body
+    assert 'value="06:00"' in body
+    assert 'name="advance_anchor"' not in body
+    assert 'name="advance_end_at"' not in body
+
+    resp = client.post(
+        "/decks/editor-save",
+        data={
+            "deck_id": deck.id,
+            "name": "Mixed",
+            "pages": "overview,calendar",
+            "advance": "timer",
+            "advance_interval_minutes": "20",
+            "advance_fires_at": "18:00",
+        },
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+    d = store.get(deck.id)
+    assert d.advance_trigger == "daily"
+    assert d.advance_fires_at == "18:00"
+    assert (d.advance_anchor, d.advance_end_at) == ("09:00", "18:00")
+
+
+def test_editor_save_without_the_fire_time_keeps_it(app: Flask) -> None:
+    client, store, deck = _daily_deck(app)
+    client.post(
+        "/decks/editor-save",
+        data={
+            "deck_id": deck.id,
+            "name": "Mixed",
+            "pages": "overview,calendar",
+            "advance": "timer",
+        },
+        follow_redirects=True,
+    )
+    d = store.get(deck.id)
+    assert d.advance_fires_at == "06:00"
+    assert (d.advance_anchor, d.advance_end_at) == ("09:00", "18:00")
+
+
+def test_editor_of_an_interval_lineup_edits_its_window(app: Flask) -> None:
+    client, store, deck = _daily_deck(app)
+    store.upsert(
+        store.get(deck.id).model_copy(
+            update={
+                "advance_trigger": "interval",
+                "advance_fires_at": None,
+                "advance_window_start": "08:00",
+                "advance_window_end": "20:00",
+            }
+        )
+    )
+    body = client.get(f"/decks/{deck.id}/edit").get_data(as_text=True)
+    assert 'name="advance_window_start"' in body
+    assert 'name="advance_anchor"' not in body
+    client.post(
+        "/decks/editor-save",
+        data={
+            "deck_id": deck.id,
+            "name": "Mixed",
+            "pages": "overview,calendar",
+            "advance": "timer",
+            "advance_window_start": "09:30",
+            "advance_window_end": "",
+        },
+        follow_redirects=True,
+    )
+    d = store.get(deck.id)
+    assert d.advance_trigger == "interval"
+    assert (d.advance_window_start, d.advance_window_end) == ("09:30", None)
+    assert (d.advance_anchor, d.advance_end_at) == ("09:00", "18:00")
+
+
 def test_editor_exposes_the_return_home_wrapper_for_the_mode_toggle(app: Flask) -> None:
     """deck_editor.js hides return-home for timer / both by this id. If the id
     moves, the control silently stays visible for modes it doesn't apply to."""

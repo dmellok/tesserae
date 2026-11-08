@@ -119,6 +119,31 @@
                 {% endfor %}
               </div>
             </div>
+            {# The time controls follow the lineup's trigger: a daily lineup runs on
+               its fire time and an interval lineup on its window, not on the
+               cycle's anchor / end, so each writes the field it runs on. #}
+            {% set trig = deck.advance_trigger if deck else 'cycle' %}
+            {% if trig == 'daily' %}
+            <div class="dxe-set">
+              <span class="dxe-mono-label">FIRES AT</span>
+              <input type="time" name="advance_fires_at"
+                     value="{{ deck.advance_fires_at or '' }}">
+              <p class="dxe-help">once a day, then holds until the next lineup</p>
+            </div>
+            {% elif trig == 'interval' %}
+            <div class="dxe-set">
+              <span class="dxe-mono-label">START AT</span>
+              <input type="time" name="advance_window_start"
+                     value="{{ deck.advance_window_start or '' }}">
+              <p class="dxe-help">blank runs all day</p>
+            </div>
+            <div class="dxe-set">
+              <span class="dxe-mono-label">STOP AT</span>
+              <input type="time" name="advance_window_end"
+                     value="{{ deck.advance_window_end or '' }}">
+              <p class="dxe-help">blank runs until midnight</p>
+            </div>
+            {% else %}
             <div class="dxe-set">
               <span class="dxe-mono-label">START AT</span>
               <input type="time" name="advance_anchor"
@@ -131,6 +156,7 @@
                      value="{{ deck.advance_end_at if deck and deck.advance_end_at else '' }}">
               <p class="dxe-help">blank cycles until midnight</p>
             </div>
+            {% endif %}
             <div class="dxe-set">
               <span class="dxe-mono-label">MODE</span>
               <select name="advance_mode">
