@@ -6,6 +6,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.506.0], 2026-11-09
+
 ### Added
 
 - Settings → Logs: the server's own log as it's written. Pick a watch level (debug, info, warning or error and up), filter by text, follow live, download or clear. The record level can be lowered for the running server, so debug lines can be watched without a restart. It returns to the configured level on restart. Device tokens and pairing codes in a line are masked.
