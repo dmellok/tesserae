@@ -174,6 +174,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- Devices: a device's card shows an 800 px thumbnail of its latest picture rather than the full composition, which for a 4K display was about 10 MB.
 - Home Assistant, Entities: a door, window or motion sensor reads Closed / Open / Clear the way Home Assistant words it, instead of Off / On.
 - Visionect frames: a saved Wi-Fi password now reaches the frame, is masked on the device page instead of sent back to the browser, and is hidden in the frame log if the frame echoes it.
 - History: 12-hour times no longer overlap the thumbnail.
