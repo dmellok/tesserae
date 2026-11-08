@@ -27,6 +27,7 @@ from typing import Any
 
 import jsonschema
 
+from app import schema_validation
 from app.state.page_store import Panel
 
 logger = logging.getLogger(__name__)
@@ -422,7 +423,7 @@ def discover(
             continue
 
         try:
-            jsonschema.validate(manifest, schema)
+            schema_validation.validate(manifest, schema)
         except jsonschema.ValidationError as err:
             field_path = ".".join(str(p) for p in err.absolute_path) or "<root>"
             registry.errors.append(

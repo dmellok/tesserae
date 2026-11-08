@@ -49,6 +49,7 @@ from flask import (
 )
 from werkzeug.wrappers import Response
 
+from app import schema_validation
 from app.capabilities import Capabilities, set_delegate_resolver
 from app.capabilities import parse as _parse_capabilities
 
@@ -533,7 +534,7 @@ def _scan_plugin_dir(
             continue
 
         try:
-            jsonschema.validate(manifest, schema)
+            schema_validation.validate(manifest, schema)
         except jsonschema.ValidationError as err:
             field_path = ".".join(str(p) for p in err.absolute_path) or "<root>"
             registry.errors.append(

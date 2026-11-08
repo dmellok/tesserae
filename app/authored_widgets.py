@@ -32,6 +32,8 @@ from typing import Any
 
 import jsonschema
 
+from app import schema_validation
+
 logger = logging.getLogger(__name__)
 
 # Extraction caps. Compressed bound is checked before reading; the uncompressed
@@ -176,7 +178,7 @@ def _validate_manifest(manifest: Any, schema: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(manifest, dict):
         raise InstallError("plugin.json must be a JSON object", 422)
     try:
-        jsonschema.validate(manifest, schema)
+        schema_validation.validate(manifest, schema)
     except jsonschema.ValidationError as err:
         field = ".".join(str(p) for p in err.absolute_path) or "<root>"
         raise InstallError(f"manifest schema [{field}]: {err.message}", 422) from err

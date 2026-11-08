@@ -42,6 +42,7 @@ from typing import Any
 
 import jsonschema
 
+from app import schema_validation
 from app.device_loader import Device, DeviceRegistry, LoaderError
 
 logger = logging.getLogger(__name__)
@@ -121,7 +122,7 @@ def discover_hardware(
         manifest: dict[str, Any] = raw
 
         try:
-            jsonschema.validate(manifest, schema)
+            schema_validation.validate(manifest, schema)
         except jsonschema.ValidationError as err:
             field_path = ".".join(str(p) for p in err.absolute_path) or "<root>"
             errors.append(
