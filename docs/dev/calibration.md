@@ -149,15 +149,15 @@ Edge handling, wired for `esp32_bin` / `pi_bin` /
   `calibrated=True`.
 - **Colour-match modes** (RGB / LAB / chroma-aware) — stored but
   ignored; RGB nearest is the only path.
-- **`pi_png`** — palette override would need a firmware-side
-  change on `tesserae-device-pi-png`.
+- **`pi_png`** — palette override would need a client-side
+  change on `tesserae-device-pi`.
 - **`trmnl_png`** — mono; palette calibration doesn't apply.
 
 ## What phase 1 doesn't cover
 
 - `pi_png` (Pi client, uses the `inky` library for gamut projection)
-  — palette override would need a firmware-side change on
-  `tesserae-device-pi-png`.
+  — palette override would need a client-side change on
+  `tesserae-device-pi`.
 - `trmnl_png` (mono) — no palette calibration meaningful.
 - The advanced tone knobs (see above).
 

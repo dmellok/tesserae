@@ -52,9 +52,8 @@ Please include:
 ### In scope
 
 - The Tesserae server in this repository.
-- The four official client repos:
-  [tesserae-device-pi-png](https://github.com/dmellok/tesserae-device-pi-png),
-  [tesserae-device-pi-bin](https://github.com/dmellok/tesserae-device-pi-bin),
+- The official client repos:
+  [tesserae-device-pi](https://github.com/dmellok/tesserae-device-pi),
   [tesserae-device-esp32-bin](https://github.com/dmellok/tesserae-device-esp32-bin),
   [tesserae-trmnl-client](https://github.com/dmellok/tesserae-trmnl-client).
 - The HA App companion repo:

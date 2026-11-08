@@ -3,9 +3,12 @@
 # Tesserae Pi client, automated install via cloud-init.
 #
 # What this is for:
-#   A dedicated Raspberry Pi driving a Pimoroni Inky Impression panel.
-#   Boots a fresh Raspberry Pi OS Lite, installs the tesserae-device-pi-bin
-#   client + its systemd service, and starts polling your Tesserae server.
+#   A dedicated Raspberry Pi driving a Pimoroni Inky panel (Impression,
+#   wHAT or pHAT). Boots a fresh Raspberry Pi OS Lite, installs the
+#   tesserae-device-pi client from PyPI + its systemd service, and starts
+#   polling your Tesserae server. The panel is auto-detected from the
+#   HAT's EEPROM, and the client keeps itself up to date with signed
+#   updates from the server's Settings -> Firmware.
 #
 # NOT for the Tesserae server itself, that's scripts/cloud-init.yaml.
 #
@@ -18,9 +21,8 @@
 #      Open the BOOT partition.
 #   3. Copy this file to BOOT/user-data as-is. You do NOT edit this
 #      file. All per-install settings live in meta-data next to it.
-#   4. Open BOOT/meta-data and add two lines (server_url + model),
-#      keeping the existing instance-id. Full example at the bottom
-#      of this file.
+#   4. Open BOOT/meta-data and add a server_url line, keeping the
+#      existing instance-id. Full example at the bottom of this file.
 #   5. Insert the SD card into the Pi and power it on. First boot is
 #      5 to 10 minutes (apt install + pip install + Inky deps); after
 #      that the daemon starts and announces itself to the server.
@@ -28,8 +30,9 @@
 #      Discovered. Click Register on the new Pi entry.
 #
 # Persistent state lives in:
-#   /home/tesserae/tesserae-device-pi-bin/         (repo + venv)
-#   /home/tesserae/.config/tesserae-pi-bin-client/ (config.toml)
+#   /home/tesserae/.venvs/tesserae-device-pi/     (venv the client runs from)
+#   /home/tesserae/.config/tesserae-device-pi/    (config.toml)
+#   /home/tesserae/.cache/tesserae-device-pi/     (frame cache, update staging)
 #
 # Reboot behaviour: enabling SPI/I2C requires a reboot before the
 # panel can be driven. cloud-init triggers one (power_state below);
@@ -94,43 +97,37 @@ write_files:
       # for the Pimoroni Inky HAT.
       dtoverlay=spi0-0cs
 
-  # 2. Client config, jinja-templated from meta-data. server_url +
-  #    model come out of your meta-data file; everything else is a
-  #    default that works for a REST setup out of the box.
-  - path: /home/tesserae/.config/tesserae-pi-bin-client/config.toml
+  # 2. Client config, jinja-templated from meta-data. server_url (and
+  #    the optional device_id) come out of your meta-data file. The
+  #    client fills in the rest of the file (pairing token, timezone,
+  #    every other section at its default) the first time it saves.
+  - path: /home/tesserae/.config/tesserae-device-pi/config.toml
     defer: true
     owner: tesserae:tesserae
     permissions: "0600"
     content: |
-      # Tesserae pi-bin client config.
+      # Tesserae Pi client config (tesserae-device-pi).
       # Default transport is REST (no broker required); flip to mqtt
       # below + populate the [mqtt] block if you already run a broker.
       transport_mode = "rest"
 
-      # [mqtt] is used ONLY when transport_mode = "mqtt" above.
-      # For the default transport_mode = "rest" this whole section is
-      # inert: the client never reads host / client_id / device_id /
-      # anything else from here. You do NOT need to change any of
-      # these values for a REST setup. Keep them for the day you
-      # decide to flip to an MQTT broker.
+      # [mqtt] holds device_id, which identifies this Pi in every
+      # transport. The rest of the section is read ONLY when
+      # transport_mode = "mqtt"; keep it for the day you move to a broker.
       [mqtt]
       host = ""              # broker hostname when using MQTT transport
       port = 1883
       username = ""
       password = ""
       client_id = "pi-impression-1"  # MQTT client id; only matters if two Pi clients share a broker
-      device_id = "pi_bin"           # MQTT topic prefix: tesserae/<device_id>/...
+      device_id = "{{ ds.meta_data.device_id | default('pi_device') }}"
       keepalive = 60
 
       [rest]
       server_url = "{{ ds.meta_data.server_url }}"
       device_token = ""    # auto-populated after Register; do not edit by hand
       pairing_code = ""    # optional: paste a Settings -> Devices pairing code
-      last_frame_etag = "" # auto-populated for If-None-Match short-circuit
       poll_interval_s = 60 # fallback wake interval if server omits next_poll_s
-
-      [panel]
-      model = "{{ ds.meta_data.model }}"
 
       [http]
       download_timeout_s = 30
@@ -139,14 +136,16 @@ write_files:
       [logging]
       level = "INFO"
 
-  # 3. systemd unit for the client. Same shape as the one
-  #    tesserae-device-pi-bin's install-service.sh installs, inlined
-  #    here so we don't have to shell out to it.
-  - path: /etc/systemd/system/tesserae-pi-bin-client.service
+  # 3. systemd unit for the client. The same unit tesserae-device-pi's
+  #    install-service.sh installs, inlined here so we don't have to
+  #    shell out to it. ExecStartPre is the update rollback guard: it
+  #    puts the previous version back if an update fails to start three
+  #    times, and its leading "-" means a missing guard never blocks a start.
+  - path: /etc/systemd/system/tesserae-device-pi.service
     permissions: "0644"
     content: |
       [Unit]
-      Description=Tesserae Pi .bin client (model {{ ds.meta_data.model }})
+      Description=Tesserae Raspberry Pi client (Pimoroni e-ink panel)
       After=network-online.target
       Wants=network-online.target
 
@@ -155,7 +154,8 @@ write_files:
       User=tesserae
       Group=tesserae
       SupplementaryGroups=gpio spi
-      ExecStart=/usr/local/bin/tesserae-pi-bin-client
+      ExecStartPre=-/home/tesserae/.venvs/tesserae-device-pi/bin/python /home/tesserae/.cache/tesserae-device-pi/ota-guard.py /home/tesserae/.cache/tesserae-device-pi/ota-pending.json
+      ExecStart=/usr/local/bin/tesserae-device-pi
       Restart=on-failure
       RestartSec=5
       StandardOutput=journal
@@ -172,41 +172,52 @@ runcmd:
   # user-creation step populates lands owned by tesserae.
   - chown -R tesserae:tesserae /home/tesserae
 
-  # Clone the client repo. `su -c ... <user>` runs without a
-  # controlling terminal, unlike `sudo` which install.sh used to
-  # rely on. That's the whole reason we skip install.sh here.
-  #
-  # v0.69.13 (issue #35): the client repo doesn't publish releases
-  # yet so this stays on ``main`` for now. Once
-  # ``tesserae-device-pi-bin`` cuts its first tag, change this to
-  # ``git clone --branch v<X.Y.Z> --depth 1 ...`` to match the
-  # server yaml above. ``--depth 1`` still shrinks the clone size
-  # meaningfully in the meantime.
-  - su -c 'git clone --depth 1 https://github.com/dmellok/tesserae-device-pi-bin.git /home/tesserae/tesserae-device-pi-bin' tesserae
+  # Build the venv and install the client from PyPI (it pulls inky[rpi]),
+  # all as the tesserae user so the venv stays writable by the client:
+  # it installs its own signed updates into this venv. `su -c ... <user>`
+  # runs without a controlling terminal, unlike the `sudo` install.sh
+  # relies on, which is why this skips install.sh.
+  - su -c 'python3 -m venv /home/tesserae/.venvs/tesserae-device-pi' tesserae
+  - su -c '/home/tesserae/.venvs/tesserae-device-pi/bin/pip install --upgrade pip' tesserae
+  - su -c '/home/tesserae/.venvs/tesserae-device-pi/bin/pip install tesserae-device-pi' tesserae
 
-  # Build the venv + pip-install the client + inky[rpi] extras, all
-  # as the tesserae user so the venv permissions stay right.
-  - su -c 'python3 -m venv /home/tesserae/tesserae-device-pi-bin/.venv' tesserae
-  - su -c '/home/tesserae/tesserae-device-pi-bin/.venv/bin/pip install --upgrade pip' tesserae
-  - su -c '/home/tesserae/tesserae-device-pi-bin/.venv/bin/pip install -e "/home/tesserae/tesserae-device-pi-bin[rpi]"' tesserae
+  # Pi 5 / Bookworm: RPi.GPIO does not drive those boards; rpi-lgpio
+  # stands in for it. Harmless to skip elsewhere.
+  - |
+    if grep -q "Raspberry Pi 5" /proc/device-tree/model 2>/dev/null; then
+      su -c '/home/tesserae/.venvs/tesserae-device-pi/bin/pip install rpi-lgpio' tesserae
+    fi
+
+  # The update rollback guard runs from the cache dir, outside the venv,
+  # so a broken update can't take the guard down with it.
+  - su -c 'mkdir -p /home/tesserae/.cache/tesserae-device-pi' tesserae
+  - su -c 'cp "$(/home/tesserae/.venvs/tesserae-device-pi/bin/python -c "import tesserae_device_pi.ota_guard as g; print(g.__file__)")" /home/tesserae/.cache/tesserae-device-pi/ota-guard.py' tesserae
 
   # Symlink the client entry-point into /usr/local/bin so the
   # systemd unit's ExecStart resolves. Run as root (default runcmd
   # user), no need for sudo.
-  - ln -sf /home/tesserae/tesserae-device-pi-bin/.venv/bin/tesserae-pi-bin-client /usr/local/bin/tesserae-pi-bin-client
+  - ln -sf /home/tesserae/.venvs/tesserae-device-pi/bin/tesserae-device-pi /usr/local/bin/tesserae-device-pi
 
   # Enable the systemd unit. systemctl start would fail here because
   # SPI/I2C don't take effect until the post-cloud-init reboot below;
   # enable + reboot is how the service starts cleanly on second boot.
   - systemctl daemon-reload
-  - systemctl enable tesserae-pi-bin-client.service
+  - systemctl enable tesserae-device-pi.service
+
+# SPI, I2C and the spi0-0cs overlay take effect only after a reboot, so
+# cloud-init reboots once it has finished; the service starts on the
+# second boot.
+power_state:
+  mode: reboot
+  message: Rebooting so SPI and I2C take effect for the Inky panel
+  condition: true
 
 final_message: |
-  Tesserae pi-bin client installed.
+  Tesserae Pi client (tesserae-device-pi) installed.
 
-  Service: systemctl status tesserae-pi-bin-client
-  Logs:    journalctl -u tesserae-pi-bin-client -f
-  Config:  /home/tesserae/.config/tesserae-pi-bin-client/config.toml
+  Service: systemctl status tesserae-device-pi
+  Logs:    journalctl -u tesserae-device-pi -f
+  Config:  /home/tesserae/.config/tesserae-device-pi/config.toml
 
   Next step: open your Tesserae server's web UI, go to
   Settings -> Devices -> Discovered, and click Register on the new
@@ -219,15 +230,18 @@ final_message: |
 #
 #   instance-id: pi-inky-01
 #   server_url: http://tesserae.local:8765
-#   model: inky_13_3
+#   device_id: pi_lounge
 #   ssh_key: ssh-ed25519 AAAA...your-key...
 #
-# `server_url` and `model` are mandatory.
+# `server_url` is mandatory: your Tesserae server's base URL
+# (whatever you'd type in a browser to reach the web UI).
 #
-# `server_url` is your Tesserae server's base URL (whatever you'd
-# type in a browser to reach the web UI). `model` is one of:
+# `device_id` is optional (default pi_device). Give each Pi its own
+# when you run more than one: lowercase, 2-32 characters, starting
+# with a letter.
 #
-#   inky_4 | inky_5_7 | inky_7_3 | inky_13_3
+# There is no panel setting: the client reads the panel from the
+# Inky HAT's EEPROM. An older meta-data's `model:` line is ignored.
 #
 # `ssh_key` is optional, but without a key the account is
 # unreachable.

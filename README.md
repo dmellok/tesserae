@@ -215,12 +215,12 @@ microSD and the frontlight are not wired yet.
 
 | Panel | Resolution | Client | Status |
 |---|---|---|---|
-| [Inky Impression 4"](https://shop.pimoroni.com/products/inky-impression) (6-colour Spectra 6) | 600×400 | [pi-png](https://github.com/dmellok/tesserae-device-pi-png) or [pi-bin](https://github.com/dmellok/tesserae-device-pi-bin) | ✅ |
-| Inky Impression 4" (legacy 7-colour ACeP) | 640×400 | [pi-png](https://github.com/dmellok/tesserae-device-pi-png) or [pi-bin](https://github.com/dmellok/tesserae-device-pi-bin) | ✅ |
-| [Inky Impression 5.7"](https://shop.pimoroni.com/products/inky-impression-5-7) (7-colour ACeP) | 600×448 | [pi-png](https://github.com/dmellok/tesserae-device-pi-png) or [pi-bin](https://github.com/dmellok/tesserae-device-pi-bin) | ✅ |
-| [Inky Impression 7.3"](https://shop.pimoroni.com/products/inky-impression?variant=55186435244411) (6-colour Spectra 6) | 800×480 | [pi-png](https://github.com/dmellok/tesserae-device-pi-png) or [pi-bin](https://github.com/dmellok/tesserae-device-pi-bin) | ✅ |
-| [Inky Impression 13.3"](https://shop.pimoroni.com/products/inky-impression?variant=55186435277179) (6-colour Spectra 6) | 1600×1200 | [pi-png](https://github.com/dmellok/tesserae-device-pi-png) or [pi-bin](https://github.com/dmellok/tesserae-device-pi-bin) | ✅ |
-| Inky [pHAT](https://shop.pimoroni.com/products/inky-phat) / [wHAT](https://shop.pimoroni.com/products/inky-what) | various | [pi-png](https://github.com/dmellok/tesserae-device-pi-png) | works via `pi_png` |
+| [Inky Impression 4"](https://shop.pimoroni.com/products/inky-impression) (6-colour Spectra 6) | 600×400 | [tesserae-device-pi](https://github.com/dmellok/tesserae-device-pi) | ✅ |
+| Inky Impression 4" (legacy 7-colour ACeP) | 640×400 | [tesserae-device-pi](https://github.com/dmellok/tesserae-device-pi) | ✅ |
+| [Inky Impression 5.7"](https://shop.pimoroni.com/products/inky-impression-5-7) (7-colour ACeP) | 600×448 | [tesserae-device-pi](https://github.com/dmellok/tesserae-device-pi) | ✅ |
+| [Inky Impression 7.3"](https://shop.pimoroni.com/products/inky-impression?variant=55186435244411) (6-colour Spectra 6) | 800×480 | [tesserae-device-pi](https://github.com/dmellok/tesserae-device-pi) | ✅ |
+| [Inky Impression 13.3"](https://shop.pimoroni.com/products/inky-impression?variant=55186435277179) (6-colour Spectra 6) | 1600×1200 | [tesserae-device-pi](https://github.com/dmellok/tesserae-device-pi) | ✅ |
+| Inky [pHAT](https://shop.pimoroni.com/products/inky-phat) / [wHAT](https://shop.pimoroni.com/products/inky-what) | various | [tesserae-device-pi](https://github.com/dmellok/tesserae-device-pi) | works via `pi_png` |
 
 ### Waveshare
 

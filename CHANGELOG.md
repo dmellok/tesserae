@@ -127,6 +127,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Changed
 
+- Raspberry Pi: the docs, README and issue templates point to the unified [tesserae-device-pi](https://github.com/dmellok/tesserae-device-pi) client; the pi-png and pi-bin repos are archived. The Pi cloud-init (`scripts/pi-client-cloud-init.yaml`) installs it from PyPI with its update rollback guard, needs only `server_url` in meta-data (`device_id` optional, no panel model), and reboots itself once so SPI and I²C take effect.
 - Lineups redesign, part 2 of 3: the Lineups page is rebuilt on the view model
   from part 1. Each display gets a header that says what is on screen (the
   picture itself), what is queued and when it lands, and when the frame next

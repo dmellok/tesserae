@@ -168,10 +168,10 @@ VENDOR_INTRO: dict[str, str] = {
 # entry is a list of ``(label, url)`` tuples.
 CLIENT_REPOS: dict[str, list[tuple[str, str]]] = {
     "pi_png": [
-        ("tesserae-device-pi-png", "https://github.com/dmellok/tesserae-device-pi-png"),
+        ("tesserae-device-pi", "https://github.com/dmellok/tesserae-device-pi"),
     ],
     "pi_bin": [
-        ("tesserae-device-pi-bin", "https://github.com/dmellok/tesserae-device-pi-bin"),
+        ("tesserae-device-pi", "https://github.com/dmellok/tesserae-device-pi"),
     ],
     "esp32_bin": [
         (

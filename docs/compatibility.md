@@ -36,8 +36,8 @@ A renderer turns the composition PNG into the exact bytes a client wants. Each s
 | `esp32_gray2_bin` | `.bin` | - | Composition PNG dithered to 4-level grayscale and packed into a 2-bpp raw buffer for UC8179-class mono panels driven in their 4-gray waveform mode. |
 | `esp32_gray_bin` | `.bin` | - | Composition PNG dithered to 16-level grayscale and packed into a 4-bpp raw buffer the ESP32 firmware streams straight to the IT8951 controller's image buffer. |
 | `kaleido_png` | `.png` | - | Composition PNG fitted to the e-reader's screen and quantised to the E Ink Kaleido 3 gamut: a 24-bit RGB PNG with every channel dithered to 16 levels (4096 colours), which is what a colour filter over 16-grey glass can show. |
-| `pi_bin` | `.bin` | [tesserae-device-pi-bin](https://github.com/dmellok/tesserae-device-pi-bin) | Composition PNG packed into the panel-native 4-bpp buffer the .bin Pi client consumes. |
-| `pi_png` | `.png` | [tesserae-device-pi-png](https://github.com/dmellok/tesserae-device-pi-png) | Composition PNG, rotated to the Pi client's landscape-native pixel grid. |
+| `pi_bin` | `.bin` | [tesserae-device-pi](https://github.com/dmellok/tesserae-device-pi) | Composition PNG packed into the panel-native 4-bpp buffer the .bin Pi client consumes. |
+| `pi_png` | `.png` | [tesserae-device-pi](https://github.com/dmellok/tesserae-device-pi) | Composition PNG, rotated to the Pi client's landscape-native pixel grid. |
 | `pico_bin` | `.bin` | - | Composition PNG packed into the panel-native landscape 4-bpp buffer the battery-powered Pico Plus 2 firmware (tesserae-device-pico-bin) streams onto a Pimoroni Inky-style Spectra 6 panel over SPI. |
 | `trmnl_png` | `.png` | [tesserae-trmnl-client](https://github.com/dmellok/tesserae-trmnl-client) | Composition PNG fitted to the device's panel size, then quantised to 1-bit black/white with the selected dither. |
 | `trmnl_png_color` | `.png` | - | Composition PNG quantised to an indexed PNG matched to a Spectra 6 / Waveshare E6 / ACeP colour panel, delivered over the same TRMNL BYOS /api/display path as the 1-bit trmnl_png renderer. |

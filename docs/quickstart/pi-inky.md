@@ -5,28 +5,25 @@ A Raspberry Pi wired to a Pimoroni Inky Impression: 4", 5.7", 7.3", 13.3", or a 
 !!! tip "Fresh SD card?"
     If you're setting up a brand-new Pi specifically for this, the [cloud-init path](pi-inky-cloud-init.md) is zero-touch: flash the SD card with Pi Imager, drop one yaml into the boot partition, edit two values, boot. No SSH required.
 
-!!! tip "Which client?"
-    Two clients drive Pimoroni Inky panels: `pi-bin` (fast, panel-native 4-bpp packed buffer) and `pi-png` (PNG path, quantises on the Pi). This guide uses `pi-bin`. Switch to `pi-png` only if your panel uses a colour gamut `pi-bin` doesn't pack (the pHAT and wHAT in particular).
+!!! tip "One client for every Inky panel"
+    [`tesserae-device-pi`](https://github.com/dmellok/tesserae-device-pi) drives every Pimoroni Inky panel. It reads the panel from the HAT, tells the server when it pairs, and the server picks the frame format: a Spectra 6 Impression gets frames already packed for the panel (the fastest path), every other panel gets a PNG the Pi dithers itself. It replaces the earlier `tesserae-device-pi-png` and `tesserae-device-pi-bin` clients.
 
 ## 01 — Install the Pi client
 
 On the Pi wired to your Inky, as your normal user:
 
 ```sh
-git clone https://github.com/dmellok/tesserae-device-pi-bin.git
-cd tesserae-device-pi-bin
-./scripts/install.sh
+git clone https://github.com/dmellok/tesserae-device-pi.git
+cd tesserae-device-pi
+./scripts/install.sh            # add --bookworm on a Pi 5
 ```
 
-The script enables SPI / I²C, asks for your Tesserae server URL (REST, no broker needed) and panel size, then installs a `tesserae-pi-bin-client` systemd service that runs on boot.
+The script enables SPI / I²C, asks for your Tesserae server URL (REST, no broker needed) and a device id, then installs a `tesserae-device-pi` systemd service that runs on boot. Reboot once when it asks, so SPI and I²C take effect. There is no panel to choose: the client reads it from the HAT.
 
-If you want the PNG path instead:
+The client is also on PyPI (`pip install tesserae-device-pi`); the [client README](https://github.com/dmellok/tesserae-device-pi#from-pypi) covers that path.
 
-```sh
-git clone https://github.com/dmellok/tesserae-device-pi-png.git
-cd tesserae-device-pi-png
-./scripts/install.sh
-```
+!!! note "Upgrading from pi-png or pi-bin?"
+    Install the new client the same way. It picks up the old client's config, keeps the device's id and pairing, and disables the old service, so nothing needs re-pairing.
 
 ## 02 — Pair the panel
 
@@ -34,10 +31,14 @@ In **Settings → Devices**, your Pi appears under **Discovered** within a few s
 
 If your Pi doesn't appear:
 
-- Check `journalctl -u tesserae-pi-bin-client -f` on the Pi for connection errors.
+- Check `journalctl -u tesserae-device-pi -f` on the Pi for connection errors.
 - Confirm the Pi can reach your Tesserae server's URL (`curl http://<server>:8765/api/healthz` from the Pi).
 
-## 03 — Compose a dashboard
+## 03 — Keep it up to date
+
+The client updates itself. When a new release is out, **Settings → Firmware** offers it for the Pi; the update is signed, and if the new version fails to start the Pi puts the old one back.
+
+## 04 — Compose a dashboard
 
 In the editor:
 
@@ -48,7 +49,7 @@ In the editor:
 
 The composer sizes the layout to your panel automatically: 1600×1200 for the 13.3", 800×480 for the 7.3", 600×448 for the 5.7", 640×400 for the 4".
 
-## 04 — Put it on a cadence
+## 05 — Put it on a cadence
 
 Open the dashboard's **Schedules** card:
 

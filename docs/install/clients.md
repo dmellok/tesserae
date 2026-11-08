@@ -14,8 +14,7 @@ device-registration flow described in [Set up a device](devices.md).
 |---|---|---|---|
 | [`tesserae-device-firmware`](https://github.com/dmellok/tesserae-device-firmware) | REST | `esp32` | Seeed reTerminal E1001-E1004, XIAO EE02, XIAO EE03, XIAO 7.5", Waveshare 13.3" Spectra 6, PhotoPainter 7.3" (browser flash at [tesserae.ink/flash](https://tesserae.ink/flash)) |
 | `tesserae-device-esp32-bw` | MQTT | `esp32_bw` | Waveshare 4.2" B/W (400×300, 1-bpp) and other small B/W panels |
-| `tesserae-device-pi-bin` | MQTT | `pi_bin` | Plugged-in Pimoroni Inky Impression (fastest path) |
-| `tesserae-device-pi-png` | REST / MQTT | `pi_png` | Any inky-supported panel (2/3/6/7 colour) |
+| [`tesserae-device-pi`](https://github.com/dmellok/tesserae-device-pi) | REST / MQTT / cloud relay | `pi_device` | Any Pimoroni Inky panel on a Raspberry Pi: Impression (4", 5.7", 7.3", 13.3"), wHAT, pHAT |
 | `tesserae-device-pico-bin` | MQTT | `pico_bin` | Pimoroni Pico-driven Inky Impression (4-bpp Spectra 6) |
 | [`tesserae-koreader`](https://github.com/dmellok/tesserae-koreader) | REST | `koreader_client` | Jailbroken Kindles, Kobo, and other e-readers running KOReader; 16-level greyscale, or colour on a Kaleido 3 reader (Kobo Libra Colour, Clara Colour), sleeps between refreshes |
 | [TRMNL stock firmware](https://github.com/usetrmnl/trmnl-firmware) or [KOReader plugin](https://github.com/koreader/koreader) | HTTP-pull (BYOS) | `trmnl` | TRMNL devices + KOReader-on-Kindle |
@@ -66,30 +65,34 @@ up without changes.
     with the result either way and the table on [Screens & compatibility](../compatibility.md)
     gets updated.
 
-## tesserae-device-pi-bin
+## tesserae-device-pi
 
-[:material-github: dmellok/tesserae-device-pi-bin](https://github.com/dmellok/tesserae-device-pi-bin)
-· pairs with the `pi_bin` renderer · default id `pi_bin`
+[:material-github: dmellok/tesserae-device-pi](https://github.com/dmellok/tesserae-device-pi)
+· pairs as `pi_client`, with the `pi_bin` or `pi_png` renderer · default id `pi_device`
 
-A Raspberry-Pi-side Python daemon. It subscribes to
-`tesserae/<device_id>/frame/bin` and writes the server's already-packed 4-bpp
-buffer straight into the [`inky`](https://github.com/pimoroni/inky) library's
-internal `_buf`, no PIL on the Pi paint path. This is the **fastest** path on a
-Pimoroni Inky Impression (Spectra 6 / Waveshare E6, any of the four sizes,
-auto-detected via the HAT EEPROM). The trade-off is a private-API dependency:
-the `inky` version is pinned exactly.
+A Python daemon for a **Raspberry Pi** driving any Pimoroni Inky panel. It reads
+the panel from the HAT's EEPROM and reports it when it pairs, and the server
+picks the frame format: a **Spectra 6 Impression** (4", 7.3", 13.3") gets the
+`pi_bin` frame, already quantised and packed for the panel and written straight
+to it, the fastest path; **every other panel** (the 7-colour Impressions, wHAT,
+pHAT) gets the `pi_png` frame, which the Pi dithers to the panel's colours.
 
-## tesserae-device-pi-png
+It speaks REST (the default, no broker), MQTT, or the cloud relay for a panel
+that can't reach the server. Beyond painting frames it has push updates,
+offline decks and albums, the front buttons, battery and sensor telemetry,
+status screens on the panel, a settings page on your network, and signed
+self-updates from **Settings → Firmware**.
 
-[:material-github: dmellok/tesserae-device-pi-png](https://github.com/dmellok/tesserae-device-pi-png)
-· pairs with the `pi_png` renderer · default id `pi_png`
+Install it with the one-shot script in its repo, from PyPI
+(`pip install tesserae-device-pi`), or on a fresh SD card with the
+[cloud-init quickstart](../quickstart/pi-inky-cloud-init.md). The
+[Raspberry Pi quickstart](../quickstart/pi-inky.md) walks through it.
 
-The same Pi-side daemon shape, but it subscribes to
-`tesserae/<device_id>/frame/png` and hands incoming PNGs to `inky`'s high-level
-`set_image()`. That makes it work on **every panel the inky library supports** -
-pHAT, wHAT, Impression 4"/5.7"/7.3"/13.3", in 2/3/6/7 colour. Quantising on the
-Pi every frame makes it the slower of the two Pi paths, but it stays
-wire-compatible with the inky-dash v3/v4 listener protocol.
+It replaces the two earlier Pi clients, `tesserae-device-pi-bin` and
+`tesserae-device-pi-png`, whose repos are archived. Installing it on a Pi that
+ran either picks up the old config and keeps the device's id and pairing.
+A device paired by an old client keeps its `pi_bin_client` or `pi_png_client`
+kind and keeps getting the same frames.
 
 ## tesserae-koreader (Kindle, Kobo, any KOReader e-reader)
 

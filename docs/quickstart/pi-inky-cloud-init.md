@@ -1,6 +1,6 @@
 # Quickstart: Pi + Pimoroni Inky, automated via cloud-init
 
-The fastest way to stand up a dedicated Raspberry Pi driving a Pimoroni Inky panel. Flash the SD card with Raspberry Pi Imager, drop the cloud-init file into the boot partition as-is, add three lines to the boot partition's `meta-data`, insert + power on. After one reboot you have a `tesserae-pi-bin-client` systemd service polling your Tesserae server.
+The fastest way to stand up a dedicated Raspberry Pi driving a Pimoroni Inky panel. Flash the SD card with Raspberry Pi Imager, drop the cloud-init file into the boot partition as-is, add a line or two to the boot partition's `meta-data`, insert + power on. After one reboot you have the [`tesserae-device-pi`](https://github.com/dmellok/tesserae-device-pi) client running as a systemd service, polling your Tesserae server and keeping itself up to date.
 
 !!! tip "Already have the Pi running?"
     Skip this page; use the manual flow at [Raspberry Pi + Pimoroni Inky](pi-inky.md). cloud-init is for *fresh* SD cards, not for adding the client to a Pi you're already using for something else.
@@ -35,36 +35,38 @@ After the flash finishes, eject and re-insert the SD card so the BOOT partition 
 3. Leave `network-config` alone; your WiFi credentials live there.
 4. **Do NOT edit `user-data`.** Per-install settings go in `meta-data` instead. This lets you reuse the same `user-data` verbatim across every Pi you flash.
 
-## 03 — Edit `meta-data` (three lines)
+## 03 — Edit `meta-data`
 
-Open `meta-data` in the same BOOT partition. Pi Imager wrote one line (`instance-id: ...`). Add two more so the file looks like:
+Open `meta-data` in the same BOOT partition. Pi Imager wrote one line (`instance-id: ...`). Add your server, and optionally a device id, so the file looks like:
 
 ```yaml
 instance-id: pi-inky-01
 server_url: http://tesserae.local:8765
-model: inky_13_3
+device_id: pi_lounge
 ```
 
 - **`instance-id`** — any short unique id for this Pi. Whatever Pi Imager wrote is fine; if you're flashing multiple Pis, bump the number (`pi-inky-01`, `pi-inky-02`, …).
 - **`server_url`** — your Tesserae server's base URL (whatever you'd type in a browser to reach the web UI). If your Tesserae host doesn't broadcast `tesserae.local` over mDNS, use its IP: `http://192.168.1.10:8765`.
-- **`model`** — one of `inky_4`, `inky_5_7`, `inky_7_3`, `inky_13_3`.
+- **`device_id`** — optional; defaults to `pi_device`. Give each Pi its own when you run more than one: lowercase, 2 to 32 characters, starting with a letter.
+
+There is no panel setting: the client reads the panel from the Inky HAT's EEPROM. A `model:` line left over from an older guide is ignored.
 
 Save `meta-data`. Unmount the SD card cleanly.
 
-The `user-data` file references these two values via jinja templating (`{{ ds.meta_data.server_url }}` and `{{ ds.meta_data.model }}`) so you never edit the big yaml.
+The `user-data` file references these values via jinja templating (`{{ ds.meta_data.server_url }}`, `{{ ds.meta_data.device_id }}`) so you never edit the big yaml.
 
 ## 04 — Boot the Pi
 
 Insert the SD card into the Pi and power it on. **First boot takes 5 to 10 minutes** because cloud-init:
 
-- Updates apt + installs `git`, Python, and the Inky runtime deps (`libopenjp2-7`, `libtiff6`, `build-essential`, etc.).
+- Updates apt + installs Python and the Inky runtime deps (`libopenjp2-7`, `libtiff6`, `build-essential`, etc.).
 - Enables SPI + I²C via cloud-init's native `rpi.interfaces` (no `raspi-config` shell-out required).
 - Appends `dtoverlay=spi0-0cs` to `/boot/firmware/config.txt` (frees the chip-select pin for Inky).
 - Creates a `tesserae` user with `gpio` + `spi` group membership.
-- Clones [`tesserae-device-pi-bin`](https://github.com/dmellok/tesserae-device-pi-bin) into `/home/tesserae/tesserae-device-pi-bin`.
-- Builds a Python venv, pip-installs the client + `inky[rpi]` extras.
-- Symlinks `tesserae-pi-bin-client` into `/usr/local/bin/`.
-- Installs + enables the `tesserae-pi-bin-client` systemd unit.
+- Builds a Python venv in `/home/tesserae/.venvs/tesserae-device-pi` and installs [`tesserae-device-pi`](https://pypi.org/project/tesserae-device-pi/) from PyPI (plus `rpi-lgpio` on a Pi 5).
+- Sets up the update rollback guard, which puts the previous version back if an update fails to start.
+- Symlinks `tesserae-device-pi` into `/usr/local/bin/`.
+- Installs + enables the `tesserae-device-pi` systemd unit.
 - Reboots so SPI / I²C take effect.
 
 After the reboot the systemd unit starts automatically. From this point the Pi is announcing itself to your Tesserae server every poll interval (default 60s).
@@ -100,7 +102,7 @@ For battery-powered Pi setups (rare but possible), **smart sync** keeps the pane
 
 | Symptom | Likely cause + fix |
 |---|---|
-| Pi doesn't appear under Discovered after 10 minutes. | SSH into the Pi (`ssh tesserae@<pi-ip>`), check `journalctl -u tesserae-pi-bin-client -f`. Common: `server_url` in meta-data is unreachable, or SPI didn't enable. |
+| Pi doesn't appear under Discovered after 10 minutes. | SSH into the Pi (`ssh tesserae@<pi-ip>`), check `journalctl -u tesserae-device-pi -f`. Common: `server_url` in meta-data is unreachable, or SPI didn't enable. |
 | Service log says `No EEPROM detected!` | I²C didn't enable. SSH in and run `sudo raspi-config nonint do_i2c 0 && sudo reboot`. |
 | Service log says `Chip Select … currently claimed by spi0 CS0` | The `dtoverlay=spi0-0cs` line is missing from `/boot/firmware/config.txt`. Add it manually and reboot. |
 | Service log says `connection refused` to the server URL | Tesserae server isn't reachable from the Pi's network. Verify `curl http://<server>:8765/api/healthz` from the Pi. |
@@ -112,7 +114,7 @@ For battery-powered Pi setups (rare but possible), **smart sync** keeps the pane
 - **Doesn't open any ports** on a host firewall.
 - **Doesn't configure WiFi**: that's in `network-config`, written by Pi Imager.
 - **Doesn't tune `quiet_hours`, smart sync, or other server-side schedule behaviour**: that lives in the Tesserae server's UI on a per-device basis.
-- **Doesn't pin the client to a specific version yet**: the client repo (`tesserae-device-pi-bin`) doesn't publish tags yet, so this cloud-init stays on `main` with a shallow (`--depth 1`) clone. The server yaml resolves the newest Tesserae release tag at boot; the client will follow the same shape once it cuts its first tag. To pin manually today, edit the `runcmd` `git clone` line to add `--branch <sha>` or `--branch <tag>` once tags exist.
+- **Doesn't pin the client to a version**: it installs the newest `tesserae-device-pi` release from PyPI, and from then on the Pi updates itself from **Settings → Firmware**. To pin one, edit the `runcmd` `pip install` line to `tesserae-device-pi==<version>`.
 
 ## Next steps
 
