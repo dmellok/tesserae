@@ -12,6 +12,7 @@ import pytest
 from flask import Flask
 from PIL import Image, ImageDraw
 
+from app.lineup_thumbs import exact_thumb_size
 from app.main import REPO_ROOT, create_app
 from app.state.page_store import Page
 
@@ -86,7 +87,10 @@ def test_versioned_small_image_is_cached_without_event_queries(
     assert r.mimetype == "image/webp"
     assert len(r.data) < 40_000
     with Image.open(io.BytesIO(r.data)) as image:
-        assert image.size == (202, 360)
+        # Exact aspect (no rounded side), at most 360 px: the card shows no
+        # strip of its background along the image.
+        assert image.size == exact_thumb_size((1440, 2560), 360) == (198, 352)
+        assert max(image.size) <= 360
     etag = r.headers["ETag"]
     assert client.get(url, buffered=True, headers={"If-None-Match": etag}).status_code == 304
     # A cached variant can be served without opening or resizing the source.
@@ -162,7 +166,7 @@ def test_png_fallback_and_invalid_thumbnail_paths(
     with c.get(url, buffered=True) as r:
         assert r.status_code == 200 and r.mimetype == "image/png"
         with Image.open(io.BytesIO(r.data)) as image:
-            assert max(image.size) == 360
+            assert max(image.size) <= 360
     assert c.get("/compose/thumbs/v1/sent/not-a-digest.png").status_code == 404
     assert c.get("/compose/thumbs/v1/other/abcdef.png").status_code == 404
 
