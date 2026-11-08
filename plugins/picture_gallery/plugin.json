@@ -116,6 +116,9 @@
       "help": "A photo count indicator."
     }
   ],
+  "lineups": {
+    "draw": true
+  },
   "render": {
     "dither": "floyd-steinberg",
     "full_bleed": true,

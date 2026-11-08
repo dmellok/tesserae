@@ -375,3 +375,10 @@ def test_a_device_id_never_reaches_the_filename_raw(app: Flask) -> None:
         assert " " not in path.name
         assert "passwd" not in path.name and "Kitchen" not in path.name
         assert path.parent == plugin.data_dir
+
+
+def test_manifest_lets_lineups_draw_another_image() -> None:
+    import json
+
+    manifest = json.loads((Path(__file__).resolve().parents[1] / "plugin.json").read_text())
+    assert manifest["lineups"] == {"draw": True}
