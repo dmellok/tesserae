@@ -16,6 +16,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- Devices: the pairing code pop-up gives the address a device reaches Tesserae on, not the browser's. Under Home Assistant ingress it showed Home Assistant's own address (#460). The Companion pairing pop-up does the same.
 - Lineups and history thumbnails keep the display's exact shape, so a dark picture no longer shows a thin light line along one edge.
 - Devices: a device's card shows an 800 px thumbnail of its latest picture rather than the full composition, which for a 4K display was about 10 MB.
 
