@@ -217,9 +217,12 @@ def _serve_render_thumbnail(renders_dir: Path, filename: str, width: int) -> Res
             from PIL import Image
 
             thumbs_dir.mkdir(parents=True, exist_ok=True)
-            with Image.open(src) as im:
-                im.thumbnail(
-                    (width, width * _MAX_THUMB_HEIGHT_MULTIPLIER),
+            from app.lineup_thumbs import exact_fit
+
+            with Image.open(src) as source:
+                fmt = source.format
+                im = source.resize(
+                    exact_fit(source.size, width, width * _MAX_THUMB_HEIGHT_MULTIPLIER),
                     Image.Resampling.LANCZOS,
                 )
                 # Pass format= explicitly so Pillow doesn't try to
@@ -229,7 +232,7 @@ def _serve_render_thumbnail(renders_dir: Path, filename: str, width: int) -> Res
                 # extension-based format guess with
                 # ``unknown file extension: .tmp``.
                 tmp_path = thumb_path.with_name(thumb_path.name + ".tmp")
-                im.save(tmp_path, format=im.format or "PNG", optimize=True)
+                im.save(tmp_path, format=fmt or "PNG", optimize=True)
                 tmp_path.replace(thumb_path)
         except Exception:
             logger.warning("thumbnail render failed for %s", filename, exc_info=True)

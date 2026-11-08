@@ -26,7 +26,7 @@ _ENCODE_LOCK = threading.Lock()
 def _paths(kind: str, key: str, dim: int = MAX_DIM) -> tuple[Path, Path]:
     core = Path(current_app.config["DATA_ROOT"]) / "core"
     directory = core / ("renders" if kind == "sent" else "previews")
-    return directory / f"{key}.png", directory / ".thumbs" / f"{key}-lu-v1-{dim}.{_EXT}"
+    return directory / f"{key}.png", directory / ".thumbs" / f"{key}-lu-v2-{dim}.{_EXT}"
 
 
 def page_compositions(pages: list[Page]) -> dict[str, str]:
@@ -110,6 +110,38 @@ def page_thumbs(pages: list[Page], compositions: dict[str, str] | None = None) -
     return out
 
 
+def exact_fit(size: tuple[int, int], max_w: int, max_h: int) -> tuple[int, int]:
+    """Fit ``size`` inside ``max_w`` x ``max_h`` (never enlarging) at the
+    source's exact aspect ratio.
+
+    A plain thumbnail rounds one side (3840x2160 at 360 wide is 360x203, not
+    202.5), and a card sized by the display's true ratio then shows a
+    sub-pixel strip of its background along the image: a thin light line on a
+    dark photo. Stepping the long side down a few pixels finds a size whose
+    other side is a whole number (352x198 for 16:9); without one within 8%
+    the plain rounding is kept."""
+    w, h = size
+    if w <= 0 or h <= 0:
+        return max(1, w), max(1, h)
+    scale = min(max_w / w, max_h / h, 1.0)
+    if w >= h:
+        long_side, ratio = max(1, int(w * scale)), h / w
+    else:
+        long_side, ratio = max(1, int(h * scale)), w / h
+    for candidate in range(long_side, max(0, int(long_side * 0.92)), -1):
+        other = candidate * ratio
+        if abs(other - round(other)) < 0.01 and round(other) >= 1:
+            pair = (candidate, round(other))
+            return pair if w >= h else (pair[1], pair[0])
+    other = max(1, round(long_side * ratio))
+    return (long_side, other) if w >= h else (other, long_side)
+
+
+def exact_thumb_size(size: tuple[int, int], dim: int) -> tuple[int, int]:
+    """:func:`exact_fit` inside a ``dim`` square, the Lineups card bound."""
+    return exact_fit(size, dim, dim)
+
+
 def serve(kind: str, key: str, ext: str, large: bool = False) -> Response:
     """Serve a version directly, without reading the page store or event log.
     ``large`` is the lightbox rendition (``LARGE_DIM``) rather than the card's."""
@@ -126,8 +158,8 @@ def serve(kind: str, key: str, ext: str, large: bool = False) -> Response:
                 if not source.is_file():
                     abort(404)
                 cached.parent.mkdir(parents=True, exist_ok=True)
-                with Image.open(source) as im:
-                    im.thumbnail((dim, dim), Image.Resampling.LANCZOS)
+                with Image.open(source) as src:
+                    im = src.resize(exact_thumb_size(src.size, dim), Image.Resampling.LANCZOS)
                     tmp_path: Path | None = None
                     try:
                         with tempfile.NamedTemporaryFile(
@@ -152,7 +184,7 @@ def serve(kind: str, key: str, ext: str, large: bool = False) -> Response:
         cached,
         mimetype=f"image/{_EXT}",
         conditional=True,
-        etag=f"lu-v1-{dim}-{kind}-{key}-{_EXT}",
+        etag=f"lu-v2-{dim}-{kind}-{key}-{_EXT}",
         max_age=31536000,
     )
     # Authenticated images belong in the user's browser cache, not shared proxies.
