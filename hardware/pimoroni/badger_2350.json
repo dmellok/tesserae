@@ -1,0 +1,25 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "pimoroni_badger_2350",
+  "name": "Pimoroni Badger 2350",
+  "vendor": "Pimoroni",
+  "url": "https://shop.pimoroni.com/products/badger-2350",
+  "icon": "identification-badge",
+  "description": "2.7 inch 264x176 four-grey e-paper badge (SSD1680) with an RP2350, Wi-Fi and five buttons. Runs the tesserae-device-badger app inside the stock Badgeware menu: it pairs over the REST device API, paints the dashboard in four greys and sends A/B/C/up/down as button wakes. The server sends a 2-bpp esp32_gray2_bin frame, which the app expands into Badgeware's RGBA screen buffer.",
+  "protocol": "esp32_bw_client",
+  "panel": {
+    "w": 264,
+    "h": 176,
+    "orientation": "landscape",
+    "name": "2.7 inch e-paper, 4-level grayscale (264x176)",
+    "gamut": "gray_4",
+    "native_w": 264,
+    "native_h": 176
+  },
+  "renderers": [
+    "esp32_gray2_bin"
+  ],
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Client: [dmellok/tesserae-device-badger](https://github.com/dmellok/tesserae-device-badger), a Badgeware app. Double-tap RESET for the USB disk, copy the `tesserae` folder into `apps/`, add `TESSERAE_URL` to `secrets.py`, launch **Tesserae** from the menu, then click **Register** on the badge in Settings → Devices. Badgeware relaunches the app on every timer or button wake; press HOME to get back to the menu.\n\nButtons arrive with an action name and their own key: A `left`/`a`, B `refresh`/`b`, C `right`/`c`, up `left`/`up`, down `right`/`down`. The badge reports battery voltage, percentage and whether USB power is plugged in.\n\nThe frame is 11616 bytes (264*176/4), `0b00` black to `0b11` white. The SSD1680 driver keeps the top two bits of each pixel, so the levels land on 0x00, 0x40, 0x80 and 0xFF. The stay-awake and button-wake-window options don't apply.\n\nNot yet confirmed on hardware, in particular that the driver's four codes show as an even black-to-white ramp."
+}

@@ -1,0 +1,22 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "pimoroni_badger_2040_w",
+  "name": "Pimoroni Badger 2040 W",
+  "vendor": "Pimoroni",
+  "url": "https://shop.pimoroni.com/products/badger-2040-w",
+  "icon": "identification-badge",
+  "description": "2.9 inch 296x128 black-and-white e-paper badge (UC8151 Inky Pack) with a Raspberry Pi Pico W (RP2040) aboard and five buttons. Runs the tesserae-device-badger app inside the stock Badger OS launcher: it pairs over the REST device API, paints the dashboard, and sends A/B/C/up/down as button wakes. The server sends a 1-bpp esp32_bw_bin frame turned to the badge's portrait 128x296 native buffer, which the app writes into PicoGraphics' column-major framebuffer.",
+  "protocol": "esp32_bw_client",
+  "panel": {
+    "w": 296,
+    "h": 128,
+    "orientation": "landscape",
+    "name": "2.9 inch Inky Pack, black and white (296x128)",
+    "gamut": "mono",
+    "native_w": 128,
+    "native_h": 296
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Client: [dmellok/tesserae-device-badger](https://github.com/dmellok/tesserae-device-badger), a Badger OS app (`/examples/tesserae.py` plus four modules in `/lib`). Add `TESSERAE_URL` to the badge's `WIFI_CONFIG.py`, launch **Tesserae** from the menu, then click **Register** on the badge in Settings → Devices. Badger OS relaunches the app on every timer or button wake; hold A + C to get back to the launcher.\n\nButtons arrive with an action name and their own key: A `left`/`a`, B `refresh`/`b`, C `right`/`c`, up `left`/`up`, down `right`/`down`, so a button map can bind each one by key.\n\nThe frame is 4736 bytes. Badger OS has no battery reading on the 2040 W, so the device card shows none. The sleep interval rounds to whole minutes (the PCF85063A alarm), and the stay-awake and button-wake-window options don't apply.\n\nNot yet confirmed on hardware: the frame layout is checked in the client's tests against this renderer and PicoGraphics' 1-bit pen."
+}

@@ -6,6 +6,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- Hardware: Pimoroni Badger 2040 W (296x128 black and white) and Badger 2350 (264x176, four greys), driven by the new tesserae-device-badger app inside each badge's stock launcher. Both pair from the Discovered strip, and A/B/C/up/down arrive as button wakes with their own keys. Not yet confirmed on hardware.
+
 ## [0.505.0], 2026-11-08
 
 ### Added

@@ -611,3 +611,42 @@ def test_underscore_prefixed_files_ignored(
     )
     assert "should_skip" not in registry.devices
     assert registry.errors == []
+
+
+def test_badger_badges_pin_the_frame_shapes_their_app_unpacks(
+    tmp_path: Path, device_schema_path: Path, hardware_schema_path: Path
+) -> None:
+    """The tesserae-device-badger app writes the .bin frame straight into
+    each badge's framebuffer, so the wire shape is part of the contract.
+
+    Badger 2040 W: a 296x128 dashboard turned onto a portrait 128x296
+    native buffer (4736 bytes of esp32_bw_bin); the app reverses each
+    16-byte row into PicoGraphics' column-major 1-bit layout. Declaring
+    the native dims landscape would hand it rows it reads as columns.
+
+    Badger 2350: 264x176 four-grey, esp32_gray2_bin, no rotation (11616
+    bytes); the app expands it into Badgeware's RGBA screen.
+
+    Both are REST-only clients, so no Switch to MQTT."""
+    from app.device_service import transport_switchable
+
+    registry = device_loader.discover(
+        REPO_ROOT / "devices",
+        schema_path=device_schema_path,
+        data_root=tmp_path,
+        hardware_dir=REPO_ROOT / "hardware",
+        hardware_schema_path=hardware_schema_path,
+    )
+    w = registry.devices["pimoroni_badger_2040_w"]
+    assert w.manifest["renderers"] == ["esp32_bw_bin"]
+    assert (w.panel["w"], w.panel["h"]) == (296, 128)
+    assert (w.panel["native_w"], w.panel["native_h"]) == (128, 296)
+    assert w.panel["gamut"] == "mono"
+    assert not transport_switchable(w)
+
+    b = registry.devices["pimoroni_badger_2350"]
+    assert b.manifest["renderers"] == ["esp32_gray2_bin"]
+    assert (b.panel["w"], b.panel["h"]) == (264, 176)
+    assert (b.panel["native_w"], b.panel["native_h"]) == (264, 176)
+    assert b.panel["gamut"] == "gray_4"
+    assert not transport_switchable(b)
