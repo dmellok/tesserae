@@ -38,6 +38,8 @@ from typing import Any
 
 import jsonschema
 
+from app import schema_validation
+
 logger = logging.getLogger(__name__)
 
 HOST_MAJOR_VERSION: int = 1
@@ -175,7 +177,7 @@ def discover(transports_dir: Path, *, schema_path: Path) -> TransportRegistry:
             continue
 
         try:
-            jsonschema.validate(manifest, schema)
+            schema_validation.validate(manifest, schema)
         except jsonschema.ValidationError as err:
             field_path = ".".join(str(p) for p in err.absolute_path) or "<root>"
             registry.errors.append(

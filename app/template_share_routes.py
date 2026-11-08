@@ -197,9 +197,11 @@ def submit(page_id: str) -> Response | tuple[Response, int]:
 
     import jsonschema
 
+    from app import schema_validation
+
     schema_path = Path(current_app.root_path).parent / "schema" / "template.schema.json"
     try:
-        jsonschema.validate(template, _json.loads(schema_path.read_text(encoding="utf-8")))
+        schema_validation.validate(template, _json.loads(schema_path.read_text(encoding="utf-8")))
     except jsonschema.ValidationError as err:
         return jsonify({"error": f"template failed validation: {err.message}"}), 400
 

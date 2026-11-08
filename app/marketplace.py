@@ -49,6 +49,7 @@ from typing import Any, Literal
 
 import jsonschema
 
+from app import schema_validation
 from app.plugin_http import fetch_json
 
 logger = logging.getLogger(__name__)
@@ -391,7 +392,7 @@ class Marketplace:
             )
         try:
             schema = self._load_json(self._index_schema_path)
-            jsonschema.validate(raw, schema)
+            schema_validation.validate(raw, schema)
         except jsonschema.ValidationError as err:
             raise IndexUnavailable(
                 f"Catalog index failed schema validation: {err.message}"
@@ -1189,7 +1190,7 @@ class Marketplace:
             raise InstallRefused(f"Embedded plugin.json in {folder_id!r} must be a JSON object")
         try:
             schema = self._load_json(self._schema_path)
-            jsonschema.validate(raw, schema)
+            schema_validation.validate(raw, schema)
         except jsonschema.ValidationError as err:
             field_path = ".".join(str(p) for p in err.absolute_path) or "<root>"
             raise InstallRefused(

@@ -92,7 +92,7 @@ jobs:
         # Coverage deliberately does NOT run here: it is a weekly report-only
         # run (coverage.yml), since measuring it was the slowest job and the
         # one that lost its runner, and nothing gated on the number.
-        # --timeout / --durations: the suite runs in ~5 min locally but one
+        # --timeout / --durations: the suite runs in ~2 min locally but one
         # worker occasionally goes silent for 70-100 min on the runner. A
         # test that passes 15 min now fails with its stack, and the slowest
         # tests are listed either way, so a stall names itself.

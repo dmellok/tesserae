@@ -6,6 +6,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed
+
+- Start-up: plugin, device, renderer, transport and hardware manifests are checked against a validator built once per schema, instead of re-checking the schema itself for each of the ~150 manifests. The app starts about 8x faster (0.8 s to 0.1 s), and the test suite runs in about a third of the time.
+
 ## [0.506.0], 2026-11-09
 
 ### Added
