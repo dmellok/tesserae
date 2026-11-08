@@ -2009,7 +2009,9 @@ main.page.lu-page {
 .lu .lu-win-edit input {
   height: 26px !important;
   min-height: 0 !important;
-  width: 96px;
+  /* As wide as the browser draws the time, so "6:00 PM" keeps its AM/PM. */
+  width: auto;
+  min-width: 96px;
   padding: 0 4px;
   border: 1px solid var(--t-border-strong);
   border-radius: var(--lu-r);
@@ -2017,6 +2019,13 @@ main.page.lu-page {
   color: var(--t-fg);
   font: 12px var(--t-font-mono) !important;
   box-shadow: none;
+}
+/* With a mouse the time is typed or stepped with the arrow keys; Chrome's clock button
+   would cost the room "– 6:30 PM ×" needs to stay on one line. */
+@media (hover: hover) and (pointer: fine) {
+  .lu .lu-win-edit input::-webkit-calendar-picker-indicator {
+    display: none;
+  }
 }
 .lu .lu-win-edit input:focus {
   outline: none;
@@ -3247,7 +3256,7 @@ main.page.lu-page {
   }
   .lu .lu-win-edit input {
     height: 44px !important;
-    width: 116px;
+    min-width: 116px;
   }
   .lu .lu-name-edit input {
     height: 44px !important;
