@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import io
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -439,6 +440,68 @@ def test_device_page_leaves_out_what_a_tv_does_not_have(app: Flask) -> None:
     ):
         assert absent not in html, absent
     assert "Frames kept on the TV" in html and "TV&#39;s own slideshow" in html
+
+
+def _group_html(html: str, group_id: str) -> str:
+    start = html.index(f'id="{group_id}" data-devsub')
+    return html[start : html.index("data-devsub", start + 40)]
+
+
+def _add_lounge(app: Flask) -> Any:
+    client = _admin(app)
+    client.post(
+        "/settings/devices/add",
+        data={
+            "kind": "samsung_frame",
+            "id": "lounge_frame",
+            "name": "Lounge",
+            "host": "192.0.2.20",
+        },
+    )
+    return client
+
+
+def test_device_page_groups_power_and_art_mode_settings(app: Flask) -> None:
+    html = _add_lounge(app).get("/settings/devices/lounge_frame").get_data(as_text=True)
+    power = _group_html(html, "grp-power")
+    art = _group_html(html, "grp-art-mode")
+    for name in ("power_control", "power_switch", "sleep_when_in_use"):
+        assert f'name="{name}"' in power, name
+    # The switch field follows the Power control select.
+    assert power.index('name="power_control"') < power.index('name="power_switch"')
+    for name in ("matte_style", "matte_colour", "take_over_slideshow", "keep_on_tv"):
+        assert f'name="{name}"' in art, name
+    # None of them sit in Identity or Rendering any more; the host and token do.
+    identity, rendering = _group_html(html, "identity"), _group_html(html, "rendering")
+    for name in ("power_control", "power_switch", "matte_style", "keep_on_tv"):
+        assert f'name="{name}"' not in identity + rendering, name
+    assert 'name="host"' in identity and 'name="token"' in identity
+
+
+def test_the_home_assistant_switch_field_shows_only_for_a_switch(app: Flask) -> None:
+    def wrap_tag(html: str) -> str:
+        found = re.search(r'<div class="dx-f[^>]*data-show-if=[^>]*>', html)
+        assert found is not None
+        return found.group(0)
+
+    client = _add_lounge(app)
+    tv = client.get("/settings/devices/lounge_frame").get_data(as_text=True)
+    assert "data-show-if-plain" in wrap_tag(tv) and " hidden" in wrap_tag(tv)
+    store = app.config["SETTINGS_STORE"]
+    entry = dict((store.get_section("devices") or {})["lounge_frame"], power_control="switch")
+    store.patch_section("devices", {"lounge_frame": entry})
+    sw = client.get("/settings/devices/lounge_frame").get_data(as_text=True)
+    assert " hidden" not in wrap_tag(sw)
+
+
+def test_a_save_lands_back_on_a_kind_defined_group(app: Flask) -> None:
+    client = _add_lounge(app)
+    resp = client.post(
+        "/settings/devices/lounge_frame/save",
+        data={"device_name": "Lounge", "_section": "grp-art-mode", "matte_style": "modern"},
+    )
+    assert resp.status_code in (302, 303), resp.status_code
+    assert resp.headers["Location"].endswith("#grp-art-mode"), resp.headers["Location"]
 
 
 def test_other_devices_keep_timing_power_and_controls(app: Flask) -> None:

@@ -64,7 +64,9 @@
               "properties": { "value": { "type": "number" }, "label": { "type": "string" } }
             }
           },
-          "help": { "type": "string" }
+          "help": { "type": "string" },
+          "group": { "type": "string", "description": "Name of a group on the device page to put this field in (e.g. 'Power'); fields sharing a name sit together under it, after Rendering. Absent: the field stays in Identity, Rendering or Timing by its type. 'sign' and 'sign_net' are reserved for Visionect's frame settings." },
+          "show_if": { "type": "object", "description": "Show this field only while other fields of the kind hold these values, e.g. {\"power_control\": \"switch\"}. Same grammar as a widget option's show_if (a value, a list of values, or {\"not\": ...}). The field is hidden, not removed, so its value is still saved." }
         }
       }
     },

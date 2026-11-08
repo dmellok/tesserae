@@ -130,6 +130,10 @@
       {{ dsec_head('display', 'image-square', 'Display', _name ~ ((' · ' ~ section.panel.w ~ ' × ' ~ section.panel.h ~ ' · ' ~ _rot_label) if section.panel else '')) }}
       <div class="dx-dsec-body" id="display-body" data-collapsible-body>
 
+        {#- A field's ``group`` (device.json config_schema) sets where it sits: 'sign' and
+            'sign_net' are Visionect's frame settings; any other name is a group of its own
+            after Rendering. A field without one stays in Identity, Rendering or Timing. -#}
+        {% set _grouped = (section.fields or [])|selectattr('group')|rejectattr('group', 'in', ['sign', 'sign_net'])|list %}
         {% set id_fields = (section.fields or [])|selectattr('type', 'in', ['string', 'ha_device_picker'])|list %}
         <div class="dx-grp" id="identity" data-devsub>
           <div class="dx-grp-head"><h3 class="dx-grp-title">Identity</h3></div>
@@ -287,6 +291,15 @@
           </div>
         </div>
 
+        {% for gname in _grouped|map(attribute='group')|unique %}
+        <div class="dx-grp" id="grp-{{ gname|lower|replace(' ', '-') }}" data-devsub>
+          <div class="dx-grp-head"><h3 class="dx-grp-title">{{ gname }}</h3></div>
+          <div class="dx-fg">
+            {% for field in _grouped if field.group == gname %}{{ config_field(section, field, _form) }}{% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+
         {#- The frame's own settings (Visionect): only the ones this frame
             answered when it last connected are offered. Network settings sit
             apart, behind a warning. -#}
@@ -334,7 +347,7 @@
           ~ ' · ' ~ _n_lineups ~ (' lineup' if _n_lineups == 1 else ' lineups')) }}
       <div class="dx-dsec-body" id="schedule-body" data-collapsible-body>
 
-        {% set t_fields = (section.fields or [])|rejectattr('type', 'in', ['string', 'ha_device_picker', 'select'])|list %}
+        {% set t_fields = (section.fields or [])|rejectattr('type', 'in', ['string', 'ha_device_picker', 'select'])|rejectattr('name', 'in', _grouped|map(attribute='name')|list)|list %}
         {% set awake_spec = t_fields|selectattr('name', 'equalto', 'awake_poll_s')|first %}
         {% set has_always_on = t_fields|selectattr('name', 'equalto', 'always_on')|list|length > 0 %}
         {#- A display with nothing to time (a TV that is pushed to) gets no Timing group. -#}

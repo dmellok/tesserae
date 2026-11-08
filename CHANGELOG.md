@@ -6,6 +6,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- Device kinds can place a config field in a named group (`group`) and show it only for some values (`show_if`).
+
+### Changed
+
+- Samsung The Frame: its Power and Art Mode settings sit in groups of their own, and the Home Assistant switch field shows only when Power control is a Home Assistant switch.
+- Samsung The Frame: the TV's own slideshow setting reads "Managed by Tesserae" or "Managed by the TV".
+
 ## [0.510.1], 2026-11-11
 
 ### Fixed

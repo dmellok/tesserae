@@ -59,6 +59,8 @@ Key fields:
 | `buttons` | no | `false` when the SKU has no physical buttons (or its protocol forwards none): its device page shows no Controls button map and Home Assistant gets no Input event entity for it, unless it also has `touch`. Absent means it may have buttons. |
 | `battery` | no | `false` for a mains-powered display (a TV): its device page shows no Power section. Absent means it may run on a battery. |
 | `renderer_settings` | no | `false` when the kind sends the composition itself rather than its renderer's output (a push publisher that uploads the page image): its device page leaves out the renderer's client rotation, scale and letterbox settings. |
+| `config_schema` field `group` | no | Name of a device page group for the field (e.g. `"Power"`); fields sharing a name sit together in a group of that name after Rendering. Absent keeps today's place (Identity, Rendering or Timing by type). |
+| `config_schema` field `show_if` | no | Show the field only while other fields of the kind hold given values, e.g. `{"power_control": "switch"}`; hidden live as they change, still saved. |
 | `image_format` | no | Wire format hint: `png` / `bin` / `webp`. |
 | `notes_md` | no | Maintainer notes shown on the docs hardware page. |
 | `deprecated_aliases` | no | Older ids this SKU also registers under, for back-compat after a rename. |

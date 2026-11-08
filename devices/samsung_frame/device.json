@@ -28,6 +28,7 @@
     },
     "power_control": {
       "type": "select",
+      "group": "Power",
       "label": "Power control",
       "default": "tv",
       "choices": [
@@ -48,6 +49,7 @@
     },
     "power_switch": {
       "type": "string",
+      "group": "Power",
       "label": "Home Assistant switch",
       "default": "",
       "placeholder": "switch.living_room_tv",
@@ -58,6 +60,7 @@
     },
     "sleep_when_in_use": {
       "type": "select",
+      "group": "Power",
       "label": "Still in use at quiet hours",
       "default": "60",
       "choices": [
@@ -82,6 +85,7 @@
     },
     "matte_style": {
       "type": "select",
+      "group": "Art Mode",
       "label": "Mat",
       "default": "none",
       "choices": [
@@ -130,6 +134,7 @@
     },
     "matte_colour": {
       "type": "select",
+      "group": "Art Mode",
       "label": "Mat colour",
       "default": "polar",
       "choices": [
@@ -202,6 +207,7 @@
     },
     "take_over_slideshow": {
       "type": "select",
+      "group": "Art Mode",
       "label": "TV's own slideshow",
       "default": "off",
       "choices": [
@@ -218,6 +224,7 @@
     },
     "keep_on_tv": {
       "type": "select",
+      "group": "Art Mode",
       "label": "Frames kept on the TV",
       "default": "2",
       "choices": [
