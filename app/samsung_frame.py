@@ -13,6 +13,15 @@ device card's status and, when a TV comes back (switched on, plugged back
 in) with a frame it missed, sends that frame. Failed sends back off so a TV
 whose Art app is not answering isn't hammered.
 
+With a Home Assistant power switch set (a smart plug, say), Tesserae also
+switches the TV off for quiet hours that sleep through, once it is showing
+Art Mode or not answering (a programme being watched is left alone), and back
+on when they end, when Tesserae switched it off itself. A frame pushed while
+the switch is off (outside quiet hours) switches it on, waits for the TV to
+start and puts it in Art Mode before sending. A TV switched off by hand stays
+off until something is pushed. The device card's Power tile says what the
+screen is doing: Art Mode, On, Starting or Off.
+
 Per-device state (the uploaded content ids and the last frame sent) lives in
 ``<device data dir>/samsung_frame.json``; the TV's pairing token is stored
 encrypted in the device's settings.
@@ -38,7 +47,13 @@ from PIL import Image, ImageOps
 
 from app import background_loops
 from app.device_loader import Device, DeviceRegistry
-from app.samsung_frame_art import FrameArtClient, FrameArtError, FramePairingError
+from app.samsung_frame_art import (
+    FrameArtClient,
+    FrameArtError,
+    FramePairingError,
+    hold_power_key,
+    wake_on_lan,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +68,72 @@ REST_TIMEOUT_S = 4.0
 # Back-off after a failed send: 2, 4, 8 ... minutes, capped at 30.
 BACKOFF_START_S = 120
 BACKOFF_MAX_S = 1800
+# A TV switched on at the plug takes about 45 s to answer; allow a slow boot.
+BOOT_TIMEOUT_S = 180
+BOOT_POLL_S = 5
+# Wake-on-LAN is repeated while waiting; a plug-powered TV can boot to standby.
+WOL_REPEAT_S = 15
+POWER_MODES = ("tv", "switch", "none")
 
 ClientFactory = Callable[..., FrameArtClient]
+
+
+class TvInUse(Exception):
+    """The TV is showing something other than Art Mode: someone is using it,
+    so the frame waits."""
+
+
+class PowerSwitch:
+    """A Home Assistant switch (``switch.*``, ``light.*`` or ``input_boolean.*``)
+    that powers the TV, through the ha_core plugin."""
+
+    def __init__(self, app: Flask) -> None:
+        self._app = app
+
+    def _module(self) -> Any:
+        registry = self._app.config.get("PLUGIN_REGISTRY")
+        plugin = registry.get("ha_core") if registry is not None else None
+        return getattr(plugin, "server_module", None) if plugin is not None else None
+
+    def available(self) -> bool:
+        """Whether Tesserae has a working Home Assistant connection."""
+        mod = self._module()
+        if mod is None or not hasattr(mod, "is_configured"):
+            return False
+        try:
+            with self._app.app_context():
+                return bool(mod.is_configured())
+        except Exception:
+            return False
+
+    def state(self, entity_id: str) -> str | None:
+        """ "on", "off", or None when Home Assistant can't say."""
+        mod = self._module()
+        if mod is None or not hasattr(mod, "get_state"):
+            return None
+        try:
+            with self._app.app_context():
+                value = str((mod.get_state(entity_id) or {}).get("state") or "")
+        except Exception:
+            return None
+        return value if value in ("on", "off") else None
+
+    def turn(self, entity_id: str, on: bool) -> bool:
+        mod = self._module()
+        if mod is None or not hasattr(mod, "call_service"):
+            logger.warning("samsung_frame: the Home Assistant Core plugin isn't available")
+            return False
+        try:
+            with self._app.app_context():
+                mod.call_service(
+                    "homeassistant", "turn_on" if on else "turn_off", data={"entity_id": entity_id}
+                )
+            return True
+        except Exception as exc:
+            logger.warning(
+                "samsung_frame: switching %s %s failed: %s", entity_id, "on" if on else "off", exc
+            )
+            return False
 
 
 def is_samsung_frame_device(device: Any) -> bool:
@@ -105,6 +184,11 @@ class SamsungFramePublisher:
         run_async: bool = True,
         client_factory: ClientFactory = FrameArtClient,
         rest_info_fn: Callable[[str], dict[str, Any] | None] = rest_info,
+        power: PowerSwitch | None = None,
+        quiet_fn: Callable[[Device], bool] | None = None,
+        sleep_fn: Callable[[float], None] = time.sleep,
+        power_key_fn: Callable[..., None] = hold_power_key,
+        wol_fn: Callable[[str, str | None], None] = wake_on_lan,
     ) -> None:
         self._app = app
         self._devices = devices
@@ -114,6 +198,11 @@ class SamsungFramePublisher:
         self._run_async = run_async
         self._client_factory = client_factory
         self._rest_info = rest_info_fn
+        self._power = power if power is not None else PowerSwitch(app)
+        self._quiet_fn = quiet_fn if quiet_fn is not None else self._quiet_sleeps
+        self._sleep = sleep_fn
+        self._power_key = power_key_fn
+        self._wol = wol_fn
         self._lock = threading.Lock()
         # Serialises every read-modify-write of a device's state file: the push
         # worker, the status poller and device removal all touch it.
@@ -123,6 +212,8 @@ class SamsungFramePublisher:
         # device id -> (monotonic time of next allowed attempt, current back-off)
         self._backoff: dict[str, tuple[float, float]] = {}
         self._warned: dict[str, str] = {}
+        # Polls in a row each TV hasn't answered.
+        self._missed: dict[str, int] = {}
 
     # -- push reaction ----------------------------------------------------
 
@@ -244,6 +335,110 @@ class SamsungFramePublisher:
         delay = min(BACKOFF_MAX_S, delay * 2 if delay else BACKOFF_START_S)
         self._backoff[device_id] = (time.monotonic() + delay, delay)
 
+    # -- power ------------------------------------------------------------
+
+    @staticmethod
+    def _switch(cfg: dict[str, Any]) -> str:
+        return str(cfg.get("power_switch") or "").strip()
+
+    def _mode(self, cfg: dict[str, Any]) -> str:
+        """How Tesserae powers the TV: "tv" (its own Power key and
+        Wake-on-LAN, the default), "switch" (a Home Assistant switch) or
+        "none" (left as it is)."""
+        mode = str(cfg.get("power_control") or "").strip()
+        if mode == "switch" and not (self._switch(cfg) and self._power.available()):
+            return "tv"
+        if mode in POWER_MODES:
+            return mode
+        return "switch" if self._switch(cfg) and self._power.available() else "tv"
+
+    @staticmethod
+    def _in_use_limit_s(cfg: dict[str, Any]) -> float | None:
+        """Seconds a TV may stay in use into quiet hours before it is put to
+        sleep anyway; None leaves it on."""
+        raw = str(cfg.get("sleep_when_in_use") or "60")
+        if raw == "never":
+            return None
+        try:
+            return max(0, int(raw)) * 60.0
+        except ValueError:
+            return 3600.0
+
+    @staticmethod
+    def _standby(info: dict[str, Any] | None) -> bool:
+        return info is not None and str(info.get("PowerState") or "") == "standby"
+
+    def _quiet_sleeps(self, device: Device) -> bool:
+        """Whether the device is inside quiet hours that sleep through."""
+        from datetime import UTC, datetime
+
+        from app.quiet_hours import is_in_window, resolve_quiet_hours
+
+        try:
+            window = resolve_quiet_hours(self._settings.get_section("app") or {}, device)
+        except Exception:
+            return False
+        if window is None or not window.sleep_through:
+            return False
+        from app.tz_resolve import app_timezone
+
+        with self._app.app_context():
+            tz = app_timezone()  # "system" means the host's own zone
+        return is_in_window(window, datetime.now(UTC), tz)
+
+    def _put_to_sleep(self, device: Device, cfg: dict[str, Any], mode: str, host: str) -> bool:
+        if mode == "switch":
+            return self._power.turn(self._switch(cfg), False)
+        try:
+            self._power_key(host, token=self._token(cfg), name=CLIENT_NAME)
+            return True
+        except (FrameArtError, OSError) as exc:
+            logger.info("samsung_frame %s: couldn't put the TV in standby: %s", device.id, exc)
+            return False
+
+    def _wake_and_wait(self, device: Device, cfg: dict[str, Any], mode: str, host: str) -> bool:
+        """Wake the TV (switch on, Wake-on-LAN, or both) and wait, up to
+        BOOT_TIMEOUT_S, for it to answer as on."""
+        switch = self._switch(cfg)
+        if mode == "switch" and self._power.state(switch) != "on":
+            if not self._power.turn(switch, True):
+                return False
+            logger.info("samsung_frame %s: switched %s on", device.id, switch)
+        mac = str(self.load_state(device).get("mac") or "")
+        if mode == "tv" and not mac:
+            self._warn_once(
+                device.id, "can't wake the TV: its network address isn't known until it is seen on"
+            )
+            return False
+        # A push or the morning woke it: it was not left off for quiet hours any more.
+        self.update_state(device, {"starting_at": int(time.time()), "slept_by_tesserae": None})
+        self._record(device, {"screen": "starting", "screen_why": "waking up"})
+        start = time.monotonic()
+        # A plug gets ~30 s to boot the TV before Wake-on-LAN helps it along.
+        next_wol = start if mode == "tv" else start + 30
+        while time.monotonic() - start < BOOT_TIMEOUT_S:
+            info = self._rest_info(host)
+            if info is not None and not self._standby(info):
+                return True
+            if mac and time.monotonic() >= next_wol:
+                with contextlib.suppress(OSError, ValueError):
+                    self._wol(mac, host)
+                next_wol = time.monotonic() + WOL_REPEAT_S
+            self._sleep(BOOT_POLL_S)
+        return False
+
+    def _tv_is_off(self, cfg: dict[str, Any], mode: str, host: str) -> bool:
+        """Whether the TV is off, as opposed to one missed answer: the switch
+        is off, the TV says standby, or it misses two answers in a row."""
+        if mode == "switch" and self._power.state(self._switch(cfg)) == "off":
+            return True
+        info = self._rest_info(host)
+        if info is not None:
+            return self._standby(info)
+        self._sleep(BOOT_POLL_S)
+        info = self._rest_info(host)
+        return info is None or self._standby(info)
+
     def _maybe_send(self, device: Device) -> None:
         digest = self.pending_digest(device)
         if digest is None or self._backing_off(device.id):
@@ -257,10 +452,26 @@ class SamsungFramePublisher:
         if not src.exists():
             logger.warning("samsung_frame %s: composition %s missing on disk", device.id, digest)
             return
+        mode = self._mode(cfg)
+        if mode != "none" and self._quiet_fn(device):
+            return  # held: the TV is asleep for quiet hours; sent when they end
+        woke = False
+        # Only a TV that is really off is woken; a missed answer from a TV
+        # that is on is not, so Art Mode is never forced over a programme.
+        if mode != "none" and self._tv_is_off(cfg, mode, host):
+            if not self._wake_and_wait(device, cfg, mode, host):
+                self._failed(device.id)
+                self._warn_once(device.id, "tried to wake the TV but it didn't answer")
+                return
+            woke = True
         jpeg = to_jpeg(src)
         state = self.load_state(device)
         try:
-            self._send(device, cfg, host, digest, jpeg, state)
+            show = self._send(device, cfg, host, digest, jpeg, state, woke=woke)
+        except TvInUse:
+            logger.info("samsung_frame %s: the TV is in use; frame %s waits", device.id, digest)
+            self._record(device, {"screen": "on", "screen_why": "in use, new frame waiting"})
+            return
         except FramePairingError as exc:
             self._failed(device.id)
             self._warn_once(device.id, f"{exc}. Tesserae will try again in a few minutes.")
@@ -281,7 +492,10 @@ class SamsungFramePublisher:
         logger.info(
             "samsung_frame %s: showing frame %s (%d KB)", device.id, digest, len(jpeg) // 1024
         )
-        self._record(device, {"power": "on", "last_upload": int(time.time())})
+        self._record(
+            device,
+            {"screen": "art" if show else "on", "screen_why": "", "last_upload": int(time.time())},
+        )
 
     def _send(
         self,
@@ -291,11 +505,38 @@ class SamsungFramePublisher:
         digest: str,
         jpeg: bytes,
         state: dict[str, Any],
-    ) -> None:
+        *,
+        woke: bool = False,
+    ) -> bool:
+        """Upload and select the frame; returns whether Art Mode shows it."""
         token = self._token(cfg)
         client = self._client_factory(host, token=token, name=CLIENT_NAME)
         try:
-            client.connect()
+            # Just switched on, the Art app can take a little longer than the
+            # TV's info endpoint to answer. A refused pairing is not retried.
+            attempts = 3 if woke else 1
+            for attempt in range(attempts):
+                try:
+                    client.connect()
+                    break
+                except FramePairingError:
+                    raise
+                except FrameArtError:
+                    if attempt == attempts - 1:
+                        raise
+                    self._sleep(BOOT_POLL_S * 2)
+            if woke:
+                try:
+                    if not client.art_mode_on():
+                        client.set_art_mode(True)
+                except FrameArtError as exc:
+                    logger.info("samsung_frame %s: couldn't turn Art Mode on: %s", device.id, exc)
+            else:
+                # Someone watching TV (or using an app) isn't disturbed: the
+                # frame waits until Art Mode is back or the TV is switched off.
+                with contextlib.suppress(FrameArtError):
+                    if not client.art_mode_on():
+                        raise TvInUse
             if client.token and client.token != token:
                 self._store_token(device.id, client.token)
             if cfg.get("take_over_slideshow", "off") != "keep":
@@ -333,6 +574,7 @@ class SamsungFramePublisher:
                     logger.info(
                         "samsung_frame %s: will retry deleting old frames: %s", device.id, exc
                     )
+            return show
         finally:
             client.close()
 
@@ -360,27 +602,145 @@ class SamsungFramePublisher:
     # -- status -----------------------------------------------------------
 
     def poll_once(self) -> None:
-        """Record each TV's power state; send a missed frame to a TV that is
+        """Record what each TV's screen is doing; sleep and wake TVs that have
+        a power switch for quiet hours; send a missed frame to a TV that is
         reachable again."""
         resend = False
         for device in self._frames():
-            host = str(self._cfg(device.id).get("host") or "").strip()
-            if not host:
-                continue
-            info = self._rest_info(host)
-            if info is None:
-                continue
-            self._record(
-                device,
-                {
-                    "power": str(info.get("PowerState") or "on"),
-                    "model": str(info.get("modelName") or ""),
-                },
-            )
-            if self.pending_digest(device) and not self._backing_off(device.id):
-                resend = True
+            try:
+                if self._poll_device(device):
+                    resend = True
+            except Exception:
+                logger.exception("samsung_frame %s: poll failed", device.id)
         if resend:
             self.on_push()
+
+    def _poll_device(self, device: Device) -> bool:
+        cfg = self._cfg(device.id)
+        host = str(cfg.get("host") or "").strip()
+        if not host:
+            return False
+        mode = self._mode(cfg)
+        switch = self._switch(cfg)
+        switch_state = self._power.state(switch) if mode == "switch" else None
+        info = self._rest_info(host)
+        standby = self._standby(info)
+        awake = info is not None and not standby
+        self._missed[device.id] = 0 if info is not None else self._missed.get(device.id, 0) + 1
+        mac = str((info or {}).get("wifiMac") or "")
+        state = self.load_state(device)
+        if mac and mac != state.get("mac"):
+            state = self.update_state(device, {"mac": mac})
+        screen = self._screen(device, cfg, host) if awake else None
+        off = switch_state == "off" or standby or self._missed[device.id] >= 2
+        if mode != "none" and self._quiet_fn(device):
+            # Asleep for quiet hours: at once in Art Mode. A TV in use (or
+            # whose Art app doesn't answer, so maybe showing a programme) is
+            # left on, unless it is still in use after the device's "Still in
+            # use at quiet hours" time.
+            in_use = not off and screen != "art"
+            since = float(state.get("in_use_since") or 0) if in_use else 0.0
+            if in_use and not since:
+                since = time.time()
+                self.update_state(device, {"in_use_since": int(since)})
+            elif not in_use and state.get("in_use_since"):
+                self.update_state(device, {"in_use_since": None})
+            limit = self._in_use_limit_s(cfg)
+            overdue = in_use and limit is not None and time.time() - since >= limit
+            if (
+                not off
+                and (screen == "art" or overdue)
+                and self._put_to_sleep(device, cfg, mode, host)
+            ):
+                self.update_state(device, {"slept_by_tesserae": True, "in_use_since": None})
+                logger.info(
+                    "samsung_frame %s: TV off for quiet hours%s",
+                    device.id,
+                    " (still in use)" if overdue else "",
+                )
+                off = True
+            if in_use and not off:
+                self._record(device, {"screen": "on", "screen_why": "in use in quiet hours"})
+                return False
+            if off:
+                self._record(device, {"screen": "off", "screen_why": "quiet hours"})
+                return False
+        elif mode != "none" and off and state.get("slept_by_tesserae"):
+            # Morning: back on only if Tesserae switched it off; the flag stays
+            # until the TV really answers, so a failure retries next poll.
+            logger.info("samsung_frame %s: quiet hours over, waking the TV", device.id)
+            if self._wake_and_wait(device, cfg, mode, host):
+                self.update_state(device, {"needs_art_mode": True})
+                info, awake, off = self._rest_info(host), True, False
+                switch_state = "on" if mode == "switch" else None
+                screen = self._screen(device, cfg, host)
+            else:
+                self.update_state(device, {"slept_by_tesserae": True})
+                self._record(device, {"screen": "off", "screen_why": "didn't wake"})
+                return False
+        elif awake and state.get("slept_by_tesserae"):
+            # Switched on by someone else since: a later switch-off is theirs.
+            self.update_state(device, {"slept_by_tesserae": None})
+        if state.get("in_use_since") and not self._quiet_fn(device):
+            self.update_state(device, {"in_use_since": None})
+        if mode == "switch" and switch_state == "off":
+            self._record(device, {"screen": "off", "screen_why": "power switch off"})
+            return False
+        if not awake:
+            started = float(state.get("starting_at") or 0)
+            if info is None and time.time() - started < BOOT_TIMEOUT_S:
+                self._record(device, {"screen": "starting", "screen_why": "waking up"})
+            else:
+                why = "standby" if standby else "not answering"
+                self._record(device, {"screen": "off", "screen_why": why})
+            return False
+        if self.load_state(device).get("needs_art_mode"):
+            # Woken after quiet hours: a boot may land in TV mode, which would
+            # read as someone watching from then on.
+            if screen == "on" and self._set_art_mode(device, cfg, host):
+                screen = "art"
+            self.update_state(device, {"needs_art_mode": None})
+        self._record(
+            device,
+            {
+                "screen": screen or "on",
+                "screen_why": "",
+                "power": str((info or {}).get("PowerState") or "on"),
+                "model": str((info or {}).get("modelName") or ""),
+            },
+        )
+        # A frame waiting while the TV was in use goes once Art Mode is back.
+        waiting = bool(self.pending_digest(device)) and not self._backing_off(device.id)
+        return waiting and screen != "on"
+
+    def _screen(self, device: Device, cfg: dict[str, Any], host: str) -> str | None:
+        """ "art" or "on" for a TV that answers; None when the Art app doesn't
+        or the TV isn't paired yet (no prompt is shown from the poller)."""
+        token = self._token(cfg)
+        if not token:
+            return None
+        client = self._client_factory(host, token=token, name=CLIENT_NAME)
+        try:
+            client.connect(pairing_timeout=10)
+            if client.token and client.token != token:
+                self._store_token(device.id, client.token)
+            return "art" if client.art_mode_on() else "on"
+        except (FrameArtError, OSError):
+            return None
+        finally:
+            client.close()
+
+    def _set_art_mode(self, device: Device, cfg: dict[str, Any], host: str) -> bool:
+        client = self._client_factory(host, token=self._token(cfg), name=CLIENT_NAME)
+        try:
+            client.connect(pairing_timeout=10)
+            client.set_art_mode(True)
+            return True
+        except (FrameArtError, OSError) as exc:
+            logger.info("samsung_frame %s: couldn't turn Art Mode on: %s", device.id, exc)
+            return False
+        finally:
+            client.close()
 
     def _record(self, device: Device, heartbeat: dict[str, Any]) -> None:
         events = self._app.config.get("EVENT_LOG")

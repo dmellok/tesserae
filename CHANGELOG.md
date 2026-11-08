@@ -8,6 +8,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Samsung The Frame: the TV goes to standby for quiet hours that sleep through and wakes for new frames, with its own power (Wake-on-LAN) or a Home Assistant switch, and the device card shows what the screen is doing.
 - Samsung The Frame: a `samsung_frame` kind that shows pages through the TV's own Art Mode, uploading each frame as a 4K JPEG over the local network and deleting its older uploads.
 - Raspberry Pi: one `pi_client` kind for the unified tesserae-device-pi client. A Spectra 6 Impression gets the packed .bin, every other Inky panel the PNG, from the panel the Pi reports when it pairs; it stays awake by default.
 - Device batteries: each chart has a 6h range too, and the second switch at the top of the page is gone.
