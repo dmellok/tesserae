@@ -344,7 +344,9 @@ class _RecordingButtons:
         self._shade = shade
         self.calls: list[dict] = []
 
-    def handle_button(self, *, device_id: str, button: str, event_id: int | None):
+    def handle_button(
+        self, *, device_id: str, button: str, event_id: int | None, button_key: str | None = None
+    ):
         self.calls.append({"device_id": device_id, "button": button, "event_id": event_id})
         renders_dir = Path(self._app.config["RENDERS_DIR"])
         img = Image.new("RGB", (PANEL_W, PANEL_H), (self._shade, self._shade, self._shade))

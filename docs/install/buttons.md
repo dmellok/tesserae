@@ -11,7 +11,10 @@ per-device and edited on the device's **Controls** panel.
 Introduced in v0.65.0. Server-side works for any device kind whose
 firmware speaks the button contract; ESP32 firmwares (Seeed reTerminal
 E-Series, Waveshare, XIAO ePaper family) got wire support in the same
-release. Pi + Inky Impression back-button support is on the roadmap.
+release. On a Raspberry Pi with a Pimoroni Inky Impression, the
+[tesserae-device-pi](https://github.com/dmellok/tesserae-device-pi) client reads
+the four buttons (A to D) and sends them over REST or the cloud relay; MQTT
+does not carry button presses.
 
 ## What buttons can do
 
@@ -26,6 +29,29 @@ The default map, applied to any device that doesn't override it, is:
 That's the "conventional three-button e-ink appliance" shape. If your
 hardware has different names (`a` / `b` / `c` / `d` on a Pimoroni Inky,
 say) or more than three, you configure them under the device.
+
+### Inky Impression: binding each button by its letter
+
+The Pi client sends every press with two names: the button's action
+(`left` for A, `refresh` for B, `right` for C by default) and its letter
+(`a` to `d`). The map is checked for the letter first, then the action,
+so with no map the buttons behave as the default table above, and a map
+keyed by letter binds each of the four buttons on its own:
+
+```json
+{
+  "a": "page:Calendar",
+  "b": "page:Weather",
+  "c": "page:Home",
+  "d": "page:Family"
+}
+```
+
+Button D has no action of its own, so it does nothing until the map
+binds `d`. A deck showing on the panel still takes its own button links
+first. Holding the refresh button (B) keeps its Pi-side meaning whatever
+the map says: 3 to 19 seconds unlocks the Pi's settings page, 20 seconds
+factory-resets it.
 
 ## Configuring buttons per device
 
@@ -195,6 +221,10 @@ the [Client protocol spec](../dev/client-protocol.md). Short version:
 
 - On the frame request: `GET /api/v1/device/<id>/frame?button=<name>&button_event_id=<uint>`.
 - In the status body: `{"button": "<name>", "button_event_id": <uint>, …}`.
+- Optionally, `button_key=<key>` (query) or `"button_key"` (status body)
+  names the physical button beside the action name. A map entry for the
+  key wins over one for the name, which lets one map bind buttons
+  individually while clients that send names only keep working.
 - The server dispatches the mapped action synchronously before
   selecting the frame, so the returned artefact reflects the new
   state on this same wake.

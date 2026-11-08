@@ -528,6 +528,13 @@ already reflects the new state on this same wake:
 GET /api/v1/device/kitchen/frame?button=right&button_event_id=42
 ```
 
+A client whose buttons have their own names can add `button_key=<key>`
+(and `"button_key"` in the status body's fallback delivery), e.g.
+`?button=right&button_key=c&button_event_id=42` from an Inky Impression's
+C button. The server looks the key up in the `button_map` before the
+name, so a map can bind each physical button individually; a key the map
+doesn't mention falls back to the name.
+
 When bound to a rotation, the response also carries a `rotation`
 block describing where the device is now:
 

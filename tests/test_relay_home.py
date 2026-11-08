@@ -858,7 +858,9 @@ def _button_poller(
     presses: list[dict[str, Any]] = []
 
     class _FakeButtonService:
-        def handle_button(self, *, device_id: str, button: str, event_id: Any = None) -> None:
+        def handle_button(
+            self, *, device_id: str, button: str, event_id: Any = None, button_key: Any = None
+        ) -> None:
             presses.append({"device_id": device_id, "button": button, "event_id": event_id})
 
     flask_app = Flask("relay-button-test")

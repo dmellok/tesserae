@@ -389,6 +389,17 @@ def _parse_button_event_id(raw: Any) -> int | None:
     return None
 
 
+def _parse_button_key(raw: Any) -> str | None:
+    """The physical button a press came from (``button_key``), sent beside
+    the ``button`` action name by a client whose buttons have their own
+    names (``a``-``d`` on an Inky Impression). Lower-cased; anything that
+    isn't a short plain string is ignored rather than failing the press."""
+    if not isinstance(raw, str):
+        return None
+    key = raw.strip().lower()
+    return key if 0 < len(key) <= 32 else None
+
+
 def _wants_first_byte(range_header: str | None) -> bool:
     """Whether this is the single-byte reachability probe ``bytes=0-0``.
 
@@ -447,6 +458,7 @@ def _dispatch_query_button(device: Device, *, route: str) -> Any | None:
             device_id=device.id,
             button=button_raw,
             event_id=_parse_button_event_id(raw_event_id),
+            button_key=_parse_button_key(request.args.get("button_key")),
         )
     except Exception:
         current_app.logger.exception(
@@ -1830,6 +1842,7 @@ def post_status(device_id: str) -> Response:
                     device_id=device.id,
                     button=button_name,
                     event_id=_parse_button_event_id(body.get("button_event_id")),
+                    button_key=_parse_button_key(body.get("button_key")),
                 )
             except Exception:
                 current_app.logger.exception(

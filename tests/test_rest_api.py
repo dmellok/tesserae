@@ -3078,3 +3078,54 @@ def test_frame_refresh_survives_a_render_without_a_page(app: Flask) -> None:
     pm, remaining = _refresh(app, rendered_at=now - 600, change_at=now - 60, page_id=None)
     assert pm.pushes == []
     assert remaining is None
+
+
+def test_a_button_key_on_frame_and_status_selects_its_own_binding(app: Flask) -> None:
+    """``button_key`` (the physical button) rides beside ``button`` on the
+    frame GET and the status POST, and a map entry for it wins."""
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    resp = _register_via_api(client, code=code, device_id="bedroom_pico")
+    token = resp.get_json()["device_token"]
+
+    settings = app.config["SETTINGS_STORE"]
+    devices = settings.get_section("devices") or {}
+    devices["bedroom_pico"] = {
+        **devices.get("bedroom_pico", {}),
+        "button_map": {"a": "fetch_latest", "d": "fetch_latest"},
+    }
+    settings.update_section("devices", devices)
+    app.config["PUSH_MANAGER"]._latest_renders["bedroom_pico"] = {
+        "digest": "abc123",
+        "ext": "bin",
+        "filename": "abc123.bin",
+        "renderer_id": "pico_bin",
+        "timestamp": time.time(),
+        "composition_digest": "comp123",
+    }
+    headers = {"Authorization": f"Bearer {token}"}
+
+    frame = client.get(
+        "/api/v1/device/bedroom_pico/frame?button=left&button_key=A&button_event_id=20",
+        headers=headers,
+    )
+    status = client.post(
+        "/api/v1/device/bedroom_pico/status",
+        json={"button": "d", "button_key": "d", "button_event_id": 21},
+        headers=headers,
+    )
+
+    assert frame.status_code == 200
+    assert status.status_code == 200
+    rows = [
+        row
+        for row in app.config["EVENT_LOG"].list(type="push")
+        if row.source == "button" and row.target == "bedroom_pico"
+    ]
+    # Both presses ran the key's binding (fetch_latest), not left's default
+    # rotate_prev or an unmapped "d".
+    assert sorted(row.extra["button_event_id"] for row in rows if row.status == "fetched") == [
+        20,
+        21,
+    ]

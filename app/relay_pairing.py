@@ -496,7 +496,11 @@ class RelayPairingPoller:
         button = raw_button.strip() if isinstance(raw_button, str) else ""
         if not has_deck_report and not button:
             return
-        from app.rest_api import _ingest_deck_report, _parse_button_event_id
+        from app.rest_api import (
+            _ingest_deck_report,
+            _parse_button_event_id,
+            _parse_button_key,
+        )
 
         with self._app.app_context():
             if has_deck_report:
@@ -521,6 +525,7 @@ class RelayPairingPoller:
                     device_id=device.id,
                     button=button,
                     event_id=_parse_button_event_id(parsed.get("button_event_id")),
+                    button_key=_parse_button_key(parsed.get("button_key")),
                 )
             except Exception:
                 logger.exception(

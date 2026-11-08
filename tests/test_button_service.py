@@ -1208,3 +1208,61 @@ def test_push_failure_still_persists_state(
     persisted = state_store.get("kitchen")
     assert persisted is not None
     assert persisted.step_index == 1
+
+
+def test_a_physical_button_key_wins_over_the_action_name(
+    rotation_store: RotationStore,
+    state_store: DeviceRotationStateStore,
+    settings_store: SettingsStore,
+    page_store: PageStore,
+    push_manager: StubPushManager,
+    clock: FakeClock,
+) -> None:
+    """An Inky Pi sends the action name (left/refresh/right) and its button
+    letter. A map entry for the letter binds that button on its own; a
+    letter the map leaves out falls back to the name, then the defaults."""
+    _seed_rotation(rotation_store)
+    settings_store.patch_section(
+        "devices",
+        {"kitchen": {"button_map": {"a": "page:evening", "right": "page:morning"}}},
+    )
+    svc = _wire(
+        rotation_store=rotation_store,
+        state_store=state_store,
+        settings_store=settings_store,
+        page_store=page_store,
+        push_manager=push_manager,
+        clock=clock,
+    )
+
+    assert svc._resolve_action_spec("kitchen", "left", "a") == "page:evening"
+    assert svc._resolve_action_spec("kitchen", "right", "c") == "page:morning"
+    assert svc._resolve_action_spec("kitchen", "refresh", "b") == "refresh"
+    assert svc._resolve_action_spec("kitchen", "d", "d") is None  # unbound D: no action
+    assert svc._resolve_action_spec("kitchen", "left") == "rotate_prev"  # names-only clients
+
+    result = svc.handle_button(device_id="kitchen", button="left", event_id=1, button_key="a")
+    assert result.pushed_page_id == "evening"
+
+
+def test_a_global_map_binds_button_keys_too(
+    rotation_store: RotationStore,
+    state_store: DeviceRotationStateStore,
+    settings_store: SettingsStore,
+    page_store: PageStore,
+    push_manager: StubPushManager,
+    clock: FakeClock,
+) -> None:
+    settings_store.patch_section("app", {"button_map": {"d": "page:evening"}})
+    settings_store.patch_section("devices", {"kitchen": {"button_map": {"d": "page:morning"}}})
+    svc = _wire(
+        rotation_store=rotation_store,
+        state_store=state_store,
+        settings_store=settings_store,
+        page_store=page_store,
+        push_manager=push_manager,
+        clock=clock,
+    )
+    assert svc._resolve_action_spec("hall", "d", "d") == "page:evening"
+    # The device's own map still wins over the global one.
+    assert svc._resolve_action_spec("kitchen", "d", "d") == "page:morning"

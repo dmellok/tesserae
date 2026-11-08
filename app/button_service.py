@@ -265,6 +265,18 @@ def menu_pages(pages: Iterable[Page], device_id: str) -> list[Page]:
     return [p for p in pages if not p.archived and device_id in p.device_ids]
 
 
+def _first_mapped(button_map: object, names: list[str]) -> str | None:
+    """The action ``button_map`` gives the first of ``names`` it maps to a
+    non-empty string, or None."""
+    if not isinstance(button_map, dict):
+        return None
+    for name in names:
+        value = button_map.get(name)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
 class ButtonService:
     def __init__(
         self,
@@ -426,9 +438,16 @@ class ButtonService:
         device_id: str,
         button: str,
         event_id: int | None,
+        button_key: str | None = None,
     ) -> ButtonHandleResult:
         """Full path: resolve, dedup, dispatch, persist, push, then notify
-        listeners (see :meth:`add_listener`)."""
+        listeners (see :meth:`add_listener`).
+
+        ``button_key`` names the physical button (``a``-``d`` on an Inky
+        Impression) when the client sends one beside the ``button`` action
+        name. A button map entry for the key wins over one for the name, so
+        each physical button can be bound on its own; see
+        :meth:`_resolve_action_spec`."""
         with navigation_locked(self._deck_nav, [device_id], timeout=NAV_LOCK_TIMEOUT_S) as held:
             if not held:
                 log.warning(
@@ -436,7 +455,9 @@ class ButtonService:
                     device_id,
                     NAV_LOCK_TIMEOUT_S,
                 )
-            result = self._handle_button(device_id=device_id, button=button, event_id=event_id)
+            result = self._handle_button(
+                device_id=device_id, button=button, event_id=event_id, button_key=button_key
+            )
         self._emit_button(device_id, button, result)
         return result
 
@@ -767,6 +788,7 @@ class ButtonService:
         device_id: str,
         button: str,
         event_id: int | None,
+        button_key: str | None = None,
     ) -> ButtonHandleResult:
         now = self._clock()
         rotation = self._resolve_rotation(device_id)
@@ -829,7 +851,7 @@ class ButtonService:
             )
 
         # Resolve action spec through per-device -> global -> default.
-        spec = self._resolve_action_spec(device_id, button)
+        spec = self._resolve_action_spec(device_id, button, button_key)
 
         current_step_index, _manual = self._effective_step_index(rotation, state)
         ctx = ActionContext(
@@ -2721,24 +2743,31 @@ class ButtonService:
             "page_ids_by_name": page_name_index(pages),
         }
 
-    def _resolve_action_spec(self, device_id: str, button: str) -> str | None:
+    def _resolve_action_spec(
+        self, device_id: str, button: str, button_key: str | None = None
+    ) -> str | None:
         """Per-device button_map, then app-global, then hardcoded
-        default. Returns None if the button isn't mapped anywhere."""
+        default. Returns None if the button isn't mapped anywhere.
+
+        Within each map the physical ``button_key`` is looked up before the
+        ``button`` name, so ``{"a": "page:Calendar"}`` binds one button while
+        a map keyed by name (``left`` / ``right`` / ``refresh``) keeps
+        working for every client that sends names only. The hardcoded
+        defaults are keyed by name alone."""
+        names = [n for n in (button_key, button) if n]
         try:
             devices_section = self._settings.get_section("devices") or {}
             device_map = devices_section.get(device_id, {}).get("button_map")
-            if isinstance(device_map, dict) and button in device_map:
-                value = device_map[button]
-                if isinstance(value, str) and value:
-                    return value
+            spec = _first_mapped(device_map, names)
+            if spec is not None:
+                return spec
         except Exception:
             pass
         try:
             global_map = self._settings.get_section("app").get("button_map")
-            if isinstance(global_map, dict) and button in global_map:
-                value = global_map[button]
-                if isinstance(value, str) and value:
-                    return value
+            spec = _first_mapped(global_map, names)
+            if spec is not None:
+                return spec
         except Exception:
             pass
         default = DEFAULT_BUTTON_MAP.get(button)

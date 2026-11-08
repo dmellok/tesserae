@@ -8,6 +8,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Buttons: a press can name its physical button (`button_key`) beside its action, and the device's button map binds that key first, so the four buttons on an Inky Impression can each show their own dashboard (`{"a": "page:Calendar", …, "d": "page:Family"}`) with tesserae-device-pi 0.9.3. Maps keyed by `left` / `right` / `refresh` work as before.
 - Raspberry Pi: one `pi_client` kind for the unified tesserae-device-pi client. A Spectra 6 Impression gets the packed .bin, every other Inky panel the PNG, from the panel the Pi reports when it pairs; it stays awake by default.
 - Device batteries: each chart has a 6h range too, and the second switch at the top of the page is gone.
 - Device batteries: a gear next to each frame's name opens its settings.

@@ -491,7 +491,7 @@
           <div class="dx-f dx-f-span">
             <div class="dx-f-head">
               <label class="dx-f-label" for="{{ section.id }}-button-map">JSON</label>
-              {{ info_pop('Map each button name to an action; actions with arguments use the action:arg form, e.g. page:Kitchen, step:2, webhook:https://… A page: binding takes a dashboard name or its id; a name binding breaks if the dashboard is renamed, an id binding does not. Leave it empty to use the defaults shown under Effective map.') }}
+              {{ info_pop('Map each button name to an action; actions with arguments use the action:arg form, e.g. page:Kitchen, step:2, webhook:https://… A Raspberry Pi on an Inky Impression also sends its button letter, a to d, and a letter wins over the name, so {"a": "page:Calendar", "d": "page:Weather"} binds each button on its own. A page: binding takes a dashboard name or its id; a name binding breaks if the dashboard is renamed, an id binding does not. Leave it empty to use the defaults shown under Effective map.') }}
             </div>
             <textarea id="{{ section.id }}-button-map" name="button_map_json" form="{{ _form }}"
                       class="dx-in dx-mono dx-button-map-input" rows="5" spellcheck="false" autocomplete="off"
