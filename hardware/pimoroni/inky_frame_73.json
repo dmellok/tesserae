@@ -5,7 +5,7 @@
   "vendor": "Pimoroni",
   "url": "https://shop.pimoroni.com/products/inky-frame-7-3",
   "icon": "monitor",
-  "description": "7.3 inch 800x480 Inky Frame (Pico 2 W aboard) with the Spectra 6 E673 panel shipped from September 2025. Driven by the tesserae-inkyframe Pico SDK firmware (built with PANEL_VARIANT=PANEL_SPECTRA) over the REST device API. Owners of the earlier 7-colour ACeP revision should use pimoroni_inky_frame_73_acep.",
+  "description": "7.3 inch 800x480 Inky Frame (Pico 2 W aboard) with the Spectra 6 E673 panel shipped from September 2025. Driven by the tesserae-device-inkyframe Pico SDK firmware (the inkyframe2_spectra build) over the REST device API, with setup from a phone, button letters and signed over-the-air updates. Owners of the earlier 7-colour ACeP revision should use pimoroni_inky_frame_73_acep.",
   "protocol": "pico_bin_client",
   "panel": {
     "w": 800,
@@ -18,5 +18,5 @@
   },
   "refresh_floor_s": 30,
   "image_format": "bin",
-  "notes_md": "Community firmware by [partridgeworks/tesserae.inkyframe](https://github.com/partridgeworks/tesserae.inkyframe). Untested on hardware at the time of writing (the firmware author owns the ACeP revision); the panel driver follows Pimoroni's inky_e673 sequence."
+  "notes_md": "Firmware: [dmellok/tesserae-device-inkyframe](https://github.com/dmellok/tesserae-device-inkyframe), the Tesserae-maintained fork of Carl Partridge's [partridgeworks/tesserae.inkyframe](https://github.com/partridgeworks/tesserae.inkyframe). Confirmed on a Pico 2 W Frame: pairing, painting (upright, in the Spectra 6 palette), the five buttons, the setup portal and signed over-the-air updates from Settings → Firmware, which need the A/B partition table written once over USB (see the firmware README). A Frame with an original Pico W runs the same firmware without over-the-air updates."
 }
