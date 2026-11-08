@@ -16,6 +16,8 @@ device-registration flow described in [Set up a device](devices.md).
 | `tesserae-device-esp32-bw` | MQTT | `esp32_bw` | Waveshare 4.2" B/W (400×300, 1-bpp) and other small B/W panels |
 | [`tesserae-device-pi`](https://github.com/dmellok/tesserae-device-pi) | REST / MQTT / cloud relay | `pi_device` | Any Pimoroni Inky panel on a Raspberry Pi: Impression (4", 5.7", 7.3", 13.3"), wHAT, pHAT |
 | `tesserae-device-pico-bin` | MQTT | `pico_bin` | Pimoroni Pico-driven Inky Impression (4-bpp Spectra 6) |
+| [`tesserae-device-inkyframe`](https://github.com/dmellok/tesserae-device-inkyframe) | REST | `inky_frame_73` | Pimoroni Inky Frame 7.3" (Spectra 6 on a Pico 2 W, or the earlier 7-colour ACeP); setup from a phone, signed over-the-air updates |
+| [`tesserae-device-badger`](https://github.com/dmellok/tesserae-device-badger) | REST | `badger_<mac>` | Pimoroni Badger 2350 (264×176, 4 greys) and Badger 2040 W (296×128, mono), as an app in the badge's own launcher |
 | [`tesserae-koreader`](https://github.com/dmellok/tesserae-koreader) | REST | `koreader_client` | Jailbroken Kindles, Kobo, and other e-readers running KOReader; 16-level greyscale, or colour on a Kaleido 3 reader (Kobo Libra Colour, Clara Colour), sleeps between refreshes |
 | [TRMNL stock firmware](https://github.com/usetrmnl/trmnl-firmware) or [KOReader plugin](https://github.com/koreader/koreader) | HTTP-pull (BYOS) | `trmnl` | TRMNL devices + KOReader-on-Kindle |
 
@@ -122,6 +124,50 @@ refresh interval is the panel's **Refresh interval** on the device card.
 
 Tesserae Cloud speaks the same protocol: enter `https://cloud.tesserae.ink`
 as the server and a claim code from **Settings › Panels**.
+
+## tesserae-device-inkyframe (Pimoroni Inky Frame 7.3")
+
+[:material-github: dmellok/tesserae-device-inkyframe](https://github.com/dmellok/tesserae-device-inkyframe)
+· pairs with the `pico_bin` renderer · kind `pimoroni_inky_frame_73` (Spectra 6) or `pimoroni_inky_frame_73_acep`
+
+Pico SDK firmware for the Inky Frame 7.3", the Tesserae-maintained fork of
+[partridgeworks/tesserae.inkyframe](https://github.com/partridgeworks/tesserae.inkyframe).
+The server packs each frame into the panel's own 4-bpp palette, so the frame
+streams it straight to the glass.
+
+1. Build and flash it with PlatformIO, following the repo README (the first
+   flash needs BOOTSEL held on the Pico).
+2. Power the frame and join the `Tesserae-Setup-XXXX` network it opens (password
+   `tesserae`). Enter your Wi-Fi and server address on the setup page.
+3. The frame announces itself: click **Register** on it in **Settings → Devices**.
+
+The five front buttons send button events with their letters (`a`-`e`).
+Signed over-the-air updates arrive from **Settings → Firmware** once the A/B
+partition table has been written over USB. Confirmed on a Pico 2 W Frame with
+the Spectra 6 panel.
+
+## tesserae-device-badger (Pimoroni Badger 2350 and 2040 W)
+
+[:material-github: dmellok/tesserae-device-badger](https://github.com/dmellok/tesserae-device-badger)
+· Badger 2350 pairs with `esp32_gray2_bin` (4 greys), Badger 2040 W with `esp32_bw_bin` (mono)
+
+An app for the badge's stock launcher (Badgeware on the 2350, Badger OS on the
+2040 W), so the badge keeps its other apps and Tesserae is one more entry in
+its menu.
+
+1. Copy the app onto the badge: on the 2350, double-tap RESET and copy the
+   `tesserae` folder into `apps/`; on the 2040 W, copy it with Thonny or
+   `mpremote`. The repo README has the exact files.
+2. Copy `config/tesserae_config.py` beside the badge's Wi-Fi settings and set
+   `SERVER_URL` to your server's IP address (these boards can't resolve
+   `.local` names).
+3. Launch **Tesserae** from the menu and click **Register** on the badge in
+   **Settings → Devices**.
+
+A/B/C/up/down send button events with their own keys. The config file sets the
+activity light, how long the badge stays awake after a refresh, its refresh
+speed and what each button sends. The 2350 is confirmed on hardware (Badgeware
+1.27.0); the 2040 W has not run on hardware yet.
 
 ## TRMNL / KOReader (HTTP-pull)
 

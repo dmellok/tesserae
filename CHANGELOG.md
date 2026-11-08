@@ -9,7 +9,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 ### Added
 
 - Settings → Logs: the server's own log as it's written. Pick a watch level (debug, info, warning or error and up), filter by text, follow live, download or clear. The record level can be lowered for the running server, so debug lines can be watched without a restart. It returns to the configured level on restart. Device tokens and pairing codes in a line are masked.
-- Hardware: Pimoroni Badger 2040 W (296x128 black and white) and Badger 2350 (264x176, four greys), driven by the new tesserae-device-badger app inside each badge's stock launcher. Both pair from the Discovered strip, and A/B/C/up/down arrive as button wakes with their own keys. Not yet confirmed on hardware.
+- Hardware: Pimoroni Badger 2040 W (296x128 black and white) and Badger 2350 (264x176, four greys), driven by the new tesserae-device-badger app inside each badge's stock launcher. Both pair from the Discovered strip, and A/B/C/up/down arrive as button wakes with their own keys. The Badger 2350 is confirmed on hardware; the 2040 W is not yet.
+- Docs: the README, the client install page and the compatibility matrix list the Inky Frame firmware (tesserae-device-inkyframe, Spectra 6 confirmed) and the Badger app.
 
 ## [0.505.0], 2026-11-08
 

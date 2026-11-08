@@ -222,6 +222,21 @@ microSD and the frontlight are not wired yet.
 | [Inky Impression 13.3"](https://shop.pimoroni.com/products/inky-impression?variant=55186435277179) (6-colour Spectra 6) | 1600×1200 | [tesserae-device-pi](https://github.com/dmellok/tesserae-device-pi) | ✅ |
 | Inky [pHAT](https://shop.pimoroni.com/products/inky-phat) / [wHAT](https://shop.pimoroni.com/products/inky-what) | various | [tesserae-device-pi](https://github.com/dmellok/tesserae-device-pi) | works via `pi_png` |
 
+The Inky Frame and the Badgers carry their own microcontroller, so they need no
+Raspberry Pi. The Inky Frame runs
+[tesserae-device-inkyframe](https://github.com/dmellok/tesserae-device-inkyframe)
+(Pico SDK firmware, the Tesserae fork of Carl Partridge's client: setup from a
+phone, button letters, signed over-the-air updates). The Badgers run
+[tesserae-device-badger](https://github.com/dmellok/tesserae-device-badger), an
+app inside the badge's own launcher, so the badge keeps its other apps.
+
+| Panel | Resolution | Client | Status |
+|---|---|---|---|
+| [Inky Frame 7.3"](https://shop.pimoroni.com/products/inky-frame-7-3) (6-colour Spectra 6, Pico 2 W) | 800×480 | [tesserae-device-inkyframe](https://github.com/dmellok/tesserae-device-inkyframe) | ✅ |
+| Inky Frame 7.3" (legacy 7-colour ACeP) | 800×480 | [tesserae-device-inkyframe](https://github.com/dmellok/tesserae-device-inkyframe) | TBD |
+| [Badger 2350](https://shop.pimoroni.com/products/badger-2350) | 264×176, 4-level grey | [tesserae-device-badger](https://github.com/dmellok/tesserae-device-badger) | ✅ |
+| [Badger 2040 W](https://shop.pimoroni.com/products/badger-2040-w) | 296×128, mono | [tesserae-device-badger](https://github.com/dmellok/tesserae-device-badger) | TBD |
+
 ### Waveshare
 
 | Panel | Resolution | Client | Status |
