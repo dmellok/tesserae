@@ -1226,7 +1226,14 @@
     pickChanged();
   }
   function pickChanged() {
+    // A draw finishes on its own time, so a step's peek the user opened
+    // meanwhile must survive the redraw (render() closes every popover).
+    const peekKey = root.querySelector('[data-peek][aria-expanded="true"]')?.dataset.peek;
     render(); // draws the tile from the choice, then brings an open lightbox up to date
+    if (peekKey) {
+      const btn = root.querySelector(`[data-peek="${CSS.escape(peekKey)}"]`);
+      if (btn) openPeek(btn);
+    }
   }
 
   /* ------------------------------------------------------------ zoom (lightbox) */
