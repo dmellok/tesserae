@@ -114,8 +114,9 @@ The panel never reaches the home LAN. Pairing is brokered through the relay:
    │                            │ ── { install_id, home_pubkey,  │
    │                            │      device_token, device_id,  │
    │                            │      config } ──▶             │
-   │                            │ (relay drops plaintext token,  │
-   │                            │  keeps only the hash)          │
+   │                            │ (on the panel's first poll the │
+   │                            │  relay drops the plaintext     │
+   │                            │  token, keeps only the hash)   │
 ```
 
 ### Endpoints
@@ -129,7 +130,9 @@ POST /v1/pair                              (unauthenticated)
 Body: { "code": "<code>", "panel_pubkey": "<base64url X25519>",
         "panel_w": <int?>, "panel_h": <int?>, "model": "<kind id?>",
         "gamut": "<gamut id?>" }
-→ 202 { "status": "pending" }   (unknown/expired code → 404 pairing_expired)
+→ 202 { "status": "pending" }   (unknown/expired code → 404 pairing_expired;
+                                 code already claimed by a different
+                                 panel_pubkey → 409 conflict)
 
 `panel_w` / `panel_h` / `model` / `gamut` are an **optional self-report**: the
 panel tells home its geometry, device kind, and colour gamut so the operator
@@ -159,9 +162,14 @@ GET  /v1/pair/<code>                        (unauthenticated, poll)
    or 200 { "status": "pending" }
 ```
 
-The plaintext `device_token` transits the relay exactly once (in `complete`,
-returned once from `GET /v1/pair/<code>`) so it can reach the panel; the relay
-then retains only `device_token_sha256` for future poll validation. The frame
+The plaintext `device_token` transits the relay only to reach the panel: home
+hands it over in `complete`, and `GET /v1/pair/<code>` returns it. That GET
+answers `ready` again if the panel asks again (it may have lost or failed to
+parse the first response). The panel's first authenticated poll proves it
+stored the token, and the relay then deletes the pair record and the code,
+keeping only `device_token_sha256` for future poll validation. A code binds to
+the first `panel_pubkey` that claims it; the same key again is a retry and is
+accepted. The frame
 key is **not** part of pairing: both sides derive it from the exchanged public
 keys.
 

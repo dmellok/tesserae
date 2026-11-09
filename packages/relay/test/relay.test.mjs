@@ -635,3 +635,69 @@ test("no FRAME_DAILY_LIMIT means unlimited uploads", async () => {
     assert.equal(r.status, 200);
   }
 });
+
+test("a pairing code belongs to the first panel key that claims it", async () => {
+  const e = env();
+  let r = await worker.fetch(req("POST", "/v1/install/register", { body: { install_pubkey: "PUB" } }), e);
+  const { install_id, publisher_token } = await r.json();
+  r = await worker.fetch(
+    req("POST", `/v1/i/${install_id}/pair/codes`, { headers: authHdr(publisher_token) }),
+    e,
+  );
+  const { code } = await r.json();
+  r = await worker.fetch(req("POST", "/v1/pair", { body: { code, panel_pubkey: "PANELPUB" } }), e);
+  assert.equal(r.status, 202);
+  // The same panel retrying is fine.
+  r = await worker.fetch(req("POST", "/v1/pair", { body: { code, panel_pubkey: "PANELPUB" } }), e);
+  assert.equal(r.status, 202);
+  // Someone else with the code can't swap in their key.
+  r = await worker.fetch(req("POST", "/v1/pair", { body: { code, panel_pubkey: "ATTACKER" } }), e);
+  assert.equal(r.status, 409);
+  assert.equal((await r.json()).error.code, "conflict");
+  r = await worker.fetch(
+    req("GET", `/v1/i/${install_id}/pair/pending`, { headers: authHdr(publisher_token) }),
+    e,
+  );
+  assert.deepEqual((await r.json()).pending.map((p) => p.panel_pubkey), ["PANELPUB"]);
+});
+
+test("the plaintext token stays until the panel's first poll, then only its hash is kept", async () => {
+  const e = env();
+  const deviceToken = "handoff_dev_token";
+  const { install_id, code } = await pairDevice(e, "panel1", deviceToken);
+  const pairKey = `pair/${install_id}/${code}.json`;
+
+  // The panel may lose or fail to parse the ready response, so asking again works.
+  for (let i = 0; i < 2; i++) {
+    const r = await worker.fetch(req("GET", `/v1/pair/${code}`), e);
+    assert.equal(r.status, 200);
+    assert.equal((await r.json()).device_token, deviceToken);
+  }
+  assert.notEqual(await e.RELAY_BUCKET.get(pairKey), null);
+
+  // Its first authenticated poll proves it stored the token.
+  let r = await worker.fetch(
+    req("GET", `/v1/i/${install_id}/d/panel1/frame`, { headers: authHdr(deviceToken) }),
+    e,
+  );
+  assert.equal(r.status, 204);
+  assert.equal(await e.RELAY_BUCKET.get(pairKey), null);
+  assert.equal(await e.RELAY_BUCKET.get(`code/${code}.json`), null);
+  const tokenRec = JSON.parse(
+    await (await e.RELAY_BUCKET.get(`token/${await sha256Hex(deviceToken)}.json`)).text(),
+  );
+  assert.deepEqual(tokenRec, { install_id, device_id: "panel1" });
+  for (const key of [...(await e.RELAY_BUCKET.list({ prefix: "" })).objects.map((o) => o.key)]) {
+    const v = await (await e.RELAY_BUCKET.get(key)).text();
+    assert.ok(!v.includes(deviceToken), `${key} still holds the plaintext token`);
+  }
+
+  // The code is spent, and the token keeps working.
+  r = await worker.fetch(req("GET", `/v1/pair/${code}`), e);
+  assert.equal(r.status, 404);
+  r = await worker.fetch(
+    req("POST", `/v1/i/${install_id}/d/panel1/status`, { headers: authHdr(deviceToken), body: {} }),
+    e,
+  );
+  assert.equal(r.status, 200);
+});

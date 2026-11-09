@@ -10,6 +10,9 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 - Lineups: a step's peek you opened stays open when a picture you asked for finishes drawing. The redraw used to close it.
 - Settings → System: on a Docker or non-git install, opening the page asked GitHub for the newest release even with Online features off. The check now waits for Online features like every other outbound call; with it off, the Updates card links to the releases page instead. Privacy notes list the check.
+### Security
+
+- Relay: the relay no longer keeps a paired panel's plaintext token. It held the token in the pairing record until the record expired or the panel was revoked; it now deletes that record on the panel's first authenticated poll and keeps only the token's hash. A pairing code also belongs to the first panel key that claims it, so someone who saw the code can no longer swap in their own key before home completes the pairing (409 `conflict`).
 
 ## [0.507.0], 2026-11-09
 
