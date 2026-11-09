@@ -6,6 +6,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.509.0], 2026-11-10
+
 ### Added
 
 - OTA logs: a panel that installs updates sends the log of each attempt on its own, and the device page lists it under OTA logs in the Logs group, apart from routine uploads. The newest 10 are kept, up to 512 KB, so routine uploads never push out the log of the update that went wrong. A client that can't collect logs on request (the Pi client, the Inky Frame) still gets the group for its OTA logs. The Events row names the target version and phase. Clients send them from ESP32 firmware 1.64.0, Pi client 0.10.0 and Inky Frame 0.4.0. See "OTA logs" in `docs/ota/contract.md`.
