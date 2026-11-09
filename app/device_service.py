@@ -565,6 +565,73 @@ def update_instance_gamut(
     return InstanceResult(reloaded), True
 
 
+# M5Stack PaperS3: firmware before 1.63.0 registered its 960x540 framebuffer
+# with no rotation, so the server took it as the canvas and composed
+# landscape for a panel held portrait (firmware #21). 1.63.0 registers with a
+# 90 degree turn and maps touch onto the 540x960 portrait canvas, but an
+# already-paired device never re-registers, so it would keep the landscape
+# canvas and its taps would land in the wrong place.
+_PAPERS3_KIND = "m5stack_papers3"
+_PAPERS3_PORTRAIT_FW = "1.63.0"
+_PAPERS3_HEALED_KEY = "papers3_portrait_healed"
+
+
+def heal_papers3_portrait(
+    *,
+    devices: DeviceRegistry,
+    renderers: RendererRegistry,
+    data_root: Path,
+    instance_id: str,
+    fw_version: Any,
+) -> bool:
+    """Move an already-paired PaperS3 onto the 540x960 portrait canvas the
+    first time it reports firmware 1.63.0 or later.
+
+    Only the exact panel the old registration produced is touched (960x540,
+    landscape), and only once: the instance is marked, so an owner who later
+    chooses landscape on the device page keeps it. A version that isn't plain
+    SemVer (a bench or dev build) never triggers it. Returns True when the
+    instance file was rewritten, so the caller can repaint."""
+    from app.semver import is_strictly_newer
+
+    device = devices.get(instance_id)
+    if device is None or device.kind_of != _PAPERS3_KIND:
+        return False
+    if not isinstance(fw_version, str) or not fw_version.strip():
+        return False
+    older = is_strictly_newer(_PAPERS3_PORTRAIT_FW, fw_version.strip().lstrip("vV"))
+    if older is None or older:
+        return False
+    panel = device.manifest.get("panel") or {}
+    if (panel.get("w"), panel.get("h")) != (960, 540):
+        return False
+    if str(panel.get("orientation") or "landscape") != "landscape":
+        return False
+
+    inst_file = device.path
+    try:
+        raw = json.loads(inst_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    # The marker lives in the instance file; the loader doesn't carry
+    # unknown keys into the manifest.
+    if raw.get(_PAPERS3_HEALED_KEY):
+        return False
+    block = dict(raw.get("panel") or {})
+    block.update({"w": 540, "h": 960, "orientation": "portrait", "native_w": 960, "native_h": 540})
+    raw["panel"] = block
+    raw[_PAPERS3_HEALED_KEY] = True
+    inst_file.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
+
+    devices.devices.pop(instance_id, None)
+    _drop_clones(renderers, instance_id)
+    reloaded = load_instance_file(devices, inst_file=inst_file, data_root=data_root)
+    if reloaded is None:
+        return False
+    clone_for_instances(renderers, devices)
+    return True
+
+
 VALID_ROTATIONS: tuple[int, ...] = (0, 90, 180, 270)
 
 

@@ -3129,3 +3129,89 @@ def test_a_button_key_on_frame_and_status_selects_its_own_binding(app: Flask) ->
         20,
         21,
     ]
+
+
+# -- PaperS3 portrait heal (firmware #21) --------------------------------
+
+
+def _register_papers3(app: Flask, client, device_id: str) -> str:
+    """Register the way firmware before 1.63.0 did: the 960x540 buffer,
+    no rotation, so the server stores a landscape canvas."""
+    _sign_in(client)
+    code = _issue_pairing(app)
+    resp = client.post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+        data=json.dumps(
+            {
+                "device_id": device_id,
+                "kind": "m5stack_papers3",
+                "panel_w": 960,
+                "panel_h": 540,
+                "fw_version": "1.62.3",
+            }
+        ),
+    )
+    assert resp.status_code == 201, resp.get_data(as_text=True)
+    return resp.get_json()["device_token"]
+
+
+def _panel(app: Flask, device_id: str) -> dict:
+    return dict(app.config["DEVICE_REGISTRY"].get(device_id).manifest.get("panel") or {})
+
+
+def test_papers3_on_old_firmware_keeps_its_canvas(app: Flask) -> None:
+    client = app.test_client()
+    token = _register_papers3(app, client, "paper_s3")
+    assert (_panel(app, "paper_s3")["w"], _panel(app, "paper_s3")["h"]) == (960, 540)
+    _post_status(client, "paper_s3", token, {"fw_version": "1.62.3"})
+    assert (_panel(app, "paper_s3")["w"], _panel(app, "paper_s3")["h"]) == (960, 540)
+
+
+def test_papers3_moves_to_portrait_once_it_runs_1_63(app: Flask) -> None:
+    client = app.test_client()
+    token = _register_papers3(app, client, "paper_s3")
+    _post_status(client, "paper_s3", token, {"fw_version": "1.63.0"})
+    panel = _panel(app, "paper_s3")
+    assert (panel["w"], panel["h"], panel["orientation"]) == (540, 960, "portrait")
+    assert (panel["native_w"], panel["native_h"]) == (960, 540)
+    device = app.config["DEVICE_REGISTRY"].get("paper_s3")
+    assert json.loads(device.path.read_text(encoding="utf-8"))["papers3_portrait_healed"] is True
+
+
+def test_papers3_heal_runs_once_so_a_later_landscape_choice_sticks(app: Flask) -> None:
+    from app.device_service import heal_papers3_portrait
+
+    client = app.test_client()
+    token = _register_papers3(app, client, "paper_s3")
+    _post_status(client, "paper_s3", token, {"fw_version": "1.63.1"})
+    # The owner turns it back to landscape on the device page.
+    device = app.config["DEVICE_REGISTRY"].get("paper_s3")
+    raw = json.loads(device.path.read_text(encoding="utf-8"))
+    raw["panel"].update({"w": 960, "h": 540, "orientation": "landscape"})
+    device.path.write_text(json.dumps(raw), encoding="utf-8")
+    device.manifest["panel"].update({"w": 960, "h": 540, "orientation": "landscape"})
+    assert raw["papers3_portrait_healed"] is True
+    assert not heal_papers3_portrait(
+        devices=app.config["DEVICE_REGISTRY"],
+        renderers=app.config["RENDERER_REGISTRY"],
+        data_root=device.path.parent.parent,
+        instance_id="paper_s3",
+        fw_version="1.64.0",
+    )
+
+
+@pytest.mark.parametrize("fw", ["", "99.0.0-bench", "1.63.0-3-gabc", None])
+def test_papers3_heal_ignores_unparseable_versions(app: Flask, fw: Any) -> None:
+    client = app.test_client()
+    token = _register_papers3(app, client, "paper_s3")
+    _post_status(client, "paper_s3", token, {"fw_version": fw} if fw is not None else {})
+    assert (_panel(app, "paper_s3")["w"], _panel(app, "paper_s3")["h"]) == (960, 540)
+
+
+def test_other_kinds_are_never_touched(app: Flask) -> None:
+    client = app.test_client()
+    token = _register_esp32(app, client, "esp_any")
+    before = _panel(app, "esp_any")
+    _post_status(client, "esp_any", token, {"fw_version": "1.63.0"})
+    assert _panel(app, "esp_any") == before
