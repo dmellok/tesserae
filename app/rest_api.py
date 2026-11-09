@@ -697,6 +697,29 @@ def _maybe_heal_gamut(device_id: str, body: dict[str, Any]) -> None:
         current_app.logger.exception("rest: gamut heal failed for device=%s", device_id)
 
 
+def _maybe_heal_papers3_portrait(device_id: str, body: dict[str, Any]) -> None:
+    """Once an already-paired PaperS3 reports firmware 1.63.0, move it from
+    the landscape canvas old firmware left it on to portrait, and repaint.
+    See ``heal_papers3_portrait``. Best-effort: never breaks the poll."""
+    try:
+        from app.device_service import heal_papers3_portrait
+
+        changed = heal_papers3_portrait(
+            devices=_devices(),
+            renderers=_renderers(),
+            data_root=_device_data_root(),
+            instance_id=device_id,
+            fw_version=body.get("fw_version"),
+        )
+        if changed:
+            current_app.logger.info("rest: PaperS3 %s moved to the portrait canvas", device_id)
+            push_mgr = current_app.config.get("PUSH_MANAGER")
+            if push_mgr is not None:
+                push_mgr.invalidate_and_repaint(device_id)
+    except Exception:
+        current_app.logger.exception("rest: PaperS3 portrait heal failed for device=%s", device_id)
+
+
 def _maybe_record_gamuts(device_id: str, body: dict[str, Any]) -> None:
     """Store the ``gamuts`` array a registering or beating firmware
     advertises (the colour depths it can paint). A body without the key
@@ -1806,6 +1829,7 @@ def post_status(device_id: str) -> Response:
     _status_body = request.get_json(silent=True, force=True)
     if isinstance(_status_body, dict):
         _maybe_record_gamuts(device.id, _status_body)
+        _maybe_heal_papers3_portrait(device.id, _status_body)
 
     # Optional ``tz`` field in the heartbeat body lets a client tell
     # the server its IANA timezone so the response can carry resolved

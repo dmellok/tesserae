@@ -17,6 +17,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- M5Stack PaperS3: a PaperS3 paired before firmware 1.63.0 was given a 960x540 landscape canvas for a panel held portrait. The first time it checks in on 1.63.0 or later, Tesserae moves it to the 540x960 portrait canvas that firmware's touch mapping expects, and repaints. It happens once, so choosing landscape again on the device page sticks (firmware #21).
 - Custom layout: dragging an edge that one tall cell shares with two stacked cells moves the whole line, so the tall cell narrows as the stacked cells widen (#434). It used to move only the dragged cell, which grew over the tall one. The tall cell kept its old width underneath, so a calendar in it drew its events past the visible edge. A cell growing into a gap now stops at the next cell. An overlap made before this fix stays until that edge is dragged back.
 - Devices: the pairing code pop-up gives the address a device reaches Tesserae on, not the browser's. Under Home Assistant ingress it showed Home Assistant's own address (#460). The Companion pairing pop-up does the same.
 - Lineups and history thumbnails keep the display's exact shape, so a dark picture no longer shows a thin light line along one edge.
