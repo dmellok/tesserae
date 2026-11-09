@@ -1863,19 +1863,26 @@ def _format_bytes(n: int) -> str:
 
 
 def _logs_view(device_id: str, selected: str) -> dict[str, Any] | None:
-    """The device page's Logs section (device log upload), or None when
-    the device never advertised ``logs.schema``: collection controls, the
-    wakes left, the stored uploads, the last detected failure, and the
-    upload picked with ``?log=<name>`` for the inline viewer."""
+    """The device page's Logs section (device log upload): collection
+    controls, the wakes left, the stored uploads, the OTA logs, the last
+    detected failure, and the upload picked with ``?log=<name>`` for the
+    inline viewer. None when the device never advertised ``logs.schema`` and
+    has sent no OTA log either; a client that only sends OTA logs gets the
+    section without the collection controls."""
     from app import device_logs
+    from app.state.device_logs import KIND_OTA
 
     store = current_app.config.get("DEVICE_LOGS")
-    if store is None or not device_logs.logs_capable(
+    if store is None:
+        return None
+    capable = device_logs.logs_capable(
         device_id, device_status(), current_app.config.get("DEVICE_FACTS")
-    ):
+    )
+    stored = store.list_uploads(device_id)
+    if not capable and not any(u.kind == KIND_OTA for u in stored):
         return None
     now = time.time()
-    uploads = [
+    rows = [
         {
             "name": u.name,
             "received_at": u.received_at,
@@ -1886,15 +1893,23 @@ def _logs_view(device_id: str, selected: str) -> dict[str, Any] | None:
             "download_url": url_for(
                 "auth.devices_log_download", instance_id=device_id, name=u.name
             ),
+            "kind": u.kind,
         }
-        for u in store.list_uploads(device_id)
+        for u in stored
     ]
+    uploads = [r for r in rows if r["kind"] != KIND_OTA]
+    ota_uploads = [r for r in rows if r["kind"] == KIND_OTA]
     viewing = None
-    picked = next((u for u in uploads if u["name"] == selected), None) if selected else None
+    picked = next((u for u in rows if u["name"] == selected), None) if selected else None
     if picked is not None:
         text = store.read_upload(device_id, selected)
         if text is not None:
-            viewing = {"name": selected, "received_at": picked["received_at"], "text": text}
+            viewing = {
+                "name": selected,
+                "received_at": picked["received_at"],
+                "text": text,
+                "kind": picked["kind"],
+            }
     failure = None
     cached = (device_status().get(device_id) or {}).get("diag")
     diag = cached if isinstance(cached, dict) else store.last_diag(device_id)
@@ -1910,8 +1925,10 @@ def _logs_view(device_id: str, selected: str) -> dict[str, Any] | None:
             ),
         }
     return {
+        "capable": capable,
         "remaining": store.remaining(device_id),
         "uploads": uploads,
+        "ota_uploads": ota_uploads,
         "viewing": viewing,
         "failure": failure,
         "collect_endpoint": url_for("auth.devices_logs_collect", instance_id=device_id),

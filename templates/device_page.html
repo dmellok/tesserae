@@ -726,6 +726,7 @@
             </div>
           </div>
           {% endif %}
+          {% if lg.capable %}
           <div class="dx-collect{% if lg.remaining %} is-active{% endif %}">
             <div class="dx-collect-text">
               <span class="dx-f-label">{% if lg.remaining %}Collecting: {{ lg.remaining }} wake{{ '' if lg.remaining == 1 else 's' }} left{% else %}Not collecting{% endif %}</span>
@@ -763,18 +764,6 @@
             {% endif %}
             <span class="dx-help">The newest 20 uploads are kept, up to 1 MB.</span>
           </div>
-          {% if lg.viewing %}
-          <div class="dx-log-viewer">
-            <div class="dx-code-head">
-              <span class="dx-f-label">Upload from {{ lg.viewing.received_at|fmt_time }}</span>
-              <span class="dx-btn-row">
-                <a class="dx-link-btn" href="{{ url_for('auth.device_page', instance_id=section.device_id) }}#logs">Close</a>
-                <button type="button" class="dx-btn is-sm" data-copy-target="#{{ section.id }}-log-view"><i class="ph ph-copy" aria-hidden="true"></i><span>Copy</span></button>
-              </span>
-            </div>
-            <pre class="dx-code is-tall dx-log-view" id="{{ section.id }}-log-view">{{ lg.viewing.text }}</pre>
-          </div>
-          {% endif %}
           {% else %}
           <div class="dx-empty">
             <i class="ph ph-scroll" aria-hidden="true"></i>
@@ -782,6 +771,46 @@
               <p class="dx-empty-title">No logs uploaded yet</p>
               <p class="dx-help">Start a collection above; each wake's log lands here after the panel's next check-in.</p>
             </div>
+          </div>
+          {% endif %}
+          {% endif %}{# lg.capable #}
+
+          {% if lg.ota_uploads %}
+          <div class="dx-ota-logs">
+            <span class="dx-f-label">OTA logs</span>
+            <p class="dx-help">Sent by the panel on its own around each firmware update: the download and install, and the first boot after it. The newest 10 are kept, up to 512 KB.</p>
+            <ul class="dx-list dx-log-list" data-log-list>
+              {% for up in lg.ota_uploads %}
+              <li class="dx-li dx-log-row{% if lg.viewing and lg.viewing.name == up.name %} is-active{% endif %}"{% if loop.index > 3 %} data-log-extra hidden{% endif %}>
+                <div class="dx-li-main">
+                  <span class="dx-li-when">{{ up.received_at|fmt_time }}</span>
+                  <span class="dx-li-meta">{{ up.relative }} · {{ up.size }} · {{ up.lines }} line{{ '' if up.lines == 1 else 's' }}</span>
+                </div>
+                <div class="dx-li-end">
+                  <a class="dx-btn is-sm is-ghost is-icon" href="{{ up.view_url }}" aria-label="View the OTA log from {{ up.received_at|fmt_time }}" title="View"><i class="ph ph-eye" aria-hidden="true"></i></a>
+                  <a class="dx-btn is-sm is-ghost is-icon" href="{{ up.download_url }}" aria-label="Download the OTA log from {{ up.received_at|fmt_time }}" title="Download"><i class="ph ph-download-simple" aria-hidden="true"></i></a>
+                </div>
+              </li>
+              {% endfor %}
+            </ul>
+            {% if lg.ota_uploads|length > 3 %}
+            <div class="dx-list-foot">
+              <button type="button" class="dx-link-btn" data-log-more aria-expanded="false" data-more-label="Show all {{ lg.ota_uploads|length }} OTA logs" data-less-label="Show the newest 3"><i class="ph ph-caret-down" aria-hidden="true"></i><span>Show all {{ lg.ota_uploads|length }} OTA logs</span></button>
+            </div>
+            {% endif %}
+          </div>
+          {% endif %}
+
+          {% if lg.viewing %}
+          <div class="dx-log-viewer">
+            <div class="dx-code-head">
+              <span class="dx-f-label">{% if lg.viewing.kind == 'ota' %}OTA log{% else %}Upload{% endif %} from {{ lg.viewing.received_at|fmt_time }}</span>
+              <span class="dx-btn-row">
+                <a class="dx-link-btn" href="{{ url_for('auth.device_page', instance_id=section.device_id) }}#logs">Close</a>
+                <button type="button" class="dx-btn is-sm" data-copy-target="#{{ section.id }}-log-view"><i class="ph ph-copy" aria-hidden="true"></i><span>Copy</span></button>
+              </span>
+            </div>
+            <pre class="dx-code is-tall dx-log-view" id="{{ section.id }}-log-view">{{ lg.viewing.text }}</pre>
           </div>
           {% endif %}
         </div>

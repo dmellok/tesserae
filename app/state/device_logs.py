@@ -10,6 +10,10 @@ Two things live here, both under ``data/core/``:
   verbatim as the device's ``config`` and persisted to NVS by the firmware.
 * ``device_logs/<device_id>/<UTC timestamp>.log``: the uploaded batches,
   UTF-8 text, the newest 20 kept up to 1 MB per device.
+* ``device_logs/<device_id>/ota-<UTC timestamp>.log``: OTA logs, the log a
+  client sends on its own around a firmware update (``X-Tesserae-Log-Kind:
+  ota``). Kept apart, the newest 10 up to 512 KB, so a run of routine
+  uploads never evicts the log of the update that went wrong.
 """
 
 from __future__ import annotations
@@ -31,8 +35,16 @@ KEEP_BYTES = 1024 * 1024
 # request can't leave a panel uploading on every wake indefinitely.
 MAX_COLLECT_WAKES = 100
 
+# Log kinds. "log" is the routine batch; "ota" an update's own log.
+KIND_LOG = "log"
+KIND_OTA = "ota"
+KINDS = (KIND_LOG, KIND_OTA)
+KEEP_OTA_UPLOADS = 10
+KEEP_OTA_BYTES = 512 * 1024
+_KEEP = {KIND_LOG: (KEEP_UPLOADS, KEEP_BYTES), KIND_OTA: (KEEP_OTA_UPLOADS, KEEP_OTA_BYTES)}
+
 _STAMP_FORMAT = "%Y%m%dT%H%M%SZ"
-_NAME_RE = re.compile(r"^(\d{8}T\d{6}Z)(?:-(\d{1,4}))?\.log$")
+_NAME_RE = re.compile(r"^(?:(ota)-)?(\d{8}T\d{6}Z)(?:-(\d{1,4}))?\.log$")
 _SAFE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 
 
@@ -47,7 +59,11 @@ def _sort_key(name: str) -> tuple[str, int]:
     m = _NAME_RE.match(name)
     if m is None:
         return (name, 0)
-    return (m.group(1), int(m.group(2) or 0))
+    return (m.group(2), int(m.group(3) or 0))
+
+
+def _kind_of(m: re.Match[str]) -> str:
+    return KIND_OTA if m.group(1) else KIND_LOG
 
 
 @dataclass(frozen=True)
@@ -56,6 +72,7 @@ class UploadInfo:
     bytes: int
     lines: int
     received_at: float
+    kind: str = KIND_LOG
 
 
 class DeviceLogStore:
@@ -151,35 +168,52 @@ class DeviceLogStore:
             return None
         return self._logs_root / device_id
 
-    def save_upload(self, device_id: str, data: bytes, *, now: float | None = None) -> UploadInfo:
-        """Store one batch as ``<UTC timestamp>.log`` and prune the oldest
-        past the per-device caps. Invalid UTF-8 is replaced, not refused:
-        a garbled line is still worth reading."""
+    def save_upload(
+        self,
+        device_id: str,
+        data: bytes,
+        *,
+        kind: str = KIND_LOG,
+        now: float | None = None,
+    ) -> UploadInfo:
+        """Store one batch as ``<UTC timestamp>.log`` (``ota-<stamp>.log``
+        for an OTA log) and prune the oldest of that kind past its caps.
+        Invalid UTF-8 is replaced, not refused: a garbled line is still
+        worth reading."""
         target_dir = self._device_dir(device_id)
         if target_dir is None:
             raise ValueError(f"unsafe device id {device_id!r}")
+        if kind not in KINDS:
+            raise ValueError(f"unknown log kind {kind!r}")
+        prefix = "ota-" if kind == KIND_OTA else ""
         received_at = time.time() if now is None else now
         stamp = datetime.fromtimestamp(received_at, UTC).strftime(_STAMP_FORMAT)
         text = data.decode("utf-8", errors="replace")
         with self._lock:
             target_dir.mkdir(parents=True, exist_ok=True)
-            name = f"{stamp}.log"
+            name = f"{prefix}{stamp}.log"
             n = 1
             while (target_dir / name).exists():
                 n += 1
-                name = f"{stamp}-{n}.log"
+                name = f"{prefix}{stamp}-{n}.log"
             (target_dir / name).write_text(text, encoding="utf-8", newline="")
-            self._prune(target_dir)
+            self._prune(target_dir, kind)
         return UploadInfo(
-            name=name, bytes=len(data), lines=count_lines(data), received_at=received_at
+            name=name,
+            bytes=len(data),
+            lines=count_lines(data),
+            received_at=received_at,
+            kind=kind,
         )
 
-    def _prune(self, target_dir: Path) -> None:
-        names = sorted(
-            (p.name for p in target_dir.iterdir() if _NAME_RE.match(p.name)),
-            key=_sort_key,
-            reverse=True,
-        )
+    def _prune(self, target_dir: Path, kind: str = KIND_LOG) -> None:
+        keep_uploads, keep_bytes = _KEEP[kind]
+        names = []
+        for p in target_dir.iterdir():
+            m = _NAME_RE.match(p.name)
+            if m is not None and _kind_of(m) == kind:
+                names.append(p.name)
+        names.sort(key=_sort_key, reverse=True)
         total = 0
         for index, name in enumerate(names):
             path = target_dir / name
@@ -189,30 +223,31 @@ class DeviceLogStore:
                 continue
             total += size
             # The newest batch always stays, even on its own over the cap.
-            if index > 0 and (index >= KEEP_UPLOADS or total > KEEP_BYTES):
+            if index > 0 and (index >= keep_uploads or total > keep_bytes):
                 path.unlink(missing_ok=True)
 
-    def list_uploads(self, device_id: str) -> list[UploadInfo]:
-        """Stored batches, newest first."""
+    def list_uploads(self, device_id: str, kind: str | None = None) -> list[UploadInfo]:
+        """Stored batches, newest first: every kind, or just ``kind``."""
         target_dir = self._device_dir(device_id)
         if target_dir is None or not target_dir.is_dir():
             return []
         out = []
         for path in target_dir.iterdir():
             m = _NAME_RE.match(path.name)
-            if m is None:
+            if m is None or (kind is not None and _kind_of(m) != kind):
                 continue
             try:
                 data = path.read_bytes()
             except OSError:
                 continue
-            stamp = datetime.strptime(m.group(1), _STAMP_FORMAT).replace(tzinfo=UTC)
+            stamp = datetime.strptime(m.group(2), _STAMP_FORMAT).replace(tzinfo=UTC)
             out.append(
                 UploadInfo(
                     name=path.name,
                     bytes=len(data),
                     lines=count_lines(data),
                     received_at=stamp.timestamp(),
+                    kind=_kind_of(m),
                 )
             )
         out.sort(key=lambda u: _sort_key(u.name), reverse=True)

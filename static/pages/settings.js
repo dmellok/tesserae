@@ -489,7 +489,10 @@
     });
     // Logs: the newest three, then the rest on request.
     page.querySelectorAll("[data-log-more]").forEach(function (btn) {
-      const list = page.querySelector("[data-log-list]");
+      // Each button expands its own list: the OTA logs sit in their own box
+      // after the routine uploads, inside the same Logs group.
+      const box = btn.closest(".dx-ota-logs, .dx-grp") || page;
+      const list = box.querySelector("[data-log-list]");
       if (!list) return;
       btn.addEventListener("click", function () {
         const show = btn.getAttribute("aria-expanded") !== "true";
