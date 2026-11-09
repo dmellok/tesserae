@@ -6,6 +6,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.508.0], 2026-11-09
+
 ### Fixed
 
 - Lineups: a step's peek you opened stays open when a picture you asked for finishes drawing. The redraw used to close it.
