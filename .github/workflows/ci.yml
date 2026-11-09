@@ -74,8 +74,17 @@ jobs:
         run: pytest -n 3 -q tests/test_lineups_browser.py
 
   pytest:
-    name: pytest
+    name: pytest (${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
+    # Three shards in parallel: the runner has 4 vCPUs, so one job tops out
+    # at ~15 min with -n auto. conftest.py's TESSERAE_TEST_SHARD hook gives
+    # each shard every third collected test.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    env:
+      TESSERAE_TEST_SHARD: ${{ matrix.shard }}/3
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
@@ -99,7 +108,7 @@ jobs:
         run: nice -n 10 pytest -n auto -q --timeout=900 --durations=15
 
   pytest-forward:
-    name: pytest (forward-compat)
+    name: pytest (forward-compat ${{ matrix.python-version }}, ${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
     # 3.12 and 3.13 run informationally: requires-python is >=3.11 and the
     # shipped runtime (Docker base, HA add-on) is 3.11. Failures surface as a
@@ -111,6 +120,9 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.12", "3.13"]
+        shard: [1, 2, 3]
+    env:
+      TESSERAE_TEST_SHARD: ${{ matrix.shard }}/3
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
