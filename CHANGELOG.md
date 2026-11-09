@@ -6,6 +6,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- Samsung The Frame: a `samsung_frame` kind that shows pages through the TV's own Art Mode, uploading each frame as a 4K JPEG over the local network and deleting its older uploads.
+
 ## [0.509.0], 2026-11-10
 
 ### Added

@@ -57,6 +57,8 @@ Key fields:
 | `config_schema_extends` | no | Additive merge over the protocol's `config_schema`. Use sparingly. |
 | `refresh_floor_s` | no | The repaint floor the profile lists for this glass, in seconds. A declaration, not a guarantee: it appears in the "?" help on the device card's cadence fields and in the Companion API, and nothing gates on it. Not a poll cadence, since a poll is a conditional GET and a 304 never reaches the glass. |
 | `buttons` | no | `false` when the SKU has no physical buttons (or its protocol forwards none): its device page shows no Controls button map and Home Assistant gets no Input event entity for it, unless it also has `touch`. Absent means it may have buttons. |
+| `battery` | no | `false` for a mains-powered display (a TV): its device page shows no Power section. Absent means it may run on a battery. |
+| `renderer_settings` | no | `false` when the kind sends the composition itself rather than its renderer's output (a push publisher that uploads the page image): its device page leaves out the renderer's client rotation, scale and letterbox settings. |
 | `image_format` | no | Wire format hint: `png` / `bin` / `webp`. |
 | `notes_md` | no | Maintainer notes shown on the docs hardware page. |
 | `deprecated_aliases` | no | Older ids this SKU also registers under, for back-compat after a rename. |

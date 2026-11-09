@@ -22,13 +22,20 @@ from flask import current_app, flash, redirect, render_template, request, sessio
 from werkzeug.wrappers import Response
 
 from app import backup as _backup_mod
-from app import device_service, device_timetable, next_update, palette_profiles, test_patterns
+from app import (
+    device_service,
+    device_timetable,
+    next_update,
+    palette_profiles,
+    samsung_frame,
+    test_patterns,
+)
 from app import firmware_check as firmware_check_module
 from app import install_id as install_id_module
 from app import updater as _updater_mod
 from app.button_actions import DEFAULT_BUTTON_MAP, registered_actions
 from app.clock_text import clock_of
-from app.device_loader import Device, has_buttons
+from app.device_loader import Device, has_battery, has_buttons, uses_renderer_settings
 from app.ha_options import is_ha_addon
 from app.network import detect_local_ip, docker_bridge_ip_warning, is_docker_bridge_ip, url_host
 from app.online import online_enabled
@@ -1098,7 +1105,7 @@ def _build_device_section(store: Any, device: Device) -> dict[str, Any] | None:
     _HIDDEN_TAB_FIELDS = {"calibrated"}
     picture_quality: list[dict[str, Any]] = []
     calibration_picture_quality: list[dict[str, Any]] = []
-    if is_instance:
+    if is_instance and uses_renderer_settings(device):
         for clone in renderers().for_device(device.id):
             all_dev_fields = [
                 f for f in clone.manifest.get("settings", []) if f.get("device_setting")
@@ -1374,7 +1381,7 @@ def _build_device_section(store: Any, device: Device) -> dict[str, Any] | None:
         "battery_offset": (device.manifest.get("battery_offset") or {} if is_instance else {}),
         "battery_offset_endpoint": (
             url_for("auth.devices_update_battery_offset", instance_id=device.id)
-            if is_instance
+            if is_instance and has_battery(device)
             else None
         ),
         # Per-device locale override (see app.locale_resolve).
@@ -2182,10 +2189,13 @@ def _transport_badge(device: Device) -> str:
     "HA" for push devices (OpenDisplay-via-HA) delivered through a Home
     Assistant service call rather than a broker. Visionect signs are push
     devices too, over their own TCP protocol rather than through HA, so
-    they read "TCP" (the kind column names them)."""
+    they read "TCP" (the kind column names them). Samsung Frame TVs are
+    reached directly on the local network, "LAN"."""
     if device.transport == "rest":
         return "REST"
     if device.transport == "push":
+        if samsung_frame.is_samsung_frame_device(device):
+            return "LAN"
         return "TCP" if visionect_routes.is_visionect_device(device) else "HA"
     if device.transport == "relay":
         # Before the access-token branch: relay devices carry a device token

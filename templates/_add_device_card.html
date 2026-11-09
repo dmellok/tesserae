@@ -71,6 +71,13 @@
                 aria-selected="false">
           <i class="ph ph-frame-corners" aria-hidden="true"></i><span>Visionect</span>
         </button>
+        <button type="button"
+                class="dx-segmented-btn"
+                data-segmented-btn="samsung_frame"
+                role="tab"
+                aria-selected="false">
+          <i class="ph ph-television-simple" aria-hidden="true"></i><span>Samsung Frame</span>
+        </button>
       </div>
       <p class="dx-segmented-help" data-segmented-help-rest{% if default_transport != 'rest' %} hidden{% endif %}>
         REST is the recommended default, devices pair with a one-time code, no broker required.
@@ -80,6 +87,9 @@
       </p>
       <p class="dx-segmented-help" data-segmented-help-opendisplay hidden>
         OpenDisplay BLE tags, driven through Home Assistant or the standalone bridge.
+      </p>
+      <p class="dx-segmented-help" data-segmented-help-samsung_frame hidden>
+        Samsung The Frame TVs, shown through their own Art Mode over your local network.
       </p>
       <p class="dx-segmented-help" data-segmented-help-visionect hidden>
         Visionect and Joan e-paper signs, over their own protocol on TCP {{ visionect_listener.port if visionect_listener and visionect_listener.port else 'the configured port' }}.
@@ -355,6 +365,34 @@
                         help='Clockwise turn applied to match how the frame is mounted.') }}
         <div class="dx-actions-right">
           <button type="submit" class="dx-btn-primary"><i class="ph ph-plus" aria-hidden="true"></i><span>Add Visionect frame</span></button>
+        </div>
+      </form>
+    </div>
+
+    {# Samsung Frame branch: a TV reached on the local network; pages are
+       uploaded to its Art Mode. The first connection asks for Allow on the TV. #}
+    <div class="dx-add-branch dx-add-branch--samsung_frame"
+         data-transport-branch="samsung_frame"
+         hidden>
+      <div class="dx-hint-band">
+        <i class="ph ph-info" aria-hidden="true"></i>
+        <p>
+          <strong>Shown through Art Mode.</strong> Tesserae uploads each frame to the TV's Art
+          Mode as a 4K picture and makes it the current artwork; Art Mode still switches on when
+          the TV is off, follows the room light and draws the mat. Give the TV a fixed address in
+          your router. The first time Tesserae connects, press <strong>Allow</strong> on the TV.
+          No developer mode or app install is needed.
+        </p>
+      </div>
+      <form method="post" action="{{ url_for('auth.devices_add') }}" class="form">
+        <input type="hidden" name="kind" value="samsung_frame">
+        {{ text_input('add-sf-host', 'host', 'TV address', value='', placeholder='192.168.1.50', required=True,
+                      help="The TV's IP address or host name.") }}
+        {{ text_input('add-sf-id', 'id', 'Device id', value='', placeholder='living_room_frame', required=True,
+                      help='Lowercase, no spaces.') }}
+        {{ text_input('add-sf-name', 'name', 'Display name', value='', placeholder='Living room Frame') }}
+        <div class="dx-actions-right">
+          <button type="submit" class="dx-btn-primary"><i class="ph ph-plus" aria-hidden="true"></i><span>Add Samsung Frame</span></button>
         </div>
       </form>
     </div>

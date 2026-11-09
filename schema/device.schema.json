@@ -91,6 +91,14 @@
       "type": "boolean",
       "description": "Whether this kind can send Tesserae button presses. Set false for a device with no physical buttons (or whose protocol forwards none): its device page shows no button map and Home Assistant gets no Input event entity for it. Absent → it may have buttons."
     },
+    "battery": {
+      "type": "boolean",
+      "description": "Whether this kind runs on a battery. Set false for a mains-powered display (a TV, say): its device page shows no Power section. Absent → it may have one."
+    },
+    "renderer_settings": {
+      "type": "boolean",
+      "description": "Whether the per-device settings of this kind's renderer (client rotation, scale, letterbox colour) apply. Set false for a kind whose publisher sends the composition itself rather than the renderer's output: its device page leaves them out. Absent → they apply."
+    },
     "locale": {
       "type": "string",
       "pattern": "^[a-z]{2,3}(-[A-Z]{2})?\\Z",
