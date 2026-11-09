@@ -6,6 +6,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Security
+
+- Relay: the relay no longer keeps a paired panel's plaintext token. It held the token in the pairing record until the record expired or the panel was revoked; it now deletes that record on the panel's first authenticated poll and keeps only the token's hash. A pairing code also belongs to the first panel key that claims it, so someone who saw the code can no longer swap in their own key before home completes the pairing (409 `conflict`).
+
 ## [0.507.0], 2026-11-09
 
 ### Added

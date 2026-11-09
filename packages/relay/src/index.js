@@ -16,7 +16,7 @@
  *   install/<install_id>.json          { publisher_token_sha256, install_pubkey }
  *   code/<code>.json                   { install_id, expires_at }
  *   pair/<install_id>/<code>.json      { code, expires_at, panel_pubkey?, completion? }
- *   token/<device_token_sha256>.json   { install_id, device_id }
+ *   token/<device_token_sha256>.json   { install_id, device_id, pair_code? }
  *   device/<install_id>/<device_id>.json         { token_sha256, code }
  *   frame/<install_id>/<device_id>/latest.json   { etag, blob_key, meta, quota }
  *   frame/<install_id>/<device_id>/<digest>.bin  sealed frame bytes
@@ -213,6 +213,13 @@ async function panelPair(env, request) {
   const key = `pair/${ref.install_id}/${code}.json`;
   const pending = await getJson(env, key);
   if (!pending) return fail("pairing_expired", "unknown or expired code", 404);
+  // A code belongs to the first panel that claims it. Letting a second
+  // POST swap the key would let anyone who saw the code hijack the pairing
+  // before home completes it: home would seal frames for their key. The
+  // same key again is a panel retrying, so that's still accepted.
+  if (pending.completion || (pending.panel_pubkey && pending.panel_pubkey !== panelPubkey)) {
+    return fail("conflict", "code already claimed by another panel", 409);
+  }
   pending.panel_pubkey = panelPubkey;
   // Optional panel self-report so the operator doesn't have to pre-enter the
   // panel's kind/geometry. Home uses these to fill in anything the pairing slot
@@ -270,9 +277,13 @@ async function completePairing(env, request, installId, code) {
   // Store the token hash the device will authenticate future polls with,
   // plus a per-device back-pointer to it so revoke can find the record
   // (token keys are hashes; there's no way to derive one from a device id).
+  // pair_code marks the pair record still holding the plaintext token; the
+  // device's first authenticated poll proves it stored the token, and drops
+  // that record (see deviceAuthFailure).
   await putJson(env, `token/${device_token_sha256}.json`, {
     install_id: installId,
     device_id,
+    pair_code: code,
   });
   await putJson(env, deviceKey, { token_sha256: device_token_sha256, code });
   track(env, "mailbox_created", installId, device_id);
@@ -380,12 +391,28 @@ async function getDeviceConfig(env, request, installId, deviceId) {
 // True when the bearer is the device token for exactly (installId, deviceId).
 // Returns a status code to fail with, or null when authorized.
 async function deviceAuthFailure(env, request, installId, deviceId) {
-  const tokenRec = await getJson(env, `token/${await sha256Hex(bearer(request))}.json`);
+  const tokenKey = `token/${await sha256Hex(bearer(request))}.json`;
+  const tokenRec = await getJson(env, tokenKey);
   if (!tokenRec) return fail("unauthorized", "", 401);
   if (tokenRec.install_id !== installId || tokenRec.device_id !== deviceId) {
     return fail("forbidden", "token is for another device", 403);
   }
+  if (tokenRec.pair_code) await dropPairing(env, tokenKey, tokenRec);
   return null;
+}
+
+// The panel has just authenticated with its token, so it got the pairing
+// response and stored it. The pair record (holding the plaintext token) and
+// its code are no longer needed: delete them, so the relay keeps only the
+// token hash. This waits for the first poll rather than the first
+// GET /v1/pair/<code>, because a panel that loses or can't parse that
+// response asks again on its next wake.
+async function dropPairing(env, tokenKey, tokenRec) {
+  const code = tokenRec.pair_code;
+  await env.RELAY_BUCKET.delete(`pair/${tokenRec.install_id}/${code}.json`);
+  await env.RELAY_BUCKET.delete(`code/${code}.json`);
+  const { pair_code: _dropped, ...rest } = tokenRec;
+  await putJson(env, tokenKey, rest);
 }
 
 async function getFrame(env, request, installId, deviceId) {
