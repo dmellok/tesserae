@@ -135,15 +135,21 @@ Pico SDK firmware for the Inky Frame 7.3", the Tesserae-maintained fork of
 The server packs each frame into the panel's own 4-bpp palette, so the frame
 streams it straight to the glass.
 
-1. Build and flash it with PlatformIO, following the repo README (the first
-   flash needs BOOTSEL held on the Pico).
+1. Flash it from Chrome or Edge at
+   [tesserae.ink/flash/inky-frame](https://tesserae.ink/flash/inky-frame): pick
+   your Frame, connect it over USB and click **Connect & flash**. A new Frame, or
+   one running MicroPython, needs BOOTSEL held on the Pico while you tap Reset
+   first; a Frame already on Tesserae is rebooted into its bootloader for you.
+   On a Pico 2 W it also writes the A/B partition table that over-the-air
+   updates need. To build it yourself instead, use PlatformIO as the repo README
+   describes.
 2. Power the frame and join the `Tesserae-Setup-XXXX` network it opens (password
    `tesserae`). Enter your Wi-Fi and server address on the setup page.
 3. The frame announces itself: click **Register** on it in **Settings → Devices**.
 
 The five front buttons send button events with their letters (`a`-`e`).
 Signed over-the-air updates arrive from **Settings → Firmware** once the A/B
-partition table has been written over USB. Confirmed on a Pico 2 W Frame with
+partition table has been written over USB (the web flasher does this). Confirmed on a Pico 2 W Frame with
 the Spectra 6 panel.
 
 ## tesserae-device-badger (Pimoroni Badger 2350 and 2040 W)

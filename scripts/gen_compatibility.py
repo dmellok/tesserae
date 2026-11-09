@@ -113,6 +113,17 @@ VENDOR_INTRO: dict[str, str] = {
         "greyscale driver unchanged; both M5Paper SKUs consume the identical "
         "259200-byte frame."
     ),
+    "pimoroni": (
+        "The Inky Impressions run from a Raspberry Pi with "
+        "[tesserae-device-pi](https://github.com/dmellok/tesserae-device-pi). "
+        "The Inky Frame carries its own Pico and runs "
+        "[tesserae-device-inkyframe](https://github.com/dmellok/tesserae-device-inkyframe); "
+        "flash it from the browser at "
+        "[tesserae.ink/flash/inky-frame](https://tesserae.ink/flash/inky-frame) "
+        "(Chrome / Edge, WebUSB, no toolchain). The Badgers run "
+        "[tesserae-device-badger](https://github.com/dmellok/tesserae-device-badger) "
+        "as an app in their own launcher."
+    ),
     "paperlesspaper": (
         "Open-hardware e-paper picture frames (ESP32-C6, NiMH cells) that run "
         "the [Tesserae-native firmware](https://github.com/dmellok/tesserae-device-firmware) "

@@ -227,7 +227,9 @@ The Inky Frame and the Badgers carry their own microcontroller, so they need no
 Raspberry Pi. The Inky Frame runs
 [tesserae-device-inkyframe](https://github.com/dmellok/tesserae-device-inkyframe)
 (Pico SDK firmware, the Tesserae fork of Carl Partridge's client: setup from a
-phone, button letters, signed over-the-air updates). The Badgers run
+phone, button letters, signed over-the-air updates); flash it from the browser
+at [tesserae.ink/flash/inky-frame](https://tesserae.ink/flash/inky-frame)
+(Chrome / Edge, WebUSB, no toolchain). The Badgers run
 [tesserae-device-badger](https://github.com/dmellok/tesserae-device-badger), an
 app inside the badge's own launcher, so the badge keeps its other apps.
 

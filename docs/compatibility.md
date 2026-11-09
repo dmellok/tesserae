@@ -125,6 +125,8 @@ Open-hardware e-paper picture frames (ESP32-C6, NiMH cells) that run the [Tesser
 
 ### [Pimoroni](https://shop.pimoroni.com/)
 
+The Inky Impressions run from a Raspberry Pi with [tesserae-device-pi](https://github.com/dmellok/tesserae-device-pi). The Inky Frame carries its own Pico and runs [tesserae-device-inkyframe](https://github.com/dmellok/tesserae-device-inkyframe); flash it from the browser at [tesserae.ink/flash/inky-frame](https://tesserae.ink/flash/inky-frame) (Chrome / Edge, WebUSB, no toolchain). The Badgers run [tesserae-device-badger](https://github.com/dmellok/tesserae-device-badger) as an app in their own launcher.
+
 | SKU | Panel | Gamut | Protocol / Renderer | Kind id |
 |---|---|---|---|---|
 | [Pimoroni Badger 2040 W](https://shop.pimoroni.com/products/badger-2040-w) | 296×128 | `mono` | `esp32_bw_client` (inherit) | `pimoroni_badger_2040_w` |
