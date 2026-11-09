@@ -479,7 +479,7 @@
     const nl = d.next_line;
     const next = `<p class="lu-nextl" title="${esc(nl.title)}">${esc(nl.before)}${nl.at ? ` <b>${esc(nl.at)}</b>` : ""}${nl.after ? ` ${esc(nl.after)}` : ""}</p>`;
     const collapsed = ui && ui.collapsed ? ui.collapsed(d) : false;
-    const showBar = !collapsed && !(ui && ui.view === "timeline");
+    const showBar = !(ui && ui.view === "timeline");
     const today = showBar
       ? `<div class="lu-today"><div class="lu-today-bar">${dayTrack(d, d.day, editable)}${dayScale(d.day)}</div>${dayPick(d, d.day, vm.now.weekday)}</div>`
       : "";

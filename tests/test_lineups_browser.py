@@ -783,12 +783,12 @@ def test_rows_and_displays_fold_and_remember(live: str) -> None:
         page.locator('[data-fold="night"]').focus()
         page.keyboard.press("Enter")
         assert "is-folded" not in page.locator("#lu-row-night").get_attribute("class")
-        # Collapsing a display keeps its header block, hides the rest.
+        # Collapsing a display keeps its header and day bar, hides the lineup rows.
         page.locator('[data-collapse="kitchen"]').click()
         sec = page.locator('.lu-ds[data-display="kitchen"]')
         assert "is-collapsed" in sec.get_attribute("class")
         assert sec.locator(".lu-ds-hdr h2").is_visible()
-        assert sec.locator(".lu-today").count() == 0
+        assert sec.locator(".lu-today .lu-trk").is_visible()
         assert not sec.locator(".lu-ds-body").is_visible()
         assert page.locator('[data-collapse="kitchen"]').evaluate(
             "b => b === document.activeElement"
@@ -811,6 +811,42 @@ def test_rows_and_displays_fold_and_remember(live: str) -> None:
         fa.click()
         assert page.locator(".lu-ds.is-collapsed").count() == 0
         assert page.locator(".lu-row.is-folded").count() == 0
+        assert page._lu_errors == []
+        browser.close()
+
+
+def test_collapsed_display_keeps_its_day_bar(live: str) -> None:
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser, page, _ = _open(p, live)
+        sec = page.locator('.lu-ds[data-display="kitchen"]')
+        btn = page.locator('[data-collapse="kitchen"]')
+        # The chevron controls the lineup rows, not the header or the bar.
+        body_id = btn.get_attribute("aria-controls")
+        assert sec.locator(".lu-ds-body").get_attribute("id") == body_id
+        assert not sec.locator(".lu-ds-hdr").locator(f"#{body_id}").count()
+        assert sec.locator(".lu-today .lu-trk").is_visible()
+        assert sec.locator(".lu-row").first.is_visible()
+        btn.click()
+        assert btn.get_attribute("aria-expanded") == "false"
+        assert sec.locator(".lu-today .lu-trk").is_visible()
+        assert sec.locator(".lu-today .lu-scale").is_visible()
+        assert sec.locator(".lu-dp-btn").is_visible()
+        assert not sec.locator(".lu-ds-body").is_visible()
+        assert not sec.locator(".lu-row").first.is_visible()
+        # Still there after a reload (the fold is remembered), and after opening.
+        page.reload(wait_until="load")
+        page.wait_for_function(
+            "() => document.querySelector('[data-lu]').classList.contains('is-enhanced')"
+        )
+        sec = page.locator('.lu-ds[data-display="kitchen"]')
+        assert "is-collapsed" in sec.get_attribute("class")
+        assert sec.locator(".lu-today .lu-trk").is_visible()
+        page.locator('[data-collapse="kitchen"]').click()
+        assert page.locator('[data-collapse="kitchen"]').get_attribute("aria-expanded") == "true"
+        assert sec.locator(".lu-today .lu-trk").is_visible()
+        assert sec.locator(".lu-row").first.is_visible()
         assert page._lu_errors == []
         browser.close()
 
