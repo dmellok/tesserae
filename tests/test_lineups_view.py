@@ -2239,9 +2239,14 @@ def test_push_step_logs_same_composition_and_keeps_thumbnail(
             "/decks/morning/push-step", json={"page_id": "news", "composition_digest": digest}
         )
     assert response.status_code == 200 and response.get_json()["fresh"] is False
-    row = app.config["EVENT_LOG"].list(type="push", target="news", limit=1)[0]
+    # The resend's own row: the view.json read above can start a background
+    # deck warm for "news", which may hit the patched renderer and log a
+    # failed row of its own in the meantime.
+    rows = app.config["EVENT_LOG"].list(type="push", source="resend", target="news", limit=1)
+    assert rows, "the resend logged no push row"
+    row = rows[0]
     assert row.status == "sent", row.error
-    assert row.source == "resend" and row.digest == digest
+    assert row.digest == digest
     after = client.get("/decks/view.json").get_json()
 
     def step(data: Any) -> Any:
