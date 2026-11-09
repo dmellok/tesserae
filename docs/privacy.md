@@ -172,6 +172,17 @@ locally. Nothing about your install is sent; GitHub sees an ordinary fetch
 of a public file. Off when Online features is off, and
 **Settings → Widgets → Catalog updates** hides the count on its own.
 
+### Server release check (Docker and non-git installs)
+
+On an install with no git checkout (the Docker image, a release tarball),
+the Updates card in **Settings → System** asks GitHub's public API for the
+newest release tag (`api.github.com/repos/dmellok/tesserae/tags`), in the
+background, at most once an hour while that page is open. Nothing about
+your install is sent; GitHub sees an ordinary API request. Off when Online
+features is off: the card then just links to the releases page. A git
+checkout's **Check for updates** button runs `git fetch` instead, and only
+when you press it.
+
 ### Device firmware check
 
 Tesserae looks up the latest known firmware version for each of your

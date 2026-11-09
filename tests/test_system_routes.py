@@ -34,6 +34,14 @@ def _sign_in(client: FlaskClient) -> None:
     client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
 
 
+def _online(monkeypatch: pytest.MonkeyPatch, on: bool) -> None:
+    """Pin Online features for the release check. ``online_enabled`` is always
+    off in CI (an ephemeral environment), so tests that need the check to run
+    must say so."""
+    monkeypatch.setattr("app.settings.index_routes.online_enabled", lambda _store: on)
+    monkeypatch.setattr("app.settings.system_routes.online_enabled", lambda _store: on)
+
+
 def test_settings_system_page_renders(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
@@ -205,6 +213,7 @@ def test_release_check_endpoint_reports_pending_then_result(
         return [{"name": "v999.0.0"}]
 
     monkeypatch.setattr(Updater, "_github_get_json", _slow_tags)
+    _online(monkeypatch, True)
     client = app.test_client()
     _sign_in(client)
     upd = app.config["UPDATER"]
@@ -231,6 +240,7 @@ def test_system_page_polls_rather_than_waits_for_the_release_check(
 
     monkeypatch.setattr(Updater, "latest_release_via_api", _never)
     monkeypatch.setenv("TESSERAE_IN_DOCKER", "1")
+    _online(monkeypatch, True)
     app.testing = False
     try:
         monkeypatch.setattr(Updater, "release_check_pending", lambda self: True)
@@ -243,6 +253,35 @@ def test_system_page_polls_rather_than_waits_for_the_release_check(
     assert 'data-release-check="/settings/system/release-check"' in body
     assert "data-release-check-pending" in body
     assert "Checking GitHub" in body
+
+
+def test_release_check_waits_for_online_features(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With Online features off, opening Settings → System on a Docker
+    install starts no GitHub check, and neither does the card's poll; the
+    card says the check needs Online features."""
+    from app.updater import Updater
+
+    def _never(self, *a, **k):  # pragma: no cover - the assertion is the point
+        raise AssertionError("the release check ran with Online features off")
+
+    monkeypatch.setattr(Updater, "release_check_status", _never)
+    monkeypatch.setattr(Updater, "_github_get_json", _never)
+    monkeypatch.setenv("TESSERAE_IN_DOCKER", "1")
+    _online(monkeypatch, False)
+    app.testing = False
+    try:
+        client = app.test_client()
+        _sign_in(client)
+        body = client.get("/settings/system").get_data(as_text=True)
+        polled = client.get("/settings/system/release-check").get_json()
+    finally:
+        app.testing = True
+    assert 'needs <a href="#online-features">Online features</a>' in body
+    assert "data-release-check-pending" not in body
+    assert polled["pending"] is False
+    assert 'needs <a href="#online-features">Online features</a>' in polled["html"]
 
 
 def test_update_apply_refused_under_docker(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -31,6 +31,7 @@ from werkzeug.wrappers import Response
 from app import backup as _backup_mod
 from app import install_id as install_id_module
 from app import updater as _updater_mod
+from app.online import online_enabled
 
 from ._shared import (
     bp,
@@ -51,7 +52,16 @@ def system_release_check() -> Response:
     """The Docker / bare-install Updates card polls this for the GitHub
     release check the page started in the background. Answers with the
     card's result block already rendered, plus whether a check is still
-    running so the client knows to ask again."""
+    running so the client knows to ask again. With Online features off
+    it starts no check and answers with the opted-out block."""
+    if not online_enabled(settings_store()):
+        html = render_template(
+            "_release_check.html",
+            system_release_check=None,
+            system_release_pending=False,
+            system_release_offline=True,
+        )
+        return jsonify(pending=False, html=html)
     upd = updater()
     check = upd.release_check_status(str(current_app.config.get("APP_VERSION") or "0.0.0"))
     pending = upd.release_check_pending()

@@ -6,6 +6,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Settings → System: on a Docker or non-git install, opening the page asked GitHub for the newest release even with Online features off. The check now waits for Online features like every other outbound call; with it off, the Updates card links to the releases page instead. Privacy notes list the check.
+
 ## [0.507.0], 2026-11-09
 
 ### Added
