@@ -851,6 +851,35 @@ def test_collapsed_display_keeps_its_day_bar(live: str) -> None:
         browser.close()
 
 
+@pytest.mark.parametrize("scheme", ["dark", "light"])
+@pytest.mark.parametrize("width", [1440, 1000, 700, 420])
+def test_day_picker_icon_sits_on_the_track_centre(live: str, width: int, scheme: str) -> None:
+    from playwright.sync_api import sync_playwright
+
+    probe = """(sec) => {
+      const c = (e) => { const b = e.getBoundingClientRect(); return {l: b.left, r: b.right, y: (b.top + b.bottom) / 2}; };
+      const trk = sec.querySelector('.lu-today .lu-trk');
+      const btn = sec.querySelector('.lu-today .lu-dp-btn');
+      return {trk: c(trk), btn: c(btn)};
+    }"""
+    with sync_playwright() as p:
+        browser, page, _ = _open(p, live, width=width, scheme=scheme)
+        gaps = set()
+        # Both displays: the frame's bar carries the "Update in" flag, the other may not.
+        for display in ("frame", "kitchen"):
+            sec = page.locator(f'.lu-ds[data-display="{display}"]')
+            for _ in range(2):  # open, then folded
+                got = sec.evaluate(probe)
+                assert abs(got["btn"]["y"] - got["trk"]["y"]) <= 1, (display, got)
+                gap = got["btn"]["l"] - got["trk"]["r"]
+                assert 8 <= gap <= 20, (display, got)
+                gaps.add(round(gap))
+                page.locator(f'[data-collapse="{display}"]').click()
+        assert len(gaps) == 1, gaps  # the same space from the track's end everywhere
+        assert page._lu_errors == []
+        browser.close()
+
+
 def test_storage_that_throws_still_folds(live: str) -> None:
     from playwright.sync_api import sync_playwright
 

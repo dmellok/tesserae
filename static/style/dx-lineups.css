@@ -757,20 +757,35 @@ main.page.lu-page {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
-  gap: 6px 14px;
+  gap: 5px 14px;
 }
+/* The bar and its scale are grid cells of .lu-today, so the picker can sit on
+   the track's own row and share its centre line. */
 .lu .lu-today-bar {
+  display: contents;
+}
+.lu .lu-today-bar > .lu-trk {
+  grid-area: 1 / 1;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
+}
+.lu .lu-today-bar > .lu-scale {
+  grid-area: 2 / 1;
+}
+/* The "Update in" flag's headroom is padding on the whole bar, not margin on
+   the track, so it is not part of the track's row. */
+.lu .lu-today:has(> .lu-today-bar > .lu-trk.flagged) {
+  padding-top: 30px;
+}
+.lu .lu-today .lu-trk.flagged {
+  margin-top: 0;
 }
 .lu .lu-dpick {
+  grid-area: 1 / 2;
+  align-self: stretch;
   position: relative;
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-top: 1px;
 }
 .lu .lu-dp-label {
   display: inline-flex;
@@ -856,15 +871,6 @@ main.page.lu-page {
 }
 .lu .lu-dp-today:hover {
   color: var(--t-fg);
-}
-@container lu-ds (max-width: 560px) {
-  .lu .lu-today {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .lu .lu-today .lu-dpick {
-    grid-row: 1;
-    justify-self: end;
-  }
 }
 
 /* The bar: a plain slot with a thin rod; lineup blocks sit on top of it,
