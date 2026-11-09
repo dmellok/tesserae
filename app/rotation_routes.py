@@ -261,14 +261,17 @@ def _relative(epoch: float | None) -> str:
     return f"{int(seconds / 86400)} d ago"
 
 
-def _current_step_for_each(rotations: list[Rotation]) -> dict[str, dict[str, Any]]:
+def _current_step_for_each(
+    rotations: list[Rotation], now: datetime | None = None
+) -> dict[str, dict[str, Any]]:
     """Snapshot of which step each rotation is on PLUS the dwell-window
     edges (epoch seconds) so the index template can render a live
     countdown bar. Uses the scheduler's override-aware
     ``compute_step_state`` so a manual "play step N" poke reflects
-    in the UI immediately."""
+    in the UI immediately. ``now`` lets a caller that already read the clock
+    for its page share that instant; it defaults to the current time."""
     sched = _scheduler()
-    now = datetime.now(UTC)
+    now = now.astimezone(UTC) if now is not None else datetime.now(UTC)
     pages_by_id = {p.id: p.name for p in _pages().list()}
     out: dict[str, dict[str, Any]] = {}
     for r in rotations:

@@ -1449,7 +1449,7 @@ def _build_lineups_view(
 
     rotations = current_app.config["ROTATION_STORE"].all()
     try:
-        current = _current_step_for_each(rotations)
+        current = _current_step_for_each(rotations, now)
     except Exception:
         current = {}
     panel_states = _panel_states(devices)
@@ -1586,7 +1586,7 @@ def _build_lineups_view(
                 pause=_pause_input(d),
                 on_screen=on_screen,
                 hold=hold,
-                upcoming=_upcoming_inputs(d, datetime.now(UTC)),
+                upcoming=_upcoming_inputs(d, now.astimezone(UTC)),
                 published=published,
                 published_known=published_known,
                 settings_url=url_for("auth.device_page", instance_id=d.id),
