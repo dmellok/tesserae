@@ -51,15 +51,19 @@ VENDOR_ORDER: list[tuple[str, str]] = [
 
 # Affiliate disclosure, rendered under the SKU-table intro.
 #
-# Some Seeed product links carry an affiliate parameter, so the wording has to
-# be visible next to the links rather than buried in a footer. The link pays a
-# commission and also applies a discount at checkout (confirmed on a real
-# checkout, not just the product page, which shows the undiscounted price).
+# Some Seeed product links carry an affiliate parameter, and the Pimoroni Inky
+# Frame and Inky Impression links are Shopify Collabs affiliate links, so the wording has to be
+# visible next to the links rather than buried in a footer. Every tagged link
+# pays a commission. Only the Seeed tag is known to apply a discount at
+# checkout (confirmed on a real checkout, not just the product page, which
+# shows the undiscounted price), so the discount is claimed for Seeed alone.
 AFFILIATE_DISCLOSURE = (
     '!!! info "Some links are affiliate links"\n'
-    "    Seeed product links on this page carry a Tesserae affiliate tag: a "
-    "purchase made through one gets a discount at checkout and pays a small "
-    "commission that goes back into the project. Nothing on this page is "
+    "    Seeed product links and the Pimoroni Inky Frame and Inky Impression "
+    "links on this page "
+    "carry a Tesserae affiliate tag: a purchase made through one pays a small "
+    "commission that goes back into the project, and a Seeed link also gets a "
+    "discount at checkout. Nothing on this page is "
     "listed because of it, and the tested / not-tested status of every panel "
     "is reported the same way it always has been. Links without the tag are "
     "plain product links."

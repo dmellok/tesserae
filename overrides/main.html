@@ -104,7 +104,8 @@
       var host;
       try { host = new URL(a.href).hostname.replace(/^(www|shop)\./, ''); } catch (_) { return; }
       if (['seeedstudio.com', 'waveshare.com', 'pimoroni.com',
-           'trmnl.com', 'usetrmnl.com'].indexOf(host) === -1) return;
+           'trmnl.com', 'usetrmnl.com',
+           'collabs.shop', 'collabs.shopify.com'].indexOf(host) === -1) return;
       posthog.capture('store_outbound_click', {
         url: a.href,
         text: (a.textContent || '').trim().slice(0, 80),

@@ -14,6 +14,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - GTFS: Stop ID takes stop names as well as ids ("Canal St"). An entry that matches no stop_id in the feed is read as a name, ignoring case and spacing, and brings every stop of that name with its platforms; ids and names mix in one list. This keeps working on feeds whose station ids change between releases, such as KORDIS JMK (Brno).
 - GTFS: an advanced "Arrivals" option (`limit`) sets how many arrivals the widget hands over: 12 by default as before, at most 60, for a code element that lays out a longer list.
 
+### Changed
+
+- The Pimoroni Inky Frame 7.3" (Spectra 6, Pico 2 W) and Inky Impression (4", 7.3", 13.3" Spectra 6) product links are now Tesserae affiliate links, in their catalog entries, the README and the compatibility matrix. The affiliate disclosures name them alongside the Seeed links and claim a checkout discount for Seeed only, since none is known for Pimoroni. The docs count clicks on them with the other store links. The ACeP Frame, the legacy ACeP 4" Impression and the 5.7" Impression keep plain product links.
+
 ## [0.509.0], 2026-11-10
 
 ### Added

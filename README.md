@@ -159,11 +159,12 @@ TBD means a client and hardware profile ship but nobody has confirmed a
 frame on the physical panel yet. The per-renderer bench matrix lives at
 [Screens & compatibility](https://docs.tesserae.ink/compatibility/).
 
-> **Some links below are affiliate links.** Seeed product links carry a
-> Tesserae affiliate tag: buying through one gets you a discount at checkout
-> and pays a small commission that goes back into the project. Nothing is
-> listed here because of it, and a panel's ✅ / TBD status means exactly what
-> it says above. Links without the tag are plain product links.
+> **Some links below are affiliate links.** Seeed product links and the
+> Pimoroni Inky Frame and Inky Impression links carry a Tesserae affiliate tag:
+> buying through one pays a small commission that goes back into the project,
+> and a Seeed link also gets you a discount at checkout. Nothing is listed here because of it,
+> and a panel's ✅ / TBD status means exactly what it says above. Links without
+> the tag are plain product links.
 
 ### Seeed Studio
 
@@ -215,11 +216,11 @@ microSD and the frontlight are not wired yet.
 
 | Panel | Resolution | Client | Status |
 |---|---|---|---|
-| [Inky Impression 4"](https://shop.pimoroni.com/products/inky-impression) (6-colour Spectra 6) | 600×400 | [tesserae-device-pi](https://github.com/dmellok/tesserae-device-pi) | ✅ |
+| [Inky Impression 4"](https://collabs.shop/ko5ulg) (6-colour Spectra 6) | 600×400 | [tesserae-device-pi](https://github.com/dmellok/tesserae-device-pi) | ✅ |
 | Inky Impression 4" (legacy 7-colour ACeP) | 640×400 | [tesserae-device-pi](https://github.com/dmellok/tesserae-device-pi) | ✅ |
 | [Inky Impression 5.7"](https://shop.pimoroni.com/products/inky-impression-5-7) (7-colour ACeP) | 600×448 | [tesserae-device-pi](https://github.com/dmellok/tesserae-device-pi) | ✅ |
-| [Inky Impression 7.3"](https://shop.pimoroni.com/products/inky-impression?variant=55186435244411) (6-colour Spectra 6) | 800×480 | [tesserae-device-pi](https://github.com/dmellok/tesserae-device-pi) | ✅ |
-| [Inky Impression 13.3"](https://shop.pimoroni.com/products/inky-impression?variant=55186435277179) (6-colour Spectra 6) | 1600×1200 | [tesserae-device-pi](https://github.com/dmellok/tesserae-device-pi) | ✅ |
+| [Inky Impression 7.3"](https://collabs.shop/ko5ulg) (6-colour Spectra 6) | 800×480 | [tesserae-device-pi](https://github.com/dmellok/tesserae-device-pi) | ✅ |
+| [Inky Impression 13.3"](https://collabs.shop/ko5ulg) (6-colour Spectra 6) | 1600×1200 | [tesserae-device-pi](https://github.com/dmellok/tesserae-device-pi) | ✅ |
 | Inky [pHAT](https://shop.pimoroni.com/products/inky-phat) / [wHAT](https://shop.pimoroni.com/products/inky-what) | various | [tesserae-device-pi](https://github.com/dmellok/tesserae-device-pi) | works via `pi_png` |
 
 The Inky Frame and the Badgers carry their own microcontroller, so they need no
@@ -232,7 +233,7 @@ app inside the badge's own launcher, so the badge keeps its other apps.
 
 | Panel | Resolution | Client | Status |
 |---|---|---|---|
-| [Inky Frame 7.3"](https://shop.pimoroni.com/products/inky-frame-7-3) (6-colour Spectra 6, Pico 2 W) | 800×480 | [tesserae-device-inkyframe](https://github.com/dmellok/tesserae-device-inkyframe) | ✅ |
+| [Inky Frame 7.3"](https://collabs.shop/7ab9wa) (6-colour Spectra 6, Pico 2 W) | 800×480 | [tesserae-device-inkyframe](https://github.com/dmellok/tesserae-device-inkyframe) | ✅ |
 | Inky Frame 7.3" (legacy 7-colour ACeP) | 800×480 | [tesserae-device-inkyframe](https://github.com/dmellok/tesserae-device-inkyframe) | TBD |
 | [Badger 2350](https://shop.pimoroni.com/products/badger-2350) | 264×176, 4-level grey | [tesserae-device-badger](https://github.com/dmellok/tesserae-device-badger) | ✅ |
 | [Badger 2040 W](https://shop.pimoroni.com/products/badger-2040-w) | 296×128, mono | [tesserae-device-badger](https://github.com/dmellok/tesserae-device-badger) | TBD |

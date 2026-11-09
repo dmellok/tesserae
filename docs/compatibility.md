@@ -72,7 +72,7 @@ The bundled client kinds Tesserae knows how to talk to. A flashed client announc
 Per-vendor catalog of specific device / panel SKUs Tesserae ships manifests for. Each entry maps to a device kind (protocol) + renderer combination that Tesserae picks automatically once the device pairs. Click a product name for the vendor's own page.
 
 !!! info "Some links are affiliate links"
-    Seeed product links on this page carry a Tesserae affiliate tag: a purchase made through one gets a discount at checkout and pays a small commission that goes back into the project. Nothing on this page is listed because of it, and the tested / not-tested status of every panel is reported the same way it always has been. Links without the tag are plain product links.
+    Seeed product links and the Pimoroni Inky Frame and Inky Impression links on this page carry a Tesserae affiliate tag: a purchase made through one pays a small commission that goes back into the project, and a Seeed link also gets a discount at checkout. Nothing on this page is listed because of it, and the tested / not-tested status of every panel is reported the same way it always has been. Links without the tag are plain product links.
 
 ### [Seeed Studio](https://www.seeedstudio.com/)
 
@@ -129,9 +129,9 @@ Open-hardware e-paper picture frames (ESP32-C6, NiMH cells) that run the [Tesser
 |---|---|---|---|---|
 | [Pimoroni Badger 2040 W](https://shop.pimoroni.com/products/badger-2040-w) | 296×128 | `mono` | `esp32_bw_client` (inherit) | `pimoroni_badger_2040_w` |
 | [Pimoroni Badger 2350](https://shop.pimoroni.com/products/badger-2350) | 264×176 | `gray_4` | `esp32_bw_client` <br> `esp32_gray2_bin` | `pimoroni_badger_2350` |
-| [Pimoroni Inky Frame 7.3" (Spectra 6)](https://shop.pimoroni.com/products/inky-frame-7-3) | 800×480 | `spectra_6` | `pico_bin_client` (inherit) | `pimoroni_inky_frame_73` |
+| [Pimoroni Inky Frame 7.3" (Spectra 6)](https://collabs.shop/7ab9wa) | 800×480 | `spectra_6` | `pico_bin_client` (inherit) | `pimoroni_inky_frame_73` |
 | [Pimoroni Inky Frame 7.3" (7-colour ACeP)](https://shop.pimoroni.com/products/inky-frame-7-3) | 800×480 | `inky_7colour` | `pico_bin_client` (inherit) | `pimoroni_inky_frame_73_acep` |
-| [Pimoroni Inky Impression 4"](https://shop.pimoroni.com/products/inky-impression) | 600×400 | `spectra_6` | `pi_bin_client` (inherit) | `pimoroni_inky_4` |
+| [Pimoroni Inky Impression 4"](https://collabs.shop/ko5ulg) | 600×400 | `spectra_6` | `pi_bin_client` (inherit) | `pimoroni_inky_4` |
 | [Pimoroni Inky Impression 4" (ACeP, 640x400, legacy)](https://shop.pimoroni.com/products/inky-impression) | 640×400 | `acep_7colour` | `pi_bin_client` (inherit) | `pimoroni_inky_4_acep` |
 
 ### [reMarkable](https://remarkable.com/)
