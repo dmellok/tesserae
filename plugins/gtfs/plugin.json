@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "GTFS / GTFS-RT",
-  "version": "0.12.1",
+  "version": "0.13.0",
   "kind": "widget",
   "locales": ["en", "cs", "de", "es", "fr", "it", "lt", "nb", "nl", "pl", "pt", "sk", "sv", "zh-CN", "zh-TW"],
   "description": "Approaching vehicles at a stop (or two), from any GTFS feed. Presets for the NYC Subway and BART, live times and delays from GTFS-RT TripUpdates, service alerts, vehicle positions, and an optional split-by-direction board.",
@@ -177,7 +177,7 @@
       "show_if": {
         "stop": ""
       },
-      "help": "stop_id from the feed's stops.txt, for feeds the Stop dropdown doesn't cover. A parent station ID picks up all its platforms (e.g. 'A34' = Canal St A/C/E); comma-separate to pick specific platforms ('A34N,A34S'). The Stop Finder at /plugins/gtfs/ looks these up for any feed."
+      "help": "stop_id from the feed's stops.txt, for feeds the Stop dropdown doesn't cover. A parent station ID picks up all its platforms (e.g. 'A34' = Canal St A/C/E); comma-separate to pick specific platforms ('A34N,A34S'). A stop name works too ('Canal St'): every stop of that name and its platforms, which keeps working on feeds whose ids change between releases. The Stop Finder at /plugins/gtfs/ looks these up for any feed."
     },
     {
       "name": "direction",
@@ -226,6 +226,14 @@
       "label": "Within",
       "default": 90,
       "help": "Minutes ahead. Arrivals further out than this are left off."
+    },
+    {
+      "name": "limit",
+      "type": "number",
+      "label": "Arrivals",
+      "default": 12,
+      "advanced": true,
+      "help": "How many arrivals the widget hands over, at most 60. The board itself shows what fits its cell; raise this for a code element that lays out a longer list, say one column per platform."
     },
     {
       "name": "stop_2",

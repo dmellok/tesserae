@@ -37,7 +37,10 @@ _spec.loader.exec_module(gtfs_server)
 
 
 def _feed(
-    second_direction: str = "0", second_stop: bool = False, pad_header: bool = False
+    second_direction: str = "0",
+    second_stop: bool = False,
+    pad_header: bool = False,
+    wheelchair: bool = False,
 ) -> bytes:
     """A one-stop, two-trip GTFS zip with arrivals 4 and 9 minutes out.
 
@@ -45,6 +48,8 @@ def _feed(
     ``second_stop`` moves the second trip to a different station, which is
     what a two-stop board merges. ``pad_header`` writes the stops.txt header
     with a space around every name, the way some agencies export it.
+    ``wheelchair`` adds trips.txt's wheelchair_accessible column: T1
+    accessible (1), T2 not (2).
     """
     now = datetime.now(UTC)
     first = now + timedelta(minutes=4)
@@ -68,12 +73,18 @@ def _feed(
             "route_id,route_short_name,route_long_name,route_type,route_color,route_text_color\n"
             "R1,A,Eighth Avenue Express,1,0039A6,FFFFFF\n",
         )
-        zf.writestr(
-            "trips.txt",
+        trips = (
             "route_id,service_id,trip_id,trip_headsign,direction_id\n"
             "R1,ALL,T1,Inwood-207 St,0\n"
-            f"R1,ALL,T2,Far Rockaway,{second_direction}\n",
+            f"R1,ALL,T2,Far Rockaway,{second_direction}\n"
         )
+        if wheelchair:
+            trips = (
+                "route_id,service_id,trip_id,trip_headsign,direction_id,wheelchair_accessible\n"
+                "R1,ALL,T1,Inwood-207 St,0,1\n"
+                f"R1,ALL,T2,Far Rockaway,{second_direction},2\n"
+            )
+        zf.writestr("trips.txt", trips)
         zf.writestr(
             "stop_times.txt",
             "trip_id,arrival_time,departure_time,stop_id,stop_sequence\n"
@@ -850,3 +861,76 @@ def test_padded_header_row_still_finds_the_stop() -> None:
     table = gtfs_server._distil(_feed(pad_header=True), "S1")
     assert "S1N" in table["stop_ids"]
     assert table["stop_name"] == "Canal St"
+
+
+def _arrivals(table: dict[str, object]) -> dict[str, dict[str, object]]:
+    """The scheduled arrivals of a distillate, keyed by trip."""
+    return {a["trip_id"]: a for a in gtfs_server._scheduled(table, datetime.now(UTC), 90, 0)}
+
+
+def test_wheelchair_flag_rides_on_each_arrival() -> None:
+    """trips.txt's wheelchair_accessible reaches every arrival with its own
+    codes, so a board can mark the trips a wheelchair user can't take."""
+    by_trip = _arrivals(gtfs_server._distil(_feed(wheelchair=True), "S1"))
+    assert by_trip["T1"]["wheelchair_accessible"] == 1
+    assert by_trip["T2"]["wheelchair_accessible"] == 2
+
+
+def test_feed_without_the_wheelchair_column_reads_unknown() -> None:
+    by_trip = _arrivals(gtfs_server._distil(_feed(), "S1"))
+    assert {a["wheelchair_accessible"] for a in by_trip.values()} == {0}
+
+
+def test_distillate_cached_before_the_wheelchair_field_still_renders() -> None:
+    """A timetable built by an older version has five slots per trip; it
+    reads as unknown until the 12-hour rebuild instead of failing."""
+    table = gtfs_server._distil(_feed(wheelchair=True), "S1")
+    table["trips"] = {tid: trip[:5] for tid, trip in table["trips"].items()}
+    assert {a["wheelchair_accessible"] for a in _arrivals(table).values()} == {0}
+
+
+def test_wheelchair_codes_outside_the_spec_read_unknown() -> None:
+    assert [gtfs_server._wheelchair(v) for v in ("1", "2", "0", "", "3", "x", None)] == [
+        1,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+    ]
+
+
+def test_stop_name_picks_up_the_station_and_its_platforms() -> None:
+    """Typed as a name, in any case and spacing, a stop resolves like its
+    station id: the station, its platforms, and the station's own spelling
+    on the board."""
+    table = gtfs_server._distil(_feed(), "  canal   ST ")
+    assert set(table["stop_ids"]) == {"S1", "S1N"}
+    assert table["stop_name"] == "Canal St"
+    assert set(_arrivals(table)) == {"T1", "T2"}
+
+
+def test_ids_and_names_mix_in_one_list() -> None:
+    table = gtfs_server._distil(_feed(second_stop=True), "S1,Franklin St")
+    assert {"S1", "S1N", "S2", "S2N"} <= set(table["stop_ids"])
+    assert set(_arrivals(table)) == {"T1", "T2"}
+
+
+def test_unknown_stop_name_is_still_not_found() -> None:
+    with pytest.raises(gtfs_server._StopNotFound):
+        gtfs_server._distil(_feed(), "Nowhere Junction")
+
+
+def test_limit_option_sets_how_many_arrivals_ship(tmp_path: Path) -> None:
+    """The default stays 12; "limit" lowers or raises it, capped at 60."""
+    base = {"gtfs_url": "https://example.test/gtfs.zip", "stop_id": "S1"}
+    with patch(_OPEN, return_value=_FakeResp(_feed())):
+        default = gtfs_server.fetch(base, {}, ctx={"data_dir": str(tmp_path)})
+        one = gtfs_server.fetch({**base, "limit": 1}, {}, ctx={"data_dir": str(tmp_path)})
+        huge = gtfs_server.fetch({**base, "limit": 999}, {}, ctx={"data_dir": str(tmp_path)})
+    assert len(default["arrivals"]) == 2  # the whole fixture, under the default
+    assert len(one["arrivals"]) == 1
+    assert len(huge["arrivals"]) == 2
+    assert gtfs_server.MAX_ARRIVALS == 12
+    assert gtfs_server.MAX_ARRIVALS_CAP == 60
