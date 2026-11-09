@@ -211,6 +211,47 @@ own local checks remain the acceptance gate (see **Rollback**). On each
   `failed` pauses the release. This stays a manual decision until the reporting
   path has real fleet data behind it.
 
+## OTA logs
+
+A client that installs updates sends its own log of each attempt, without
+waiting for the server to ask, as a log batch on the existing upload route:
+
+```
+POST /api/v1/device/<id>/log
+Content-Type: text/plain; charset=utf-8
+X-Tesserae-Log-Kind: ota
+X-Tesserae-Ota-Phase: failed            (optional: the report phase)
+X-Tesserae-Ota-Target: 1.63.1           (optional: target_fw)
+X-Tesserae-Ota-Attempt: 98980c          (optional: attempt_id)
+```
+
+The body is the same redacted UTF-8 log text as a routine upload, capped at
+64 KB. The server files it as `ota-<UTC stamp>.log`, apart from routine
+batches (the newest 10 kept, up to 512 KB per device), and shows it under
+**OTA logs** on the device page. An unknown `X-Tesserae-Log-Kind` is stored
+as a routine batch. A client that never advertised `logs.schema` still gets
+its OTA logs stored and shown.
+
+When to send one:
+
+1. **The attempt ends in the same wake**: any `rejected` from the apply-time
+   gate (`battery_low`, `battery_unknown`) or any `failed`. Send the log of
+   that wake, while the network is still up.
+2. **Before the reboot into a new image**: the download, the checks and the
+   slot switch. A client that reboots before it could send keeps the log and
+   sends it on the next boot.
+3. **The first boot after the switch resolves**: `confirmed` or
+   `rolled_back`. Send that boot's log, up to the point it reported, plus
+   whatever survived from the boot that failed.
+
+Send at most one OTA log per change of (`attempt_id`, `phase`, `reason`), so
+a panel that refuses `battery_low` on every wake uploads once, not every
+wake. Pre-download `rejected` reasons other than the battery gate
+(`already_current`, `kind_mismatch`, a bad signature) are not an attempt and
+send nothing. A failed upload is retried on a later wake until one succeeds
+or the next change replaces it. An OTA log is best-effort and never blocks or
+delays the install, the reboot or the report.
+
 ## Staging
 
 An operator stages a signed descriptor for a device with the signer + stager:

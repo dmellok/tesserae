@@ -1546,6 +1546,18 @@
   margin-top: 14px;
 }
 
+/* OTA logs: their own list under the routine uploads. The first child of the
+   group (a client that only sends OTA logs) needs no gap above it. */
+.dx-dp .dx-ota-logs {
+  margin-top: 18px;
+}
+.dx-dp .dx-grp-head + .dx-ota-logs {
+  margin-top: 0;
+}
+.dx-dp .dx-ota-logs > .dx-help {
+  margin: 2px 0 8px;
+}
+
 .dx-dp .dx-empty {
   display: flex;
   gap: 14px;

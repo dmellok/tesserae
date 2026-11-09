@@ -3150,7 +3150,7 @@ def post_log(device_id: str) -> Response:
 
 def _store_log_batch(device: Device) -> Response:
     """Store one uploaded log batch (``text/plain``) and note it in Events."""
-    from app.state.device_logs import MAX_UPLOAD_BYTES
+    from app.state.device_logs import KIND_LOG, KIND_OTA, MAX_UPLOAD_BYTES
 
     store = current_app.config.get("DEVICE_LOGS")
     if store is None:
@@ -3161,14 +3161,34 @@ def _store_log_batch(device: Device) -> Response:
     raw = request.get_data() or b""
     if len(raw) > MAX_UPLOAD_BYTES:
         return _error(413, "log batch too large", max_bytes=MAX_UPLOAD_BYTES)
+    # An OTA log (docs/ota/contract.md "OTA logs") is filed apart from the
+    # routine batches. Any other value, or none, is a routine batch, so an
+    # older client and a typo both still land somewhere readable.
+    kind = (request.headers.get("X-Tesserae-Log-Kind") or "").strip().lower()
+    kind = KIND_OTA if kind == KIND_OTA else KIND_LOG
+    ota_meta = {}
+    if kind == KIND_OTA:
+        for header, key in (
+            ("X-Tesserae-Ota-Phase", "phase"),
+            ("X-Tesserae-Ota-Target", "target_fw"),
+            ("X-Tesserae-Ota-Attempt", "attempt_id"),
+        ):
+            value = (request.headers.get(header) or "").strip()[:64]
+            if value:
+                ota_meta[key] = value
     try:
-        info = store.save_upload(device.id, raw)
+        info = store.save_upload(device.id, raw, kind=kind)
     except (OSError, ValueError):
         current_app.logger.exception("rest /log: storing a batch failed for device=%s", device.id)
         return _error(500, "could not store log batch")
     events = _events()
     if events is not None:
-        msg = f"log uploaded, {info.lines} line{'' if info.lines == 1 else 's'}"
+        lines = f"{info.lines} line{'' if info.lines == 1 else 's'}"
+        if kind == KIND_OTA:
+            what = ", ".join(v for v in (ota_meta.get("target_fw"), ota_meta.get("phase")) if v)
+            msg = f"OTA log uploaded{f' ({what})' if what else ''}, {lines}"
+        else:
+            msg = f"log uploaded, {lines}"
         events.record(
             type="device",
             source=device.id,
@@ -3178,7 +3198,13 @@ def _store_log_batch(device: Device) -> Response:
                 "client_log": True,
                 "msg": msg,
                 "level": "info",
-                "log_upload": {"name": info.name, "bytes": info.bytes, "lines": info.lines},
+                "log_upload": {
+                    "name": info.name,
+                    "bytes": info.bytes,
+                    "lines": info.lines,
+                    "kind": kind,
+                    **({"ota": ota_meta} if ota_meta else {}),
+                },
             },
         )
     return jsonify({"status": 200, "bytes": len(raw), "stored": True})
