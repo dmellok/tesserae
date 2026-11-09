@@ -6,6 +6,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.507.0], 2026-11-09
+
 ### Added
 
 - Lineups: the arrows on a Gallery step draw another image.
