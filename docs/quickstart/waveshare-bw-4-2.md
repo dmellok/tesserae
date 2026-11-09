@@ -9,18 +9,18 @@ A Waveshare 4.2 inch monochrome e-paper module driven by an ESP32 dev board. Bat
 
 Plug the ESP32 dev board into your computer over USB while holding the BOOT button, then release.
 
-There isn't a browser flasher for this SKU yet, and the firmware repo doesn't cut binary releases. Clone [tesserae-device-esp32-bw](https://github.com/dmellok/tesserae-device-esp32-bw) and follow the README to build + flash with ESP-IDF (`idf.py flash`). Track [tesserae.ink/flash](https://tesserae.ink/flash) for browser-flash support if it lands.
+There isn't a browser flasher for this SKU yet, and the firmware repo doesn't cut binary releases. Clone [tesserae-device-esp32-bw](https://github.com/dmellok/tesserae-device-esp32-bw) and follow the README to build + flash with PlatformIO (`pio run -t upload`). Track [tesserae.ink/flash](https://tesserae.ink/flash) for browser-flash support if it lands.
 
-On first boot the board opens a Wi-Fi captive portal (SSID `tesserae-esp32-bw-XXXX`). Connect from your phone or laptop, then set:
+On first boot the board opens a Wi-Fi captive portal (SSID `Tesserae-Setup`, password `tesserae`). Connect from your phone or laptop, then set:
 
-- **Tesserae server URL**: `http://<your-server>:8765`
+- **MQTT broker URI** (plus credentials if your broker needs them): the broker your Tesserae server uses.
 - **Wi-Fi SSID and password**: your home network.
 
 Save. The board restarts onto your network.
 
 ## 02 — It pairs itself
 
-The board calls Tesserae's `/api/setup` with its MAC and auto-provisions. Within a few seconds it appears under **Settings → Devices → Discovered**. Click **Register**.
+This firmware talks MQTT: the board publishes a heartbeat on `tesserae/<device_id>/status`. Within a few seconds it appears under **Settings → Devices → Discovered**. Click **Register**.
 
 ## 03 — Compose a dashboard
 

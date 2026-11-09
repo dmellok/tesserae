@@ -11,7 +11,7 @@ Plug the Pico Plus 2 W into your computer over USB while holding the BOOTSEL but
 
 Download the latest UF2 from the [tesserae-device-pico-bin releases](https://github.com/dmellok/tesserae-device-pico-bin/releases) and drag it onto the mounted drive. The Pico reboots and unmounts within a second.
 
-On first boot it opens a Wi-Fi captive portal (SSID `tesserae-pico-XXXX`). Connect to it from your phone or laptop, then set:
+On first boot it opens a Wi-Fi captive portal (SSID `Tesserae-Setup-XXXX`). Connect to it from your phone or laptop, then set:
 
 - **Tesserae server URL**: `http://<your-server>:8765`
 - **Wi-Fi SSID and password**: your home network.
@@ -20,7 +20,7 @@ Save and the Pico restarts onto your network.
 
 ## 02 — It pairs itself
 
-The Pico calls Tesserae's `/api/setup` endpoint with its MAC and auto-provisions. Within a few seconds it appears under **Settings → Devices → Discovered**. Click **Register** to confirm the pairing.
+The Pico announces itself on Tesserae's `/api/v1/device/discover` endpoint. Within a few seconds it appears under **Settings → Devices → Discovered**. Click **Register** to confirm the pairing.
 
 ## 03 — Compose a dashboard
 

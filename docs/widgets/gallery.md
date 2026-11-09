@@ -234,7 +234,7 @@ The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     ![ha_energy](../screenshots/widgets/ha_energy.png)
 
-    Live solar / grid / battery / house-consumption snapshot from your HA energy dashboard, with today's totals and a 24-hour sparkline. Wires to the same sensor.* entities you've already configured under HA's Energy panel.
+    Live solar / grid / battery / house-consumption snapshot from your HA energy dashboard, with today's totals, optional yesterday's solar total, and a 24-hour sparkline. Wires to the same sensor.* entities you've already configured under HA's Energy panel.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** Local
 

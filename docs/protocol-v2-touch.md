@@ -1,6 +1,8 @@
 # Protocol v2: device-owned touch
 
-Status: **design only** — no implementation. Audience: server + firmware
+Status: **design document**, since largely implemented (manifest, region
+reports on `/tap`, `/stream`, `/bundle`; the shipped wire contract is the
+"Protocol v2" section of `docs/dev/client-protocol.md`). Audience: server + firmware
 maintainers. Companion to `docs/dev/client-protocol.md` (the v1 contract,
 which stays live for the whole v1 deprecation window).
 
@@ -275,7 +277,7 @@ devices, which are asleep between wakes no matter the transport.
 Tradeoff accepted: SSE holds one waitress thread per connected always-on
 panel; with `threads = 24` (`TESSERAE_THREADS`) the budget supports a
 realistic home fleet but must be documented, and the endpoint sends a
-keepalive comment every 25 s and drops idle connections so dead panels
+keepalive comment every 5 s and drops idle connections so dead panels
 release threads (open question 4: a thread-per-connection audit at >8
 always-on panels).
 

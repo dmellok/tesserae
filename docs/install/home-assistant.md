@@ -268,7 +268,7 @@ rest_command:
     headers:
       Authorization: "Bearer !secret tesserae_webhook_token"
       Content-Type: "application/json"
-    payload: '{"page": "{{ page }}"}'
+    payload: '{"page_id": "{{ page }}"}'
 ```
 
 ```yaml

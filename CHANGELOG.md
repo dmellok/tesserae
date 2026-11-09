@@ -6,6 +6,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Docs: an audit of every page against the code. Menu paths, button labels and pairing steps match the current UI; the E1002 is Spectra 6, not ACeP; Online features is off by default; the MCP page lists all 39 tools; protocol docs carry the real keepalive, pairing-code lifetime, retained topics and `/tap` outcomes; widget and theme counts are current.
+
 ## [0.507.0], 2026-11-09
 
 ### Added

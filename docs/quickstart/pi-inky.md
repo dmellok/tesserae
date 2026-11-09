@@ -47,7 +47,7 @@ In the editor:
 3. Bind the page to your Inky in the device picker on the right.
 4. Hit **Push**, and the Pi paints the frame.
 
-The composer sizes the layout to your panel automatically: 1600×1200 for the 13.3", 800×480 for the 7.3", 600×448 for the 5.7", 640×400 for the 4".
+The composer sizes the layout to your panel automatically: 1600×1200 for the 13.3", 800×480 for the 7.3", 600×448 for the 5.7", 600×400 for the 4" (640×400 on the older 7-colour 4").
 
 ## 05 — Put it on a cadence
 

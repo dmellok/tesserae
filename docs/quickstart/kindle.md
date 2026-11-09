@@ -17,7 +17,7 @@ If KOReader's TRMNL plugin is installed and set to auto-refresh, switch it off. 
 
 ## 02 — Make a claim code
 
-In Tesserae: **Settings → Devices → Add device → Pair with a code**. The code is valid for a short while and works once.
+In Tesserae: **Settings → Devices → Add device → REST API → Issue pairing code**. The code is valid for a short while and works once.
 
 Tesserae Cloud users: **Settings › Panels › New claim code**.
 

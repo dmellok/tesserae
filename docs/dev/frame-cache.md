@@ -13,12 +13,13 @@ concrete form of the "state bundles" direction sketched in
 [protocol-v2-touch.md §B3](../protocol-v2-touch.md). Everything here is optional:
 a client that never advertises the capability sees no change on any endpoint.
 
-Status: **slice 1 implemented server-side.** The album producer, the
+Status: **slice 1 implemented.** The album producer, the
 `/collection` manifest + frame endpoints (paged), the `frame_cache` capability,
 the `/status` `collection` envelope, and ingest of the device playback report
 (surfaced on the Devices card) are built; authoring is the Gallery folder's
-"Use as offline album" action. Firmware (the cache + playback side) is the
-remaining half. Discussion: #177.
+"Use as offline album" action. The cache + playback side ships in
+tesserae-device-firmware (SD-backed offline album playback, v1.12.0 and later).
+Discussion: #177.
 
 ## Design split
 

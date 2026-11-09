@@ -24,8 +24,8 @@ There are two pieces, and they can run on **different machines**:
   there's nothing to install on the Tesserae side (Docker, Home Assistant, or
   source), and it's on out of the box.
 - **The bridge** (`tesserae-mcp`) is a small stdio program your agent launches.
-  It's a separate package, [dmellok/tesserae-mcp](https://github.com/dmellok/tesserae-mcp),
-  installed on **the machine where your agent runs** (your laptop/desktop). It
+  It's a separate package, [`tesserae-mcp`](https://github.com/dmellok/tesserae/tree/main/packages/tesserae-mcp)
+  (in this repo under `packages/tesserae-mcp`), installed on **the machine where your agent runs** (your laptop/desktop). It
   talks to your Tesserae over HTTP.
 
 So: nothing to `pip install` inside Tesserae or Home Assistant. You install the
@@ -217,23 +217,35 @@ changes — you'll get a "changed externally" reload prompt instead.
 | Tool | What it does |
 | --- | --- |
 | `list_widgets` | Every placeable widget (with fragments) + theme/style/font options |
+| `list_services` | Non-placeable service data sources (HA, weather, REST) a code element can read |
+| `list_icons` | Search the vendored Phosphor icon set by substring for a real slug |
+| `add_font` / `list_fonts` / `delete_font` | Cache a webfont on the server (Google Fonts or a URL), list, or remove it |
 | `get_widget_options` | A widget's options + format hints (big choice lists omitted by default) |
 | `get_widget_choices` | Page through one option's choice rows (HA entity pickers etc.) |
 | `probe_widget_data` | A widget's data + `data_source` (live/sample/error) + bindable field paths |
 | `list_devices` | Registered panels: dimensions + colour capability (palette, `mono` flag) |
 | `list_pages` | Existing canvas dashboards |
 | `create_canvas_page` | Create an empty canvas (size it to your panel) |
+| `delete_canvas_page` | Delete a canvas dashboard (refused while a lineup uses it) |
 | `get_canvas` | Read a canvas document (returns a `rev` for concurrency-safe writes) |
 | `set_canvas` | Replace a canvas document (compact ack; `?return=doc` for the full doc) |
+| `set_canvas_background` | Generate an AI background image (fal.ai) and set it as the canvas background |
 | `add_element` | Append one element (each call saves, so an open editor updates live) |
+| `add_elements_bulk` | Append many elements in one save (max 500), all-or-nothing |
+| `append_code` | Stream html / css / js into a code element a chunk at a time |
 | `update_element` | Change one element in place, without re-sending the whole document |
 | `delete_element` | Remove one element by id |
 | `patch_canvas` | Change document-level fields (size, theme, bg) without touching elements |
 | `arrange` | Compute aligned grid/row/column boxes so you lay out by intent, not pixels |
 | `measure_text` | Measure rendered text width/height so a box fits its content |
+| `describe_actions` | The touch-action vocabulary (`on_tap` / `on_swipe` / `actions`) for elements |
 | `render_report` | Read back what rendered (values, overflow, live-vs-sample, colours) as JSON |
 | `render_preview` | Render the canvas to a PNG the agent can see |
 | `push_to_device` | Push the canvas to explicit device(s) |
+| `bind_devices` | Persistently bind a canvas to a set of devices (do it early) |
+| `list_rotations` / `create_rotation` / `delete_rotation` | Manage rotations (timed page cycles) |
+| `list_schedules` / `create_schedule` / `delete_schedule` | Manage schedules (time-driven pushes) |
+| `list_decks` / `suggest_decks` / `create_deck` / `delete_deck` | Manage decks (pre-rendered linked pages); `suggest_decks` derives them from tap/swipe links |
 
 The write tools (`set_canvas`, `add_element`, `update_element`, `delete_element`,
 `patch_canvas`) accept an optional `base_rev` (the `rev` from `get_canvas`); if the
@@ -377,5 +389,5 @@ venv rather than installing into the system Python.
 - Core Tesserae never imports the `mcp` package; it lives entirely in the
   separate `tesserae-mcp` bridge.
 - The API surface and canvas-document schema are the contract between the two.
-  See the [`tesserae-mcp` repo](https://github.com/dmellok/tesserae-mcp) for the
-  bridge itself.
+  See [`packages/tesserae-mcp`](https://github.com/dmellok/tesserae/tree/main/packages/tesserae-mcp)
+  for the bridge itself.

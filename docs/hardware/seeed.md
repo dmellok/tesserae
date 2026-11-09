@@ -66,7 +66,7 @@ coverage to the rest of the XIAO ePaper range is on the roadmap.
    [Docker](../install/docker.md).
 2. Plug the reTerminal into a computer running Chrome or Edge.
 3. Open [tesserae.ink/flash](https://tesserae.ink/flash), pick your
-   model, hit **Install**.
+   model, hit **Connect & flash**.
 4. Follow the [unified Seeed quickstart](../quickstart/seeed-unified.md)
    for onboarding, Wi-Fi setup, and pairing with your Tesserae server.
 
@@ -75,8 +75,8 @@ coverage to the rest of the XIAO ePaper range is on the roadmap.
 The reTerminal E-Series ships with three front buttons that Tesserae
 can bind to any server-side action: rotate through the dashboards on
 this panel, jump straight to a specific one, force a fresh render,
-fire a webhook. Configure the mapping per device from **Settings →
-Devices → General → Buttons**. Defaults to
+fire a webhook. Configure the mapping per device in the **Button map** under the
+device's **Controls** section. Defaults to
 `left → rotate_prev`, `right → rotate_next`, `refresh → refresh`;
 see [Physical buttons](../install/buttons.md) for the full action
 list and common patterns.

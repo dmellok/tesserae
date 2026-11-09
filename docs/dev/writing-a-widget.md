@@ -1,8 +1,8 @@
 # Build a widget with AI
 
 A Tesserae widget is a small, self-contained plugin: a manifest, a `client.js`
-that renders into a Shadow DOM, a `client.css`, and an optional `server.py` for
-data. That shape, **a tight, documented contract with a fast feedback loop** -
+that renders into a Shadow DOM (styles live inline in its `<style>` block), and
+an optional `server.py` for data. That shape, **a tight, documented contract with a fast feedback loop** -
 makes widgets an unusually good fit for AI-assisted coding. You describe what
 you want, the model writes the files against the contract, and you watch it
 render in the browser in seconds.
@@ -19,9 +19,9 @@ should read it too.
 ## Why this works well
 
 - **The contract is small and explicit.** [`docs/widgets.md`](../widgets.md) defines the whole surface: the `render(shadow, ctx)` signature, the `ctx` shape, the Spectra semantic tokens (`--bg`, `--surface`, `--text-primary`, `--accent-1..6`, etc.) and the orthogonal `data-style` axis, container queries, the e-ink rules. A model that reads it has everything it needs.
-- **There are 58 worked examples** in `plugins/`. "Model your widget on `weather_now`" is a one-line instruction that carries an enormous amount of design and structure.
+- **There are 37 worked examples** in `plugins/`. "Model your widget on `weather_now`" is a one-line instruction that carries an enormous amount of design and structure.
 - **The feedback loop is seconds.** `/_test/render?plugin=<id>&size=md` renders a single widget with no dashboard. The dev server auto-reloads; refresh to see edits.
-- **Every widget ships a smoke test.** The model can write it and you can run it, objective "did it work" rather than vibes.
+- **Widgets ship a smoke test.** The model can write it and you can run it, objective "did it work" rather than vibes.
 
 ## Setup
 
@@ -43,7 +43,7 @@ aren't loopback-exempt), then iterate at
 
 1. **Orient the model**, point it at the contract + a reference widget.
 2. **Describe the widget**, data source, what each size shows, the layout.
-3. **Let it scaffold** the four files under `plugins/<id>/`.
+3. **Let it scaffold** the files under `plugins/<id>/`.
 4. **Render and critique**, open `/_test/render`, paste back a screenshot or describe what's off.
 5. **Write the smoke test** and run `pytest plugins/<id>/`.
 6. **Check the constraints** (below) and open a PR.
@@ -57,7 +57,6 @@ We're building a widget for Tesserae, a self-hosted e-ink dashboard.
 A widget is a drop-a-folder plugin under plugins/<id>/ with:
   - plugin.json  (manifest)
   - client.js    (ES module, default export `render(shadow, ctx)`, renders into a Shadow DOM)
-  - client.css   (styles)
   - server.py    (optional, server-side data fetch -> ctx.data)
 
 Before writing anything, read docs/widgets.md and
@@ -269,7 +268,7 @@ iterating on a polish pass.
 
 A widget that only makes sense for your setup doesn't need the catalog.
 Zip the widget folder (the one holding `plugin.json`) and pick it with
-**Upload widget** on Settings → Widgets. A `.tar.gz` works too, and so does a
+**Upload widget** on Widgets → Installed widgets. A `.tar.gz` works too, and so does a
 zip made with Finder's Compress.
 
 The widget lands in `data/authored/<id>/`, so it survives updates, and it
@@ -291,7 +290,7 @@ itself, so upload only code you wrote or have read.
 For your own widgets, third-party APIs, niche use cases — anything
 you want users to opt into per install rather than shipping to
 everyone. Your widget lives in its own GitHub repo and ships via a
-PR to the catalog index; users find it on Settings → Widgets →
+PR to the catalog index; users find it on Widgets →
 Browse catalog.
 
 See **[Publish a widget through the catalog](publishing-a-widget.md)**

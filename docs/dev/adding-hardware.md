@@ -52,6 +52,8 @@ Key fields:
 | `icon` | no | Phosphor icon slug (no `ph-` prefix). |
 | `description` | no | One-paragraph description. |
 | `protocol_config` | no | Free-form protocol-specific defaults. Each protocol owns its own validation. |
+| `renderers` | no | Override for the protocol's default renderer list. Absent means inherit the protocol's renderers. |
+| `touch` | no | `true` when the panel has a digitizer, so touch dispatch and the editors' Interaction UI apply. Absent means not tappable. |
 | `config_schema_extends` | no | Additive merge over the protocol's `config_schema`. Use sparingly. |
 | `refresh_floor_s` | no | The repaint floor the profile lists for this glass, in seconds. A declaration, not a guarantee: it appears in the "?" help on the device card's cadence fields and in the Companion API, and nothing gates on it. Not a poll cadence, since a poll is a conditional GET and a 304 never reaches the glass. |
 | `buttons` | no | `false` when the SKU has no physical buttons (or its protocol forwards none): its device page shows no Controls button map and Home Assistant gets no Input event entity for it, unless it also has `touch`. Absent means it may have buttons. |
@@ -62,34 +64,39 @@ Key fields:
 ## A worked example
 
 The bundled
-[`hardware/seeed/reterminal_e1003.json`](https://github.com/dmellok/tesserae/blob/main/hardware/seeed/reterminal_e1003.json)
-is the reference:
+[`hardware/trmnl/x.json`](https://github.com/dmellok/tesserae/blob/main/hardware/trmnl/x.json)
+is the reference (`notes_md` shortened here):
 
 ```json
 {
   "tesserae_compat": "1.x",
-  "id": "seeed_reterminal_e1003",
-  "name": "Seeed reTerminal E1003",
-  "vendor": "Seeed Studio",
-  "url": "https://www.seeedstudio.com/reTerminal-E1003-p-6731.html",
-  "icon": "device-tablet",
-  "description": "10.3 inch monochrome ePaper terminal with 16-level greyscale, ESP32-S3, up to six-month battery. Speaks Tesserae's TRMNL BYOS endpoints once flashed with TRMNL firmware.",
+  "id": "trmnl_x",
+  "name": "TRMNL X",
+  "vendor": "TRMNL",
+  "url": "https://shop.trmnl.com/products/trmnl-x",
+  "icon": "device-tablet-speaker",
+  "description": "TRMNL X, 10.3 inch ePaper at 1872x1404 with 16 grey levels. Stock firmware speaks TRMNL BYOS and reports its model as `x`; Tesserae sends it a 4-bit greyscale PNG (trmnl_png_gray16), with the 1-bit trmnl_png still selectable on the device card.",
   "protocol": "trmnl_client",
+  "renderers": [
+    "trmnl_png_gray16",
+    "trmnl_png"
+  ],
   "panel": {
-    "w": 1404,
-    "h": 1872,
-    "orientation": "portrait",
-    "name": "10.3 inch monochrome ePaper",
-    "gamut": "mono",
-    "native_w": 1404,
-    "native_h": 1872
+    "w": 1872,
+    "h": 1404,
+    "orientation": "landscape",
+    "name": "10.3 inch ePaper, 16-level greyscale",
+    "gamut": "gray_16",
+    "native_w": 1872,
+    "native_h": 1404
   },
   "protocol_config": {
-    "model_header": "reTerminal E1003"
+    "model_header": "x",
+    "png_bit_depth": 4
   },
   "refresh_floor_s": 60,
   "image_format": "png",
-  "notes_md": "The reTerminal E1003 ships with Seeed's own ESP32-S3 UI; flash with TRMNL firmware to use the BYOS path, then point the device's API URL at your Tesserae base URL and pair via the access token shown in Settings -> Devices."
+  "notes_md": "Confirmed on real hardware running the stock TRMNL firmware. It auto-provisions on first poll; Tesserae provisions it on this kind and picks the native 1872x1404 panel from the Model header. ..."
 }
 ```
 
@@ -97,13 +104,13 @@ is the reference:
 
 1. At boot, `device_loader.discover()` walks `devices/` and registers each
    folder-based kind. `trmnl_client` registers here as a protocol.
-2. The loader then walks `hardware/` recursively. The E1003 file passes
+2. The loader then walks `hardware/` recursively. The TRMNL X file passes
    schema validation, and the loader looks up `trmnl_client` in the
    registry.
 3. The catalog builds a derived `Device`: shares the protocol's
    `parse_status` Python module, carries the SKU's own manifest (the
    panel block, name, vendor, `protocol_config`, etc.).
-4. The derived Device registers under `seeed_reterminal_e1003`. The
+4. The derived Device registers under `trmnl_x`. The
    Settings UI's kind picker now offers it alongside folder-defined kinds.
 
 The flow is identical to a folder-defined kind because the catalog-derived
@@ -111,14 +118,16 @@ Device is indistinguishable from a folder kind at the registry level.
 
 ## How a real device pairs
 
-For a TRMNL-BYOS-compatible SKU (like the E1003), once the catalog entry is
-registered, pairing follows the standard TRMNL flow:
+For a TRMNL-BYOS-compatible SKU (like the TRMNL X), once the catalog entry
+is registered, pairing follows the standard TRMNL flow:
 
-1. **Settings → Devices → Add device → TRMNL**. Pick the SKU from the kind
-   dropdown.
-2. Tesserae mints a short access token. Paste it into the device's TRMNL
-   firmware config (web flasher / serial console / however the firmware
-   takes config).
+1. Point the device's TRMNL firmware at your Tesserae base URL (via the
+   firmware's captive portal).
+2. On first boot the device calls `GET /api/setup` with its MAC in the
+   `Id` header. Tesserae creates the device instance, on the catalog SKU
+   whose `protocol_config.model_header` matches the `Model` header (else
+   the bare `trmnl_client` kind), and hands back a freshly minted access
+   token. No admin click is needed.
 3. The device polls `GET /api/display`. Tesserae's BYOS endpoint responds
    with the rendered frame URL.
 
@@ -167,7 +176,7 @@ change when a new SKU lands:
 4. **Verify on real hardware** if you have it. Pair a device against the
    new SKU, push a render, confirm the panel paints.
 5. **Open a PR** with the JSON file. The bundled
-   `seeed/reterminal_e1003.json` is the shape to mirror. Update
+   `trmnl/x.json` is the shape to mirror. Update
    [`docs/compatibility.md`](../compatibility.md) too if your SKU
    introduces a new resolution / gamut combination the matrix doesn't
    already cover.
@@ -181,11 +190,17 @@ What each protocol currently reads from `protocol_config`:
 - `model_header` (string): the value the firmware sends in the `Model`
   HTTP header. Read by `app/trmnl_api.py` to drive auto-provision and
   panel-dim fallback for native TRMNL devices.
+- `png_bit_depth` (1 / 2 / 4 / 8): fixed PNG bit depth this SKU asks its
+  renderer for (the TRMNL X uses `4`). Read by `app/renderer_loader.py`.
+- `renderer_min_firmware` (object, renderer id -> version): the lowest
+  firmware that can paint each renderer's output, so a device moves onto
+  that renderer once it reports a new enough build. Read by
+  `app/device_service.py`.
 
 ### `pi_bin_client` / `pi_png_client` / `esp32_client` / `esp32_bw_client` / `pico_bin_client`
 
-No `protocol_config` fields are read today. The SKU's `panel` block carries
-everything the renderers need.
+No protocol-specific `protocol_config` fields are read today. The SKU's
+`panel` block carries everything the renderers need.
 
 As protocols add new fields, they'll be documented here. The schema's
 `additionalProperties: true` on `protocol_config` means you can stash

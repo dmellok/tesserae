@@ -2,8 +2,8 @@
 
 Themes are catalog-installable in the same way as widgets: a tagged
 release tarball in your own GitHub repo, an entry in the catalog
-index, one-click install from **Settings → Themes** (via Browse
-community widgets). The contract is deliberately minimal — one
+index, one-click install from **Widgets → Browse catalog**, managed
+under **Settings → Themes**. The contract is deliberately minimal — one
 manifest file plus one CSS file per theme — so publishing a theme
 doesn't require any Python, JavaScript, or build tooling.
 
@@ -184,7 +184,7 @@ verifies:
    - Screenshot shows what users would actually see?
 
 9. Once merged, the theme shows up in everyone's
-   **Settings → Widgets → Browse catalog** on the next
+   **Widgets → Browse catalog** on the next
    catalog refresh.
 
 ## Updates

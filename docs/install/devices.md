@@ -8,14 +8,14 @@ broker (**Settings → Server → MQTT broker**), and you've
 ## Register an MQTT client (Pi / ESP32)
 
 1. **Flash a client** for your hardware (see [Install a client](clients.md)). On first run it publishes a heartbeat on `tesserae/<device-id>/status`.
-2. **Settings → Devices → Discovered.** A client that announced itself shows up here with its kind and panel size pre-filled, click **Register** to turn it into a device instance.
+2. **Settings → Devices.** A client that announced itself shows up in the banner at the top ("heard but not registered") with its kind and panel size pre-filled, click **Register** to turn it into a device instance.
 
     !!! note "No heartbeat yet?"
         Use **Add device** to create one by hand. Check the broker host in
         **Settings → Server**, and that the client's `device_id` and broker
         credentials match.
 
-3. **Calibrate orientation.** Hit **Calibrate** to push a numbered test card to the panel, then tell Tesserae which number landed in the top-left corner; it sets the rotation that makes your dashboard read upright. The **Rotation** dropdown (0 / 90 / 180 / 270°) is there for manual tweaks. A client can also declare its rotation when it registers, which additionally tells Tesserae that the dims it reported are its framebuffer rather than the dashboard canvas (see [the client protocol](../dev/client-protocol.md)); the dropdown edits that afterwards either way.
+3. **Calibrate orientation.** Hit the compass button (**Send orientation card**) beside the **Rotation** dropdown to push a numbered test card to the panel, then tell Tesserae which number landed in the top-left corner; it sets the rotation that makes your dashboard read upright. The **Rotation** dropdown (0 / 90 / 180 / 270°) is there for manual tweaks. A client can also declare its rotation when it registers, which additionally tells Tesserae that the dims it reported are its framebuffer rather than the dashboard canvas (see [the client protocol](../dev/client-protocol.md)); the dropdown edits that afterwards either way.
 4. **Bind a dashboard.** Open the page editor and set the page's **panel** block to match the device's panel size, then pick a layout preset and assign a widget per cell (see [Compose a dashboard](#compose-a-dashboard) below). Send the page to push it to the device.
 
 ## Register a TRMNL / KOReader client (HTTP-pull)
@@ -26,7 +26,7 @@ Two paths, depending on the client:
 
 **KOReader on a Kindle (token-typed):** KOReader's `trmnl-display` plugin doesn't send a MAC, so you provision via a short token instead.
 
-1. **Settings → Devices → Add device → TRMNL.** Tesserae generates a five-character access token and prints it on the card.
+1. **Settings → Devices → Add device**, with the **TRMNL client** kind. Tesserae generates a five-character access token and prints it on the card.
 2. **Type the token into the KOReader plugin config.** It calls `/api/setup`, exchanges the token for a permanent device-id + access token, and starts polling `/api/display` on the cadence you configure.
 3. **Calibrate + bind a dashboard** exactly as above, the device appears in the Devices list the moment it completes setup.
 
@@ -67,7 +67,7 @@ the rest stay on Auto.
 
 **Quiet hours** hold automated pushes (schedules, lineups, webhooks) during a
 daily window so a panel does not repaint a dark room. The window is set once in
-**Settings → Server → App → Quiet hours** and any device can override it on its
+**Settings → Server → Quiet hours** and any device can override it on its
 card. Manual sends, Push-now buttons, and physical buttons ignore it.
 
 The window has three parts:
@@ -160,9 +160,9 @@ widget per cell**.
    one or many. A page bound to several differently-sized panels
    renders once per distinct panel size and fans each frame out.
 6. **Send.** Hit Send to push immediately, or let the scheduler do it
-   on the cadence set in the top nav's **Schedules** entry. For
-   cycling between several dashboards on one device, use
-   **Rotations** instead (also in the top nav), shipped in 0.45.0.
+   on a schedule set up under **Lineups** in the top nav. For
+   cycling between several dashboards on one device, use a rotation
+   lineup (also under **Lineups**).
 
 ### Dashboard refresh settings
 

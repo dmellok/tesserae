@@ -71,8 +71,9 @@ you look like a new install.
 
 ## What the app sends to api.tesserae.ink
 
-Everything below rides the single **Online features** switch (on by
-default). Turning it off stops all of it.
+Everything below rides the single **Online features** switch (off by
+default; you opt in at the first-run wizard or in Settings). Turning it
+off stops all of it.
 
 ### Marketplace install count
 
@@ -241,6 +242,6 @@ pause collection, or delete every counter.
 ## Docs site analytics
 
 Aggregate analytics on the documentation site
-(`dmellok.github.io/tesserae/`) are kept separately from the app and
+(`docs.tesserae.ink`) are kept separately from the app and
 provide a coarse traffic overview only. The docs site honours
 Do-Not-Track headers and skips analytics entirely when DNT is set.

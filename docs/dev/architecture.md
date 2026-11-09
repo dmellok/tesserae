@@ -70,7 +70,7 @@ id (e.g. `pi_kitchen`, `esp32_hallway`).
 | `tesserae/esp32/frame/bin` | `{url}` | yes | publish |
 | `tesserae/esp32/status` | `{battery_mv, battery_pct, rssi, ip, kind, panel_w, panel_h, fw_version}` | yes | subscribe |
 | `tesserae/esp32/config` | `{sleep_interval_s}` | yes | both |
-| `tesserae/<id>/frame/trmnl` | `{url}`, only when `trmnl_png` is enabled for a TRMNL-style device that prefers MQTT over the HTTP pull | yes | publish |
+| `tesserae/<id>/frame/trmnl` | `{url}`, only when `trmnl_png` is enabled for a TRMNL-style device that prefers MQTT over the HTTP pull | no | publish |
 | `tesserae/+/status` | (wildcard), any unregistered id surfaces for one-click registration in Settings → Devices | | subscribe |
 
 The `kind` / `panel_w` / `panel_h` / `fw_version` keys in a heartbeat
@@ -85,14 +85,15 @@ server on a schedule. A handful of HTTP endpoints (served by
 
 | Route | Purpose |
 |---|---|
-| `GET /api/setup` | Initial pairing, client sends MAC, server returns a 5-char access token + assigned device id. |
+| `GET /api/setup` | Initial pairing, client sends its MAC in the `Id` header, server returns an access token (`api_key`) + `friendly_id`. |
 | `GET /api/display` | Latest frame URL + next-poll interval for the calling device. Authenticated via the device's access token. |
 | `POST /api/log` | Client log messages (battery state, RSSI, errors). Surfaces in the device card. |
 
-Pairing uses a short token printed at the top of Settings → Devices →
-Add device → TRMNL. The device reads its MAC from EEPROM, calls
-`/api/setup`, and the server pre-fills a Discovered entry on the
-admin's Devices page for one-click registration.
+A device that sends its MAC to `/api/setup` self-provisions: the server
+creates a TRMNL instance keyed by that MAC, mints a high-entropy access
+token, and the device appears in Settings → Devices with no admin click.
+Callers that send no MAC (KOReader on a Kindle) keep the token they
+brought, and land as a Discovered entry for one-click registration.
 
 ## Webhook push
 
@@ -101,7 +102,7 @@ on-demand re-render and push:
 
 | Route | Purpose |
 |---|---|
-| `POST /api/v1/push` | Re-render every device assigned to the named page and publish. Body: `{"page": "<id>"}`. Auth: `Authorization: Bearer <token>`. |
+| `POST /api/v1/push` | Re-render every device assigned to the named page and publish. Body: `{"page_id": "<id>"}`. Auth: `Authorization: Bearer <token>`. |
 
 The token is generated / rotated / cleared from Settings → System →
 Webhook and stored under `data/core/settings.json`. Use it from
@@ -116,8 +117,8 @@ HA's MQTT discovery messages so every device + every assigned page
 shows up automatically as HA entities (a hub device per Tesserae
 install, plus a button + select + image + diagnostic entities per
 display). See `docs/install/home-assistant.md`. The publisher lives
-in `app/ha_discovery.py`; it's opt-in via Settings → Integrations →
-Home Assistant.
+in `app/ha_discovery.py`; it's opt-in via Settings → Server →
+Network & integrations.
 
 ## Tech stack
 
@@ -126,8 +127,8 @@ Home Assistant.
 - Playwright + Chromium for headless render
 - paho-mqtt for the broker bridge
 - Vanilla JavaScript on the admin (no React, no Lit, no TypeScript)
-- esbuild bundles one entry per admin page
-  (`static/pages/*.js` → `static/dist/`)
+- No front-end build step: `static/` ships as-is (`package.json` only
+  carries lint / format tooling)
 - waitress as the production WSGI server
 
 ## UI font loading
@@ -147,14 +148,14 @@ pages start at their final position without a page-wide entry slide.
 tesserae/
   app/             Flask app, transport, push pipeline, state, scheduler
   plugins/<id>/    widget / font / data / admin plugins
-                   (drop-a-folder), 35 widgets ship bundled.
+                   (drop-a-folder), 37 widgets ship bundled.
                    Themes live in static/style/spectra-*.css + a
                    Python registry, not the plugin tree.
   renderers/<id>/  renderer plugins (drop-a-folder)
   devices/<id>/    device plugins (drop-a-folder)
   schema/          JSON Schemas for plugin/renderer/device manifests
-  static/          Lit components, page entries, shared CSS, dist/, icons/
-                   (vendored Phosphor 2.1.1, woff2 only, 1.5 MB)
+  static/          admin JS modules, page entries, shared CSS, vendor/, icons/
+                   (vendored Phosphor icon font)
   templates/       Jinja shells
   tests/           top-level tests
   data/            runtime state (gitignored)

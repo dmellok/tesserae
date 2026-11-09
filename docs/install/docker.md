@@ -102,7 +102,7 @@ below if you're testing there.
   `/dev/shm` is enough and the compose file needs no `shm_size`.
 - **Waitress** as the WSGI server. Production-tuned by default; no
   nginx required for a single-user install.
-- **Non-root user** (`tesserae`, uid 1001) for defence in depth. This
+- **Non-root user** (`pwuser`, uid 1001) for defence in depth. This
   is not a widget sandbox, widgets still execute in the same Python
   process and can read anything this user can read (see
   [issue #3](https://github.com/dmellok/tesserae/issues/3)).
@@ -139,12 +139,13 @@ The full list of environment variables and flags lives in the
 
 ## Configuring the MQTT broker
 
-Tesserae publishes frames over MQTT. Two ways to configure it:
+Only needed if your devices use the MQTT transport (REST, the default,
+needs no broker). Two ways to configure it:
 
 ### Use the built-in broker
 
-After first-run, go to **Settings → Server → MQTT** and toggle the
-built-in broker on. Then expose port 1883 from the container so your
+After first-run, go to **Settings → Server → MQTT broker** and toggle
+**Built-in broker** on. Then expose port 1883 from the container so your
 panels can reach it:
 
 ```yaml
@@ -166,7 +167,7 @@ version to 3.1.1, v5 clients get rejected.
 ### Point at Mosquitto (or HA's broker)
 
 If you already run Mosquitto, point Tesserae at it via **Settings →
-Server → MQTT** (host, port, username, password). The compose file
+Server → MQTT broker** (host, port, username, password). The compose file
 doesn't need any extra ports for this path.
 
 For a "full MQTT v5 with a Mosquitto sidecar" setup, add the sidecar
@@ -256,8 +257,8 @@ docker compose up -d      # recreate with the new image
 Your `./data` volume carries settings, pages, schedules, history, and
 the render cache across the upgrade.
 
-The in-app **Settings → System → Updates** card is hidden under
-Docker, a `git pull` inside a layered filesystem would lose changes
+The in-app update form on the **Settings → System → Updates** card is
+hidden under Docker, a `git pull` inside a layered filesystem would lose changes
 on the next image rebuild, so upgrades go through `docker compose
 pull` instead. The Settings page surfaces a `docker compose` hint
 instead of the update form.
@@ -267,7 +268,7 @@ instead of the update form.
 Two related features under **Settings → System**:
 
 - **Backups** (`Settings → System → Backups`) snapshots the full Tesserae state into a ZIP under `./data/core/backups/` on your host. Use it for periodic safety copies and rollback.
-- **Data export / import** (`Settings → System → Data`) is the one-shot migration ZIP for moving to another self-hosted Tesserae Server, not for routine snapshots.
+- **Data export / import** (`Settings → System → Backups → Migrate to another install`) is the one-shot migration ZIP for moving to another self-hosted Tesserae Server, not for routine snapshots.
 
 Both still work under Docker. Snapshotting `./data` with your normal backup tool (restic, borg, rsnapshot, or a plain cron'd tarball) covers everything Tesserae has, including the in-app backups.
 

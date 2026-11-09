@@ -10,8 +10,9 @@ other.
 
 ## What Tesserae does and doesn't own
 
-Tesserae **displays** room status. It never writes to your calendar and
-never stores a booking.
+Tesserae **displays** room status. It never stores a booking, and it
+writes to your calendar only if you turn on
+[booking directly in the calendar](#booking-directly-in-the-calendar).
 
 That's deliberate. If Tesserae owned the bookings, then Tesserae being
 down would mean nobody could book a room, and two people booking the same
@@ -21,7 +22,7 @@ reading it.
 
 ## Setup
 
-1. **Add the room's calendar.** Widgets → Calendar Feeds. Any ICS URL
+1. **Add the room's calendar.** Settings → Widgets → Calendar Core. Any ICS URL
    works, which covers Google Calendar, iCloud and Outlook; CalDAV works
    through the feed discovery. The usual arrangement is one resource
    calendar per room, which is how Exchange, Google Workspace and

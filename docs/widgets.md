@@ -47,7 +47,7 @@ element, `ctx.cell.size` gives you the token, you stamp the class).
 
 ## Real panel dimensions
 
-What cells actually live on. Sizes are **native landscape**; users can
+What cells actually live on. Sizes are **native landscape** (except where noted); users can
 mount portrait, which swaps to the other axis via the panel
 orientation setting.
 
@@ -58,6 +58,9 @@ orientation setting.
 | `inky_7_3`        | 800×480         | Spectra 6                             |
 | `inky_13_3`       | 1600×1200       | Spectra 6 (Pimoroni)                  |
 | `waveshare_e6_7_5`| 800×480         | Waveshare E6                          |
+| `waveshare_photopainter_7_3` | 800×480 | Spectra 6, Waveshare 7.3" PhotoPainter (ESP32-S3) |
+| `waveshare_e6_13_3` | 1200×1600 | Spectra 6 (ESP32), **portrait-native** |
+| `waveshare_42_bw` | 400×300 | 4.2" black/white, 1-bpp |
 
 Source: [`app/panel.py`](https://github.com/dmellok/tesserae/blob/main/app/panel.py) → `PANEL_PRESETS`.
 
@@ -119,9 +122,10 @@ lowercase `[a-z0-9_]` is convention, not enforced. Name it `<family>_<role>`
   Omit ones you don't support; the editor will skip your widget on
   cells that exceed them.
 * **`cell_options`**, per-cell knobs. The editor renders one form
-  field per option. Types: `string`, `textarea`, `number`, `select`
-  (needs `choices` OR `choices_from`), `multiselect` (same),
-  `boolean`, `color`. The user's values land in `ctx.cell.options` at
+  field per option. Types: `string`, `textarea`, `number`, `slider`,
+  `select` (needs `choices` OR `choices_from`), `multiselect` (same),
+  `boolean`, `color`, `location_search`, plus the special-purpose
+  `variables_textarea` and `entity_overrides`. The user's values land in `ctx.cell.options` at
   render time. Don't ship a `variant` option for visual direction,
   that model is gone; the `data-style` axis at page level provides
   cross-widget shape selection. If a widget needs a genuine layout
@@ -650,7 +654,8 @@ def fetch(options: dict, settings: dict, *, ctx: dict) -> dict:
     """
     options: cell_options for THIS cell (defaults merged in).
     settings: plugin settings (secrets are real values, not masked).
-    ctx: {"panel_w": int, "panel_h": int, "preview": bool, "data_dir": str}
+    ctx: {"panel_w": int, "panel_h": int, "cell_w": int, "cell_h": int,
+          "preview": bool, "data_dir": str, ...}
 
     Return ANY JSON-serializable value (usually a dict). On error,
     return {"error": "..."} so client.js can render an error state.
@@ -1166,8 +1171,8 @@ The 6 accents have **fixed roles by position**:
 | `--accent-6` | third category | third series, supplementary tags |
 
 In light theme the hues are terracotta / ochre / moss / teal / slate-blue
-/ plum; in dark they shift; in Dracula they're red / peach / mint /
-lavender / cyan / pink. The hexes change; the roles don't. **Reach by
+/ plum; in dark they shift; in Nord they're Aurora red / yellow / green /
+frost cyan / frost blue / purple. The hexes change; the roles don't. **Reach by
 role, not by hue.** "I want red" is the wrong instinct, pick the slot
 whose meaning matches; the theme provides the colour.
 
@@ -1255,8 +1260,8 @@ the user expects to see**, you can hard-code hex values. Examples:
 
 * **F1 team colours**, Ferrari `#E80020`, Mercedes `#27F4D2`, Red Bull
   `#3671C6`. Painting Ferrari in `--accent-1` reads wrong; the data
-  carries its own colour. See [`plugins/f1_standings_drivers`](https://github.com/dmellok/tesserae/tree/main/plugins/f1_standings_drivers)
-  for the canonical implementation (constructor → hex map, fallback to
+  carries its own colour. See [`f1_standings_drivers`](https://github.com/dmellok/tesserae-widget-f1/tree/main/f1_standings_drivers)
+  (catalog F1 bundle) for the canonical implementation (constructor → hex map, fallback to
   `var(--surface-sunken)` for unknown teams).
 * **Brand logos and indicators**, Spotify green, GitHub black,
   particular calendar-tag colours.
@@ -1615,12 +1620,12 @@ the conventions land in practice.
 
 Canonical patterns to lift:
 
-* WMO-code → Phosphor icon lookup ([`weather_*`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_core))
+* WMO-code → Phosphor icon lookup ([`weather_*`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_now))
 * Chart helpers via `tokens()` probe ([`weather_hourly`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_hourly), [`ha_history`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_history))
 * server.py disk-cache pattern ([any `weather_*`, `f1_*` widget])
-* Family-shared module ([`f1_core`](https://github.com/dmellok/tesserae/tree/main/plugins/f1_core) → `getCircuit()` + `trackSvg()`)
+* Family-shared module ([`f1_core`](https://github.com/dmellok/tesserae-widget-f1/tree/main/f1_core) → `getCircuit()` + `trackSvg()`)
 * `--c-zoom`-aware title bar ([`spectra-widgets.css`'s `.w-title`](https://github.com/dmellok/tesserae/blob/main/static/style/spectra-widgets.css))
-* Team-colour stripe via inset box-shadow ([`f1_standings_drivers`](https://github.com/dmellok/tesserae/tree/main/plugins/f1_standings_drivers))
+* Team-colour stripe via inset box-shadow ([`f1_standings_drivers`](https://github.com/dmellok/tesserae-widget-f1/tree/main/f1_standings_drivers))
 
 ---
 

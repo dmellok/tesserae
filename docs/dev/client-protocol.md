@@ -15,7 +15,7 @@ If you're picking a path:
   it. The MAC-match auto-claim flow under
   [Discovery & pairing](#discovery-and-pairing) keeps zero-touch
   re-pairing working after firmware updates.
-- **Always-on (Pi, kiosk)**: MQTT is simpler. The retained
+- **Always-on (Pi, kiosk)**: MQTT is simpler. The
   `tesserae/<id>/frame/<fmt>` topic delivers a JSON envelope with a
   download URL whenever a new frame ships.
 
@@ -26,9 +26,10 @@ artefacts (PNG, packed `.bin`, TRMNL 1-bpp PNG). When a new frame is
 ready, the server either:
 
 1. **MQTT push**: publishes a JSON envelope with the frame URL to
-   `tesserae/<device_id>/frame/<fmt>` (retained). The client wakes /
-   reacts, fetches the URL, paints, sleeps. Fan-out across multiple
-   panels is one publish per renderer.
+   `tesserae/<device_id>/frame/<fmt>` (retained for the MCU `.bin`
+   renderers, `esp32_*bin` and `pico_bin`; see [MQTT topics](#mqtt-topics)).
+   The client wakes / reacts, fetches the URL, paints, sleeps. Fan-out
+   across multiple panels is one publish per renderer.
 2. **REST pull**: the client polls
    `GET /api/v1/device/<id>/frame`. The server responds with the
    same JSON envelope (or 304 with an `ETag`, or 204 if no frame
@@ -75,9 +76,10 @@ What only the client knows (and must report):
 
 ## Discovery and pairing
 
-Every device gets a per-device bearer token (32+ random bytes,
-constant-time compared). Tokens live in the instance manifest
-server-side; clients store them in persistent flash / NVS / secrets.
+Every device gets a per-device bearer token (20 random alphanumeric
+characters, about 119 bits, constant-time compared). Tokens live in
+the instance manifest server-side; clients store them in persistent
+flash / NVS / secrets.
 
 A user never has to type a token by hand. The default flow is the
 zero-touch one below (path A): firmware announces itself, the admin
@@ -346,7 +348,7 @@ click.
 
 1. Admin generates a code in Settings → Devices → "Pair new device"
    (server route: `POST /api/v1/device/admin/pairing/issue`,
-   15-minute expiry, single-use).
+   10-minute expiry, single-use).
 2. Device POSTs `/api/v1/device/register` with the code in the
    `X-Pairing-Code` header and a manifest:
    ```http
@@ -638,9 +640,9 @@ client's mode alone.
 Continuously powered clients that poll `/frame` on a timer can send
 the stroke out-of-band instead via `POST /api/v1/device/<id>/tap`
 with body `{"x0": …, "y0": …, "x1"?: …, "y1"?: …, "duration_ms"?: …,
-"digest": "<etag>", "event_id"?: …}`. The response is always `200`
+"digest": "<etag>", "event_id"?: …}`. A well-formed request always answers `200`
 with `{"outcome": "dispatched" | "noop" | "webhook_dispatched" |
-"stale" | "no_frame" | "no_target" | "deduped" | "error", "gesture":
+"fetched" | "stale" | "no_frame" | "no_target" | "deduped" | "error", "gesture":
 "tap" | "swipe_up" | …, "action_spec": …, "description": …,
 "rotation"?: {…}}`; in every non-dispatched case the client's correct
 move is the same, re-poll `/frame` and carry on.
@@ -724,10 +726,12 @@ the sense that they're marked volatile, so a change in one of them
 alone doesn't write an event-log row on every beat. Nothing else
 interprets them.
 
-The capability blocks (`ota`, `deck`, `collection`, `overlay`, `proto`,
-`logs`) are nested objects rather than scalar fields, and they're sticky:
-the server carries the last advertised value forward across beats that
-omit it, so you only need to send them once per boot.
+The capability blocks (`ota`, `overlay`, `proto`, `logs`) are nested
+objects rather than scalar fields, and they're sticky: the server carries
+the last advertised value forward across beats that omit it, so you only
+need to send them once per boot. The storage capabilities (`deck_cache`,
+`frame_cache`) are the exception: they're current-state per beat, see
+[deck cache sync](#deck-cache-sync-on-device-frame-cache).
 
 #### Log upload and failure reports
 
@@ -1052,7 +1056,7 @@ fetch a dashboard on demand without a computer in the loop.
       "id": "current",
       "title": "Current dashboard",
       "subtitle": "Download as sleep screen",
-      "url": "http://<server>/api/v1/device/<id>/frame.bmp?k=<token>"
+      "url": "http://<server>/api/v1/device/<id>/frame.bmp?button=refresh&button_event_id=<epoch>&k=<token>"
     },
     {
       "id": "page:morning_briefing",
@@ -1501,7 +1505,7 @@ surfaces:
   with the v1 outcome names.
 - `GET /api/v1/device/<id>/stream` — Server-Sent Events: `values` /
   `patches` / `sync` envelopes (identical payloads to the `/status`
-  piggybacks and `/frame/data`), comment keepalive every 25 s. An
+  piggybacks and `/frame/data`), comment keepalive every 5 s. An
   optimisation over the 1 s linger poll, never a correctness
   requirement; reverse proxies must not buffer the route.
 - `GET /api/v1/device/<id>/bundle` (+ `/bundle/frame/<digest>`) — the
@@ -1516,7 +1520,7 @@ All topics are namespaced under `tesserae/<device_id>/`.
 
 | Topic | Direction | Payload | Retain | QoS | Trigger |
 |---|---|---|---|---|---|
-| `tesserae/<id>/frame/bin` | server → device | JSON envelope, see below | **yes** | 1 | New `.bin` frame published (pico_bin, esp32, pi_bin renderers) |
+| `tesserae/<id>/frame/bin` | server → device | JSON envelope, see below | **yes** (`pi_bin`: no) | 1 | New `.bin` frame published (pico_bin, esp32, pi_bin renderers) |
 | `tesserae/<id>/frame/png` | server → device | JSON envelope | no | 1 | New `.png` frame (pi_png renderer) |
 | `tesserae/<id>/frame/trmnl` | server → device | JSON envelope | no | 1 | New TRMNL 1-bpp PNG (trmnl renderer) |
 | `tesserae/<id>/status` | device → server | JSON, see [heartbeat](#post-apiv1deviceidstatus) | typically yes | 1 | Device after paint / interval |
@@ -1548,8 +1552,8 @@ most recent heartbeat without waiting for the next one.
 
 Used by `pi_bin`, `esp32_bin`, `pico_bin` renderers. Bit width and
 byte layout depend on the panel's gamut, so a client should key its
-unpack path off the `gamut` field it receives in `/api/v1/device/config`
-(or its `discover` payload).
+unpack path off the `gamut` it declared in its `discover` / `register`
+payload.
 
 #### 4-bpp layout (6 and 7 colour panels)
 

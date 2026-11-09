@@ -141,14 +141,19 @@ Edge handling, wired for `esp32_bin` / `pi_bin` /
   pixel close to some entry and the same guard would flatten
   photographs instead of cleaning backgrounds.
 
-## What still isn't wired (later phases)
+## What v0.67.4 adds
 
 - **LAB dynamic-range compression** (`lab_compress_min` /
-  `lab_compress_max` on the profile) — stored but ignored; the
-  existing linear `_compress_to_calibrated_range` still runs when
-  `calibrated=True`.
-- **Colour-match modes** (RGB / LAB / chroma-aware) — stored but
-  ignored; RGB nearest is the only path.
+  `lab_compress_max` on the profile, 0-100) — `_compress_lab_range`
+  rescales L* only, leaving hue alone. Overrides the linear
+  `_compress_to_calibrated_range` when set; the default `(0, 100)` is
+  a no-op.
+- **Colour-match modes** (`rgb` / `lab` / `chroma-aware`) on the
+  error-diffusion dithers. `chroma-aware` weights a*/b* 2x to keep hue
+  over lightness.
+
+## What still isn't wired (later phases)
+
 - **`pi_png`** — palette override would need a client-side
   change on `tesserae-device-pi`.
 - **`trmnl_png`** — mono; palette calibration doesn't apply.

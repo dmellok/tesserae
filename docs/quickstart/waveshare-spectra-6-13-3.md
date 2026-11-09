@@ -6,9 +6,9 @@ The Waveshare 13.3" Spectra 6 e-paper board with an ESP32-S3-WROOM-2 driver. Bat
 
 Plug the ESP32-S3-WROOM-2 board into your computer over USB. Hold the BOOT button while plugging in, then release.
 
-Open the [Tesserae browser flasher](https://tesserae.ink/flash) in Chrome or Edge, pick **Waveshare 13.3" Spectra 6** in the device dropdown, then click **Verify & flash**. It installs the firmware over Web Serial with no toolchain.
+Open the [Tesserae browser flasher](https://tesserae.ink/flash) in Chrome or Edge, pick **Waveshare 13.3" Spectra 6** in the device dropdown, then click **Connect & flash**. It installs the firmware over Web Serial with no toolchain.
 
-On first boot the board opens a Wi-Fi captive portal (SSID `tesserae-esp32-XXXX`). Connect from your phone or laptop, then set:
+On first boot the board opens a Wi-Fi captive portal (SSID `Tesserae-Setup`). Connect from your phone or laptop, then set:
 
 - **Tesserae server URL**: `http://<your-server>:8765`
 - **Wi-Fi SSID and password**: your home network.
@@ -17,7 +17,7 @@ Save. The board restarts onto your network.
 
 ## 02 — It pairs itself
 
-The board calls Tesserae's `/api/setup` with its MAC and auto-provisions. Within a few seconds it appears under **Settings → Devices → Discovered**. Click **Register**.
+The board announces itself on Tesserae's `/api/v1/device/discover` endpoint. Within a few seconds it appears under **Settings → Devices → Discovered**. Click **Register**.
 
 ## 03 — Compose a dashboard
 

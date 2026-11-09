@@ -49,7 +49,7 @@ equivalent of every MQTT capability Tesserae uses.
 | **Discovery (unknown device)** | Server wildcard-subscribes to `tesserae/+/status`. Any heartbeat from an unregistered device id appears in the Discovered strip. | Firmware POSTs `/api/v1/device/discover` (unauthenticated). Entry added to the same `DiscoveryCache` that MQTT feeds. Shows up in the same Discovered strip. | MQTT discovery is incidental (any client publishing status is discovered). REST requires an explicit announce call. Either way ends up in the same admin UI. |
 | **Device → server auth** | Broker-level: username + password set in broker config, used by every client. One shared credential. | Per-device bearer token in the `Authorization: Bearer <token>` header (or `X-Tesserae-Token` fallback). Tokens are unique per device, revocable per device. | REST is a meaningful security improvement: revoking one device's access doesn't affect the others. |
 | **Server → device auth** | Same broker creds; topic ACLs are not enforced by amqtt's default config. | Server-side token validation checks the URL device id matches the token's owner. Cross-device access returns 403. | REST has real per-device isolation at the auth layer; MQTT's bundled-broker setup gives effectively shared credentials. |
-| **First-boot pairing** | User flashes broker host + port + username + password into firmware (captive portal, build-time config, etc.). | User generates a 6-digit pairing code on Settings → Devices → Pair new device, flashes that into firmware. Firmware POSTs `/api/v1/device/register` once, persists the device token, wipes the pairing code. | REST replaces "type 4 broker fields" with "type 1 pairing code." Friendlier UX, single rotation point if compromised. |
+| **First-boot pairing** | User flashes broker host + port + username + password into firmware (captive portal, build-time config, etc.). | User generates a 6-digit pairing code on Settings → Devices → Add device → REST API → Issue pairing code, flashes that into firmware. Firmware POSTs `/api/v1/device/register` once, persists the device token, wipes the pairing code. | REST replaces "type 4 broker fields" with "type 1 pairing code." Friendlier UX, single rotation point if compromised. |
 | **Idempotent registration** | N/A (no register step). | POST `/register` with an already-registered `device_id` returns 200 + `reused_existing: true` + the existing token. A firmware retry after a network glitch is safe. | MQTT doesn't have this problem because there's no pairing step. |
 | **Brute-force protection** | None at the broker level (amqtt) for credential guessing. The shared credential makes guessing one device's worth of access trivial anyway. | `POST /register` is rate-limited (10 failed attempts / 60s / IP) with `Retry-After` on 429. Successful registers release the bucket. | A real win for REST. The 6-digit code's 20 bits of entropy is meaningful only with rate limiting; without it, a brute force takes minutes. |
 | **Transport lifecycle** | Persistent TCP connection. Keepalive packets. Reconnect logic on broker drop. | Stateless HTTP. No connection to maintain. | REST is simpler in firmware: no connection state, no keepalive, no reconnect path. Each wake makes one or two requests and exits. |
@@ -111,7 +111,7 @@ first boots, sealed appliances, BLE-provisioned devices, devices
 shipped on a kiosk image, you can pre-mint a token via a one-shot
 pairing code instead.
 
-1. **Settings → Devices → Pair new device**. Click **Issue pairing
+1. **Settings → Devices → Add device → REST API**. Click **Issue pairing
    code**. A six-digit code appears (10-minute TTL).
 2. Type the code into the firmware's setup form alongside the
    server URL.
@@ -174,18 +174,18 @@ let you switch is put back on REST when the server starts.
 By default each device counts its sleep from whenever it last checked
 in, so two panels on the same interval drift apart and repaint at
 unrelated moments. **Synchronized wake** pins the wake grid to the wall
-clock instead: open the device card → **Schedule** tab → *Synchronized
-wake*.
+clock instead: open the device card → **Schedule** section → *Advanced:
+synchronized wake* → **Wake on the clock**.
 
 - **On the clock**: keeps the sleep interval as the period but lands
   every wake on `anchor + multiples of it` in local time. A 15-minute
   panel anchored at `00:00` wakes at :00 / :15 / :30 / :45; every
   device set to the same grid repaints together.
-- **At set times**: the device wakes only at the times you list
+- **At set times only**: the device wakes only at the times you list
   (e.g. `07:00, 12:30, 19:00`), ignoring the interval. Good for very
   long battery life on content that changes a few times a day.
 
-The **Apply to all devices** switch copies the setting to every REST
+The **Apply to all** switch copies the setting to every REST
 device in one save, which is the quickest way to put a whole fleet on
 one grid. Grid points inside quiet hours are skipped, and the server
 learns each device's wake-to-paint latency after a cycle or two so the
@@ -237,8 +237,8 @@ else (a frame at the office, a relative's house) by putting Tesserae
 behind a Cloudflare Tunnel, so nothing on your home router is
 port-forwarded. Two settings make this safe.
 
-1. **Turn on signed render URLs.** Settings → Server → Network →
-   *Allow REST clients on public networks* (off by default). With it on,
+1. **Turn on signed render URLs.** Settings → Server → Network &
+   integrations → *Allow REST clients on public networks* (off by default). With it on,
    the server hands each device a short-lived, signed URL for its frame
    image; unsigned requests to `/renders/` are refused even from the
    public side. Leave it off and render artifacts stay reachable only
@@ -272,11 +272,11 @@ use the per-device toggle described above.
 
 If you want to flip the entire install:
 
-1. Settings → Server → App → Default transport = REST. New devices
+1. Settings → Server → Network & integrations → Default transport for new devices = REST. New devices
    added via the wizard default to REST.
 2. For existing MQTT devices, use the per-device toggle to move them
    one at a time. Each switch reveals the new bearer token for that
    device which needs to be flashed into firmware.
 3. Once every device is on REST, you can stop the broker (Settings →
-   Server → Broker → uncheck "Built-in broker"; for external Mosquitto,
+   Server → MQTT broker → uncheck "Built-in broker"; for external Mosquitto,
    stop the service yourself).

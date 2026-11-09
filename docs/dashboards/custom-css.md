@@ -60,7 +60,7 @@ Make the headings smaller everywhere:
 Change one widget's accent without changing the theme:
 
 ```css
-[data-widget="calendar_agenda"] { --accent-1: #2a5d8f; }
+[data-widget="calendar_day"] { --accent-1: #2a5d8f; }
 ```
 
 ## Notes

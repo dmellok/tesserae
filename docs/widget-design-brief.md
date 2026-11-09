@@ -56,7 +56,8 @@ Example: *sm, md, lg, skipping xs because the chart needs at least
 ## 3. Cell options (per-cell user knobs)
 
 The form fields the editor will render. Types: `string` · `textarea` ·
-`number` · `select` · `boolean` · `color`. `select` requires `choices`.
+`number` · `slider` · `select` · `multiselect` · `boolean` · `color` ·
+`location_search`. `select` requires `choices` (or `choices_from`).
 
 | name | type | default | label | choices |
 |------|------|---------|-------|---------|
@@ -113,7 +114,7 @@ origin fetches; **B** for purely computed widgets (time of day, etc.).
 
 ### B. Client-side only (no `server.py`)
 
-- **Inputs**: `ctx.cell.options.*` (per-cell), `ctx.theme`, `ctx.cell.size`.
+- **Inputs**: `ctx.cell.options.*` (per-cell), `ctx.cell.size`, `ctx.locale`.
 - **What you compute**: e.g. *time and date from `Date.now()` and the
   user's timezone option.*
 
@@ -168,13 +169,14 @@ grouping, and which theme token / icon goes where.
 │  └──────────────┘                                                 │
 └──────────────────────────────────────────────────────────────────┘
 
-[1] place label, uppercase, weight 700, fgSoft. ph-map-pin (regular,
-    accent) before the text.
+[1] place label, uppercase, weight 700, `--text-secondary`. ph-map-pin
+    (regular, `--accent-4`) before the text.
 [2] stats, 4 columns. label uppercase muted; value weight 700.
-    Icons (left of each value): ph-thermometer-simple at bold weight (warn),
-    ph-drop-half at bold (accent), ph-wind at bold (fgSoft), ph-sun-dim at bold
-    (tone by UV band).
-[3] sun row, ph-duotone-sun-horizon + ph-duotone-moon-stars (accent).
+    Icons (left of each value): ph-thermometer-simple at bold weight
+    (`--accent-2`), ph-drop-half at bold (`--accent-4`), ph-wind at bold
+    (`--text-secondary`), ph-sun-dim at bold (tone by UV band).
+[3] sun row, `ph-duotone ph-sun-horizon` + `ph-duotone ph-moon-stars`
+    (`--accent-4`).
 ```
 
 ### md (640×400)
@@ -314,7 +316,7 @@ What gets hidden / shrunk as the cell gets smaller. Be specific.
 
 Anything that doesn't fit above. Examples:
 
-- "Bias toward `warn` for hot temps on the Spectra 6 panel, the
+- "Bias toward `--accent-2` for hot temps on the Spectra 6 panel, the
   yellow primary is the most attention-grabbing."
 - "Chart.js: enable the `tension: 0.35` smoothing; disable
   animations (`animation: false`)."

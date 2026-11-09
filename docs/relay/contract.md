@@ -53,8 +53,9 @@ relay stores only `sha256(token)`.
   the panel once through the relay at pairing; authorizes exactly one mailbox
   (`GET .../frame`).
 
-Unknown / revoked token → `401`. Token valid but for the wrong install or device
-→ `403`.
+Unknown / revoked token → `401`. Device token valid but for the wrong install or
+device → `403`. A publisher token is checked against the addressed install's
+record, so one presented to another install's routes is a `401`.
 
 Revoking a device (`DELETE /v1/i/<install>/d/<device>`, publisher token)
 deletes its mailbox **and its token record**, so a revoked panel's next poll is

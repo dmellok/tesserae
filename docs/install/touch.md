@@ -25,8 +25,8 @@ Two sides to it:
 2. **Firmware / a client that reports touch** over the REST API (see
    [Client side](#client-side-any-device)). A display-only panel renders
    the same dashboard fine; the touch actions just never fire.
-3. Touch **enabled** on the device: **Settings → Devices** → the device
-   card → **General** → turn on **Touch input**. On battery boards this
+3. Touch **enabled** on the device: open the device from **Settings →
+   Devices** and turn on **Touch input**. On battery boards this
    keeps the digitizer powered through deep sleep (a few mA), so it's off
    by default. **Touch linger** keeps the device awake briefly after a
    touch so follow-up taps skip the deep-sleep wake latency. **Touch wake**
@@ -42,9 +42,9 @@ Two sides to it:
 E-ink repaints in seconds, not milliseconds, so a tap gives the person in
 front of the panel nothing to go on until the whole pipeline (dispatch,
 render, download, flash) has finished. On the Seeed reTerminal E series
-there's a buzzer on the board to close that gap: **Settings → Devices** →
-the device card → **General** → **Beep on interaction**, with a tone and a
-volume next to it.
+there's a buzzer on the board to close that gap: open the device from
+**Settings → Devices** and turn on **Beep on interaction**, with **Beep
+tone** and **Beep volume** to pick the sound.
 
 The panel sounds it itself, the moment the touch controller reports the
 stroke, before the server is contacted at all. That's the whole point: a
@@ -89,7 +89,7 @@ behave identically). It offers:
 | Home Assistant | Call a service (e.g. `light.turn_on`) with a target entity and optional service data |
 
 **Home Assistant** actions run server-side through the Home Assistant
-Core plugin's connection (Settings → Plugins → Home Assistant Core), so
+Core plugin's connection (Settings → Widgets → Home Assistant Core), so
 you don't expose HA to the panel. Pick a service and entity; add extra
 service data as JSON (e.g. `{"brightness_pct": "{value}"}` on a slider).
 Navigation actions (refresh / rotate / step / page) work on any device;
