@@ -3,7 +3,7 @@
   "name": "Samsung The Frame (Art Mode)",
   "icon": "frame-corners",
   "version": "0.1.0",
-  "description": "Samsung The Frame TV, shown through its own Art Mode. Tesserae renders the page at 4K, uploads it to the Art app's My Photos over the TV's local network API and makes it the current artwork, then deletes its older uploads so only a few frames use the TV's storage. Art Mode keeps doing the display: it starts when the TV is switched off, follows the room light with its brightness sensor and draws the mat chosen below. Enter the TV's address, save, then press Allow on the TV the first time Tesserae connects. No developer mode or app install on the TV.",
+  "description": "Samsung The Frame TV, shown through its own Art Mode. Tesserae renders the page at 4K, uploads it to the Art app's My Photos over the TV's local network API and makes it the current artwork, then deletes its older uploads so only a few frames use the TV's storage. Art Mode keeps doing the display: it starts when the TV is switched off, follows the room light with its brightness sensor and draws the mat chosen below. Enter the TV's address, save, then press Allow on the TV the first time Tesserae connects. It switches the TV off for quiet hours and back on for new frames, with the TV's own power or a Home Assistant switch. No developer mode or app install on the TV.",
   "renderers": [
     "pi_png"
   ],
@@ -25,6 +25,60 @@
       "default": "",
       "placeholder": "192.168.1.50",
       "help": "The TV's IP address or host name on your network. Give the TV a fixed address in your router so it doesn't move."
+    },
+    "power_control": {
+      "type": "select",
+      "label": "Power control",
+      "default": "tv",
+      "choices": [
+        {
+          "value": "tv",
+          "label": "The TV's own power (Wake-on-LAN)"
+        },
+        {
+          "value": "switch",
+          "label": "A Home Assistant switch (needs Home Assistant)"
+        },
+        {
+          "value": "none",
+          "label": "Leave it on"
+        }
+      ],
+      "help": "How Tesserae switches the TV off for quiet hours that sleep through (once Art Mode is showing) and back on when they end or a frame is pushed while it is off. The TV's own power works on any Frame: standby by holding Power over the network, back on with Wake-on-LAN (the TV's network standby, on by default, must stay on). With Home Assistant connected, a switch such as a smart plug can cut the power completely instead (without the connection Tesserae falls back to the TV's own power); Wake-on-LAN still helps a TV that boots to standby."
+    },
+    "power_switch": {
+      "type": "string",
+      "label": "Home Assistant switch",
+      "default": "",
+      "placeholder": "switch.living_room_tv",
+      "help": "With Power control set to a Home Assistant switch: the switch that powers the TV, such as switch.tv_plug. Needs the Home Assistant Core plugin.",
+      "show_if": {
+        "power_control": "switch"
+      }
+    },
+    "sleep_when_in_use": {
+      "type": "select",
+      "label": "Still in use at quiet hours",
+      "default": "60",
+      "choices": [
+        {
+          "value": "never",
+          "label": "Leave it on"
+        },
+        {
+          "value": "30",
+          "label": "Sleep after 30 minutes"
+        },
+        {
+          "value": "60",
+          "label": "Sleep after 1 hour"
+        },
+        {
+          "value": "120",
+          "label": "Sleep after 2 hours"
+        }
+      ],
+      "help": "A TV showing something other than Art Mode when quiet hours start is left on. This puts it to sleep anyway once it has stayed in use that long into quiet hours (a TV left on by mistake), or never does."
     },
     "matte_style": {
       "type": "select",

@@ -125,7 +125,10 @@ def _plant_render(
     app.config["PUSH_MANAGER"]._latest_renders[device_id] = {"composition_digest": digest}
 
 
-def _publisher(app: Flask, tv: FakeTV, rest: dict[str, Any] | None = None) -> SamsungFramePublisher:
+_ON = {"PowerState": "on"}
+
+
+def _publisher(app: Flask, tv: FakeTV, rest: dict[str, Any] | None = _ON) -> SamsungFramePublisher:
     return SamsungFramePublisher(
         app=app,
         devices=app.config["DEVICE_REGISTRY"],
@@ -236,13 +239,22 @@ def test_failed_delete_is_retried_next_time(app: Flask) -> None:
     assert tv.photos == ["MY_F0003"]
 
 
-def test_watching_tv_is_not_interrupted(app: Flask) -> None:
-    _make_frame(app)
+def test_a_tv_in_use_gets_its_frame_once_art_mode_is_back(app: Flask) -> None:
+    _make_frame(app, token_secret="tok-1")
     _plant_render(app, "office_frame", "aaa111")
     tv = FakeTV()
-    tv.art_mode = False
-    _publisher(app, tv).on_push()
-    assert ("select", "MY_F0001", False) in tv.calls
+    tv.art_mode = False  # someone is watching
+    pub = _publisher(app, tv)
+    pub.on_push()
+    assert tv.uploads == []
+    assert _screen(app)["screen_why"] == "in use, new frame waiting"
+    assert not pub._backing_off("office_frame")
+    pub.poll_once()  # still watching: nothing sent
+    assert tv.uploads == []
+    tv.art_mode = True  # back to Art Mode
+    pub.poll_once()
+    assert len(tv.uploads) == 1
+    assert ("select", "MY_F0001", True) in tv.calls
 
 
 def test_slideshow_left_alone_when_take_over_is_off(app: Flask) -> None:
@@ -495,3 +507,492 @@ def test_the_async_worker_sends_the_newest_frame_and_stops(app: Flask) -> None:
         FakeClient.upload_jpeg = original  # type: ignore[method-assign]
     assert not pub._worker_running
     assert pub.load_state(_device(app))["last_digest"] == "d2"
+
+
+class FakePower:
+    """A Home Assistant switch powering the fake TV."""
+
+    def __init__(self, tv: FakeTV, on: bool = True) -> None:
+        self.tv, self.on, self.calls = tv, on, []
+
+    def state(self, entity_id: str) -> str | None:
+        return "on" if self.on else "off"
+
+    fail_turn = False
+
+    def available(self) -> bool:
+        return True
+
+    def turn(self, entity_id: str, on: bool) -> bool:
+        self.calls.append((entity_id, on))
+        if self.fail_turn:
+            return False
+        self.on = on
+        if on:
+            self.tv.art_mode = False  # a cold boot may land in TV mode
+        return True
+
+
+def _powered(app: Flask, tv: FakeTV, power: FakePower, quiet: list[bool]) -> SamsungFramePublisher:
+    def set_art_mode(self: FakeClient, on: bool) -> None:
+        self.tv.calls.append(("set_art_mode", on))
+        self.tv.art_mode = on
+
+    FakeClient.set_art_mode = set_art_mode  # type: ignore[attr-defined]
+    return SamsungFramePublisher(
+        app=app,
+        devices=app.config["DEVICE_REGISTRY"],
+        settings=app.config["SETTINGS_STORE"],
+        renders_dir=app.config["RENDERS_DIR"],
+        latest_render_fn=app.config["PUSH_MANAGER"].latest_render_for,
+        run_async=False,
+        client_factory=lambda host, **kw: FakeClient(tv, host, **kw),
+        rest_info_fn=lambda host: {"PowerState": "on"} if power.on else None,
+        power=power,
+        quiet_fn=lambda device: quiet[0],
+        sleep_fn=lambda s: None,
+        power_key_fn=lambda *a, **k: None,
+        wol_fn=lambda mac, host: None,
+    )
+
+
+def _screen(app: Flask) -> dict[str, Any]:
+    return app.config["DEVICE_STATUS"]["office_frame"]["parsed"]
+
+
+def test_a_push_to_a_switched_off_tv_switches_it_on_in_art_mode(app: Flask) -> None:
+    _make_frame(app, power_switch="switch.tv_plug", token_secret="tok-1")
+    _plant_render(app, "office_frame", "aaa111")
+    tv = FakeTV()
+    power = FakePower(tv, on=False)
+    _powered(app, tv, power, [False]).on_push()
+    assert power.calls == [("switch.tv_plug", True)]
+    assert ("set_art_mode", True) in tv.calls
+    assert ("select", "MY_F0001", True) in tv.calls
+    assert _screen(app)["screen"] == "art"
+
+
+def test_quiet_hours_switch_off_a_tv_showing_art_and_hold_frames(app: Flask) -> None:
+    _make_frame(app, power_switch="switch.tv_plug", token_secret="tok-1")
+    tv = FakeTV()
+    power = FakePower(tv, on=True)
+    pub = _powered(app, tv, power, [True])
+    pub.poll_once()
+    assert power.calls == [("switch.tv_plug", False)]
+    assert _screen(app)["screen"] == "off" and _screen(app)["screen_why"] == "quiet hours"
+    _plant_render(app, "office_frame", "aaa111")
+    pub.on_push()
+    assert tv.uploads == []  # held until quiet hours end
+
+
+def test_quiet_hours_leave_a_tv_that_is_being_watched_on(app: Flask) -> None:
+    _make_frame(app, power_switch="switch.tv_plug", token_secret="tok-1")
+    tv = FakeTV()
+    tv.art_mode = False
+    power = FakePower(tv, on=True)
+    _powered(app, tv, power, [True]).poll_once()
+    assert power.calls == []
+    assert _screen(app)["screen"] == "on"
+
+
+def test_end_of_quiet_hours_switches_back_on_only_what_tesserae_switched_off(app: Flask) -> None:
+    _make_frame(app, power_switch="switch.tv_plug", token_secret="tok-1")
+    tv = FakeTV()
+    power = FakePower(tv, on=True)
+    quiet = [True]
+    pub = _powered(app, tv, power, quiet)
+    pub.poll_once()  # off for the night
+    quiet[0] = False
+    pub.poll_once()  # morning: back on
+    assert power.calls == [("switch.tv_plug", False), ("switch.tv_plug", True)]
+    assert _screen(app)["screen"] == "art"
+    # Switched off by hand: it stays off until something is pushed.
+    power.on = False
+    power.calls.clear()
+    pub.poll_once()
+    assert power.calls == []
+    assert _screen(app)["screen"] == "off" and _screen(app)["screen_why"] == "power switch off"
+
+
+def test_device_card_shows_the_screen_not_a_battery(app: Flask) -> None:
+    _make_frame(app, power_switch="switch.tv_plug", token_secret="tok-1")
+    tv = FakeTV()
+    power = FakePower(tv, on=True)
+    _powered(app, tv, power, [False]).poll_once()
+    client = _admin(app)
+    html = client.get("/settings/devices/office_frame").get_data(as_text=True)
+    assert "Art Mode" in html and ">Screen<" in html
+
+
+@pytest.mark.parametrize(
+    ("value", "ok"),
+    [
+        ("switch.tv_plug", True),
+        ("input_boolean.tv", True),
+        ("", True),
+        ("tv plug", False),
+        ("sensor.x", False),
+    ],
+)
+def test_power_switch_must_be_an_entity_id(app: Flask, value: str, ok: bool) -> None:
+    _make_frame(app)
+    assert _device(app).module.validate_config({"power_switch": value})[0] is ok
+
+
+def test_a_failed_morning_switch_on_is_retried(app: Flask) -> None:
+    _make_frame(app, power_switch="switch.tv_plug", token_secret="tok-1")
+    tv = FakeTV()
+    power = FakePower(tv, on=True)
+    quiet = [True]
+    pub = _powered(app, tv, power, quiet)
+    pub.poll_once()  # off for the night
+    quiet[0] = False
+    power.fail_turn = True
+    pub.poll_once()  # HA refuses: the flag stays
+    assert pub.load_state(_device(app)).get("slept_by_tesserae") is True
+    power.fail_turn = False
+    pub.poll_once()
+    assert power.on and power.calls[-1] == ("switch.tv_plug", True)
+    assert "slept_by_tesserae" not in pub.load_state(_device(app))
+
+
+def test_morning_switch_on_puts_a_tv_mode_boot_into_art_mode(app: Flask) -> None:
+    _make_frame(app, power_switch="switch.tv_plug", token_secret="tok-1")
+    tv = FakeTV()
+    power = FakePower(tv, on=True)
+    quiet = [True]
+    pub = _powered(app, tv, power, quiet)
+    pub.poll_once()
+    quiet[0] = False
+    pub.poll_once()  # switched on; FakePower boots it in TV mode; Art Mode goes back on
+    assert ("set_art_mode", True) in tv.calls
+    assert _screen(app)["screen"] == "art" and _screen(app)["screen_why"] == ""
+    assert "needs_art_mode" not in pub.load_state(_device(app))
+
+
+def test_a_push_that_wakes_the_tv_clears_the_night_flag(app: Flask) -> None:
+    _make_frame(app, power_switch="switch.tv_plug", token_secret="tok-1")
+    tv = FakeTV()
+    power = FakePower(tv, on=True)
+    quiet = [True]
+    pub = _powered(app, tv, power, quiet)
+    pub.poll_once()  # off for the night
+    quiet[0] = False
+    _plant_render(app, "office_frame", "aaa111")
+    pub.on_push()  # the 08:08 catch-up push wakes it before the poller does
+    assert power.on and len(tv.uploads) == 1
+    power.on = False  # the owner switches it off by hand later
+    power.calls.clear()
+    pub.poll_once()
+    assert power.calls == []
+    assert _screen(app)["screen_why"] == "power switch off"
+
+
+def test_quiet_hours_leave_a_tv_on_when_its_art_app_does_not_answer(app: Flask) -> None:
+    _make_frame(app, power_switch="switch.tv_plug", token_secret="tok-1")
+    tv = FakeTV()
+    tv.fail["connect"] = FrameArtError("art app wedged")
+    power = FakePower(tv, on=True)
+    _powered(app, tv, power, [True]).poll_once()
+    assert power.calls == []
+
+
+def test_quiet_hours_count_a_tv_that_stops_answering_as_off(app: Flask) -> None:
+    _make_frame(app, power_switch="switch.tv_plug", token_secret="tok-1")
+    tv = FakeTV()
+    power = FakePower(tv, on=True)
+    pub = _powered(app, tv, power, [True])
+    pub._rest_info = lambda host: None  # type: ignore[method-assign]
+    pub.poll_once()
+    pub.poll_once()
+    assert power.calls == []  # nothing to switch off; not flagged for the morning
+    assert _screen(app)["screen"] == "off" and _screen(app)["screen_why"] == "quiet hours"
+    assert "slept_by_tesserae" not in pub.load_state(_device(app))
+
+
+def test_a_missed_answer_with_the_switch_on_does_not_force_art_mode(app: Flask) -> None:
+    _make_frame(app, power_switch="switch.tv_plug", token_secret="tok-1")
+    _plant_render(app, "office_frame", "aaa111")
+    tv = FakeTV()
+    tv.art_mode = False  # someone is watching
+    power = FakePower(tv, on=True)
+    pub = _powered(app, tv, power, [False])
+    answers = iter([None])
+    pub._rest_info = lambda host: next(answers, {"PowerState": "on"})  # type: ignore[method-assign]
+    pub.on_push()
+    assert power.calls == []
+    assert ("set_art_mode", True) not in tv.calls
+    assert tv.uploads == []  # being watched: the frame waits for Art Mode
+
+
+def test_a_tv_that_never_starts_backs_off(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    _make_frame(app, power_switch="switch.tv_plug", token_secret="tok-1")
+    _plant_render(app, "office_frame", "aaa111")
+    tv = FakeTV()
+    power = FakePower(tv, on=False)
+    clock = [0.0]
+    monkeypatch.setattr(samsung_frame.time, "monotonic", lambda: clock[0])
+    pub = _powered(app, tv, power, [False])
+    pub._rest_info = lambda host: None  # type: ignore[method-assign]
+    pub._sleep = lambda s: clock.__setitem__(0, clock[0] + s)  # type: ignore[method-assign]
+    pub.on_push()
+    assert power.calls == [("switch.tv_plug", True)]
+    assert tv.uploads == []
+    assert pub._backing_off("office_frame")
+
+
+def test_a_held_frame_is_sent_after_quiet_hours(app: Flask) -> None:
+    _make_frame(app, power_switch="switch.tv_plug", token_secret="tok-1")
+    tv = FakeTV()
+    power = FakePower(tv, on=True)
+    quiet = [True]
+    pub = _powered(app, tv, power, quiet)
+    pub.poll_once()
+    _plant_render(app, "office_frame", "aaa111")
+    pub.on_push()
+    assert tv.uploads == []
+    quiet[0] = False
+    pub.poll_once()  # back on, and the missed frame goes
+    assert len(tv.uploads) == 1
+    assert pub.pending_digest(_device(app)) is None
+
+
+def test_the_poller_keeps_a_new_pairing_token(app: Flask) -> None:
+    _make_frame(app, token_secret="old-token")
+    tv = FakeTV()
+    tv.issue_token = None
+    original = FakeClient.connect
+
+    def connect_and_rotate(self: FakeClient, pairing_timeout: float = 45) -> None:
+        original(self, pairing_timeout)
+        self.token = "new-token"
+
+    FakeClient.connect = connect_and_rotate  # type: ignore[method-assign]
+    try:
+        _powered(app, tv, FakePower(tv), [False]).poll_once()
+    finally:
+        FakeClient.connect = original  # type: ignore[method-assign]
+    section = app.config["SETTINGS_STORE"].get_section("devices")["office_frame"]
+    assert section["token_secret"] == "new-token"
+
+
+def test_power_switch_talks_to_home_assistant(app: Flask) -> None:
+    calls: list[Any] = []
+    core = app.config["PLUGIN_REGISTRY"].get("ha_core").server_module
+    core.get_state = lambda entity_id: {"state": "off"}  # type: ignore[attr-defined]
+    core.call_service = lambda *a, **k: calls.append((a, k)) or []  # type: ignore[attr-defined]
+    power = samsung_frame.PowerSwitch(app)
+    assert power.state("switch.tv_plug") == "off"
+    assert power.turn("switch.tv_plug", True)
+    assert calls == [(("homeassistant", "turn_on"), {"data": {"entity_id": "switch.tv_plug"}})]
+    core.get_state = lambda entity_id: {"state": "unavailable"}  # type: ignore[attr-defined]
+    assert power.state("switch.tv_plug") is None
+
+    def boom(*a: Any, **k: Any) -> None:
+        raise RuntimeError("HA down")
+
+    core.call_service = boom  # type: ignore[attr-defined]
+    core.get_state = boom  # type: ignore[attr-defined]
+    assert power.turn("switch.tv_plug", False) is False
+    assert power.state("switch.tv_plug") is None
+
+
+def test_quiet_sleeps_follows_the_quiet_hours_settings(app: Flask) -> None:
+    from datetime import datetime, timedelta
+
+    _make_frame(app)
+    now = datetime.now().astimezone()
+    start = (now - timedelta(hours=1)).strftime("%H:%M")
+    end = (now + timedelta(hours=1)).strftime("%H:%M")
+    store = app.config["SETTINGS_STORE"]
+    base = {
+        "quiet_hours_enabled": True,
+        "quiet_hours_start": start,
+        "quiet_hours_end": end,
+        "quiet_hours_days": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+        "timezone": "system",
+    }
+    pub = _publisher(app, FakeTV())
+    store.patch_section("app", {**base, "quiet_hours_sleep": True})
+    assert pub._quiet_sleeps(_device(app)) is True
+    store.patch_section("app", {**base, "quiet_hours_sleep": False})
+    assert pub._quiet_sleeps(_device(app)) is False
+
+
+class OwnPowerTV:
+    """A TV with network standby: the Power key puts it in standby, then off
+    the network; Wake-on-LAN brings it back in Art Mode."""
+
+    def __init__(self, tv: FakeTV) -> None:
+        self.tv, self.state, self.keys, self.wols = tv, "on", 0, 0
+
+    def rest(self, host: str) -> dict[str, Any] | None:
+        if self.state == "off":
+            return None
+        return {"PowerState": self.state, "wifiMac": "a4:30:7a:f4:a1:f9", "modelName": "QN50LS03T"}
+
+    def power_key(self, host: str, **kw: Any) -> None:
+        self.keys += 1
+        self.state = "standby"
+
+    def wol(self, mac: str, host: str | None) -> None:
+        assert mac == "a4:30:7a:f4:a1:f9"
+        self.wols += 1
+        self.state = "on"
+        self.tv.art_mode = True
+
+
+def _own_power(app: Flask, tv: FakeTV, own: OwnPowerTV, quiet: list[bool]) -> SamsungFramePublisher:
+    pub = _powered(app, tv, FakePower(tv), quiet)
+    pub._rest_info = own.rest  # type: ignore[method-assign]
+    pub._power_key = own.power_key  # type: ignore[method-assign]
+    pub._wol = own.wol  # type: ignore[method-assign]
+    return pub
+
+
+def test_tvs_own_power_sleeps_and_wakes_for_quiet_hours(app: Flask) -> None:
+    _make_frame(app, token_secret="tok-1")  # no switch: the TV's own power
+    tv = FakeTV()
+    own = OwnPowerTV(tv)
+    quiet = [False]
+    pub = _own_power(app, tv, own, quiet)
+    pub.poll_once()  # learns the MAC while on
+    assert pub.load_state(_device(app))["mac"] == "a4:30:7a:f4:a1:f9"
+    quiet[0] = True
+    pub.poll_once()
+    assert own.keys == 1 and own.state == "standby"
+    assert _screen(app)["screen_why"] == "quiet hours"
+    own.state = "off"  # it leaves the network
+    pub.poll_once()
+    assert own.keys == 1
+    quiet[0] = False
+    pub.poll_once()  # morning: Wake-on-LAN
+    assert own.wols == 1 and own.state == "on"
+    assert _screen(app)["screen"] == "art"
+
+
+def test_tvs_own_power_wakes_for_a_push(app: Flask) -> None:
+    _make_frame(app, token_secret="tok-1")
+    tv = FakeTV()
+    own = OwnPowerTV(tv)
+    pub = _own_power(app, tv, own, [False])
+    pub.poll_once()  # learns the MAC
+    own.state = "standby"
+    _plant_render(app, "office_frame", "aaa111")
+    pub.on_push()
+    assert own.wols >= 1
+    assert ("select", "MY_F0001", True) in tv.calls
+
+
+def test_tvs_own_power_needs_the_mac_before_it_can_wake(app: Flask) -> None:
+    _make_frame(app, token_secret="tok-1")
+    tv = FakeTV()
+    own = OwnPowerTV(tv)
+    own.state = "off"
+    pub = _own_power(app, tv, own, [False])
+    _plant_render(app, "office_frame", "aaa111")
+    pub.on_push()
+    assert own.wols == 0 and tv.uploads == []
+    assert pub._backing_off("office_frame")
+
+
+def test_a_tv_off_by_hand_stays_off_with_its_own_power(app: Flask) -> None:
+    _make_frame(app, token_secret="tok-1")
+    tv = FakeTV()
+    own = OwnPowerTV(tv)
+    pub = _own_power(app, tv, own, [False])
+    pub.poll_once()
+    own.state = "standby"  # the remote's Power button
+    pub.poll_once()
+    assert own.wols == 0
+    assert _screen(app)["screen"] == "off" and _screen(app)["screen_why"] == "standby"
+
+
+def test_power_control_none_leaves_the_tv_alone(app: Flask) -> None:
+    _make_frame(app, token_secret="tok-1", power_control="none")
+    tv = FakeTV()
+    own = OwnPowerTV(tv)
+    pub = _own_power(app, tv, own, [True])
+    pub.poll_once()
+    pub.poll_once()
+    assert own.keys == 0 and own.state == "on"
+
+
+def test_switch_mode_needs_home_assistant(app: Flask) -> None:
+    _make_frame(app, token_secret="tok-1", power_control="switch", power_switch="switch.tv_plug")
+    pub = _publisher(app, FakeTV())
+    assert pub._mode(pub._cfg("office_frame")) == "tv"  # no Home Assistant connection
+
+
+def _in_use_tv(app: Flask, setting: str | None) -> tuple[SamsungFramePublisher, FakeTV, OwnPowerTV]:
+    extra = {"sleep_when_in_use": setting} if setting else {}
+    _make_frame(app, token_secret="tok-1", **extra)
+    tv = FakeTV()
+    tv.art_mode = False  # TV mode at quiet-hours start
+    own = OwnPowerTV(tv)
+    return _own_power(app, tv, own, [True]), tv, own
+
+
+def test_a_tv_still_in_use_sleeps_after_the_chosen_time(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pub, _tv, own = _in_use_tv(app, "30")
+    clock = [1_000_000.0]
+    monkeypatch.setattr(samsung_frame.time, "time", lambda: clock[0])
+    pub.poll_once()
+    assert own.keys == 0
+    assert _screen(app)["screen_why"] == "in use in quiet hours"
+    clock[0] += 29 * 60
+    pub.poll_once()
+    assert own.keys == 0
+    clock[0] += 2 * 60
+    pub.poll_once()
+    assert own.keys == 1 and own.state == "standby"
+    state = pub.load_state(_device(app))
+    assert state["slept_by_tesserae"] is True and "in_use_since" not in state
+
+
+def test_the_default_is_one_hour(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    pub, _tv, own = _in_use_tv(app, None)
+    clock = [1_000_000.0]
+    monkeypatch.setattr(samsung_frame.time, "time", lambda: clock[0])
+    pub.poll_once()
+    clock[0] += 59 * 60
+    pub.poll_once()
+    assert own.keys == 0
+    clock[0] += 2 * 60
+    pub.poll_once()
+    assert own.keys == 1
+
+
+def test_leave_it_on_never_sleeps_a_tv_in_use(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    pub, _tv, own = _in_use_tv(app, "never")
+    clock = [1_000_000.0]
+    monkeypatch.setattr(samsung_frame.time, "time", lambda: clock[0])
+    pub.poll_once()
+    clock[0] += 10 * 3600
+    pub.poll_once()
+    assert own.keys == 0 and own.state == "on"
+
+
+def test_art_mode_during_quiet_hours_resets_the_in_use_timer(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pub, tv, own = _in_use_tv(app, "30")
+    clock = [1_000_000.0]
+    monkeypatch.setattr(samsung_frame.time, "time", lambda: clock[0])
+    pub.poll_once()
+    assert pub.load_state(_device(app))["in_use_since"] == 1_000_000
+    tv.art_mode = True  # back to Art Mode: sleeps at once
+    clock[0] += 60
+    pub.poll_once()
+    assert own.keys == 1
+    assert "in_use_since" not in pub.load_state(_device(app))
+
+
+@pytest.mark.parametrize(
+    ("value", "ok"), [("never", True), ("30", True), ("60", True), ("45", False)]
+)
+def test_sleep_when_in_use_choices(app: Flask, value: str, ok: bool) -> None:
+    _make_frame(app)
+    assert _device(app).module.validate_config({"sleep_when_in_use": value})[0] is ok

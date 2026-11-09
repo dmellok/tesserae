@@ -45,13 +45,15 @@ MATTE_COLOURS = {
     "skyblue",
     "turquoise",
 }
+_SWITCH = re.compile(r"^(switch|light|input_boolean)\.[a-z0-9_]+$")
 _HOSTNAME = re.compile(
     r"^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$"
 )
 
 
 def parse_status(payload: bytes) -> dict[str, Any]:
-    """Map the poller's JSON (``power``, ``model``, ``last_upload``) onto the
+    """Map the poller's JSON (``screen``, ``screen_why``, ``power``, ``model``,
+    ``last_upload``) onto the
     common status shape. The TV has no battery."""
     out: dict[str, Any] = {"battery_pct": None}
     if not payload:
@@ -64,7 +66,7 @@ def parse_status(payload: bytes) -> dict[str, Any]:
     if not isinstance(decoded, dict):
         out["error"] = f"expected JSON object, got {type(decoded).__name__}"
         return out
-    for key in ("power", "model", "last_upload"):
+    for key in ("screen", "screen_why", "power", "model", "last_upload"):
         if key in decoded:
             out[key] = decoded[key]
     return out
@@ -84,6 +86,17 @@ def validate_config(payload: dict[str, Any]) -> tuple[bool, str | None]:
     host = payload.get("host")
     if host not in (None, "") and (not isinstance(host, str) or not valid_host(host.strip())):
         return False, "TV address must be an IP address or host name"
+    in_use = payload.get("sleep_when_in_use")
+    if in_use not in (None, "", "never", "30", "60", "120"):
+        return False, "Still in use at quiet hours must be never, 30, 60 or 120"
+    mode = payload.get("power_control")
+    if mode not in (None, "", "tv", "switch", "none"):
+        return False, "Power control must be tv, switch or none"
+    switch = payload.get("power_switch")
+    if switch not in (None, "") and (
+        not isinstance(switch, str) or not _SWITCH.match(switch.strip())
+    ):
+        return False, "Power switch must be a Home Assistant entity id such as switch.tv_plug"
     style = payload.get("matte_style")
     if style not in (None, "") and style not in MATTE_STYLES:
         return False, f"unknown mat {style!r}"

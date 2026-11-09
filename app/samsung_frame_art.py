@@ -35,6 +35,10 @@ from datetime import datetime
 from typing import Any
 
 ART_CHANNEL = "com.samsung.art-app"
+REMOTE_CHANNEL = "samsung.remote.control"
+# Holding Power this long puts the Frame in standby; a short press only
+# leaves Art Mode for the TV.
+POWER_HOLD_S = 3.0
 MY_PHOTOS = "MY-C0002"
 DEFAULT_PORT = 8002
 # Pairing waits for a person to press Allow on the TV.
@@ -416,6 +420,10 @@ class FrameArtClient:
         reply = self.request({"request": "get_artmode_status"})
         return str(reply.get("value", reply.get("status", ""))) == "on"
 
+    def set_art_mode(self, on: bool) -> None:
+        """Switch Art Mode on (from TV mode) or off."""
+        self.request({"request": "set_artmode_status", "value": "on" if on else "off"})
+
     def current(self) -> str:
         reply = self.request({"request": "get_current_artwork"})
         return str(reply.get("content_id") or "")
@@ -450,3 +458,79 @@ class FrameArtClient:
             except FrameArtError as exc:
                 last = exc
         raise FrameArtError(f"could not read the TV slideshow: {last}")
+
+
+def hold_power_key(
+    host: str,
+    *,
+    token: str | None,
+    name: str = "Tesserae",
+    port: int = DEFAULT_PORT,
+    seconds: float = POWER_HOLD_S,
+    timeout: float = REQUEST_TIMEOUT_S,
+) -> None:
+    """Hold the remote's Power key over the network: the Frame goes to
+    standby (screen off, Art Mode with it). Uses the TV's remote-control
+    channel with the same pairing token as the Art app."""
+    query = {"name": base64.b64encode(name.encode()).decode()}
+    if token:
+        query["token"] = token
+    path = f"/api/v2/channels/{REMOTE_CHANNEL}?" + urllib.parse.urlencode(query)
+    try:
+        ws = _WebSocket.connect(host, port, path, timeout)
+    except OSError as exc:
+        raise FrameArtError(f"can't reach the TV at {host}: {exc}") from exc
+    try:
+        deadline = time.monotonic() + timeout
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise FrameArtTimeout(f"{host} remote channel did not open")
+            try:
+                message = json.loads(ws.recv_text(remaining) or "{}")
+            except TimeoutError as exc:
+                raise FrameArtTimeout(f"{host} remote channel did not open") from exc
+            event = message.get("event") if isinstance(message, dict) else None
+            if event == "ms.channel.connect":
+                break
+            if event in ("ms.channel.unauthorized", "ms.channel.timeOut"):
+                raise FramePairingError("the TV did not allow Tesserae's remote")
+        for cmd in ("Press", "Release"):
+            ws.send_text(
+                json.dumps(
+                    {
+                        "method": "ms.remote.control",
+                        "params": {
+                            "Cmd": cmd,
+                            "DataOfCmd": "KEY_POWER",
+                            "Option": "false",
+                            "TypeOfRemote": "SendRemoteKey",
+                        },
+                    }
+                )
+            )
+            if cmd == "Press":
+                time.sleep(seconds)
+    finally:
+        ws.close()
+
+
+def wake_on_lan(mac: str, host: str | None = None) -> None:
+    """Send Wake-on-LAN magic packets for ``mac``: to the broadcast address,
+    the /24 broadcast of ``host`` and ``host`` itself, so one gets through
+    whether Tesserae runs on the host network or behind a container bridge.
+    The TV needs network standby on (it is by default on a Frame)."""
+    digits = "".join(c for c in mac if c.isalnum())
+    if len(digits) != 12:
+        raise ValueError(f"not a MAC address: {mac!r}")
+    packet = b"\xff" * 6 + bytes.fromhex(digits) * 16
+    targets = ["255.255.255.255"]
+    if host:
+        parts = host.split(".")
+        if len(parts) == 4 and all(p.isdigit() for p in parts):
+            targets += [".".join([*parts[:3], "255"]), host]
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        for target in targets:
+            with contextlib.suppress(OSError):
+                sock.sendto(packet, (target, 9))

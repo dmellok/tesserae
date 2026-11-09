@@ -1783,7 +1783,9 @@ def _device_overview(device: Device, section: dict[str, Any]) -> dict[str, Any]:
             "value": power.get("label") or "-",
             "sub": power.get("sub") or "",
             "low": battery_low,
-            "muted": power.get("label") == "Mains",
+            "muted": bool(power.get("muted", power.get("label") == "Mains")),
+            # A display that reports its screen (a TV) has no battery to show.
+            "title": power.get("title") or "Battery",
         },
         "firmware": {
             "value": fw_value,
@@ -2393,6 +2395,9 @@ def _humanize_signal(rssi: object) -> dict[str, Any] | None:
     return {"bars": bars, "label": label, "sub": f"{value} dBm"}
 
 
+_SCREEN_LABELS = {"art": "Art Mode", "on": "On", "starting": "Starting", "off": "Off"}
+
+
 def _humanize_power(parsed: dict[str, Any]) -> dict[str, Any]:
     """Map battery_mv / battery_pct to a {label, sub} tile. Treats both
     fields being absent or zero as a mains device so a Pi or ESP32 dev
@@ -2401,6 +2406,16 @@ def _humanize_power(parsed: dict[str, Any]) -> dict[str, Any]:
     ``power_plugged`` (a UPS such as a PiSugar on a Pi reports it) words
     the sub-line: a battery sitting at 100 % plugged in and one running
     down read the same without it."""
+    screen = parsed.get("screen")
+    if isinstance(screen, str) and screen in _SCREEN_LABELS:
+        # A mains display that reports what its screen is doing (a TV).
+        why = parsed.get("screen_why")
+        return {
+            "label": _SCREEN_LABELS[screen],
+            "sub": str(why) if why else "Mains",
+            "title": "Screen",
+            "muted": screen == "off",
+        }
     pct = parsed.get("battery_pct")
     mv = parsed.get("battery_mv")
     plugged = parsed.get("power_plugged")

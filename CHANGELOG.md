@@ -8,6 +8,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Samsung The Frame: the TV goes to standby for quiet hours that sleep through and wakes for new frames, with its own power (Wake-on-LAN) or a Home Assistant switch, and the device card shows what the screen is doing.
 - Samsung The Frame: a `samsung_frame` kind that shows pages through the TV's own Art Mode, uploading each frame as a 4K JPEG over the local network and deleting its older uploads.
 
 ## [0.509.0], 2026-11-10

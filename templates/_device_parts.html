@@ -37,7 +37,7 @@
 {%- macro overview_tiles(section, base=None) -%}
 <div class="dx-live" data-render-sync="tiles:{{ section.get('device_id') }}">
 {{ stat_tile('Showing', section.overview.showing, (base ~ '#lineups') if base is not none else '', "Open this display's lineups") }}
-{{ stat_tile('Battery', section.overview.battery, (base ~ '#power') if base is not none and section.battery_offset_endpoint else '', 'Open power settings') }}
+{{ stat_tile(section.overview.battery.title or 'Battery', section.overview.battery, (base ~ '#power') if base is not none and section.battery_offset_endpoint else '', 'Open power settings') }}
 {%- set _fw_update = section.overview.firmware.has_update or ((section.status.firmware or {}).state == 'outdated' and (section.status.firmware or {}).latest) %}
 {{ stat_tile('Firmware', section.overview.firmware, url_for('auth.firmware_index') if _fw_update else ((base ~ '#connection') if base is not none else ''), 'Open the Firmware page' if _fw_update else 'Open firmware and connection details') }}
 {{ stat_tile('Next update', section.overview.next_wake, (base ~ '#timing') if base is not none else '', 'Open wake timing') }}
@@ -305,7 +305,7 @@
 <ul class="dx-vitals" aria-label="Vital signs" data-render-sync="tiles:{{ section.get('device_id') }}">
   {%- set bat_tip = ov.battery.sub or '' %}
   <li><a class="dx-vital" href="{{ '#power' if section.battery_offset_endpoint else '#connection' }}"{% if bat_tip %} title="{{ bat_tip }}"{% endif %}>
-    <span class="dx-vital-k">Battery</span>
+    <span class="dx-vital-k">{{ ov.battery.title or 'Battery' }}</span>
     <span class="dx-vital-v{% if ov.battery.low %} is-warn{% endif %}{% if ov.battery.muted %} is-muted{% endif %}">{{ ov.battery.value }}</span>
     <span class="dx-vital-s">{{ bat_tip }}</span></a></li>
   {%- set nu_parts = [] %}
