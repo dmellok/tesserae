@@ -9,6 +9,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 ### Fixed
 
 - Lineups: a step's peek you opened stays open when a picture you asked for finishes drawing. The redraw used to close it.
+- Settings → System: on a Docker or non-git install, opening the page asked GitHub for the newest release even with Online features off. The check now waits for Online features like every other outbound call; with it off, the Updates card links to the releases page instead. Privacy notes list the check.
 
 ## [0.507.0], 2026-11-09
 
@@ -6688,7 +6689,6 @@ per-version sections below carry the detail.
   stable per-device filename overwritten in place (no media-folder growth), and orphaned files are
   swept on startup and when a device is removed. Best when Tesserae runs as the Home Assistant
   add-on with a shared `/media`; requires the Home Assistant Core plugin.
-
 
 - **Touch interactions guide (#49).** A new docs page covers enabling touch, attaching tap / swipe /
   slider / hotspot / code-element actions in the editor, verifying with the touch monitor, and

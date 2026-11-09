@@ -31,6 +31,7 @@ from app.clock_text import clock_of
 from app.device_loader import Device, has_buttons
 from app.ha_options import is_ha_addon
 from app.network import detect_local_ip, docker_bridge_ip_warning, is_docker_bridge_ip, url_host
+from app.online import online_enabled
 from app.panel import PANEL_PRESET_CHOICES, PANEL_PRESETS
 from app.state.settings_store import SECRET_MASK
 
@@ -191,6 +192,7 @@ def settings_area(area: str) -> str | Response:
     install_method = os.environ.get("TESSERAE_INSTALL_METHOD", "").strip()
     system_release_check = None
     system_release_pending = False
+    system_release_offline = False
     system_git_available = True
     if area == "system":
         upd = current_app.config["UPDATER"]
@@ -209,7 +211,11 @@ def settings_area(area: str) -> str | Response:
             # bare-install hint) still renders. Outside tests this never
             # waits on GitHub: it renders what is cached and the page
             # polls /settings/system/release-check while a refresh runs.
-            if not current_app.testing:
+            # The check asks api.github.com, so like every other outbound
+            # call it waits for Online features: an opted-out install
+            # makes no request just because someone opened this page.
+            system_release_offline = not online_enabled(settings_store())
+            if not current_app.testing and not system_release_offline:
                 system_release_check = upd.release_check_status(
                     current_app.config.get("APP_VERSION", "0.0.0")
                 )
@@ -303,6 +309,7 @@ def settings_area(area: str) -> str | Response:
         system_git_available=system_git_available,
         system_install_method=install_method,
         system_release_check=system_release_check,
+        system_release_offline=system_release_offline,
         system_release_pending=system_release_pending,
         system_webhook_token_set=system_webhook_token_set,
         system_webhook_reveal_token=system_webhook_reveal_token,

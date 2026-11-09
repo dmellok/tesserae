@@ -1,8 +1,11 @@
 {# Settings → System, Docker / bare-install Updates card: the GitHub
    release check. Rendered inline on page load from whatever is cached,
    and again by /settings/system/release-check once the background
-   check finishes (static/pages/settings.js swaps the block in). #}
-{% if system_release_check %}
+   check finishes (static/pages/settings.js swaps the block in). With
+   Online features off no check runs, and the block says so. #}
+{% if system_release_offline %}
+<p class="field-help">Checking GitHub for a newer release needs <a href="#online-features">Online features</a>, which is off. Releases are listed on <a href="https://github.com/dmellok/tesserae/releases" target="_blank" rel="noopener">GitHub</a>.</p>
+{% elif system_release_check %}
 <p>
   <strong>v{{ system_release_check.current_version }}</strong>
   {% if system_release_check.behind and system_release_check.latest_tag %}
