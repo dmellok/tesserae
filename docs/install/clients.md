@@ -106,7 +106,7 @@ protocol, the same one the ESP32 firmware speaks. Kindles need a jailbreak to
 run KOReader; Kobo, PocketBook and reMarkable do not.
 
 1. Copy `tesserae.koplugin/` from the [latest release](https://github.com/dmellok/tesserae-koreader/releases) into `koreader/plugins/` and restart KOReader.
-2. In Tesserae, **Settings → Devices → Add device → Pair with a code** to make a claim code.
+2. In Tesserae, **Settings → Devices → Add device → REST API → Issue pairing code** to make a claim code.
 3. On the reader, **Tools → Tesserae → Pair with a claim code…**, enter your server's address and the code.
 4. Assign the new panel a dashboard, then **Tools → Tesserae → Show dashboard**.
 
@@ -186,7 +186,7 @@ handy when you want a panel that "just talks to the internet".
 Pairing has two paths:
 
 - **TRMNL devices (auto-provision, no admin action).** Seeed-built hardware running the TRMNL firmware sends its MAC in the `Id` header on its first `/api/setup` call; Tesserae creates a device record and mints an access token automatically. The new card appears in **Settings → Devices** within seconds. Auto-provision was wired up in 0.44.1.
-- **KOReader on a Kindle (token-typed).** KOReader's `trmnl-display` plugin doesn't send a MAC, so you generate a short 5-character token via **Settings → Devices → Add device → TRMNL**, paste it into the plugin config, and the next `/api/setup` exchanges it for a permanent device-id + access token.
+- **KOReader on a Kindle (token-typed).** KOReader's `trmnl-display` plugin doesn't send a MAC, so you generate a short 5-character token by adding a device of the **TRMNL client** kind under **Settings → Devices → Add device**, paste it into the plugin config, and the next `/api/setup` exchanges it for a permanent device-id + access token.
 
 From there the device polls `/api/display` authenticated via the token. Errors / battery / RSSI heartbeat back via `POST /api/log` and surface on the device card.
 

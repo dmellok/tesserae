@@ -6,7 +6,7 @@ smoke test, you have two ways to ship it:
 | Path | When to use | Trust model |
 |---|---|---|
 | **Bundle in the Tesserae repo** | Foundational widgets ([Stable tier](../widgets/tiers.md)), built against a documented API, intended to ship to every installation. | Reviewed in the host PR; lives in `plugins/<id>/` alongside the existing bundled widgets. |
-| **Publish through the community catalog** | Your own widget, third-party APIs, niche use cases, anything you want users to opt into rather than installing for everyone. | Audit-only review on each catalog PR; lives in [dmellok/tesserae-widgets](https://github.com/dmellok/tesserae-widgets) and installs into the user's `plugins/` via Settings → Widgets → Browse catalog. |
+| **Publish through the community catalog** | Your own widget, third-party APIs, niche use cases, anything you want users to opt into rather than installing for everyone. | Audit-only review on each catalog PR; lives in [dmellok/tesserae-widgets](https://github.com/dmellok/tesserae-widgets) and installs into the user's `data/marketplace/<id>/` via Widgets → Browse catalog. |
 
 This page covers the catalog path. For the bundled path see
 [Build a widget with AI → Submitting](writing-a-widget.md#submitting).
@@ -19,7 +19,8 @@ Each entry pins a tagged release tarball + sha256. A user's Browse
 page fetches the index, renders one card per entry, and (on Install)
 downloads the tarball, verifies the sha256, validates the embedded
 `plugin.json` against the host schema, and drops the result into
-`plugins/<id>/`.
+`data/marketplace/<id>/` (the persistent data volume, so it survives
+image upgrades).
 
 Trust model is **audit-only** for phase 1: every catalog entry lands
 via a PR I review by hand. There's no capability sandbox or process
@@ -171,7 +172,7 @@ github-bundle-v1.0/        ← any wrapping folder name (the marketplace
 The catalog `id` is a logical name for the family (not necessarily a
 folder name). The marketplace verifies the tarball's direct children
 match the `folders` list exactly, validates each `plugin.json`, and
-installs all of them as siblings under `plugins/`. Install +
+installs all of them as siblings under `data/marketplace/`. Install +
 uninstall act on the whole bundle atomically; per-folder versions
 remain independent.
 

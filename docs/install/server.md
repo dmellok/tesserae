@@ -171,17 +171,16 @@ prompts.
 
 1. Open `http://127.0.0.1:8765/`, on first boot you're sent to `/setup` to pick an admin password.
 2. Sign in at `/login`. The onboarding wizard runs through six steps: **welcome → help out → timezone → transport → device → dashboard**. Same screens you'd reach via Settings if you skipped it.
-3. **Settings → Server** holds the broker host / credentials, **base URL** the panel uses to fetch frames, optional **mDNS** broadcast of `tesserae.local`, and Chromium fallback for webpage rendering.
-4. **Settings → Server** also holds the timezone and location (**Location & time**) and the **Home Assistant MQTT discovery** toggle (**Network & integrations**). The timezone setting forwards to the rendering Chromium (since 0.44.10), so clock + calendar widgets paint in your local zone whether the container's `TZ` env var matches or not. **Settings → System → Online features** is the single switch for all `api.tesserae.ink` contact: update checks and anonymous install counts.
+3. **Settings → Server** holds the broker host / credentials, the **Public URL** Tesserae uses when building external links (set it behind a reverse proxy), and optional **mDNS** broadcast of `tesserae.local`. The Chromium fallback for webpage rendering is an environment variable, see [below](#chromium-for-webpage-rendering).
+4. **Settings → Server** also holds the timezone and location (**Location & time**) and the **Home Assistant MQTT discovery** toggle (**Network & integrations**). The timezone setting forwards to the rendering Chromium (since 0.44.10), so clock + calendar widgets paint in your local zone whether the container's `TZ` env var matches or not. **Settings → System → Online features** is the single switch for all `api.tesserae.ink` contact: update checks, anonymous install counts and a once-a-day anonymous heartbeat. It is off by default; the onboarding wizard asks once.
 5. Renderers and plugins that declare settings show up as their own sections, generated from their manifests.
 
-To preview a single widget without composing a dashboard, run `--dev`, sign
-in, then open
-`http://127.0.0.1:8765/_test/render?plugin=clock_analog&size=md` in your
-browser. `/_test/render` needs the dev (or test) server **and** a logged-in
-session, it isn't loopback-exempt. The loopback bypass is only for
-`/compose/`, `/renders/`, and `/plugins/<id>/<asset>`, which the in-process
-Playwright renderer fetches without a session.
+To preview a single widget without composing a dashboard, open
+`http://127.0.0.1:8765/_test/render?plugin=clock_analog&size=md` in a
+browser on the server itself. `/_test/render` answers over loopback without
+a session (the in-process Playwright renderer and the MCP widget render use
+it, like `/compose/`); from another machine it needs the dev (or test)
+server **and** a logged-in session.
 
 ## Older x86-64 processors
 
@@ -219,28 +218,31 @@ External systems (Home Assistant automations, cron, GitHub Actions,
 shortcuts apps, anything that speaks HTTP) can trigger an on-demand
 re-render + push without going through the admin UI.
 
-1. **Settings → System → Webhook.** Click **Generate token** the first
-   time, or **Rotate** to invalidate the old one. The token is shown
-   masked after creation; copy it once.
+1. **Settings → System → Webhook.** Click **Regenerate token** to mint
+   one (clicking it again invalidates the old one), or paste your own
+   under **Custom token**. The token is shown once, then masked; copy it
+   then.
 2. **Call the endpoint:**
 
     ```sh
     curl -X POST https://your-tesserae.local/api/v1/push \
       -H "Authorization: Bearer <your-token>" \
       -H "Content-Type: application/json" \
-      -d '{"page": "ha_home"}'
+      -d '{"page_id": "ha_home"}'
     ```
 
-3. **Response:** `200` once the request is queued (the actual render
-   happens asynchronously); `401` if the token is wrong; `404` if the
-   named page doesn't exist; `429` if you're hitting it too fast.
+3. **Response:** `200` once the frame is sent; `202` with
+   `status: "quiet"` if every bound device is in quiet hours; `401` if
+   the token is wrong; `404` if the named page doesn't exist; `409` if a
+   push is already running; `503` if no token is set.
 
 The endpoint re-renders the named page and publishes the frame to
-every device bound to it. Useful patterns: an HA automation that pings
+every device bound to it (pass an optional `device_ids` array to narrow
+that). Useful patterns: an HA automation that pings
 `/api/v1/push` when a person leaves home so the next refresh shows an
 empty-house mode; a cron that triggers a fresh render at sunset so
-dusk lighting widgets repaint promptly. The token lives at
-`data/core/settings.json` under `webhook.token` and is masked on disk.
+dusk lighting widgets repaint promptly. The token lives in
+`data/core/settings.json` under `app.webhook_token_secret`, encrypted at rest.
 
 ## Backup, export, import
 

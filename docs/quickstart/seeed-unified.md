@@ -40,8 +40,8 @@ Tesserae ships a **web-based firmware flasher**. Chrome / Edge / Chromium-based 
 
 1. Plug the device into your computer over USB. Use a real data cable, not a charge-only cable, and make sure the port supports data (front-panel USB on a desktop tower sometimes doesn't).
 2. Open **[tesserae.ink/flash](https://tesserae.ink/flash)** in Chrome or Edge.
-3. Select your device from the list. If your device isn't there, check the "Which device do you have?" table above; the flasher shows only devices that have a matching firmware image built.
-4. Click **Connect**, pick the serial port for your device, and click **Install**.
+3. Under **Choose your panel**, select your device from the **Device** list. If your device isn't there, check the "Which device do you have?" table above; the flasher shows only devices that have a matching firmware image built.
+4. Click **Next: plug it in**, then under **Flash it over USB** click **Connect & flash** and pick the serial port for your device.
 5. Wait 60-90 seconds for the flash to complete. The panel goes blank + resets automatically at the end; leave the USB cable plugged in until the flasher confirms success.
 
 !!! note "USB serial permissions"
@@ -103,7 +103,7 @@ Some panels have quirks worth knowing about.
 |---|---|
 | Device doesn't appear in Discovered after 2 minutes. | Check the Wi-Fi credentials were accepted (device should be off the soft-AP now). Verify the Tesserae server URL is reachable from the device's network: `curl http://<server>:8765/healthz` from another machine on the same LAN. |
 | Discovered card says the wrong kind (e.g. `esp32_client` instead of `seeed_reterminal_e1002`). | The firmware kind string doesn't match the hardware catalog. Update to the latest firmware from tesserae.ink/flash. |
-| Panel refreshes but shows garbage / stripes. | Frame size mismatch. Check that Tesserae's server version is at least v0.64.60 (the E-series manifests need to be present). Settings → Devices → your card → Debug shows the running version. |
+| Panel refreshes but shows garbage / stripes. | Frame size mismatch. Check that Tesserae's server version is at least v0.64.60 (the E-series manifests need to be present). Settings → Devices → your device → Troubleshooting → Diagnostics shows the running version. |
 | Web flasher won't connect. | Firefox / Safari don't support Web Serial. Use Chrome or Edge. Also make sure you're using a data-capable USB cable and port. |
 | Serial-port list is empty on macOS with a reTerminal plugged in. | The WCH CH340 driver isn't installed / enabled. Install [`WCHSoftGroup/ch34xser_macos`](https://github.com/WCHSoftGroup/ch34xser_macos), then toggle it on under **System Settings → General → Login Items & Extensions → Driver Extensions**. |
 | Firmware flashes but device stays in soft-AP mode forever. | Wi-Fi credentials weren't saved. Re-join the soft-AP and re-enter them; some captive portals need an explicit "Save" tap. |
@@ -113,6 +113,6 @@ Some panels have quirks worth knowing about.
 
 - [Set up multiple panels on one server](../install/devices.md#multiple-panels): different dashboards on different Seeed devices, all painted by the same Tesserae install.
 - [Add a rotation](../install/devices.md#next-steps): cycle through several dashboards on the same panel across the day.
-- [Bind the front buttons](../install/buttons.md): rotate through dashboards, jump straight to one, or force a refresh with the reTerminal's three front buttons. Default is `left → previous`, `right → next`, `refresh → re-render`; override per device from **Settings → Devices → General → Buttons**.
+- [Bind the front buttons](../install/buttons.md): rotate through dashboards, jump straight to one, or force a refresh with the reTerminal's three front buttons. Default is `left → previous`, `right → next`, `refresh → re-render`; override per device in the **Button map** under the device's **Controls** section.
 - [Browse community widgets](https://tesserae.ink/catalog/): one-click installs for Spotify, GitHub, OctoPrint, F1, and more.
 - [Firmware source](https://github.com/dmellok/tesserae-device-firmware): read the code, file issues, contribute board support for new panels.

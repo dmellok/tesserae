@@ -82,7 +82,7 @@ working through a rename.
 
 An empty field clears the override and the device falls back to the
 built-in default above. Save is wired into the
-device card's normal **Save changes** button; validation rejects
+device page's normal **Save** bar; validation rejects
 malformed JSON, unknown actions, and bad action arguments before
 writing.
 
@@ -143,8 +143,8 @@ still catches up, just not until its next scheduled wake.
 
 The Seeed reTerminal E series has a buzzer on the board, and Tesserae can
 sound it the instant a press registers rather than leaving the user waiting
-on the repaint: **Settings → Devices** → the device card → **General** →
-**Beep on interaction**, with a tone and volume beside it. The panel makes
+on the repaint: open the device from **Settings → Devices** and turn on
+**Beep on interaction**, with **Beep tone** and **Beep volume** to pick the sound. The panel makes
 the sound locally, before the server is contacted. Off by default. The same
 setting covers taps on the touch models. Needs firmware v1.22.0 or later.
 

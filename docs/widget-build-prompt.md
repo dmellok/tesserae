@@ -19,8 +19,8 @@ folder.
 Tesserae uses **Spectra**, a token-themed design system with two
 orthogonal axes:
 
-- **`data-theme`**, colour only. ~40 themes shipped across the Light /
-  Dark / Movement / Vivid / Gradient families. Set on `<body>`,
+- **`data-theme`**, colour only. 14 themes shipped across the Light /
+  Dark / Movement families, more in the catalog. Set on `<body>`,
   cascades into every widget.
 - **`data-style`**, typography, scale, density, shape (never colour).
   9 styles shipped (standard, display, editorial, mono, elegant,
@@ -50,18 +50,18 @@ Three docs are the canonical contract. Read each before drafting:
 4. Pick two existing widgets that share your information shape and
    read their `client.js` as reference. Good examples by archetype:
 
-   - **Status archetype**, [`plugins/ha_climate`](../plugins/ha_climate),
-     [`plugins/clock_sunrise_sunset`](../plugins/clock_sunrise_sunset)
-   - **List archetype**, [`plugins/news_hacker_news`](../plugins/news_hacker_news),
-     [`plugins/ha_entities`](../plugins/ha_entities)
-   - **Chart archetype**, [`plugins/weather_hourly`](../plugins/weather_hourly),
-     [`plugins/ha_history`](../plugins/ha_history)
-   - **Stat archetype**, [`plugins/weather_now`](../plugins/weather_now),
-     [`plugins/ha_battery`](../plugins/ha_battery)
-   - **Calendar archetype**, [`plugins/calendar_day`](../plugins/calendar_day),
-     [`plugins/calendar_week`](../plugins/calendar_week)
-   - **Image archetype**, [`plugins/picture_gallery`](../plugins/picture_gallery),
-     [`plugins/picture_apod`](../plugins/picture_apod)
+   - **Status archetype**, [`plugins/ha_climate`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_climate),
+     [`plugins/clock_sunrise_sunset`](https://github.com/dmellok/tesserae/tree/main/plugins/clock_sunrise_sunset)
+   - **List archetype**, [`plugins/news_hacker_news`](https://github.com/dmellok/tesserae/tree/main/plugins/news_hacker_news),
+     [`plugins/ha_entities`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_entities)
+   - **Chart archetype**, [`plugins/weather_hourly`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_hourly),
+     [`plugins/ha_history`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_history)
+   - **Stat archetype**, [`plugins/weather_now`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_now),
+     [`plugins/ha_battery`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_battery)
+   - **Calendar archetype**, [`plugins/calendar_day`](https://github.com/dmellok/tesserae/tree/main/plugins/calendar_day),
+     [`plugins/calendar_week`](https://github.com/dmellok/tesserae/tree/main/plugins/calendar_week)
+   - **Image archetype**, [`plugins/picture_gallery`](https://github.com/dmellok/tesserae/tree/main/plugins/picture_gallery),
+     [`plugins/picture_apod`](https://github.com/dmellok/tesserae/tree/main/plugins/picture_apod)
 
 ---
 
@@ -225,8 +225,8 @@ configures those out-of-band.
 
 One filled-in brief per widget, following
 [`widget-design-brief.md`](widget-design-brief.md) section by section.
-Include sample markup in section 3 (Markup sketch) and a sample data
-payload in section 8 (Server contract). If the widget has parts worth placing
+Include layout mockups in section 7 (Layout mockups) and a sample data
+payload in section 6 (`ctx.data` shape). If the widget has parts worth placing
 independently on the canvas, list them as `fragments` in the manifest and note
 which markup each paints (convention 6). When you finish the brief,
 note any open questions in a "Questions" subsection at the end. Don't
@@ -234,7 +234,7 @@ guess on data structure, API endpoints, or naming if the user's spec
 is ambiguous.
 
 If the widget is part of a family (`f1_*`, `weather_*`, `news_*`),
-mention it explicitly in section 0 (Identity) so the build path
+mention it explicitly in section 1 (Identity) so the build path
 follows the family's existing shared-helper patterns (e.g. `f1_core`
 exposes `getCircuit()` + `trackSvg()` for every F1 widget).
 

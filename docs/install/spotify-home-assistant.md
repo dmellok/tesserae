@@ -217,7 +217,7 @@ The setting takes effect immediately; no restart needed.
 
 1. Open Tesserae via the public HTTPS URL (still NOT via HA Ingress).
 2. Install the bundle if you haven't: **top nav → Widgets → Browse
-   community widgets → Install Spotify Widgets**. Restart when
+   catalog → Install Spotify Widgets**. Restart when
    prompted.
 3. **top nav → Widgets → Spotify Core** (listed under "Admin pages").
 4. Paste Client ID + Client Secret. Save.
@@ -247,8 +247,8 @@ internet while leaving the configured cert + DNS + Public URL setting
 in place. If you ever need to re-Connect, re-enable the proxy host.
 
 **If you leave the public URL up**, pick a strong admin password
-(20+ random characters from a password manager). Tesserae stores the
-bcrypt hash; brute-forcing it locally is slow but possible against a
+(20+ random characters from a password manager). Tesserae stores a
+PBKDF2 hash; brute-forcing it locally is slow but possible against a
 weak password.
 
 ## Troubleshooting

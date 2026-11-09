@@ -72,6 +72,7 @@ RELAY_DATA_DIR=/var/lib/tesserae-relay PORT=8787 npm start
 | `PORT` | `8787` | Listen port |
 | `HOST` | `0.0.0.0` | Bind address |
 | `RELAY_MAX_BODY` | `8388608` | Request body cap in bytes; over it returns `413` |
+| `FRAME_DAILY_LIMIT` | unset (unlimited) | Frame uploads per panel per UTC day; over it `PUT .../frame` returns `429 rate_limited` |
 
 `GET /healthz` answers `200 ok` for container health checks. It sits outside
 the `/v1` contract so it can never collide with a relay route.

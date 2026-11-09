@@ -2,7 +2,7 @@
 
 The cross-widget rulebook. [`widgets.md`](widgets.md) is the authoring
 contract (one widget, in isolation); this is the "how widgets relate to
-each other on a panel" layer. What makes 58 separate widgets read as one
+each other on a panel" layer. What makes dozens of separate widgets read as one
 design family.
 
 If you're building a new widget, read [`widgets.md`](widgets.md) first
@@ -49,7 +49,7 @@ cell:
 
 | Axis | Attribute | Controls | Shipped |
 |---|---|---|---|
-| **Theme** | `data-theme` | colour only (surfaces, text, accents) | 7 Light + 2 Dark + 3 Movement + 15 Vivid + 14 Gradient = 41 |
+| **Theme** | `data-theme` | colour only (surfaces, text, accents) | 9 Light + 2 Dark + 3 Movement = 14 bundled (more in the catalog) |
 | **Style** | `data-style` | typography / scale / density / shape (never colour) | 6 neutral + 3 movement = 9 |
 
 Any theme composes with any style. The user picks a `(theme, style)`
@@ -61,7 +61,7 @@ shape. The two axes flow through CSS custom properties so when the user
 flips Mono → Display, your widget repaints automatically.
 
 Visual coverage: spin up the dev server, hit `/_test/matrix` to see one
-widget across the full theme × style grid (171 combos).
+widget across a theme × style grid (9 themes × 9 styles, 81 combos).
 
 ---
 
@@ -170,8 +170,8 @@ hue carries that meaning.
 | `--accent-6` | third category | third series, supplementary tags |
 
 In the light theme the colours are roughly: terracotta, ochre, moss,
-teal, slate-blue, plum. In Dracula they're red, peach, mint, lavender,
-cyan, pink. The hexes change; the roles don't.
+teal, slate-blue, plum. In Nord they're red, yellow, green, frost cyan,
+frost blue, purple. The hexes change; the roles don't.
 
 Every accent has a `-soft` companion (`--accent-1-soft` etc.) for
 low-saturation background tints, pill backgrounds, list-row highlights,

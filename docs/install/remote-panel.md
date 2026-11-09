@@ -55,8 +55,8 @@ handshake and the device appears under **Settings → Devices** and **Cloud rela
 
 ### 4. Give it a dashboard
 
-It is a normal device now. Compose a page bound to it (or add it to a rotation /
-schedule) and **Send**, exactly like a local panel. That render is what gets
+It is a normal device now. Compose a page bound to it (or add it to a lineup) and
+**Send**, exactly like a local panel. That render is what gets
 sealed and uploaded to its relay mailbox. It appears on the panel at its next
 wake, and each later render lands on the following poll.
 

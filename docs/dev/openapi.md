@@ -158,7 +158,7 @@ Each operation tags which ones it accepts.
 | Scheme | Where it's sent | Used by |
 | --- | --- | --- |
 | `DeviceToken` | `Authorization: Bearer <token>` | All `/api/v1/device/*` except `/discover` (unauthenticated) and `/register` (which uses the pairing code). |
-| `PairingCode` | `X-Pairing-Code: <6-digit-code>` | `/api/v1/device/register` only. Single-use, 15-minute TTL. |
+| `PairingCode` | `X-Pairing-Code: <6-digit-code>` | `/api/v1/device/register` only. Single-use, 10-minute TTL. |
 | `TrmnlAccessToken` | `access-token: <token>` | TRMNL BYOS endpoints. Legacy header name; the bearer header is also accepted. |
 | `TrmnlAuthBearer` | `Authorization: Bearer <token>` | TRMNL BYOS endpoints. |
 | `WebhookBearer` | `Authorization: Bearer <token>` | `/api/v1/push`. Global token, generated under Settings -> System -> Webhook. |
@@ -183,7 +183,7 @@ never type one in.** The default flow is:
 For environments where the admin can't be at the UI when the
 device boots, sealed appliances, BLE provisioning, kiosk mode,
 there's a fallback: pre-mint a 6-digit pairing code under
-Settings → Devices → Pair, type it into the firmware setup form,
+Settings → Devices → Add device (REST → **Issue pairing code**), type it into the firmware setup form,
 and the firmware POSTs `/api/v1/device/register` with
 `X-Pairing-Code: <code>` instead of `/discover`. Same end state, no
 admin click required. This path is the exception, not the default.
