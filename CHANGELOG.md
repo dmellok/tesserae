@@ -11,6 +11,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - Lineups: a step's peek you opened stays open when a picture you asked for finishes drawing. The redraw used to close it.
 - Settings → System: on a Docker or non-git install, opening the page asked GitHub for the newest release even with Online features off. The check now waits for Online features like every other outbound call; with it off, the Updates card links to the releases page instead. Privacy notes list the check.
 - Docs: an audit of every page against the code. Menu paths, button labels and pairing steps match the current UI; the E1002 is Spectra 6, not ACeP; Online features is off by default; the MCP page lists all 39 tools; protocol docs carry the real keepalive, pairing-code lifetime, retained topics and `/tap` outcomes; widget and theme counts are current.
+- Setup wizard: the device step lists a panel that has announced itself, with a name field and a Register button, and fills in on its own as one arrives. On REST, the default for new installs, it used to offer only pairing codes, so a freshly flashed panel sat unseen while the sidebar said a new device was waiting. Pairing codes are still there under "Pair with a code instead" for clients that ask for one.
+- Setup wizard: a REST panel registered from the device step collects its token on its next check-in. Registering there skipped the panel's MAC, so it waited for approval indefinitely. The wizard now registers through the same steps as Settings → Devices, which also runs the device-added steps it used to miss.
 
 ### Security
 

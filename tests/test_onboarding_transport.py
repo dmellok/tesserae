@@ -151,3 +151,98 @@ def test_device_step_shows_pair_card_when_transport_is_rest(app: Flask) -> None:
     assert "Issue pairing code" in body
     # And the MQTT add-by-hand form is NOT shown.
     assert "Add a device by hand" not in body
+
+
+def _announce_sticky(client, device_id: str = "sticky-3f9a2c") -> None:
+    """What a freshly flashed panel does on the REST transport: POST
+    /discover with its id, kind and MAC (no token yet)."""
+    resp = client.post(
+        "/api/v1/device/discover",
+        json={
+            "device_id": device_id,
+            "kind": "seeed_reterminal_sticky",
+            "panel_w": 480,
+            "panel_h": 800,
+            "fw_version": "1.63.0",
+            "mac": "34:85:18:3F:9A:2C",
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["registered"] is False
+
+
+def test_rest_device_step_lists_a_panel_that_announced_itself(app: Flask) -> None:
+    """A REST panel announces over /discover, so the REST device step has
+    to show it for one-click registration. It used to offer only pairing
+    codes, which left a discovered panel invisible in the wizard while the
+    sidebar badge said a new device was waiting."""
+    client = app.test_client()
+    _sign_in(client)
+    app.config["SETTINGS_STORE"].patch_section("app", {"default_transport": "rest"})
+    _announce_sticky(client)
+
+    body = client.get("/onboarding/device").get_data(as_text=True)
+    assert "Discovered" in body
+    assert "sticky-3f9a2c" in body
+    assert "/onboarding/device/sticky-3f9a2c/register" in body
+    assert 'name="name"' in body
+    # The poller is wired so the list fills in without a reload.
+    assert "data-discovered-poll" in body
+    # Pairing codes stay available, folded away, for clients that need one.
+    assert "Pair with a code instead" in body
+
+
+def test_rest_device_step_waits_when_nothing_has_announced(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    app.config["SETTINGS_STORE"].patch_section("app", {"default_transport": "rest"})
+    body = client.get("/onboarding/device").get_data(as_text=True)
+    assert "Waiting for a panel to announce itself" in body
+    assert "data-discovered-poll" in body
+
+
+def test_registering_a_discovered_panel_from_the_wizard_keeps_the_name(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    app.config["SETTINGS_STORE"].patch_section("app", {"default_transport": "rest"})
+    _announce_sticky(client)
+
+    resp = client.post(
+        "/onboarding/device/sticky-3f9a2c/register",
+        data={"name": "  Kitchen  "},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    device = app.config["DEVICE_REGISTRY"].get("sticky-3f9a2c")
+    assert device is not None
+    assert device.name == "Kitchen"
+    assert device.kind_of == "seeed_reterminal_sticky"
+    # Registered panels leave the Discovered list.
+    body = client.get("/onboarding/device").get_data(as_text=True)
+    assert "/onboarding/device/sticky-3f9a2c/register" not in body
+
+
+def test_rest_panel_registered_in_the_wizard_collects_its_token(app: Flask) -> None:
+    """The wizard's register used to be its own copy of the Settings one
+    and dropped the REST MAC, so the panel's next /discover found no match
+    and it waited for approval forever. It now shares Settings' lifecycle."""
+    client = app.test_client()
+    _sign_in(client)
+    app.config["SETTINGS_STORE"].patch_section("app", {"default_transport": "rest"})
+    _announce_sticky(client)
+    client.post("/onboarding/device/sticky-3f9a2c/register", data={"name": "Kitchen"})
+
+    resp = client.post(
+        "/api/v1/device/discover",
+        json={
+            "device_id": "sticky-3f9a2c",
+            "kind": "seeed_reterminal_sticky",
+            "panel_w": 480,
+            "panel_h": 800,
+            "mac": "34:85:18:3F:9A:2C",
+        },
+    )
+    body = resp.get_json()
+    assert body["registered"] is True
+    assert body["device_token"]
+    assert body["device_id"] == "sticky-3f9a2c"

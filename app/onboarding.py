@@ -422,60 +422,16 @@ def add_device() -> Response:
 
 @bp.post("/device/<discovered_id>/register")
 def register_discovered(discovered_id: str) -> Response:
-    """One-click register a device the broker already heard from."""
-    entry = _discovery().get(discovered_id)
-    if entry is None or not entry.kind:
-        flash("That device is no longer announcing itself, add it by hand.", "error")
-        return redirect(url_for("onboarding.step", step="device"))
-    # Parity with app.settings.devices_routes.devices_register_discovered
-    # (issue #82). An explicit variant pick is authoritative over the
-    # heartbeat's dims / gamut (which we can't trust to identify the
-    # panel); without one, honour the declared dims + gamut.
-    explicit_kind = (request.form.get("kind") or "").strip()
-    kind_id = explicit_kind or entry.kind
-    user_picked_variant = bool(explicit_kind) and explicit_kind != (entry.kind or "")
-    # Guard against firmware reporting panel dims as zero; mirrors the
-    # check in app.settings.devices_routes.devices_register_discovered.
-    overrides: dict[str, Any] = {}
-    if not user_picked_variant:
-        if entry.panel_w is not None and entry.panel_w > 0:
-            overrides["w"] = entry.panel_w
-        if entry.panel_h is not None and entry.panel_h > 0:
-            overrides["h"] = entry.panel_h
-        if entry.gamut:
-            from app.quantizer import canonicalise_gamut
+    """One-click register a device that announced itself, then come back
+    to this step. Same lifecycle as Settings -> Devices (shared helper), so
+    a REST panel gets its MAC + transport stored and collects its token on
+    its next /discover, and the device-added hooks run."""
+    from app.settings.devices_routes import register_discovered_device
 
-            overrides["gamut"] = canonicalise_gamut(entry.gamut)
-    # Same geometry resolution as the Settings → Devices register button
-    # (issue #200): keep the announce's dims and derive an orientation that
-    # agrees with them, rather than letting the kind's default orientation
-    # rewrite them on the next save.
-    geometry, reported_orientation = device_service.panel_geometry_from_report(
-        w=overrides.get("w"), h=overrides.get("h"), rotation=entry.rotation
-    )
-    overrides.update(geometry)
-    renderers = _renderers()
-    kind = _devices().get(kind_id)
-    renderer_id = device_service.renderer_id_for_gamut(
-        renderers, kind, overrides.get("gamut")
-    ) or device_service.renderer_id_for_format(renderers, kind, entry.wire_format)
-    result = device_service.create_instance(
-        devices=_devices(),
-        renderers=renderers,
-        data_root=_data_root(),
-        instance_id=discovered_id,
-        kind_id=kind_id,
-        panel_overrides=overrides,
-        orientation=reported_orientation,
-        renderer_id=renderer_id,
-    )
-    if not result.ok or result.device is None:
-        flash(result.error or "Could not register device.", "error")
-    else:
-        _discovery().forget(discovered_id)
-        _rebuild_transport()
-        flash(f"Registered {result.device.name!r}.", "ok")
-    return redirect(url_for("onboarding.step", step="device"))
+    def back(device: Any | None = None) -> Response:
+        return redirect(url_for("onboarding.step", step="device"))
+
+    return register_discovered_device(discovered_id, back)
 
 
 @bp.post("/dashboard")

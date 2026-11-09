@@ -154,7 +154,38 @@
     {% elif step == 'device' %}
     {% if default_transport == 'rest' %}
     <h1>Pair a device</h1>
-    <p class="lede">Flash a Tesserae client for your panel with the <a href="https://tesserae.ink/flash" target="_blank" rel="noopener">web flasher</a>, then generate a pairing code below. The firmware POSTs the code to <code>/api/v1/device/register</code> and the device is registered. The code is single-use and expires in 10 minutes.</p>
+    <p class="lede">Flash your panel with the <a href="https://tesserae.ink/flash" target="_blank" rel="noopener">web flasher</a> and point it at this server. It announces itself and appears below within a minute; click Register to approve it.</p>
+    {# Live discovery, same as the MQTT branch: a panel on the Tesserae
+       firmware announces over /api/v1/device/discover, so most devices never
+       need the pairing code below. Refresh when one turns up. #}
+    <span data-discovered-poll="{{ discovered_sig }}" hidden></span>
+    <script src="{{ url_for('static', filename='discovery-poll.js') }}"></script>
+
+    {% if discovered %}
+    <h2 class="wizard-subhead">Discovered</h2>
+    <ul class="wizard-discovered">
+      {% for d in discovered %}
+      <li>
+        <span><code>{{ d.id }}</code>{% if d.kind %} · {{ d.kind }}{% endif %}{% if d.panel_w and d.panel_h %} · {{ d.panel_w }}×{{ d.panel_h }}{% endif %}</span>
+        {% if d.kind %}
+        <form method="post" action="{{ url_for('onboarding.register_discovered', discovered_id=d.id) }}" class="form form--inline">
+          <input type="text" name="name" placeholder="Name, e.g. Kitchen" aria-label="Name for {{ d.id }}" maxlength="64">
+          <div class="actions">{{ button('Register', icon='plus') }}</div>
+        </form>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% elif not instances %}
+    <p class="field-help wizard-waiting"><i class="ph ph-broadcast" aria-hidden="true"></i> Waiting for a panel to announce itself. This page updates on its own.</p>
+    {% endif %}
+
+    {# A client that can't announce (an e-reader plugin, a hand-rolled
+       client) pairs with a code instead. Open by default only while a code
+       is live, so a just-issued code stays in view. #}
+    <details class="wizard-manual"{% if pairing_reveal or pairing_codes %} open{% endif %}>
+    <summary>Pair with a code instead</summary>
+    <p class="field-help">For a client that asks for a pairing code. It POSTs the code to <code>/api/v1/device/register</code>; each code is single-use and expires in 10 minutes.</p>
 
     {% if pairing_reveal %}
     <div class="pair-reveal" role="status" aria-live="polite">
@@ -192,6 +223,7 @@
       {% endfor %}
     </ul>
     {% endif %}
+    </details>
 
     {% if instances %}
     <div class="wizard-registered">
