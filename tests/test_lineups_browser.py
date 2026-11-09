@@ -3194,8 +3194,15 @@ def test_clicking_through_items_draws_only_the_one_you_stop_on(live: str) -> Non
         browser, page, api = _open(p, live, pics=True)
         tile = page.locator(f"{ART} .lu-tile")
         tile.hover()
-        for _ in range(5):
-            tile.locator('[data-item="dinner:1:1"]').click()
+        # Five clicks inside the draw's debounce window. Separate Playwright
+        # clicks each wait for the redrawn tile to settle, which on a loaded
+        # runner spaces them past the window and draws the ones between.
+        page.evaluate(
+            """() => {
+                for (let i = 0; i < 5; i++)
+                    document.querySelector('[data-item="dinner:1:1"]').click();
+            }"""
+        )
         page.wait_for_function(
             "() => document.querySelector('#lu-row-dinner [data-step=\"1\"] img').getAttribute('src').includes('art-5')"
         )
@@ -3900,6 +3907,10 @@ def test_lightbox_draw_navigation_text_and_buttons(live: str) -> None:
         page.wait_for_function(
             "() => document.querySelector('[data-lb-pos]').textContent === 'Drawn here: 2 of 2'"
         )
+        # The position moves at once, but the draw is asked for after a short
+        # debounce, and stepping away inside it rightly cancels the draw. Wait
+        # for the second picture before going back.
+        page.wait_for_function("() => !document.querySelector('.lu-lb.is-loading')")
         page.keyboard.press("ArrowLeft")
         assert page.locator("[data-lb-pos]").inner_text() == "Drawn here: 1 of 2"
         assert len(api.item_calls) == 2
