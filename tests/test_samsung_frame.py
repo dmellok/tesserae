@@ -21,6 +21,12 @@ from app.samsung_frame import SamsungFramePublisher
 from app.samsung_frame_art import FrameArtError, FramePairingError
 
 
+@pytest.fixture(autouse=True)
+def _fresh_backoff() -> None:
+    # Back-off is shared by every publisher in the process; start each test clean.
+    samsung_frame._BACKOFF.clear()
+
+
 @pytest.fixture
 def app(tmp_path: Path) -> Flask:
     a = create_app(
@@ -424,7 +430,13 @@ def test_device_page_leaves_out_what_a_tv_does_not_have(app: Flask) -> None:
     )
     html = client.get("/settings/devices/lounge_frame").get_data(as_text=True)
     assert 'id="schedule"' in html and 'id="quiet-hours"' in html
-    for absent in ('id="timing"', 'id="power"', "Button map", "Client rotation", "Letterbox"):
+    for absent in (
+        'class="dx-grp" id="timing"',
+        'id="power"',
+        "Button map",
+        "Client rotation",
+        "Letterbox",
+    ):
         assert absent not in html, absent
     assert "Frames kept on the TV" in html and "TV&#39;s own slideshow" in html
 
@@ -829,7 +841,12 @@ class OwnPowerTV:
     def rest(self, host: str) -> dict[str, Any] | None:
         if self.state == "off":
             return None
-        return {"PowerState": self.state, "wifiMac": "a4:30:7a:f4:a1:f9", "modelName": "QN50LS03T"}
+        return {
+            "PowerState": self.state,
+            "networkType": "wireless",
+            "wifiMac": "a4:30:7a:f4:a1:f9",
+            "modelName": "QN50LS03T",
+        }
 
     def power_key(self, host: str, **kw: Any) -> None:
         self.keys += 1
@@ -996,3 +1013,82 @@ def test_art_mode_during_quiet_hours_resets_the_in_use_timer(
 def test_sleep_when_in_use_choices(app: Flask, value: str, ok: bool) -> None:
     _make_frame(app)
     assert _device(app).module.validate_config({"sleep_when_in_use": value})[0] is ok
+
+
+def _token_of(app: Flask) -> str | None:
+    cfg = (app.config["SETTINGS_STORE"].get_section("devices") or {}).get("office_frame") or {}
+    return SamsungFramePublisher._token(cfg)
+
+
+def test_first_pairing_keeps_the_token_while_the_tv_is_in_use(app: Flask) -> None:
+    # Allow is pressed with the TV showing a programme: the send waits, but the
+    # token is stored, so the next attempt doesn't prompt again.
+    _make_frame(app)
+    _plant_render(app, "office_frame", "aaa111")
+    tv = FakeTV()
+    tv.art_mode = False
+    _publisher(app, tv).on_push()
+    assert tv.uploads == []
+    assert _token_of(app) == "tok-1"
+
+
+def test_a_wired_tv_keeps_no_mac_and_isnt_put_to_sleep(app: Flask) -> None:
+    # wifiMac on a wired TV is the radio's, which Wake-on-LAN can't reach:
+    # sending it to standby would leave it there.
+    _make_frame(app, token_secret="tok-1")
+    tv = FakeTV()
+    own = OwnPowerTV(tv)
+    real_rest = own.rest
+    own.rest = lambda host: {**(real_rest(host) or {}), "networkType": "wired"}  # type: ignore[method-assign]
+    quiet = [False]
+    pub = _own_power(app, tv, own, quiet)
+    pub.poll_once()
+    assert not pub.load_state(_device(app)).get("mac")
+    quiet[0] = True
+    pub.poll_once()
+    assert own.keys == 0 and own.state == "on"
+
+
+def test_an_unpaired_tv_isnt_sent_the_power_key(app: Flask) -> None:
+    _make_frame(app)  # no token: the remote channel would ask for Allow
+    tv = FakeTV()
+    own = OwnPowerTV(tv)
+    quiet = [False]
+    pub = _own_power(app, tv, own, quiet)
+    pub.poll_once()
+    quiet[0] = True
+    pub.update_state(_device(app), {"in_use_since": 1})  # long overdue
+    pub.poll_once()
+    assert own.keys == 0
+
+
+def test_a_tv_that_stays_unreachable_is_recorded_once(app: Flask) -> None:
+    _make_frame(app, token_secret="tok-1")
+    pub = _publisher(app, FakeTV(), rest=None)
+    pub.poll_once()
+    first = app.config["DEVICE_STATUS"]["office_frame"]["received_at"]
+    pub.poll_once()
+    pub.poll_once()
+    assert app.config["DEVICE_STATUS"]["office_frame"]["received_at"] == first
+    assert _screen(app)["screen_why"] == "not answering"
+
+
+def test_removal_reads_the_tv_settings_before_they_are_wiped(app: Flask) -> None:
+    _make_frame(app, token_secret="tok-1")
+    _plant_render(app, "office_frame", "aaa111")
+    tv = FakeTV()
+    pub = _publisher(app, tv)
+    pub.on_push()
+    device = _device(app)
+    cfg, state = dict(pub._cfg(device.id)), pub.load_state(device)
+    app.config["SETTINGS_STORE"].patch_section("devices", {"office_frame": {}})
+    pub.remove_uploads(device, cfg, state)
+    assert ("delete", ["MY_F0001"]) in tv.calls
+
+
+def test_ipv6_addresses_are_refused() -> None:
+    from devices.samsung_frame.device import valid_host
+
+    assert valid_host("192.0.2.10")
+    assert valid_host("frame.local")
+    assert not valid_host("fd00::5")

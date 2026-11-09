@@ -73,9 +73,10 @@ def parse_status(payload: bytes) -> dict[str, Any]:
 
 
 def valid_host(value: str) -> bool:
+    # IPv4 only: the TV's REST and websocket URLs are built as host:port,
+    # which an IPv6 literal would break.
     try:
-        ipaddress.ip_address(value)
-        return True
+        return isinstance(ipaddress.ip_address(value), ipaddress.IPv4Address)
     except ValueError:
         return bool(_HOSTNAME.match(value))
 
@@ -85,7 +86,7 @@ def validate_config(payload: dict[str, Any]) -> tuple[bool, str | None]:
     publisher skips a device with no address."""
     host = payload.get("host")
     if host not in (None, "") and (not isinstance(host, str) or not valid_host(host.strip())):
-        return False, "TV address must be an IP address or host name"
+        return False, "TV address must be an IPv4 address or host name"
     in_use = payload.get("sleep_when_in_use")
     if in_use not in (None, "", "never", "30", "60", "120"):
         return False, "Still in use at quiet hours must be never, 30, 60 or 120"

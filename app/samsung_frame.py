@@ -172,6 +172,13 @@ def rest_info(host: str, timeout: float = REST_TIMEOUT_S) -> dict[str, Any] | No
     return device if isinstance(device, dict) else None
 
 
+# Shared by every publisher instance: a transport rebuild makes a new one while
+# the old one may still be mid-send, and both must serialise on the same state
+# file and see the same back-off.
+_STATE_LOCK = threading.RLock()
+_BACKOFF: dict[str, tuple[float, float]] = {}
+
+
 class SamsungFramePublisher:
     def __init__(
         self,
@@ -206,14 +213,17 @@ class SamsungFramePublisher:
         self._lock = threading.Lock()
         # Serialises every read-modify-write of a device's state file: the push
         # worker, the status poller and device removal all touch it.
-        self._state_lock = threading.RLock()
+        self._state_lock = _STATE_LOCK
         self._dirty = False
         self._worker_running = False
         # device id -> (monotonic time of next allowed attempt, current back-off)
-        self._backoff: dict[str, tuple[float, float]] = {}
+        self._backoff = _BACKOFF
         self._warned: dict[str, str] = {}
         # Polls in a row each TV hasn't answered.
         self._missed: dict[str, int] = {}
+        # The last screen state recorded for a TV that didn't answer, so a TV
+        # that stays unreachable isn't recorded (and seen) every minute.
+        self._last_silent: dict[str, tuple[str, str]] = {}
 
     # -- push reaction ----------------------------------------------------
 
@@ -389,6 +399,17 @@ class SamsungFramePublisher:
     def _put_to_sleep(self, device: Device, cfg: dict[str, Any], mode: str, host: str) -> bool:
         if mode == "switch":
             return self._power.turn(self._switch(cfg), False)
+        # Not paired yet: the remote channel would ask for Allow on screen,
+        # and with no known MAC Wake-on-LAN couldn't bring it back.
+        if not self._token(cfg):
+            return False
+        if not self.load_state(device).get("mac"):
+            self._warn_once(
+                device.id,
+                "not putting the TV in standby: its MAC for Wake-on-LAN isn't known "
+                "(a wired TV doesn't report it; use a Home Assistant switch)",
+            )
+            return False
         try:
             self._power_key(host, token=self._token(cfg), name=CLIENT_NAME)
             return True
@@ -450,7 +471,7 @@ class SamsungFramePublisher:
             return
         src = self._renders_dir / f"{digest}.png"
         if not src.exists():
-            logger.warning("samsung_frame %s: composition %s missing on disk", device.id, digest)
+            self._warn_once(device.id, f"composition {digest} missing on disk")
             return
         mode = self._mode(cfg)
         if mode != "none" and self._quiet_fn(device):
@@ -518,6 +539,7 @@ class SamsungFramePublisher:
             for attempt in range(attempts):
                 try:
                     client.connect()
+                    self._keep_token(device.id, client, token)
                     break
                 except FramePairingError:
                     raise
@@ -537,8 +559,6 @@ class SamsungFramePublisher:
                 with contextlib.suppress(FrameArtError):
                     if not client.art_mode_on():
                         raise TvInUse
-            if client.token and client.token != token:
-                self._store_token(device.id, client.token)
             if cfg.get("take_over_slideshow", "off") != "keep":
                 try:
                     client.slideshow_off()
@@ -591,6 +611,13 @@ class SamsungFramePublisher:
             keep = DEFAULT_KEEP
         return max(1, min(10, keep))
 
+    def _keep_token(self, device_id: str, client: Any, token: str | None) -> None:
+        """Store the token the TV handed over on connecting, straight away:
+        on first pairing the owner presses Allow, and a send that then stops
+        (the TV is in use) must not lose it and prompt again next time."""
+        if client.token and client.token != token:
+            self._store_token(device_id, client.token)
+
     def _store_token(self, device_id: str, token: str) -> None:
         try:
             self._settings.update_for_namespace(
@@ -627,10 +654,14 @@ class SamsungFramePublisher:
         standby = self._standby(info)
         awake = info is not None and not standby
         self._missed[device.id] = 0 if info is not None else self._missed.get(device.id, 0) + 1
-        mac = str((info or {}).get("wifiMac") or "")
         state = self.load_state(device)
-        if mac and mac != state.get("mac"):
-            state = self.update_state(device, {"mac": mac})
+        if info is not None:
+            # wifiMac is the Wi-Fi radio's; on a wired TV it isn't the NIC that
+            # Wake-on-LAN must reach, so it is kept only for a wireless one.
+            wireless = str(info.get("networkType") or "").lower() == "wireless"
+            mac = str(info.get("wifiMac") or "") if wireless else ""
+            if mac != str(state.get("mac") or ""):
+                state = self.update_state(device, {"mac": mac or None})
         screen = self._screen(device, cfg, host) if awake else None
         off = switch_state == "off" or standby or self._missed[device.id] >= 2
         if mode != "none" and self._quiet_fn(device):
@@ -689,11 +720,15 @@ class SamsungFramePublisher:
         if not awake:
             started = float(state.get("starting_at") or 0)
             if info is None and time.time() - started < BOOT_TIMEOUT_S:
-                self._record(device, {"screen": "starting", "screen_why": "waking up"})
+                screen_now, why = "starting", "waking up"
             else:
-                why = "standby" if standby else "not answering"
-                self._record(device, {"screen": "off", "screen_why": why})
+                screen_now, why = "off", "standby" if standby else "not answering"
+            if info is not None or self._last_silent.get(device.id) != (screen_now, why):
+                self._record(device, {"screen": screen_now, "screen_why": why})
+            if info is None:
+                self._last_silent[device.id] = (screen_now, why)
             return False
+        self._last_silent.pop(device.id, None)
         if self.load_state(device).get("needs_art_mode"):
             # Woken after quiet hours: a boot may land in TV mode, which would
             # read as someone watching from then on.
@@ -722,8 +757,7 @@ class SamsungFramePublisher:
         client = self._client_factory(host, token=token, name=CLIENT_NAME)
         try:
             client.connect(pairing_timeout=10)
-            if client.token and client.token != token:
-                self._store_token(device.id, client.token)
+            self._keep_token(device.id, client, token)
             return "art" if client.art_mode_on() else "on"
         except (FrameArtError, OSError):
             return None
@@ -731,9 +765,11 @@ class SamsungFramePublisher:
             client.close()
 
     def _set_art_mode(self, device: Device, cfg: dict[str, Any], host: str) -> bool:
-        client = self._client_factory(host, token=self._token(cfg), name=CLIENT_NAME)
+        token = self._token(cfg)
+        client = self._client_factory(host, token=token, name=CLIENT_NAME)
         try:
             client.connect(pairing_timeout=10)
+            self._keep_token(device.id, client, token)
             client.set_art_mode(True)
             return True
         except (FrameArtError, OSError) as exc:
@@ -764,11 +800,18 @@ class SamsungFramePublisher:
 
     # -- housekeeping -----------------------------------------------------
 
-    def remove_uploads(self, device: Device) -> None:
-        """Best effort: delete a removed device's uploads from its TV."""
-        cfg = self._cfg(device.id)
+    def remove_uploads(
+        self,
+        device: Device,
+        cfg: dict[str, Any] | None = None,
+        state: dict[str, Any] | None = None,
+    ) -> None:
+        """Best effort: delete a removed device's uploads from its TV. The
+        removal hook passes ``cfg`` and ``state`` read before the device's
+        settings are wiped."""
+        cfg = self._cfg(device.id) if cfg is None else cfg
         host = str(cfg.get("host") or "").strip()
-        state = self.load_state(device)
+        state = self.load_state(device) if state is None else state
         ids = [u["content_id"] for u in state["uploads"]] + state["pending_delete"]
         if host and ids:
             client = self._client_factory(host, token=self._token(cfg), name=CLIENT_NAME)
@@ -823,8 +866,13 @@ def _register_hooks(app: Flask) -> None:
         pub = app.config.get("SAMSUNG_FRAME_PUBLISHER")
         if pub is None:
             return
+        # Read now: the caller wipes the device's settings right after.
+        cfg, state = dict(pub._cfg(device.id)), pub.load_state(device)
         threading.Thread(
-            target=pub.remove_uploads, args=(device,), name="samsung-frame-remove", daemon=True
+            target=pub.remove_uploads,
+            args=(device, cfg, state),
+            name="samsung-frame-remove",
+            daemon=True,
         ).start()
 
     device_service.register_kind_hooks(
