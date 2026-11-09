@@ -10,6 +10,9 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 - Samsung The Frame: the TV goes to standby for quiet hours that sleep through and wakes for new frames, with its own power (Wake-on-LAN) or a Home Assistant switch, and the device card shows what the screen is doing.
 - Samsung The Frame: a `samsung_frame` kind that shows pages through the TV's own Art Mode, uploading each frame as a 4K JPEG over the local network and deleting its older uploads.
+- GTFS: every arrival carries `wheelchair_accessible` from trips.txt (1 accessible, 2 not, 0 no information), so a board can mark the trips a wheelchair user can or can't take. A timetable cached by an earlier version reads 0 until its 12-hour rebuild.
+- GTFS: Stop ID takes stop names as well as ids ("Canal St"). An entry that matches no stop_id in the feed is read as a name, ignoring case and spacing, and brings every stop of that name with its platforms; ids and names mix in one list. This keeps working on feeds whose station ids change between releases, such as KORDIS JMK (Brno).
+- GTFS: an advanced "Arrivals" option (`limit`) sets how many arrivals the widget hands over: 12 by default as before, at most 60, for a code element that lays out a longer list.
 
 ## [0.509.0], 2026-11-10
 

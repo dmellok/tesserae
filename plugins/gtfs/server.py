@@ -30,9 +30,10 @@ import re
 import struct
 import threading
 import time
+import unicodedata
 import urllib.request
 import zipfile
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from datetime import date as _date
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -66,6 +67,9 @@ USER_AGENT = "tesserae/0.1 (+gtfs)"
 # glyphs a plain-text board can't render.
 _ICON_MARKER = re.compile(r"\[[^\]]*\bicon\b[^\]]*\]", re.IGNORECASE)
 MAX_ARRIVALS = 12
+# The "limit" option can raise the default for a code element that lays out
+# its own board; the cap keeps a misconfigured cell from shipping a timetable.
+MAX_ARRIVALS_CAP = 60
 
 # route_type -> semantic mode name the client maps to a Phosphor glyph.
 _MODES = {
@@ -193,6 +197,7 @@ def fetch(
     basis = "departure" if str(options.get("time_basis") or "") == "departure" else "arrival"
     horizon = _positive_int(options.get("horizon"), 90)
     walk = max(0, _positive_int(options.get("walk_minutes"), 0))
+    limit = min(MAX_ARRIVALS_CAP, _positive_int(options.get("limit"), MAX_ARRIVALS))
     # Comma-separated route short names ("A,C"), case-insensitive. Blank
     # means every route calling at the stop, which is the lobby-board default.
     wanted_routes = {
@@ -296,7 +301,7 @@ def fetch(
         "live": live,
         "feed_age_s": feed_age_s,
         "note": note,
-        "arrivals": arrivals[:MAX_ARRIVALS],
+        "arrivals": arrivals[:limit],
     }
 
 
@@ -628,7 +633,7 @@ def _inspect_stop(raw: bytes, stop_opt: str) -> dict[str, Any]:
     """
     table = _distil(raw, stop_opt)
     directions: dict[str, dict[str, Any]] = {}
-    for route_id, headsign, direction, _service, platform in table["trips"].values():
+    for route_id, headsign, direction, _service, platform, *_ in table["trips"].values():
         bucket = directions.setdefault(
             str(direction or ""), {"headsigns": {}, "routes": set(), "platforms": set()}
         )
@@ -715,6 +720,7 @@ def _demo(name: str, title: str) -> dict[str, Any]:
                 "canceled": bool(entry.get("canceled", False)),
                 "route_id": entry.get("route", ""),
                 "direction": str(entry.get("direction", "0")),
+                "wheelchair_accessible": _wheelchair(entry.get("wheelchair_accessible")),
             }
         )
     return {
@@ -793,6 +799,11 @@ def _scheduled(
                     "color": route.get("color") or "",
                     "text_color": route.get("text_color") or "",
                     "live": False,
+                    # trips.txt's own codes: 1 accessible, 2 not, 0 no
+                    # information. A distillate cached before this field
+                    # existed has no sixth slot and reads as 0 until its
+                    # next rebuild.
+                    "wheelchair_accessible": trip[5] if len(trip) > 5 else 0,
                 }
             )
     out.sort(key=lambda a: a["minutes"])
@@ -1361,32 +1372,97 @@ class _StopNotFound(Exception):
     pass
 
 
+def _name_key(name: str) -> str:
+    """A stop name as typed and as the feed spells it compare equal: case,
+    Unicode normalisation and runs of whitespace (no-break spaces included)
+    don't count."""
+    return " ".join(unicodedata.normalize("NFKC", name).split()).casefold()
+
+
+def _pick_stops(
+    read_rows: Callable[[], Iterator[dict[str, str]]], wanted: set[str]
+) -> tuple[dict[str, dict[str, str]], str]:
+    """The stops.txt rows a ``stop_id`` option names, by stop_id, and the
+    name to title the board with when it was given by name ("" otherwise).
+
+    Each comma-separated entry is a stop_id when the feed has one by that
+    id (a station also brings its platforms, as before), and otherwise a
+    stop name: every stop of that name, plus the platforms of any station
+    of that name. Typing "Canal St" is easier than finding "A34", and on a
+    feed whose station ids change between releases it is the only spelling
+    that keeps working. A name that several towns share picks up all of
+    them; ids stay the precise way.
+
+    One streaming pass, as before; stops.txt is read a second time only
+    when a name was used, to collect the platforms of a station found by
+    name, which can carry names of their own ("Canal St North").
+    """
+    key_of = {w: _name_key(w) for w in wanted}
+    keys = set(key_of.values())
+    picked: dict[str, dict[str, str]] = {}
+    named: dict[str, dict[str, str]] = {}
+    ids_seen: set[str] = set()
+    for row in read_rows():
+        sid = row.get("stop_id", "")
+        parent = row.get("parent_station", "")
+        if sid in wanted:
+            ids_seen.add(sid)
+        if sid in wanted or parent in wanted:
+            picked[sid] = row
+        if _name_key(row.get("stop_name", "")) in keys:
+            named[sid] = row
+    # Only the entries that matched no stop_id are names.
+    name_keys = {key_of[w] for w in wanted - ids_seen}
+    named = {
+        sid: row for sid, row in named.items() if _name_key(row.get("stop_name", "")) in name_keys
+    }
+    if not named:
+        return picked, ""
+    picked.update(named)
+    for row in read_rows():
+        if row.get("parent_station", "") in named:
+            picked.setdefault(row.get("stop_id", ""), row)
+    if ids_seen:
+        return picked, ""
+    # Asked for by name alone: title the board with the stop's own spelling,
+    # preferring the station over one of its platforms.
+    parents = {row.get("parent_station", "") for row in picked.values()}
+    station = next((row for sid, row in named.items() if sid in parents), None)
+    return picked, (station or next(iter(named.values()))).get("stop_name", "")
+
+
+def _wheelchair(value: Any) -> int:
+    """trips.txt wheelchair_accessible: 1 or 2 as given, anything else 0."""
+    code = _int(value, 0)
+    return code if code in (1, 2) else 0
+
+
 def _distil(raw: bytes, stop_opt: str) -> dict[str, Any]:
     wanted = {s.strip() for s in stop_opt.split(",") if s.strip()}
     with zipfile.ZipFile(io.BytesIO(raw)) as zf:
         names = {n.rsplit("/", 1)[-1]: n for n in zf.namelist()}
 
+        picked, named_as = _pick_stops(lambda: _rows(zf, names, "stops.txt"), wanted)
+
         stop_ids: set[str] = set()
-        stop_name = ""
+        stop_name = named_as
         stop_coords: dict[str, list[float]] = {}
         station_of: dict[str, str] = {}
         names_by_id: dict[str, str] = {}
-        for row in _rows(zf, names, "stops.txt"):
-            sid = row.get("stop_id", "")
+        for sid, row in picked.items():
             parent = row.get("parent_station", "")
-            if sid in wanted or parent in wanted:
-                stop_ids.add(sid)
-                station_of[sid] = parent or sid
-                names_by_id[sid] = row.get("stop_name", "")
-                if not stop_name or sid in wanted:
-                    stop_name = row.get("stop_name", "") or stop_name
-                # Kept so a VehiclePositions report with only coordinates
-                # can still say how far out the vehicle is.
-                with contextlib.suppress(ValueError):
-                    stop_coords[sid] = [
-                        round(float(row.get("stop_lat", "")), 6),
-                        round(float(row.get("stop_lon", "")), 6),
-                    ]
+            stop_ids.add(sid)
+            station_of[sid] = parent or sid
+            names_by_id[sid] = row.get("stop_name", "")
+            if not stop_name or sid in wanted:
+                stop_name = row.get("stop_name", "") or stop_name
+            # Kept so a VehiclePositions report with only coordinates
+            # can still say how far out the vehicle is.
+            with contextlib.suppress(ValueError):
+                stop_coords[sid] = [
+                    round(float(row.get("stop_lat", "")), 6),
+                    round(float(row.get("stop_lon", "")), 6),
+                ]
         if not stop_ids:
             raise _StopNotFound(f"Stop '{stop_opt}' isn't in this feed.")
 
@@ -1433,6 +1509,7 @@ def _distil(raw: bytes, stop_opt: str) -> dict[str, Any]:
                 row.get("direction_id", ""),
                 row.get("service_id", ""),
                 at_stop[trip_id],
+                _wheelchair(row.get("wheelchair_accessible")),
             ]
 
         services: dict[str, Any] = {}
