@@ -2316,6 +2316,43 @@ input[type="range"].slider:focus::-moz-range-thumb {
   border-radius: var(--t-radius);
   margin-bottom: 0.5rem;
 }
+/* REST device step: optional name field beside Register on one row. */
+.wizard-discovered .form--inline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  justify-content: flex-end;
+}
+.wizard-discovered li > span {
+  min-width: 0;
+}
+@media (max-width: 540px) {
+  .wizard-discovered li {
+    flex-wrap: wrap;
+  }
+}
+.wizard-discovered .form--inline .actions {
+  margin: 0;
+  padding: 0;
+}
+.wizard-discovered input[type="text"] {
+  width: 12rem;
+  max-width: 100%;
+  padding: var(--t-space-2) var(--t-space-3);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-sm);
+  background: var(--t-surface);
+  font: inherit;
+  font-size: var(--t-size-base);
+  color: var(--t-fg);
+}
+.wizard-waiting {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
 .wizard-page-actions {
   display: flex;
   gap: 0.5rem;
