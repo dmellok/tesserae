@@ -1863,6 +1863,7 @@ class Scheduler:
             return  # window closed between find and fire; next tick recovers
         held = self._held_device_ids(rotation.id, now)
         on_pause = self._paused_or_read(now, paused) & set(deck.device_ids)
+        failed: set[str] = set()
         fired = self._fire_deck_advance(
             deck,
             rotation,
@@ -1871,7 +1872,20 @@ class Scheduler:
             now,
             held=held,
             paused=on_pause,
+            failed=failed,
         )
+        if failed:
+            # A panel's push failed. Leave the window unrecorded so the next
+            # tick finds it due again, as the unbound path does; panels that
+            # already took the frame are skipped by their own per-display
+            # record, so a retry doesn't send twice. Held, paused, quiet and
+            # min-hold skips are deliberate and stay recorded below.
+            with self._lock:
+                self._rotation_last_status[rotation.id] = "failed"
+                self._rotation_last_reason[rotation.id] = (
+                    f"push failed for {', '.join(sorted(failed))}"
+                )
+            return
         with self._lock:
             # Arm the same transition / min-hold gates rotations use so the
             # find pass stays one code path for every cycle record.
@@ -1924,6 +1938,7 @@ class Scheduler:
         held: set[str] | None = None,
         paused: set[str] | None = None,
         only_device: str | None = None,
+        failed: set[str] | None = None,
     ) -> bool:
         """Advance one bound timer deck's panels to the target page. Pushes
         only at a step transition (or a new dwell window, for a keep-fresh
@@ -1933,6 +1948,8 @@ class Scheduler:
         panels (a per-display pause) are skipped too, quietly, since the
         tick comes round every 30 s; the pause's end brings them back.
         ``only_device`` limits the advance to one panel (a pause catch-up).
+        ``failed``, when given, collects the panels whose push failed (not
+        quiet-hours or other deliberate skips).
         Returns whether any panel took the frame."""
         fired_any = False
         for device_id in deck.device_ids:
@@ -1984,16 +2001,24 @@ class Scheduler:
                 # Delivery and the nav record happen together under the
                 # display's navigation lock, so a button press or Home
                 # Assistant's Next / Previous can't land in between.
-                if self._advance_device(deck, target, state, now, device_id, key):
+                if self._advance_device(deck, target, state, now, device_id, key, failed):
                     fired_any = True
         return fired_any
 
     def _advance_device(
-        self, deck: Deck, target: str, state: StepState, now: datetime, device_id: str, key: str
+        self,
+        deck: Deck,
+        target: str,
+        state: StepState,
+        now: datetime,
+        device_id: str,
+        key: str,
+        failed: set[str] | None = None,
     ) -> bool:
         """Deliver one lineup advance to one display and record it (see
         :meth:`_fire_deck_advance`); the caller holds its navigation
-        lock. True when the panel took the frame."""
+        lock. True when the panel took the frame; a failed push adds the
+        display to ``failed``."""
         pusher = self._push_factory()
         quiet_check = getattr(pusher, "device_in_quiet_hours", None)
         if callable(quiet_check) and quiet_check(device_id):
@@ -2019,6 +2044,8 @@ class Scheduler:
                 # dashboard" rather than "that dashboard won't render"
                 # (#167).
                 reason = result.error or f"push {result.status}"
+                if failed is not None and result.status in ("failed", "busy", "superseded"):
+                    failed.add(device_id)
                 logger.warning(
                     "deck timer advance failed: device=%s deck=%s -> %s (%s)",
                     device_id,
