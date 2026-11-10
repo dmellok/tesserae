@@ -748,7 +748,10 @@ class Scheduler:
                 # or the schedule has no device bindings, fall back to
                 # interval firing so the page still pushes on time.
                 if s.smart_sync and self._smart_sync_should_wait(
-                    s.page_id, s.smart_sync_lead_s, now
+                    s.page_id,
+                    s.smart_sync_lead_s,
+                    now,
+                    device_ids=self._lineup_target_devices(s.id, cycle=False),
                 ):
                     continue
                 candidates.append(s)
@@ -1994,7 +1997,9 @@ class Scheduler:
                 elif now.timestamp() < last_at + min_hold_s:
                     self._log_deck_skip(device_id, deck.id, target, "min-hold")
                     continue  # min-hold anti-flap
-            if rot.smart_sync and self._smart_sync_should_wait(target, rot.smart_sync_lead_s, now):
+            if rot.smart_sync and self._smart_sync_should_wait(
+                target, rot.smart_sync_lead_s, now, device_ids=deck.device_ids
+            ):
                 self._log_deck_skip(device_id, deck.id, target, "smart-sync wait")
                 continue
             with navigation_locked(self._deck_nav_store, [device_id]):
@@ -2494,7 +2499,10 @@ class Scheduler:
             # steps are silent on purpose (the user opted in to "only
             # render around wake").
             if rotation.smart_sync and self._smart_sync_should_wait(
-                step.page_id, rotation.smart_sync_lead_s, now
+                step.page_id,
+                rotation.smart_sync_lead_s,
+                now,
+                device_ids=self._lineup_target_devices(rotation.id, cycle=True),
             ):
                 # Surface the hold on the card. Only reached when a fire
                 # is actually due (same-window self-fires bail earlier),
@@ -2852,7 +2860,27 @@ class Scheduler:
             )
         return result
 
-    def _smart_sync_should_wait(self, page_id: str, lead_s: int, now: datetime) -> bool:
+    def _lineup_target_devices(self, record_id: str, *, cycle: bool) -> list[str] | None:
+        """The displays a bound lineup actually sends to, or None when the
+        record isn't a bound lineup (it then goes to its page's bound
+        displays). Mirrors the bound/unbound split in ``_fire_cycle`` and
+        ``_fire_timed``."""
+        deck = self._deck_store.get(record_id) if self._deck_store is not None else None
+        if deck is None or deck.advance != "timer" or not deck.device_ids:
+            return None
+        if cycle != (deck.advance_trigger == "cycle"):
+            return None
+        if cycle and self._deck_nav_store is None:
+            return None
+        return list(deck.device_ids)
+
+    def _smart_sync_should_wait(
+        self,
+        page_id: str,
+        lead_s: int,
+        now: datetime,
+        device_ids: list[str] | None = None,
+    ) -> bool:
         """Return True when smart-sync wants to *hold* the fire (don't
         push yet), False when it should fire now. Shared between
         schedules and rotations: both consult the same predicted-wake
@@ -2874,9 +2902,13 @@ class Scheduler:
             only delay a frame it could already have collected.
           - At least one trusted device is inside the lead window.
         """
-        if self._device_telemetry is None or self._device_ids_for_page is None:
+        if self._device_telemetry is None:
             return False
-        device_ids = self._device_ids_for_page(page_id)
+        if device_ids is None:
+            # Not a bound lineup: the displays the page is bound to.
+            if self._device_ids_for_page is None:
+                return False
+            device_ids = self._device_ids_for_page(page_id)
         if not device_ids:
             return False
         trusted_predictions: list[float] = []

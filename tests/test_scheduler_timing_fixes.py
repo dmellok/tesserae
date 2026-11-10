@@ -107,5 +107,40 @@ def test_failed_send_does_not_block_the_next_slot(tmp_path):
     assert push.calls[-1][0] == "b"
 
 
-def _unused() -> SimpleNamespace:  # keep import used for later tests
-    return SimpleNamespace()
+def _telemetry(sched, wake_at: float):
+    entries = {
+        "panel": SimpleNamespace(always_on=False, is_trusted=True, predicted_next_wake_at=wake_at),
+        "other": SimpleNamespace(always_on=True, is_trusted=True, predicted_next_wake_at=None),
+    }
+    sched._device_telemetry = SimpleNamespace(get=entries.get)
+
+
+def test_smart_sync_ignores_displays_outside_the_lineup(tmp_path):
+    sched, push, _deck, ds = _rig(tmp_path, advance_smart_sync=True)
+    # The dashboards are also bound to an always-on display the lineup
+    # doesn't target.
+    sched._device_ids_for_page = lambda _pid: ["panel", "other"]
+    _telemetry(sched, (T + timedelta(minutes=10)).timestamp())
+    assert _tick(sched, T) == []  # waiting for the panel's wake at 06:10
+    assert push.calls == []
+    # Targeting the always-on display too is what opens the gate.
+    ds.upsert(ds.get("lu").model_copy(update={"device_ids": ["panel", "other"]}))
+    assert _tick(sched, T) == [("lu", 0)]
+
+
+def test_smart_sync_on_interval_lineup_uses_its_targets(tmp_path):
+    sched, _push, deck, ds = _rig(tmp_path)
+    ds.upsert(
+        deck.model_copy(
+            update={
+                "advance_trigger": "interval",
+                "advance_interval_minutes": 5,
+                "advance_window_start": "05:00",
+                "advance_window_end": "18:00",
+                "advance_smart_sync": True,
+            }
+        )
+    )
+    sched._device_ids_for_page = lambda _pid: ["panel", "other"]
+    _telemetry(sched, (T + timedelta(minutes=10)).timestamp())
+    assert sched.find_due(T) == []
