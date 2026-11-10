@@ -493,8 +493,8 @@ def test_unavailable_group_preserves_shared_and_unassigned_lineups(app: Flask) -
     never_assigned = next(g for g in groups if "Not on a display yet" in g)
     assert 'id="lu-row-unassigned"' in never_assigned
     assert 'id="lu-row-partial"' in panel_a
-    assert '<span class="lu-row-name">shared</span>' in panel_a
-    assert '<span class="lu-row-name">shared</span>' in panel_b
+    assert 'title="Rename. Click to edit">shared</button>' in panel_a
+    assert 'title="Rename. Click to edit">shared</button>' in panel_b
     assert body.count('id="lu-row-shared"') == 1
     assert app.config["DECK_STORE"].get("partial").device_ids == ["panel_a", "deleted"]
 
