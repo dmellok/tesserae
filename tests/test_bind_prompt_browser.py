@@ -192,22 +192,26 @@ def test_switching_display_asks_and_cancel_reverts(real: tuple[str, Flask]) -> N
     base, app = real
     with sync_playwright() as p:
         browser, page, errors = _editor(p, base)
-        page.locator("[data-change-display]").click()
-        sel = page.locator("[data-display-select]")
-        assert sel.input_value() == "hallway"
-        sel.select_option("frame")
-        dlg = page.locator("dialog.bind-dialog")
+        loc = page.locator("#dxe-loc")
+        assert loc.inner_text().startswith("On hallway")
+
+        def move() -> Any:
+            page.locator("[data-move]").click()
+            mv = page.locator("dialog.dxe-move-dialog")
+            mv.wait_for(state="visible")
+            mv.locator("select").select_option("frame")
+            mv.locator("[data-ok]").click()
+            return page.locator("dialog.bind-dialog:not(.dxe-move-dialog)")
+
+        dlg = move()
         assert dlg.get_by_role("heading").inner_text().startswith("Bind “Clock” to ")
         _answer(page, "Cancel")
-        assert sel.input_value() == "hallway"  # put back, nothing changed
+        assert loc.inner_text().startswith("On hallway")  # nothing changed
         assert page.locator(".dxe-step .dxe-tag.warn").count() == 0
 
-        sel.select_option("frame")
+        move()
         _answer(page, _BIND)
-        assert (
-            "Frame" in page.locator(".dxe-disp").inner_text()
-            or "frame" in page.locator(".dxe-disp").inner_text()
-        )
+        assert loc.inner_text().startswith("Moving to frame")
         assert page.locator(".dxe-step .dxe-tag.warn").count() == 1
         _save(page)
         assert app.config["DECK_STORE"].get("mine").device_ids == ["frame"]
