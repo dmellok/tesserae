@@ -1131,11 +1131,18 @@
     return (
       `<section class="dxe-detail" id="dxe-detail" data-panel="${esc(id)}" aria-label="${esc(p.name)}">` +
       `<div class="dxe-detail-head"><span class="dxe-plug" aria-hidden="true"><i class="ph ${esc(p.icon || "ph-squares-four")}"></i></span>` +
-      `<span class="dxe-detail-t"><b>${esc(p.name)}</b>${sub ? `<span class="dxe-soft">${esc(sub)}</span>` : ""}</span>` +
+      `<span class="dxe-detail-t"><span class="dxe-name-row"><b>${esc(p.name)}</b>${editLink(p)}</span>${sub ? `<span class="dxe-soft">${esc(sub)}</span>` : ""}</span>` +
       `<span class="dxe-detail-acts">${drawBtn}${push}</span><button type="button" class="lu-ibtn dxe-close" data-expand="${esc(id)}" data-fk="close-${esc(id)}" aria-label="Close ${esc(p.name)} details" title="Close (Esc)">${ico("x")}</button></div>` +
       body +
       `</section>`
     );
+  }
+
+  /* The gear beside a dashboard's name opens it in the dashboard editor. */
+  function editLink(p) {
+    if (p.missing || !S.urls.editPage) return "";
+    const href = S.urls.editPage.replace("__ID__", encodeURIComponent(p.id));
+    return `<a class="lu-gear dxe-gear" href="${esc(href)}" data-edit-dashboard="${esc(p.id)}" title="Edit dashboard" aria-label="Edit dashboard ${esc(p.name)}">${ico("gear")}</a>`;
   }
 
   /* --- children: what a dashboard shows one of */
@@ -1164,7 +1171,7 @@
       const pinMode = !!it.pinnable && !!pinned;
       const head =
         `<div class="dxe-kids-head"><span class="dxe-mono">${esc(plural(it.count, it.noun || "items"))}</span>` +
-        `<span class="dxe-soft">${pinned ? `Showing the chosen item; the others are skipped.` : it.order === "random" ? `A random one each visit.` : `One per visit, in turn.`}</span>` +
+        `<span class="dxe-soft">${pinned ? `Shows the chosen one.` : it.order === "random" ? `A random one each visit.` : `Rotates through them.`}</span>` +
         (it.pinnable
           ? `<span class="lu-seg dxe-seg sm" role="group" aria-label="${esc(p.name)}: rotate items or show chosen"><button type="button" data-pin-mode="${esc(p.id)}" data-mode="walk" data-fk="pinmode-${esc(p.id)}-walk" aria-pressed="${!pinned}">Rotate items</button><button type="button" data-pin-mode="${esc(p.id)}" data-mode="pin" data-fk="pinmode-${esc(p.id)}-pin" aria-pressed="${!!pinned}">Show chosen</button></span>`
           : "") +

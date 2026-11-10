@@ -998,6 +998,23 @@ main.page.dxe-page {
 .lu.dxe .dxe-detail-t span {
   font-size: var(--t-size-md);
 }
+.lu.dxe .dxe-name-row {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-1);
+  min-width: 0;
+}
+.lu.dxe .dxe-name-row b {
+  min-width: 0;
+}
+.lu.dxe .dxe-name-row .lu-gear {
+  flex: none;
+}
+/* The gear shows while the panel header is hovered or has focus inside. */
+.lu.dxe .dxe-detail-head:hover .lu-gear,
+.lu.dxe .dxe-detail-head:focus-within .lu-gear {
+  opacity: 1;
+}
 /* Its actions in one row, then × apart from them. */
 .lu.dxe .dxe-detail-acts {
   display: flex;

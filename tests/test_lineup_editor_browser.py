@@ -1511,6 +1511,15 @@ def test_the_item_control_says_rotate_items_and_show_chosen(real: tuple[str, Fla
             "Applies to this dashboard in every lineup." in page.locator("#dxe-detail").inner_text()
         )
         assert page.locator(".dxe-it .dxe-tag").first.inner_text().lower() == "chosen"
+        # The panel's wording matches the two choices, and its gear opens the dashboard editor.
+        text = page.locator("#dxe-detail").inner_text()
+        assert "Shows the chosen one." in text or "Rotates through them." in text
+        assert "One per visit" not in text
+        gear = page.locator("#dxe-detail .dxe-name-row a[data-edit-dashboard]")
+        assert gear.get_attribute("href") == "/pages/news"
+        assert gear.get_attribute("aria-label") == "Edit dashboard News"
+        page.locator('[data-pin-mode="news"][data-mode="walk"]').click()
+        assert "Rotates through them." in page.locator("#dxe-detail").inner_text()
         _settle(page)
         assert errors == []
         browser.close()
