@@ -2516,7 +2516,7 @@ def step_item(deck_id: str) -> Response:
         return fail("This lineup doesn't play on that display.", 400)
     from app.step_items import find_item
 
-    item = find_item(page, request.args.get("item") or "")
+    item = find_item(page, request.args.get("item") or "", display_id)
     if item is None:
         return fail("That item isn't in this dashboard.", 404)
     render = _item_render(page, display_id, item)
@@ -2637,7 +2637,9 @@ def push_step(deck_id: str) -> Response:
     if item_key:
         from app.step_items import find_item
 
-        chosen = find_item(page, item_key) if page is not None else None
+        chosen = (
+            find_item(page, item_key, targets[0] if targets else None) if page is not None else None
+        )
         if page is None or chosen is None:
             return fail(_EditError("That item isn't in this dashboard any more.", 409, deck_id))
         for did in targets:
@@ -3132,11 +3134,13 @@ def _when_of(deck: Deck | None) -> dict[str, Any]:
     return {"mode": "between", "start": start, "end": end, "days": days, "kind": kind}
 
 
-def _editor_page(page: Any, dims: tuple[int, int], token: str) -> dict[str, Any]:
+def _editor_page(
+    page: Any, dims: tuple[int, int], token: str, device_id: str | None = None
+) -> dict[str, Any]:
     from app.lineup_editor import dashboard_summary
 
     try:
-        summary = dashboard_summary(page)
+        summary = dashboard_summary(page, device_id)
     except Exception:
         current_app.logger.exception("lineup editor: summary of %s failed", page.id)
         summary = {"subtitle": "", "items": {"mode": "none", "count": 1}, "fresh": ""}
@@ -3181,7 +3185,12 @@ def _editor_state(deck: Deck | None) -> dict[str, Any]:
             token = page_preview_token(p, dims)
         except Exception:
             dims, token = (0, 0), ""
-        page_meta[p.id] = {**_editor_page(p, dims, token), "shared": shared.get(p.id, 0)}
+        page_meta[p.id] = {
+            **_editor_page(
+                p, dims, token, deck.device_ids[0] if deck and deck.device_ids else None
+            ),
+            "shared": shared.get(p.id, 0),
+        }
     # A step whose dashboard was deleted still belongs to the lineup: list it,
     # flagged, so it can be seen and removed rather than kept on every save.
     for dp in deck.pages if deck is not None else []:
@@ -3329,7 +3338,8 @@ def dashboard_items() -> Response:
     """A page of one dashboard's items for the lineup editor's grid: query
     ``page_id``, optional ``offset``, ``limit`` (at most
     ``app.step_items.MAX_PAGE_ITEMS``) and ``q`` (a text filter on the
-    name). Replies ``app.step_items.ItemPage.to_dict()``. Unlike the
+    name); ``display_id`` (optional) names the display whose cell size a
+    widget's item hook sees. Replies ``app.step_items.ItemPage.to_dict()``. Unlike the
     Lineups view (which lists the first ``MAX_STEP_ITEMS``) it reaches every
     item, and it lists a pinned widget's items too."""
     from app.step_items import MAX_PAGE_ITEMS, list_items
@@ -3346,8 +3356,10 @@ def dashboard_items() -> Response:
         except ValueError:
             return default
 
+    display = (request.args.get("display_id") or "").strip()[:100] or None
     found = list_items(
         page,
+        device_id=display,
         offset=whole("offset", 0),
         limit=whole("limit", MAX_PAGE_ITEMS),
         query=(request.args.get("q") or "")[:100],

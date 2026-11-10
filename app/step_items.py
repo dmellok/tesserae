@@ -48,11 +48,13 @@ page.
 
 from __future__ import annotations
 
+import inspect
 import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlsplit
 
 from flask import current_app, url_for
 
@@ -91,6 +93,105 @@ def _plugin_module(plugin_id: str) -> Any:
     return getattr(plugin, "server_module", None) if plugin is not None else None
 
 
+def _accepts_ctx(fn: Callable[..., Any]) -> bool:
+    """True when ``fn`` takes a ``ctx`` keyword (or ``**kwargs``)."""
+    try:
+        params = inspect.signature(fn).parameters.values()
+    except (TypeError, ValueError):
+        return False
+    return any(
+        (p.name == "ctx" and p.kind is not inspect.Parameter.POSITIONAL_ONLY)
+        or p.kind is inspect.Parameter.VAR_KEYWORD
+        for p in params
+    )
+
+
+def _call_hook(fn: Callable[..., Any], options: dict[str, Any], ctx: dict[str, Any] | None) -> Any:
+    """Call a widget's ``lineup_items`` / ``lineup_item_count`` hook; the
+    render ``ctx`` goes only to a hook that declares it, so a widget written
+    with one argument keeps working."""
+    if ctx is not None and _accepts_ctx(fn):
+        return fn(dict(options), ctx=ctx)
+    return fn(dict(options))
+
+
+def _item_ctx(page: Any, placement: Any, plugin_id: str, device_id: str | None) -> dict[str, Any]:
+    """The ``ctx`` an item hook gets, built as the renderer builds a widget's:
+    the widget's data dir, the cell's size on the target display, the
+    placement's id and the display's panel. ``device_id`` None means the
+    dashboard's first bound display."""
+    from app.panel import device_panel, fit_cells_to_panel, resolve_panel_for_page
+
+    reg = current_app.config.get("PLUGIN_REGISTRY")
+    plugin = reg.get(plugin_id) if reg is not None else None
+    devices = current_app.config.get("DEVICE_REGISTRY")
+    settings = current_app.config.get("SETTINGS_STORE")
+    target = device_id or next(iter(getattr(page, "device_ids", None) or []), None)
+    panel = None
+    try:
+        device = devices.get(target) if devices is not None and target else None
+        panel = device_panel(device) if device is not None else None
+        if panel is None:
+            panel = resolve_panel_for_page(page, devices, settings)
+    except Exception:
+        panel = None
+    panel_w = int(getattr(panel, "w", 0) or 0)
+    panel_h = int(getattr(panel, "h", 0) or 0)
+    cell_w = cell_h = 0
+    cells = list(getattr(page, "cells", None) or [])
+    try:
+        idx = next(i for i, c in enumerate(cells) if c is placement)
+        if panel_w and panel_h:
+            coords = [(int(c.x), int(c.y), int(c.w), int(c.h)) for c in cells]
+            strip = getattr(page, "status_bar_cell_id", None)
+            top = next((i for i, c in enumerate(cells) if strip and c.id == strip), None)
+            fitted = fit_cells_to_panel(coords, panel_w, panel_h, top_strip_index=top)
+            cell_w, cell_h = int(fitted[idx][2]), int(fitted[idx][3])
+        else:
+            cell_w, cell_h = int(cells[idx].w), int(cells[idx].h)
+    except Exception:
+        # A canvas element (or anything unfittable) reports its own size.
+        cell_w = int(getattr(placement, "w", 0) or 0)
+        cell_h = int(getattr(placement, "h", 0) or 0)
+    return {
+        "data_dir": str(getattr(plugin, "data_dir", "") or ""),
+        "cell_w": cell_w,
+        "cell_h": cell_h,
+        "placement_id": str(getattr(placement, "id", "") or ""),
+        "device_id": target or None,
+        "panel_w": panel_w,
+        "panel_h": panel_h,
+    }
+
+
+def _safe_thumb(raw: Any) -> str:
+    """A widget-supplied preview image URL, kept only when it is http(s) or an
+    app-relative path (never ``//host`` or a script scheme)."""
+    if not isinstance(raw, str):
+        return ""
+    url = raw.strip()
+    if not url or len(url) > 2000 or any(ord(ch) < 32 or ch in '\\"<>' for ch in url):
+        return ""
+    if url.startswith("/") and not url.startswith("//"):
+        return url
+    parts = urlsplit(url)
+    return url if parts.scheme in ("http", "https") and parts.netloc else ""
+
+
+def _declared_infos(listed: list[dict[str, Any]], limit: int | None = None) -> list[ItemInfo]:
+    return [
+        ItemInfo(
+            i,
+            str(x.get("label") or x["key"]),
+            _safe_thumb(x.get("thumb")),
+            key=str(x["key"]),
+            version=str(x.get("version") or ""),
+        )
+        for i, x in enumerate(listed[:limit])
+        if x.get("key") not in (None, "")
+    ]
+
+
 def _gallery_files(module: Any, folder: str) -> tuple[int, tuple[str, ...]] | None:
     """``(count, the first MAX_STEP_ITEMS names)`` of a gallery folder."""
     listed = _gallery_all(module, folder)
@@ -124,7 +225,7 @@ def _gallery_all(module: Any, folder: str) -> tuple[int, tuple[str, ...]] | None
     return entry[1], entry[2]
 
 
-def _gallery_items(cell: Any) -> StepItems | None:
+def _gallery_items(cell: Any, ctx: dict[str, Any] | None = None) -> StepItems | None:
     folder = str(cell.options.get("folder") or "")
     module = _plugin_module("picture_gallery")
     listed = _gallery_files(module, folder) if module is not None else None
@@ -158,35 +259,28 @@ def _gallery_item_infos(module: Any, folder: str, named: list[tuple[int, str]]) 
     return items
 
 
-def _draw_items(cell: Any) -> StepItems | None:
+def _draw_items(cell: Any, ctx: dict[str, Any] | None = None) -> StepItems | None:
     return StepItems(str(cell.id), "_draw", 0, (), mode="draw")
 
 
-def _declared_items(plugin_id: str, option: str) -> Callable[[Any], StepItems | None]:
+def _declared_items(
+    plugin_id: str, option: str
+) -> Callable[[Any, dict[str, Any] | None], StepItems | None]:
     """A provider for a widget that declared ``lineups.pin_option`` and whose
     server module lists its items with ``lineup_items(options)``."""
 
-    def provide(cell: Any) -> StepItems | None:
+    def provide(cell: Any, ctx: dict[str, Any] | None = None) -> StepItems | None:
         lister = getattr(_plugin_module(plugin_id), "lineup_items", None)
         if not callable(lister) or str(cell.options.get(option) or "").strip():
             return None  # no list to offer, or the cell is already pinned to one entry
         try:
-            listed = [dict(x) for x in lister(dict(cell.options))]
+            listed = [dict(x) for x in _call_hook(lister, dict(cell.options), ctx)]
         except Exception:
             current_app.logger.warning("%s: lineup_items failed", plugin_id, exc_info=True)
             return None
         if len(listed) <= 1:
             return None
-        items = tuple(
-            ItemInfo(
-                i,
-                str(x.get("label") or x["key"]),
-                "",
-                key=str(x["key"]),
-                version=str(x.get("version") or ""),
-            )
-            for i, x in enumerate(listed[:MAX_STEP_ITEMS])
-        )
+        items = tuple(_declared_infos(listed, MAX_STEP_ITEMS))
         return StepItems(str(cell.id), option, len(listed), items)
 
     return provide
@@ -197,7 +291,7 @@ def _declared_items(plugin_id: str, option: str) -> Callable[[Any], StepItems | 
 _KNOWN_DRAW_WIDGETS = frozenset({"picture_google_album", "picture_apple_album"})
 
 
-def _provider(plugin_id: str) -> Callable[[Any], StepItems | None] | None:
+def _provider(plugin_id: str) -> Callable[[Any, dict[str, Any] | None], StepItems | None] | None:
     """How ``plugin_id`` offers items, or None. An uninstalled widget offers
     nothing, whatever the page says."""
     reg = current_app.config.get("PLUGIN_REGISTRY")
@@ -237,42 +331,44 @@ def named_placements(page: Any) -> list[tuple[str, Any]]:
     return named
 
 
-def _placements(page: Any) -> list[tuple[Callable[[Any], StepItems | None], Any]]:
+def _placements(
+    page: Any,
+) -> list[tuple[str, Callable[[Any, dict[str, Any] | None], StepItems | None], Any]]:
     """Every list-walking widget on ``page`` as ``(provider, placement)``."""
     found = []
     for plugin_id, placement in named_placements(page):
         provider = _provider(plugin_id)
         if provider is not None:
-            found.append((provider, placement))
+            found.append((plugin_id, provider, placement))
     return found
 
 
-def step_choices(page: Any) -> StepItems | None:
+def step_choices(page: Any, device_id: str | None = None) -> StepItems | None:
     """The choosable items of ``page``, or None: exactly one placement may walk
     a list, otherwise which one a pin would apply to is ambiguous."""
     placements = _placements(page)
     if len(placements) != 1:
         return None
-    provider, placement = placements[0]
-    return provider(placement)
+    plugin_id, provider, placement = placements[0]
+    return provider(placement, _item_ctx(page, placement, plugin_id, device_id))
 
 
-def step_items(page: Any) -> tuple[int, tuple[ItemInfo, ...]]:
+def step_items(page: Any, device_id: str | None = None) -> tuple[int, tuple[ItemInfo, ...]]:
     """``(count, items)`` for the Lineups view: one item unless the dashboard
     walks a list."""
-    found = step_choices(page)
+    found = step_choices(page, device_id)
     return (found.count, found.items) if found is not None and found.mode == "pick" else (1, ())
 
 
-def step_draws(page: Any) -> bool:
+def step_draws(page: Any, device_id: str | None = None) -> bool:
     """True when the arrows draw the dashboard again rather than choose."""
-    found = step_choices(page)
+    found = step_choices(page, device_id)
     return found is not None and found.mode == "draw"
 
 
-def find_item(page: Any, key: str) -> ItemInfo | None:
+def find_item(page: Any, key: str, device_id: str | None = None) -> ItemInfo | None:
     """The listed item with this key, or None (unknown, or not choosable)."""
-    found = step_choices(page)
+    found = step_choices(page, device_id)
     if found is None or not key:
         return None
     if found.mode == "draw":
@@ -281,11 +377,13 @@ def find_item(page: Any, key: str) -> ItemInfo | None:
     return next((it for it in found.items if it.key == key), None)
 
 
-def pin_item(page: Any, page_dict: dict[str, Any], key: str) -> dict[str, Any] | None:
+def pin_item(
+    page: Any, page_dict: dict[str, Any], key: str, device_id: str | None = None
+) -> dict[str, Any] | None:
     """``page_dict`` with the widget's pin option set to ``key``, or None when
     ``key`` is not one of the page's items."""
-    found = step_choices(page)
-    if found is None or find_item(page, key) is None:
+    found = step_choices(page, device_id)
+    if found is None or find_item(page, key, device_id) is None:
         return None
     options: dict[str, Any] = {found.option: key}
     if found.mode == "draw":
@@ -376,44 +474,41 @@ def _catalog(page: Any) -> tuple[str, Any] | None:
     return found[0] if len(found) == 1 else None
 
 
-def _draw_count(plugin_id: str, options: dict[str, Any]) -> int:
+def _draw_count(plugin_id: str, options: dict[str, Any], ctx: dict[str, Any] | None = None) -> int:
     """What a draw widget's optional ``lineup_item_count(options)`` says, or 0."""
     counter = getattr(_plugin_module(plugin_id), "lineup_item_count", None)
     if not callable(counter):
         return 0
     try:
-        n = counter(dict(options))
+        n = _call_hook(counter, options, ctx)
     except Exception:
         current_app.logger.warning("%s: lineup_item_count failed", plugin_id, exc_info=True)
         return 0
     return n if isinstance(n, int) and not isinstance(n, bool) and n > 0 else 0
 
 
-def _declared_listing(plugin_id: str, option: str, options: dict[str, Any]) -> list[ItemInfo]:
+def _declared_listing(
+    plugin_id: str, option: str, options: dict[str, Any], ctx: dict[str, Any] | None = None
+) -> list[ItemInfo]:
     lister = getattr(_plugin_module(plugin_id), "lineup_items", None)
     if not callable(lister):
         return []
     rest = {k: v for k, v in options.items() if k != option}
     try:
-        listed = [dict(x) for x in lister(rest)]
+        listed = [dict(x) for x in _call_hook(lister, rest, ctx)]
     except Exception:
         current_app.logger.warning("%s: lineup_items failed", plugin_id, exc_info=True)
         return []
-    return [
-        ItemInfo(
-            i,
-            str(x.get("label") or x["key"]),
-            "",
-            key=str(x["key"]),
-            version=str(x.get("version") or ""),
-        )
-        for i, x in enumerate(listed)
-        if x.get("key") not in (None, "")
-    ]
+    return _declared_infos(listed)
 
 
 def list_items(
-    page: Any, *, offset: int = 0, limit: int = MAX_PAGE_ITEMS, query: str = ""
+    page: Any,
+    *,
+    offset: int = 0,
+    limit: int = MAX_PAGE_ITEMS,
+    query: str = "",
+    device_id: str | None = None,
 ) -> ItemPage:
     """A page of ``page``'s items, filtered by ``query`` (case-insensitive,
     on the label or key). Unlike ``step_choices`` this reads a pinned
@@ -426,6 +521,7 @@ def list_items(
         return ItemPage("none", 1, 1, 0, (), "items")
     plugin_id, placement = found
     options = dict(getattr(placement, "options", None) or {})
+    ctx = _item_ctx(page, placement, plugin_id, device_id)
     noun = _noun(plugin_id)
     if plugin_id == "picture_gallery":
         folder = str(options.get("folder") or "")
@@ -439,7 +535,7 @@ def list_items(
     declared = _declared(plugin_id)
     option = declared.get("pin_option")
     if isinstance(option, str) and option:
-        every = _declared_listing(plugin_id, option, options)
+        every = _declared_listing(plugin_id, option, options, ctx)
         pinned = str(options.get(option) or "").strip()
         label = next((it.label for it in every if it.key == pinned), pinned)
         kept = [it for it in every if not q or q in it.label.casefold() or q in it.key.casefold()]
@@ -455,14 +551,14 @@ def list_items(
             pinned=pinned,
             pinned_label=label if pinned else "",
         )
-    count = _draw_count(plugin_id, options)
+    count = _draw_count(plugin_id, options, ctx)
     return ItemPage("draw", count, count, 0, (), noun, plugin_id)
 
 
-def item_summary(page: Any) -> dict[str, Any]:
+def item_summary(page: Any, device_id: str | None = None) -> dict[str, Any]:
     """What the editor's row says about ``page``'s items: ``{mode, count,
     noun, plugin, pinnable, pinned, pinned_label}``."""
-    found = list_items(page, limit=1)
+    found = list_items(page, limit=1, device_id=device_id)
     return {
         "mode": found.mode,
         "count": found.total,
@@ -474,7 +570,7 @@ def item_summary(page: Any) -> dict[str, Any]:
     }
 
 
-def pin_page(page: Any, key: str | None) -> dict[str, Any] | None:
+def pin_page(page: Any, key: str | None, device_id: str | None = None) -> dict[str, Any] | None:
     """``page``'s definition (a dict) with its declared widget pinned to
     ``key``, or unpinned for None/"". None when the page has no pinnable
     widget or ``key`` is not one of its items."""
@@ -486,8 +582,9 @@ def pin_page(page: Any, key: str | None) -> dict[str, Any] | None:
     if not isinstance(option, str) or not option:
         return None
     options = dict(getattr(placement, "options", None) or {})
+    ctx = _item_ctx(page, placement, plugin_id, device_id)
     key = (key or "").strip()
-    if key and key not in {it.key for it in _declared_listing(plugin_id, option, options)}:
+    if key and key not in {it.key for it in _declared_listing(plugin_id, option, options, ctx)}:
         return None
     cell_id = str(placement.id)
 

@@ -1773,7 +1773,9 @@ def compose(page_id: str) -> Response:
     if item_key:
         from app.step_items import pin_item
 
-        pinned_dict = pin_item(page, page_dict, item_key)
+        pinned_dict = pin_item(
+            page, page_dict, item_key, (request.args.get("device_id") or "").strip() or None
+        )
         if pinned_dict is None:
             abort(404)
         page_dict = pinned_dict

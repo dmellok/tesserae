@@ -230,6 +230,14 @@ drawing render also carries hidden options `_draw` (a token) and `_browse`
 (how many turns past the current one, for a widget that keeps its own turn:
 show that turn and move nothing).
 
+An item may also carry `"thumb": "<image URL>"` (absolute http(s) or an app-relative
+path; anything else is dropped) to show a preview picture in the lineup editor and the
+Lineups page; without one the item shows its rendered thumbnail or a label card. A
+`lineup_items(options, *, ctx=None)` or `lineup_item_count(options, *, ctx=None)` that
+names a `ctx` keyword also gets a plain dict with `data_dir`, `cell_w` and `cell_h` (the
+element's size in px on the target display), `placement_id`, `device_id` (or `None`),
+`panel_w` and `panel_h`; a hook with one argument is called as before.
+
 Two optional extras for the lineup editor, which lists a dashboard's items in its
 rows: `"lineups": { "noun": "papers" }` names them ("6 papers" instead of "6 items"),
 and a draw widget can report how many items it draws from with

@@ -67,7 +67,7 @@ def _count(n: int, noun: str) -> str:
     return f"{n} {noun[:-1] if n == 1 and noun.endswith('s') else noun}"
 
 
-def dashboard_summary(page: Any) -> dict[str, Any]:
+def dashboard_summary(page: Any, device_id: str | None = None) -> dict[str, Any]:
     """``{kind, icon, facts, subtitle, items, fresh}`` for one dashboard.
 
     ``kind`` names what it is (the widget, or the first two of several) and
@@ -77,7 +77,7 @@ def dashboard_summary(page: Any) -> dict[str, Any]:
     what keeps it current, from its own Updates (``Page.refresh_minutes``)."""
     widgets = named_placements(page)
     items: dict[str, Any] = (
-        item_summary(page) if widgets else {"mode": "none", "count": 1, "noun": "items"}
+        item_summary(page, device_id) if widgets else {"mode": "none", "count": 1, "noun": "items"}
     )
     lister = items.get("plugin") or ""
     icon = ""

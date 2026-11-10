@@ -835,3 +835,94 @@ def test_deleting_says_lineup(app: Flask) -> None:
     _deck(app)
     resp = app.test_client().post("/decks/lu/delete", follow_redirects=True)
     assert b"Lineup deleted." in resp.data
+
+
+# -- item hooks: render context and preview images --------------------------------
+
+
+def test_an_item_hook_gets_ctx_only_when_it_asks_and_old_hooks_still_work(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _register(app, "tv")
+    seen: list[dict[str, Any]] = []
+
+    def new_hook(options: dict[str, Any], *, ctx: dict[str, Any] | None = None) -> list[Any]:
+        seen.append(ctx or {})
+        return PAPERS
+
+    def count_hook(options: dict[str, Any], *, ctx: dict[str, Any] | None = None) -> int:
+        seen.append(ctx or {})
+        return 7
+
+    manifest = {"lineups": {"pin_option": "paper", "noun": "papers"}}
+    _install(
+        app,
+        monkeypatch,
+        newpaper={"manifest": manifest, "module": SimpleNamespace(lineup_items=new_hook)},
+        oldpaper={
+            "manifest": manifest,
+            "module": SimpleNamespace(lineup_items=lambda options: PAPERS),
+        },
+        drawer={
+            "manifest": {"lineups": {"draw": True}},
+            "module": SimpleNamespace(lineup_item_count=count_hook),
+        },
+    )
+    ps = app.config["PAGE_STORE"]
+    for pid, plugin in (("p1", "newpaper"), ("p2", "oldpaper"), ("p3", "drawer")):
+        ps.save(
+            Page(
+                id=pid,
+                name=pid,
+                device_ids=["tv"],
+                cells=[Cell(id="c1", plugin=plugin, x=0, y=0, w=10, h=10, options={})],
+            )
+        )
+    c = app.test_client()
+    got = c.get("/decks/dashboard-items?page_id=p1&display_id=tv").get_json()
+    assert got["total"] == 2
+    ctx = seen[-1]
+    assert set(ctx) >= {
+        "data_dir", "cell_w", "cell_h", "placement_id", "device_id", "panel_w", "panel_h"
+    }  # fmt: skip
+    assert ctx["placement_id"] == "c1" and ctx["device_id"] == "tv"
+    assert ctx["cell_w"] > 0 and ctx["cell_h"] > 0 and ctx["panel_w"] > 0
+    # Without a display: the dashboard's first bound one.
+    c.get("/decks/dashboard-items?page_id=p1")
+    assert seen[-1]["device_id"] == "tv"
+    # A hook with the old one-argument signature is called as before.
+    assert c.get("/decks/dashboard-items?page_id=p2").get_json()["total"] == 2
+    # The count hook gets it too.
+    assert c.get("/decks/dashboard-items?page_id=p3").get_json()["total"] == 7
+    assert seen[-1]["placement_id"] == "c1"
+
+
+def test_an_item_can_carry_a_preview_image_and_only_safe_urls_survive(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    items = [
+        {"key": "a", "label": "A", "thumb": "https://img.example/a.jpg"},
+        {"key": "b", "label": "B", "thumb": "/plugins/x/b.png"},
+        {"key": "c", "label": "C", "thumb": "javascript:alert(1)"},
+        {"key": "d", "label": "D", "thumb": "//evil.example/d.jpg"},
+        {"key": "e", "label": "E", "thumb": 'https://x.example/"onerror=1'},
+        {"key": "f", "label": "F"},
+    ]
+    _install(
+        app,
+        monkeypatch,
+        papers={
+            "manifest": {"lineups": {"pin_option": "paper"}},
+            "module": SimpleNamespace(lineup_items=lambda options: items),
+        },
+    )
+    _widget_page(app, "papers", {}, "news")
+    got = app.test_client().get("/decks/dashboard-items?page_id=news").get_json()
+    assert [it["thumb_url"] for it in got["items"]] == [
+        "https://img.example/a.jpg",
+        "/plugins/x/b.png",
+        "",
+        "",
+        "",
+        "",
+    ]
