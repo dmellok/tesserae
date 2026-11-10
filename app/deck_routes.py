@@ -73,6 +73,7 @@ from app.state.deck_model import Deck, DeckPage
 from app.state.deck_store import DeckStore
 from app.state.page_store import PageStore
 from app.step_items import step_draws as _step_draws
+from app.step_items import step_fit as _step_fit
 from app.step_items import step_items as _step_items
 
 bp = Blueprint("decks", __name__, url_prefix="/decks")
@@ -1505,6 +1506,7 @@ def _build_lineups_view(
             item_count=count,
             items=items,
             draw=_step_draws(page) if page is not None else False,
+            item_fit=_step_fit(page) if page is not None else False,
         )
 
     by_display: dict[str, list[LineupInput]] = {d.id: [] for d in devices}

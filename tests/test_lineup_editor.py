@@ -926,3 +926,15 @@ def test_an_item_can_carry_a_preview_image_and_only_safe_urls_survive(
         "",
         "",
     ]
+
+
+def test_a_gallery_set_to_fit_says_its_previews_are_letterboxed(
+    app: Flask, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _gallery(app, monkeypatch, tmp_path, 5)
+    c = app.test_client()
+    assert c.get("/decks/dashboard-items?page_id=photos").get_json()["fit"] is True
+    _widget_page(
+        app, "picture_gallery", {"folder": "trip", "mode": "sequential", "scale": "fill"}, "fills"
+    )
+    assert c.get("/decks/dashboard-items?page_id=fills").get_json()["fit"] is False

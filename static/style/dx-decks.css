@@ -817,16 +817,16 @@ main.page.dxe-page {
 .lu.dxe .dxe-tiles .lu-tile.stacked::before,
 .lu.dxe .dxe-tiles .lu-tile.stacked::after {
   opacity: 1;
-  border: 1px solid color-mix(in oklab, var(--t-fg) 42%, transparent);
+  border: 1px solid var(--lu-stack-edge);
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.18);
 }
 .lu.dxe .dxe-tiles .lu-tile.stacked::before {
   transform: translate(12px, -12px);
-  background: color-mix(in oklab, var(--lu-paper) 78%, var(--t-fg));
+  background: var(--lu-stack-far);
 }
 .lu.dxe .dxe-tiles .lu-tile.stacked::after {
   transform: translate(6px, -6px);
-  background: color-mix(in oklab, var(--lu-paper) 90%, var(--t-fg));
+  background: var(--lu-stack-near);
 }
 .lu.dxe .dxe-tiles .lu-count {
   right: -10px;
@@ -836,10 +836,6 @@ main.page.dxe-page {
   padding: 0 8px;
   font: 700 12px/24px var(--t-font-mono);
   box-shadow: 0 0 0 2px var(--t-surface);
-}
-.lu.dxe .dxe-tiles .lu-count.is-draw {
-  cursor: pointer;
-  letter-spacing: 0.04em;
 }
 /* The item arrows, as on the Lineups page: on hover or focus, always on touch,
    over a shade at the foot of the picture only. */
@@ -1124,17 +1120,22 @@ main.page.dxe-page {
 }
 .lu.dxe .dxe-grid-items {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(var(--dxe-iw, 104px), 1fr));
 }
-/* Every tile the same size: a 16:10 box for a photo or a named item, the
-   display's shape (as the row's thumbnail) for a drawn render. */
+/* Every item tile is a box in the display's own shape (--dxe-arw/--dxe-arh, set
+   on .dxe-kids): tall on a portrait frame, wide on a landscape one. A picture
+   fills it the way the frame shows it: cropped to cover, or whole where the
+   widget letterboxes (.is-fit). */
+.lu.dxe .dxe-kids {
+  --dxe-iw: clamp(56px, calc(84px * var(--dxe-arw, 16) / var(--dxe-arh, 10)), 120px);
+}
 .lu.dxe .dxe-it {
   display: flex;
   flex: none;
   flex-direction: column;
   align-items: stretch;
   gap: 5px;
-  width: 104px;
+  width: var(--dxe-iw, 104px);
   min-width: 0;
   font-size: 11.5px;
   color: var(--t-fg-soft);
@@ -1162,7 +1163,7 @@ main.page.dxe-page {
   display: grid;
   place-items: center;
   width: 100%;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: var(--dxe-arw, 16) / var(--dxe-arh, 10);
   border-radius: var(--lu-r-xs);
   border: 1px solid var(--t-border-strong);
   background: var(--lu-paper);
@@ -1172,6 +1173,23 @@ main.page.dxe-page {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+.lu.dxe .dxe-kids.is-fit .dxe-it-pic img {
+  object-fit: contain;
+}
+.lu.dxe .dxe-it.is-ghost .dxe-it-pic {
+  background: color-mix(in oklab, var(--t-fg) 7%, var(--lu-paper));
+  animation: dxe-pulse 1.2s ease-in-out infinite alternate;
+}
+@keyframes dxe-pulse {
+  to {
+    opacity: 0.55;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lu.dxe .dxe-it.is-ghost .dxe-it-pic {
+    animation: none;
+  }
 }
 .lu.dxe .dxe-it.is-render .dxe-it-pic {
   width: var(--dxe-tw);
@@ -1210,7 +1228,8 @@ main.page.dxe-page {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 65px;
+  align-self: stretch;
+  min-height: 56px;
   padding: 0 14px;
   border: 1px dashed var(--t-border-strong);
   border-radius: var(--lu-r);

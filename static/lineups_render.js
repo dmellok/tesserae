@@ -49,7 +49,7 @@
   function thumb(name, url, aspect, orientation, cls, title, priority, display, extra) {
     const ar = String(aspect || "16/10").split("/");
     const inner = url
-      ? `<img src="${esc(url)}" alt="" width="${esc(ar[0])}" height="${esc(ar[1])}" loading="${priority ? "eager" : "lazy"}" decoding="async"${priority ? ' fetchpriority="high"' : ""}>`
+      ? `<img src="${esc(url)}" alt="" width="${esc(ar[0])}" height="${esc(ar[1])}" loading="${priority ? "eager" : "lazy"}" decoding="async" referrerpolicy="no-referrer"${priority ? ' fetchpriority="high"' : ""}>`
       : `<span class="lu-thumb-ph" aria-hidden="true">${esc(
           String(cls || "")
             .split(" ")
@@ -342,8 +342,8 @@
   // The lineup editor (deck_editor.js) draws its dashboards with this too and adds, all
   // optional: ``ui.stepKey(s)`` (data-step), ``ui.stepClass(s)`` and ``ui.stepAttrs(s)`` on
   // the step, ``ui.tileExtra(s)`` inside the tile, ``ui.captionExtra(s)`` in the caption,
-  // ``ui.pushOverlay === false`` (Push now lives elsewhere; the arrows stay) and
-  // ``ui.drawBadge`` (a widget that draws shows a stacked tile and "draw").
+  // ``ui.pushOverlay === false`` (Push now lives elsewhere; the arrows stay).
+  // A tile is a stack with a ×N badge only when the dashboard lists more than one item.
   function stepHtml(d, l, s, ui) {
     const choice = (ui && ui.itemChoice && ui.itemChoice(d, l, s)) || null;
     const canPush = !!(d.id && l.actions.push_step_url && !s.missing && !s.off_display);
@@ -371,13 +371,10 @@
     const items = canPick
       ? `<span class="lu-items" role="group" aria-label="${draw ? `Draw another ${esc(s.name)} picture` : `Choose which ${esc(s.name)} item to push`}"><button type="button" class="lu-it" data-item="${esc(l.id)}:${s.index}:-1" aria-label="${prevLabel}" title="${prevLabel}"${draw && !choice ? " disabled" : ""}>${ico("chevl")}</button><span class="lu-it-pos" aria-hidden="true">${choice && !draw ? `${choice.idx + 1}/${s.items.length}` : ""}</span><button type="button" class="lu-it" data-item="${esc(l.id)}:${s.index}:1" aria-label="${nextLabel}" title="${nextLabel}">${ico("chev")}</button></span>`
       : "";
-    const drawMark = !!(ui && ui.drawBadge) && draw && !(s.item_count > 1);
     const count =
       s.item_count > 1
         ? `<button type="button" class="lu-count" data-peek="${esc(l.id)}:${s.index}" aria-haspopup="dialog" aria-expanded="false" title="${s.item_count} items in this step. Show them">×${s.item_count}</button>`
-        : drawMark
-          ? `<span class="lu-count is-draw" title="A fresh draw each time">draw</span>`
-          : "";
+        : "";
     const hook = (name) => (ui && ui[name] ? ui[name](s) || "" : "");
     const cond = s.conditional
       ? ` <span title="Shows only while its conditions pass">${ico("funnel")}</span>`
@@ -397,7 +394,7 @@
           : "";
     return (
       `<li class="lu-step${cls ? " " + cls : ""}${s.missing ? " is-missing" : ""}${s.off_display ? " is-offdisplay" : ""}${hook("stepClass") ? " " + hook("stepClass") : ""}" data-step="${esc(ui && ui.stepKey ? ui.stepKey(s) : s.index)}"${hook("stepAttrs")}${s.missing ? ' title="This dashboard was deleted; remove it from the lineup"' : s.off_display ? ` title="${esc(s.off_display_note)}"` : ""}><figure><span class="lu-slot">${pill}</span>` +
-      `<span class="lu-tile${s.item_count > 1 || drawMark ? " stacked" : ""}${canPick ? " has-items" : ""}${choice && choice.state === "loading" ? " is-loading" : ""}${choice && (choice.state === "error" || choice.state === "busy") ? " is-itemfail" : ""}">${thumb(s.name, picked || s.thumb_url, s.aspect, d.orientation || s.orientation, s.missing ? "missing" : s.off_display ? "offdisplay" : "", null, false, d, s.thumb_url && !s.missing && !s.off_display ? zoomBtn(`step:${l.id}:${s.index}`, `Zoom ${s.name}`) : "")}<span class="lu-scrim" aria-hidden="true"></span>${push}${items}<span class="lu-pushed-msg" aria-hidden="true"></span>${count}${hook("tileExtra")}</span>` +
+      `<span class="lu-tile${s.item_count > 1 ? " stacked" : ""}${canPick ? " has-items" : ""}${choice && choice.state === "loading" ? " is-loading" : ""}${choice && (choice.state === "error" || choice.state === "busy") ? " is-itemfail" : ""}">${thumb(s.name, picked || s.thumb_url, s.aspect, d.orientation || s.orientation, s.missing ? "missing" : s.off_display ? "offdisplay" : "", null, false, d, s.thumb_url && !s.missing && !s.off_display ? zoomBtn(`step:${l.id}:${s.index}`, `Zoom ${s.name}`) : "")}<span class="lu-scrim" aria-hidden="true"></span>${push}${items}<span class="lu-pushed-msg" aria-hidden="true"></span>${count}${hook("tileExtra")}</span>` +
       `<figcaption><span class="lu-step-name">${esc(s.name)}</span><span class="lu-step-meta">${esc(s.position)}${cond}</span>${off}${hook("captionExtra")}</figcaption></figure>${sep}</li>`
     );
   }
@@ -570,7 +567,7 @@
       // its initial, never the step's picture standing in for it.
       const url = it && it.key ? it.thumb_url : (it && it.thumb_url) || s.thumb_url;
       items.push(
-        `<li class="lu-pk-item">${thumb(s.name, url, s.aspect, d.orientation || s.orientation, "", label, false, d)}` +
+        `<li class="lu-pk-item">${thumb(s.name, url, s.aspect, d.orientation || s.orientation, s.item_fit ? "it fit" : "it", label, false, d)}` +
           "</li>"
       );
     }

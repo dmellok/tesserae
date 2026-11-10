@@ -49,6 +49,12 @@ main.page.lu-page {
   --lu-warn-text: color-mix(in oklab, var(--t-warn) 80%, var(--t-fg));
   --lu-shadow-pop: var(--t-shadow-md);
   --lu-paper: #f2efe7; /* an e-paper sheet behind a thumbnail */
+  /* The cards behind a multi-item tile, and its ×N badge. */
+  --lu-stack-far: color-mix(in oklab, var(--lu-paper) 78%, var(--t-fg));
+  --lu-stack-near: color-mix(in oklab, var(--lu-paper) 90%, var(--t-fg));
+  --lu-stack-edge: color-mix(in oklab, var(--t-fg) 42%, transparent);
+  --lu-count-bg: var(--t-fg);
+  --lu-count-fg: var(--t-bg);
   font-size: 14px;
   line-height: 1.45;
   color: var(--t-fg);
@@ -60,6 +66,12 @@ main.page.lu-page {
   --lu-blk-bg: color-mix(in oklab, var(--t-fg) 6%, var(--t-border-strong));
   --lu-on-warn: var(--t-bg);
   --lu-pz-edge: color-mix(in oklab, var(--t-warn) 25%, var(--t-bg));
+  /* Dark: cards darker than the page's surface, with a lighter edge. */
+  --lu-stack-far: color-mix(in oklab, var(--t-bg) 70%, var(--t-surface));
+  --lu-stack-near: color-mix(in oklab, var(--t-bg) 35%, var(--t-surface));
+  --lu-stack-edge: color-mix(in oklab, var(--t-fg) 38%, transparent);
+  --lu-count-bg: color-mix(in oklab, var(--t-fg) 18%, var(--t-surface));
+  --lu-count-fg: var(--t-fg);
 }
 :root[data-ui="paper"] .lu {
   --lu-r: 2px;
@@ -2465,6 +2477,14 @@ main.page.lu-page {
   height: 100%;
   object-fit: contain;
 }
+/* An item's preview fills the display's box as the frame shows it: cropped to
+   cover, or whole where the widget letterboxes (.fit). */
+.lu .lu-thumb.it img {
+  object-fit: cover;
+}
+.lu .lu-thumb.it.fit img {
+  object-fit: contain;
+}
 .lu .lu-thumb-ph {
   display: grid;
   place-items: center;
@@ -2538,7 +2558,7 @@ main.page.lu-page {
   inset: 0;
   border-radius: var(--lu-r-xs);
   border: 1px solid var(--t-border-strong);
-  background: color-mix(in oklab, var(--lu-paper) 80%, var(--t-surface));
+  background: var(--lu-stack-near);
 }
 .lu .lu-tile.stacked::before {
   transform: translate(8px, -8px);
@@ -2560,8 +2580,9 @@ main.page.lu-page {
   min-width: 28px;
   padding: 0 6px;
   border-radius: var(--lu-r-pill);
-  background: var(--t-fg);
-  color: var(--t-bg);
+  background: var(--lu-count-bg);
+  color: var(--lu-count-fg);
+  box-shadow: inset 0 0 0 1px var(--lu-stack-edge);
   font: 700 11px/20px var(--t-font-mono);
   text-align: center;
   cursor: pointer;
@@ -3402,6 +3423,7 @@ main.page.lu-page {
   }
   /* ×N: a 44px target in the tile's top-right corner, the badge inside it. */
   .lu .lu-count {
+    box-shadow: none;
     right: -8px;
     bottom: auto;
     top: -10px;
@@ -3413,8 +3435,9 @@ main.page.lu-page {
     display: flex;
     align-items: flex-start;
     justify-content: flex-end;
-    background: linear-gradient(var(--t-fg), var(--t-fg)) no-repeat right top / 32px 20px;
-    color: var(--t-bg);
+    background: linear-gradient(var(--lu-count-bg), var(--lu-count-bg)) no-repeat right top / 32px
+      20px;
+    color: var(--lu-count-fg);
     line-height: 20px;
   }
   :root:not([data-ui="paper"]) .lu .lu-count {

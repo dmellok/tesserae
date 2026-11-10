@@ -27,7 +27,7 @@
   const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
   const GRID_PAGE = 18;
-  const STRIP = 5;
+  const STRIP = 8; // items shown up front, then "+N more" opens the whole list
   const SHOW_FOR = [5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240];
   const UPDATES = [0, 1, 5, 10, 15, 30, 60, 120, 360, 720, 1440];
   const KEEP_READY = [0, 5, 15, 30, 60, 120, 360];
@@ -904,7 +904,6 @@
     });
     const hooks = {
       pushOverlay: false,
-      drawBadge: true,
       itemChoice: (_d, _l, vm) => choiceView(vm.dashboard_id),
       stepKey: (vm) => vm.dashboard_id,
       stepAttrs: () => ` draggable="true"`,
@@ -975,7 +974,7 @@
   function itemTile(p, it, mark, pinMode) {
     const label = it.label || `#${it.index + 1}`;
     const pic = it.thumb_url
-      ? `<img src="${esc(it.thumb_url)}" alt="" loading="lazy" decoding="async">`
+      ? `<img src="${esc(it.thumb_url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
       : `<span class="dxe-it-word">${esc(label)}</span>`;
     const tag = mark
       ? `<span class="dxe-tag ${mark === "Chosen" ? "now" : "mute"}">${esc(mark)}</span>`
@@ -1005,7 +1004,12 @@
         `</div>`;
       const strip = ui.strip[p.id];
       let tiles = "";
-      if (!strip || strip.busy) tiles = `<span class="dxe-soft dxe-loading">Loading…</span>`;
+      if (!strip || strip.busy)
+        tiles = Array.from(
+          { length: Math.min(STRIP, it.count || STRIP) },
+          () =>
+            `<span class="dxe-it is-ghost" aria-hidden="true"><span class="dxe-it-pic"></span></span>`
+        ).join("");
       else if (strip.err) tiles = `<span class="dxe-soft">${esc(strip.err)}</span>`;
       else {
         const gridOpen = !!(ui.grid[p.id] && ui.grid[p.id].open);
@@ -1016,9 +1020,9 @@
         const more = it.count - Math.min(STRIP, strip.data.items.length);
         const g = ui.grid[p.id];
         if (more > 0)
-          tiles += `<button type="button" class="dxe-more" data-grid="${esc(p.id)}" data-fk="grid-${esc(p.id)}" aria-expanded="${!!(g && g.open)}">${ico("layers")}<span><b>${g && g.open ? "Hide" : `+ ${more} more`}</b><small>${g && g.open ? "" : "Browse all"}</small></span></button>`;
+          tiles += `<button type="button" class="dxe-more" data-grid="${esc(p.id)}" data-fk="grid-${esc(p.id)}" aria-expanded="${!!(g && g.open)}">${ico("layers")}<span><b>${g && g.open ? "Hide" : `+${more} more`}</b><small>${g && g.open ? "" : "Browse all"}</small></span></button>`;
       }
-      return `<div class="dxe-kids">${head}<div class="dxe-strip">${tiles}</div>${gridHtml(s, p)}</div>`;
+      return `<div class="dxe-kids${it.fit ? " is-fit" : ""}"${shapeVars()} aria-busy="${!strip || !!strip.busy}">${head}<div class="dxe-strip">${tiles}</div>${gridHtml(s, p)}</div>`;
     }
     if (it.mode === "draw") {
       const c = ui.choice[p.id];
@@ -1698,6 +1702,7 @@
   async function fetchItems(id, offset, limit, q) {
     const u = new URLSearchParams({ page_id: id, offset: String(offset), limit: String(limit) });
     if (q) u.set("q", q);
+    if (st.display) u.set("display_id", st.display);
     return request(`${S.urls.items}?${u}`, { headers: { Accept: "application/json" } });
   }
   async function loadStrip(id) {
@@ -1707,10 +1712,33 @@
     ui.strip[id] = { busy: true };
     try {
       ui.strip[id] = { data: await fetchItems(id, 0, STRIP + 1, "") };
+      renderStripThumbs(id);
     } catch (err) {
       ui.strip[id] = { err: err.net ? "Can't reach Tesserae; open it again." : err.message };
     }
     draw();
+  }
+  // An item with no picture of its own is drawn by the same endpoint the arrows
+  // use, a few at a time; its tile shows its name until the picture lands.
+  function renderStripThumbs(id) {
+    const strip = ui.strip[id];
+    if (!strip || !strip.data || !canPick(id)) return;
+    const todo = strip.data.items.slice(0, STRIP).filter((x) => !x.thumb_url && x.key);
+    let next = 0;
+    let timer = 0;
+    const worker = async () => {
+      while (next < todo.length && ui.strip[id] === strip) {
+        const x = todo[next++];
+        const e = { key: x.key };
+        await pollItem(id, e, () => ui.strip[id] === strip);
+        if (e.state === "ready" && ui.strip[id] === strip) {
+          x.thumb_url = e.thumb;
+          window.clearTimeout(timer);
+          timer = window.setTimeout(itemChanged, 120);
+        }
+      }
+    };
+    for (let i = 0; i < Math.min(3, todo.length); i++) worker();
   }
   const gridTimers = {}; // page id -> its search's debounce
   async function loadGrid(id) {

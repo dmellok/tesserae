@@ -366,6 +366,17 @@ def step_draws(page: Any, device_id: str | None = None) -> bool:
     return found is not None and found.mode == "draw"
 
 
+def step_fit(page: Any) -> bool:
+    """True when the dashboard's pictures are letterboxed on the frame (a
+    gallery set to fit), so item previews show them whole; otherwise a
+    preview fills its box the way the frame shows it."""
+    for plugin_id, placement in named_placements(page):
+        if plugin_id == "picture_gallery":
+            options = getattr(placement, "options", None) or {}
+            return str(options.get("scale") or "fit") != "fill"
+    return False
+
+
 def find_item(page: Any, key: str, device_id: str | None = None) -> ItemInfo | None:
     """The listed item with this key, or None (unknown, or not choosable)."""
     found = step_choices(page, device_id)
@@ -434,6 +445,7 @@ class ItemPage:
     pinnable: bool = False
     pinned: str = ""
     pinned_label: str = ""
+    fit: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -446,6 +458,7 @@ class ItemPage:
             "pinnable": self.pinnable,
             "pinned": self.pinned,
             "pinned_label": self.pinned_label,
+            "fit": self.fit,
             "items": [
                 {"index": it.index, "label": it.label, "key": it.key, "thumb_url": it.thumb_url}
                 for it in self.items
@@ -531,7 +544,9 @@ def list_items(
         named = [(i, n) for i, n in enumerate(names) if not q or q in n.casefold()]
         items = _gallery_item_infos(module, folder, named[offset : offset + limit])
         mode = "pick" if len(names) > 1 else "none"
-        return ItemPage(mode, len(names), len(named), offset, tuple(items), noun, plugin_id)
+        return ItemPage(
+            mode, len(names), len(named), offset, tuple(items), noun, plugin_id, fit=step_fit(page)
+        )
     declared = _declared(plugin_id)
     option = declared.get("pin_option")
     if isinstance(option, str) and option:
@@ -567,6 +582,7 @@ def item_summary(page: Any, device_id: str | None = None) -> dict[str, Any]:
         "pinnable": found.pinnable,
         "pinned": found.pinned,
         "pinned_label": found.pinned_label,
+        "fit": found.fit,
     }
 
 

@@ -315,13 +315,13 @@ def test_dashboards_reorder_items_add_remove_and_discard(real: tuple[str, Flask]
         page.keyboard.press("Alt+ArrowDown")
         assert _steps(page) == ["clock", "photos", "climate"]
         assert page.locator("[data-step]:focus-within").get_attribute("data-step") == "photos"
-        # Its items: the first few, then every one in a searchable, paged grid.
+        # Its items: the first eight, then every one in a searchable, paged grid.
         page.locator('[data-expand="photos"]').click()
         head = page.locator('[data-panel="photos"] .dxe-detail-head')
         assert "Gallery · 31 photos" in head.inner_text()
         strip = page.locator('[data-panel="photos"] .dxe-strip .dxe-it')
-        strip.first.wait_for()
-        assert strip.count() == 5
+        page.locator('[data-panel="photos"] .dxe-strip .dxe-it img').first.wait_for()
+        assert strip.count() == 8
         page.locator('[data-grid="photos"]').click()
         grid = page.locator('[data-grid-for="photos"] .dxe-grid-items .dxe-it')
         grid.first.wait_for()
@@ -897,9 +897,9 @@ def test_a_drawing_dashboards_arrows_draw_another_and_go_back(
         page.route("**/_img/**", lambda r: r.fulfill(path=icon))
         page.route("**/step-item?**", item)
         tile = page.locator('[data-step="album"]')
-        # It cannot count its photos: a stacked tile that says "draw".
-        assert tile.locator(".lu-count").inner_text() == "draw"
-        assert tile.locator(".lu-tile.stacked").count() == 1
+        # It cannot count its photos, so no stack and no badge; it still draws.
+        assert tile.locator(".lu-count").count() == 0
+        assert tile.locator(".lu-tile.stacked").count() == 0
         back = tile.locator('.lu-it[aria-label="Previous picture"]')
         assert back.is_disabled()  # nothing drawn here yet
         tile.hover()
@@ -1498,5 +1498,128 @@ def test_the_item_control_says_rotate_items_and_show_chosen(real: tuple[str, Fla
         )
         assert page.locator(".dxe-it .dxe-tag").first.inner_text().lower() == "chosen"
         _settle(page)
+        assert errors == []
+        browser.close()
+
+
+def _listing_widget(app: Flask, n_by_plugin: dict[str, int]) -> None:
+    """Fake list-walking widgets (plugin id -> item count) whose items carry a preview."""
+    from types import SimpleNamespace
+
+    reg = app.config["PLUGIN_REGISTRY"]
+    real_get = reg.get
+
+    def fake(n: int) -> Any:
+        return SimpleNamespace(
+            manifest={"lineups": {"pin_option": "paper", "noun": "papers"}},
+            server_module=SimpleNamespace(
+                lineup_items=lambda options, n=n: [
+                    {"key": f"k{i}", "label": f"Paper {i}", "thumb": f"/_img/{i}.png"}
+                    for i in range(n)
+                ]
+            ),
+        )
+
+    fakes = {pid: fake(n) for pid, n in n_by_plugin.items()}
+    reg.get = lambda pid: fakes.get(pid) or real_get(pid)
+
+
+def test_items_show_the_first_eight_in_the_displays_shape_and_stack_only_when_many(
+    real: tuple[str, Flask],
+) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    _frame(app)
+    _listing_widget(app, {"papers": 12, "oneshot": 1})
+    pages, decks = app.config["PAGE_STORE"], app.config["DECK_STORE"]
+    for pid, plugin, dev in (
+        ("np", "papers", "frame"),
+        ("nl", "papers", "tv"),
+        ("one", "oneshot", "tv"),
+    ):
+        pages.save(
+            Page(
+                id=pid, name=pid.upper(), device_ids=[dev],
+                cells=[Cell(id="c", plugin=plugin, x=0, y=0, w=10, h=10, options={})],
+            )
+        )  # fmt: skip
+    decks.upsert(
+        Deck(id="portrait", name="P", device_ids=["frame"], pages=[DeckPage(page_id="np")])
+    )
+    decks.upsert(
+        Deck(
+            id="land", name="L", device_ids=["tv"],
+            pages=[DeckPage(page_id="nl"), DeckPage(page_id="one")],
+        )
+    )  # fmt: skip
+    icon = str(REPO_ROOT / "static/brand/icon-192.png")
+    boxes = "[...document.querySelectorAll('.dxe-strip .dxe-it-pic')].map(e => { const r = e.getBoundingClientRect(); return [r.width, r.height]; })"
+    with sync_playwright() as p:
+        for deck, step, portrait in (("portrait", "np", True), ("land", "nl", False)):
+            browser, page, errors = _open(p, base, f"/decks/{deck}/edit")
+            page.route("**/_img/**", lambda r: r.fulfill(path=icon))
+            tile = page.locator(f'[data-step="{step}"]')
+            # Many items: a stack with ×N.
+            assert tile.locator(".lu-tile.stacked").count() == 1
+            assert tile.locator(".lu-count").inner_text() == "×12"
+            tile.locator(".dxe-sel").click()
+            page.locator(".dxe-strip .dxe-it img").first.wait_for()
+            # First eight up front, then one "+4 more" tile that opens the grid.
+            assert page.locator(".dxe-strip .dxe-it").count() == 8
+            assert page.locator(".dxe-more b").inner_text() == "+4 more"
+            img = page.locator(".dxe-strip .dxe-it img").first
+            assert img.get_attribute("referrerpolicy") == "no-referrer"
+            assert img.get_attribute("loading") == "lazy"
+            # Every box is the display's shape: tall on the portrait frame, wide on the TV.
+            for w, h in page.evaluate(boxes):
+                assert (h > w) is portrait, (w, h)
+            page.locator("[data-grid]").click()
+            page.locator(".dxe-grid-items .dxe-it").first.wait_for()
+            for w, h in page.evaluate(
+                "[...document.querySelectorAll('.dxe-grid-items .dxe-it-pic')].map(e => { const r = e.getBoundingClientRect(); return [r.width, r.height]; })"
+            ):
+                assert (h > w) is portrait, (w, h)
+            _settle(page)
+            if deck == "land":
+                # One item: a plain tile, no stack, no badge, no arrows.
+                one = page.locator('[data-step="one"]')
+                assert one.locator(".lu-tile.stacked").count() == 0
+                assert one.locator(".lu-count").count() == 0
+                assert one.locator(".lu-items").count() == 0
+            assert errors == []
+            browser.close()
+
+
+def test_the_item_stack_follows_the_dark_theme(real: tuple[str, Flask]) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    _listing_widget(app, {"papers": 5})
+    app.config["PAGE_STORE"].save(
+        Page(
+            id="np", name="NP", device_ids=["tv"],
+            cells=[Cell(id="c", plugin="papers", x=0, y=0, w=10, h=10, options={})],
+        )
+    )  # fmt: skip
+    app.config["DECK_STORE"].upsert(
+        Deck(id="d", name="D", device_ids=["tv"], pages=[DeckPage(page_id="np")])
+    )
+    # The cards' computed colours are oklab(L a b); L is the lightness.
+    js = """() => {
+        const t = document.querySelector('[data-step="np"] .lu-tile');
+        const light = (pseudo) =>
+            Number(getComputedStyle(t, pseudo).backgroundColor.match(/[\\d.]+/)[0]);
+        return [light('::before'), light('::after')];
+    }"""
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/d/edit")
+        _settle(page)
+        light = page.evaluate(js)
+        assert min(light) > 0.7  # paper sheets in the light theme
+        page.evaluate("document.documentElement.setAttribute('data-theme', 'dark')")
+        dark = page.evaluate(js)
+        # Dark: the back cards are darker than cream paper, not lighter than the page's text.
+        assert max(dark) < 0.35, dark
         assert errors == []
         browser.close()
