@@ -78,6 +78,13 @@
                 aria-selected="false">
           <i class="ph ph-television-simple" aria-hidden="true"></i><span>Samsung Frame</span>
         </button>
+        <button type="button"
+                class="dx-segmented-btn"
+                data-segmented-btn="fraimic"
+                role="tab"
+                aria-selected="false">
+          <i class="ph ph-frame-corners" aria-hidden="true"></i><span>Fraimic</span>
+        </button>
       </div>
       <p class="dx-segmented-help" data-segmented-help-rest{% if default_transport != 'rest' %} hidden{% endif %}>
         REST is the recommended default, devices pair with a one-time code, no broker required.
@@ -90,6 +97,9 @@
       </p>
       <p class="dx-segmented-help" data-segmented-help-samsung_frame hidden>
         Samsung The Frame TVs, shown through their own Art Mode over your local network.
+      </p>
+      <p class="dx-segmented-help" data-segmented-help-fraimic hidden>
+        Fraimic colour e-paper canvases, sent new pictures over your local network when they wake.
       </p>
       <p class="dx-segmented-help" data-segmented-help-visionect hidden>
         Visionect and Joan e-paper signs, over their own protocol on TCP {{ visionect_listener.port if visionect_listener and visionect_listener.port else 'the configured port' }}.
@@ -393,6 +403,34 @@
         {{ text_input('add-sf-name', 'name', 'Display name', value='', placeholder='Living room Frame') }}
         <div class="dx-actions-right">
           <button type="submit" class="dx-btn-primary"><i class="ph ph-plus" aria-hidden="true"></i><span>Add Samsung Frame</span></button>
+        </div>
+      </form>
+    </div>
+
+    {# Fraimic branch: a canvas reached on the local network while it is
+       awake; Tesserae sets its wake schedule and uploads at each wake. #}
+    <div class="dx-add-branch dx-add-branch--fraimic"
+         data-transport-branch="fraimic"
+         hidden>
+      <div class="dx-hint-band">
+        <i class="ph ph-info" aria-hidden="true"></i>
+        <p>
+          <strong>Sent when the frame wakes.</strong> On battery a Fraimic sleeps and can't be
+          reached, so Tesserae sets the frame's own wake schedule and uploads the latest picture at
+          each wake. Reserve the frame's address in your router, then <strong>tap the frame</strong>
+          once after adding it so Tesserae can set the schedule. Defaults to the 31.5" Large Canvas;
+          for the 13.3", set the panel to 1200x1600 on the device card.
+        </p>
+      </div>
+      <form method="post" action="{{ url_for('auth.devices_add') }}" class="form">
+        <input type="hidden" name="kind" value="fraimic">
+        {{ text_input('add-fr-host', 'host', 'Frame address', value='', placeholder='192.168.1.42', required=True,
+                      help="The frame's IP address, shown on its portal at fraimic.local/info.") }}
+        {{ text_input('add-fr-id', 'id', 'Device id', value='', placeholder='hallway_fraimic', required=True,
+                      help='Lowercase, no spaces.') }}
+        {{ text_input('add-fr-name', 'name', 'Display name', value='', placeholder='Hallway Fraimic') }}
+        <div class="dx-actions-right">
+          <button type="submit" class="dx-btn-primary"><i class="ph ph-plus" aria-hidden="true"></i><span>Add Fraimic</span></button>
         </div>
       </form>
     </div>

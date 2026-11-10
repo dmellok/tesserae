@@ -25,6 +25,7 @@ from app import backup as _backup_mod
 from app import (
     device_service,
     device_timetable,
+    fraimic,
     next_update,
     palette_profiles,
     samsung_frame,
@@ -2191,12 +2192,12 @@ def _transport_badge(device: Device) -> str:
     "HA" for push devices (OpenDisplay-via-HA) delivered through a Home
     Assistant service call rather than a broker. Visionect signs are push
     devices too, over their own TCP protocol rather than through HA, so
-    they read "TCP" (the kind column names them). Samsung Frame TVs are
-    reached directly on the local network, "LAN"."""
+    they read "TCP" (the kind column names them). Samsung Frame TVs and
+    Fraimic canvases are reached directly on the local network, "LAN"."""
     if device.transport == "rest":
         return "REST"
     if device.transport == "push":
-        if samsung_frame.is_samsung_frame_device(device):
+        if samsung_frame.is_samsung_frame_device(device) or fraimic.is_fraimic_device(device):
             return "LAN"
         return "TCP" if visionect_routes.is_visionect_device(device) else "HA"
     if device.transport == "relay":

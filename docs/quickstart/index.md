@@ -38,6 +38,10 @@ Devices that speak the TRMNL BYOS protocol. The TRMNL flagship hardware ships re
 
 - [Bloomin8 Canvas](bloomin8.md): point the Canvas's Schedule Pull upstream at Tesserae. Built against Bloomin8's spec, not yet tested on hardware.
 
+## Fraimic Canvas
+
+- [Fraimic Canvas](fraimic.md): add the frame by its address; Tesserae sets its wake schedule and sends a new picture at each wake. Picture format checked on a 31.5" Large Canvas.
+
 ## Visionect signs
 
 - [Visionect signs](visionect.md): Tesserae replaces the Visionect Software Suite and pushes frames to the sign over its own protocol on TCP 11113. Tested on a Place & Play 32.

@@ -1,0 +1,114 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Fraimic Canvas",
+  "icon": "frame-corners",
+  "version": "0.1.0",
+  "description": "Fraimic colour e-paper canvas (31.5\" Large Canvas or 13.3\"), driven over its local REST API with no app, cloud or firmware change. On battery the frame sleeps and can't be reached, so Tesserae sets the frame's own wake schedule and, at each wake, uploads the latest frame as the .bin the frame paints and puts it back to sleep. While it is charging or set to stay awake, new frames go straight away. Enter the frame's IP address (give it a fixed lease in your router) and tap the frame once so Tesserae can set its schedule.",
+  "renderers": [
+    "fraimic_bin"
+  ],
+  "transport": "push",
+  "panel": {
+    "w": 1440,
+    "h": 2560,
+    "orientation": "portrait",
+    "name": "Fraimic 31.5\" Large Canvas",
+    "native_w": 1440,
+    "native_h": 2560,
+    "gamut": "spectra_6"
+  },
+  "buttons": false,
+  "battery": true,
+  "config_schema": {
+    "host": {
+      "type": "string",
+      "label": "Frame address",
+      "default": "",
+      "placeholder": "192.168.1.42",
+      "help": "The frame's IP address, shown on its portal at fraimic.local/info. Reserve it in your router (a DHCP reservation) so it doesn't change; fraimic.local is slow to answer right after a wake, so an IP address is more reliable."
+    },
+    "wake_mode": {
+      "type": "select",
+      "label": "Wake schedule",
+      "default": "interval",
+      "choices": [
+        {
+          "value": "interval",
+          "label": "Every few hours"
+        },
+        {
+          "value": "times",
+          "label": "At set times each day"
+        },
+        {
+          "value": "manual",
+          "label": "Leave the frame's own schedule"
+        }
+      ],
+      "help": "When the frame wakes to take a new picture. Tesserae writes this to the frame the next time it is awake (tap it once after saving). Leave the frame's own schedule if you set it yourself, for example from Home Assistant; Tesserae then only uses the wakes the frame reports."
+    },
+    "wake_interval_minutes": {
+      "type": "select",
+      "label": "Wake every",
+      "default": "60",
+      "choices": [
+        {
+          "value": "60",
+          "label": "Every hour"
+        },
+        {
+          "value": "90",
+          "label": "Every 90 minutes"
+        },
+        {
+          "value": "120",
+          "label": "Every 2 hours"
+        },
+        {
+          "value": "180",
+          "label": "Every 3 hours"
+        },
+        {
+          "value": "240",
+          "label": "Every 4 hours"
+        },
+        {
+          "value": "360",
+          "label": "Every 6 hours"
+        },
+        {
+          "value": "480",
+          "label": "Every 8 hours"
+        },
+        {
+          "value": "720",
+          "label": "Every 12 hours"
+        },
+        {
+          "value": "1440",
+          "label": "Once a day"
+        }
+      ],
+      "help": "Counted from midnight, so every 6 hours is midnight, 6 AM, noon and 6 PM. Every wake costs some battery: hourly drains it noticeably faster than a few wakes a day. The frame can't wake more often than hourly.",
+      "show_if": {
+        "wake_mode": "interval"
+      }
+    },
+    "wake_times": {
+      "type": "string",
+      "label": "Wake times",
+      "default": "06:00",
+      "placeholder": "06:00, 18:00",
+      "help": "Up to four 24-hour times in the frame's local time, separated by commas.",
+      "show_if": {
+        "wake_mode": "times"
+      }
+    },
+    "sleep_after_upload": {
+      "type": "boolean",
+      "label": "Sleep straight after a new picture",
+      "default": true,
+      "help": "After a scheduled wake, put the frame back to sleep once its new picture is uploaded instead of waiting out its two-minute window. It finishes drawing first. A frame you tapped awake is left alone."
+    }
+  }
+}

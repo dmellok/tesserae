@@ -8,6 +8,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Fraimic: a `fraimic` kind for Fraimic colour e-paper canvases (31.5" Large Canvas and 13.3"), over the frame's local REST API with no app, cloud or firmware change. Tesserae sets the frame's own wake schedule (hourly to daily, or up to four set times), uploads the latest frame at each wake as the `.bin` the frame takes, in the panel controllers' byte order (a new `fraimic_bin` renderer), and puts it back to sleep. A frame that is awake anyway gets new frames within seconds. The device card shows its battery, Wi-Fi and next wake. See `docs/quickstart/fraimic.md`.
 - Samsung The Frame: the TV goes to standby for quiet hours that sleep through and wakes for new frames, with its own power (Wake-on-LAN) or a Home Assistant switch, and the device card shows what the screen is doing.
 - Samsung The Frame: a `samsung_frame` kind that shows pages through the TV's own Art Mode, uploading each frame as a 4K JPEG over the local network and deleting its older uploads.
 - GTFS: every arrival carries `wheelchair_accessible` from trips.txt (1 accessible, 2 not, 0 no information), so a board can mark the trips a wheelchair user can or can't take. A timetable cached by an earlier version reads 0 until its 12-hour rebuild.
