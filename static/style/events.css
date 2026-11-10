@@ -223,33 +223,6 @@
   border-radius: 4px;
 }
 
-.event-thumb {
-  width: 72px;
-  height: 54px;
-  background: var(--t-surface-sunk);
-  border: 1px solid var(--t-border);
-  border-radius: var(--t-radius-sm);
-  overflow: hidden;
-  display: grid;
-  place-items: center;
-  transition:
-    transform var(--t-trans),
-    box-shadow var(--t-trans-fast);
-}
-.event-thumb:hover {
-  transform: scale(1.04);
-  box-shadow: var(--t-shadow-sm);
-}
-.event-thumb img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  transition: transform 280ms var(--t-ease-spring);
-}
-.event-thumb:hover img {
-  transform: scale(1.05);
-}
-
 /* Events page toolbar (live pill + type-filter chips). */
 .events-toolbar {
   display: flex;

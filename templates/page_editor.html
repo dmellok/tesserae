@@ -314,7 +314,7 @@
       {% if preview_groups|length > 1 %}
       <p class="preview-group-label">{{ g.label }}</p>
       {% endif %}
-      <div class="preview-frame"
+      <div class="thumb-frame preview-frame"
            {{ color_attrs(g.device_ids|default([])) }}
            data-fit-preview
            data-panel-w="{{ g.w }}"

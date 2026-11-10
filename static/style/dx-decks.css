@@ -485,33 +485,21 @@
 }
 .dxe-thumb {
   height: 112px;
-  border-radius: 7px;
-  overflow: hidden;
-  border: 1px solid var(--t-border);
-  background: var(--t-inset);
+  --thumb-radius: 7px;
+  --thumb-bg: var(--t-inset);
+  --thumb-slot-w: 100%;
+  --thumb-slot-h: 112px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.dxe-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
 /* A page card keeps the dashboard's own shape: wide for landscape, tall for a
-   portrait panel, whole picture shown. */
+   portrait panel. */
 .dxe-thumb[style*="--thumb-r"] {
-  --dxe-h: 112px;
-  width: min(100%, calc(var(--dxe-h) * var(--thumb-r)));
-  height: auto;
-  aspect-ratio: var(--thumb-ar);
   margin-inline: auto;
 }
-.dxe-thumb.is-portrait[style*="--thumb-r"] {
-  --dxe-h: 190px;
-}
-.dxe-thumb[style*="--thumb-r"] img {
-  object-fit: contain;
+.dxe-thumb.is-portrait {
+  --thumb-slot-h: 190px;
 }
 .dxe-thumb.is-ph {
   font-family: var(--t-font-mono);

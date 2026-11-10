@@ -1209,7 +1209,7 @@ def test_editor_shows_one_preview_per_aspect_and_checked_devices(app: Flask) -> 
     )
     body = client.get(f"/pages/{pid}").get_data(as_text=True)
     # One landscape (800x480) + one portrait (480x800) preview = two cards.
-    assert body.count('class="preview-frame"') == 2
+    assert body.count('class="thumb-frame preview-frame"') == 2
     assert "w=800&amp;h=480" in body
     assert "w=480&amp;h=800" in body
     # Both devices are pre-checked checkboxes named device_ids (the

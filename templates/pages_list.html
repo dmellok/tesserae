@@ -252,7 +252,7 @@
     </span>
     <span class="dx-dc dx-dc-name">
       <span class="dx-dot dx-dash-dot is-{{ _state }}" aria-hidden="true"></span>
-      <span class="dx-dash-thumb{% if not (pv_w and pv_h) %} is-empty{% elif pv_h > pv_w %} is-portrait{% endif %}"
+      <span class="thumb-frame dx-dash-thumb{% if not (pv_w and pv_h) %} is-empty{% elif pv_h > pv_w %} is-portrait{% endif %}"
             {% if pv_w and pv_h %}style="--thumb-ar: {{ pv_w }} / {{ pv_h }}; --thumb-r: {{ '%.4f'|format(pv_w / pv_h) }}"{% endif %} aria-hidden="true">
         {% if pv_w and pv_h and _png %}<img src="{{ _png }}" alt="" loading="lazy" decoding="async" {{ color_attrs(_cdev) }} data-dash-thumb>{% endif %}
         <i class="ph ph-{{ page.icon or 'cube' }}"></i>
@@ -292,7 +292,7 @@
 
   {# OPENED ROW: preview, four figures, then the row's controls. #}
   <div class="dx-devquick dx-dashquick" id="dashq-{{ _rid }}" data-dashquick data-lf-tail{% if not _open %} hidden{% endif %}>
-    <div class="dx-dashquick-preview{% if not (pv_w and pv_h) %} is-empty{% elif pv_h > pv_w %} is-portrait{% endif %}"
+    <div class="thumb-frame dx-dashquick-preview{% if not (pv_w and pv_h) %} is-empty{% elif pv_h > pv_w %} is-portrait{% endif %}"
          {% if pv_w and pv_h %}style="aspect-ratio: {{ pv_w }} / {{ pv_h }}"{% endif %} {{ color_attrs(_cdev) }} data-dashquick-preview>
       <span class="dx-thumb-empty"><i class="ph ph-image" aria-hidden="true"></i><span>{{ 'Rendering preview' if pv_w and pv_h else 'No preview' }}</span></span>
     </div>
@@ -545,8 +545,8 @@
      to a live, scaled-down /compose/<id> iframe if the image can't render. */
   .dx-dash-preview {
     position: absolute; z-index: 400; pointer-events: none;
-    border: 1px solid var(--t-border); border-radius: 10px; overflow: hidden;
-    background: var(--t-surface); box-shadow: 0 10px 30px rgba(0, 0, 0, .22);
+    --thumb-radius: 10px; --thumb-bg: var(--t-surface);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .22);
     opacity: 0; transform: translateY(4px);
     transition: opacity .12s ease, transform .12s ease;
   }
@@ -566,7 +566,6 @@
   .dx-bulk-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .dx-bulk-actions .form { margin: 0; }
   .dx-dash-preview iframe { border: 0; transform-origin: top left; pointer-events: none; background: #fff; }
-  .dx-dash-preview img { display: block; width: 100%; height: 100%; object-fit: contain; background: #fff; }
   @media (hover: none), (max-width: 720px) { .dx-dash-preview { display: none; } }
 </style>
 <script>
@@ -831,7 +830,7 @@
     function build() {
       if (pop) return;
       pop = document.createElement('div');
-      pop.className = 'dx-dash-preview';
+      pop.className = 'thumb-frame dx-dash-preview';
       pop.setAttribute('aria-hidden', 'true');
       img = document.createElement('img');
       img.setAttribute('alt', '');

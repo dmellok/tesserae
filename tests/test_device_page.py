@@ -614,10 +614,10 @@ def test_the_thumbnail_keeps_the_screens_shape(app: Flask) -> None:
     """A portrait screen's latest render used to sit in a fixed 4:3 box and
     be cropped to its middle. The box now takes the panel's aspect ratio."""
     portrait = _thumb(app, {"w": 1440, "h": 2560})
-    assert 'style="--thumb-ar: 1440 / 2560"' in portrait
+    assert 'style="--thumb-ar: 1440 / 2560; --thumb-r: 0.5625"' in portrait
     assert "dx-thumb--portrait" in portrait
     landscape = _thumb(app, {"w": 800, "h": 480})
-    assert 'style="--thumb-ar: 800 / 480"' in landscape
+    assert 'style="--thumb-ar: 800 / 480; --thumb-r: 1.6667"' in landscape
     assert "dx-thumb--portrait" not in landscape
 
 
@@ -639,7 +639,9 @@ def test_an_opened_dashboard_preview_keeps_the_dashboards_shape(app: Flask) -> N
         resp = client.post("/api/mcp/pages", json={"name": name, "w": w, "h": h})
         assert resp.status_code == 200
     body = client.get("/pages").get_data(as_text=True)
-    previews = re.findall(r'<div class="dx-dashquick-preview([^"]*)"\s+style="([^"]*)"', body)
+    previews = re.findall(
+        r'<div class="thumb-frame dx-dashquick-preview([^"]*)"\s+style="([^"]*)"', body
+    )
     by_ratio = {style: cls for cls, style in previews}
     assert "is-portrait" in by_ratio["aspect-ratio: 1440 / 2560"]
     assert "is-portrait" not in by_ratio["aspect-ratio: 800 / 480"]
@@ -662,7 +664,7 @@ def test_the_dashboards_row_thumbnail_keeps_the_dashboards_shape(app: Flask) -> 
     _sign_in(client)
     _tall_and_wide_pages(client)
     body = client.get("/pages").get_data(as_text=True)
-    thumbs = re.findall(r'<span class="dx-dash-thumb([^"]*)"\s+style="([^"]*)"', body)
+    thumbs = re.findall(r'<span class="thumb-frame dx-dash-thumb([^"]*)"\s+style="([^"]*)"', body)
     by_ratio = {style.split(";")[0]: cls for cls, style in thumbs}
     assert "is-portrait" in by_ratio["--thumb-ar: 1440 / 2560"]
     assert "is-portrait" not in by_ratio["--thumb-ar: 800 / 480"]
@@ -693,7 +695,10 @@ def test_the_lineups_page_screens_keep_each_dashboards_shape(app: Flask) -> None
     # Each step tile carries its dashboard's own ratio (the strip sizes it by
     # height from --arw/--arh), never a fixed crop box.
     ratios = set(
-        re.findall(r'<span class="lu-thumb [pl]" style="--ar:(\d+/\d+);--arw:\d+;--arh:\d+"', body)
+        re.findall(
+            r'<span class="thumb-frame lu-thumb [pl]" style="--ar:(\d+/\d+);--arw:\d+;--arh:\d+"',
+            body,
+        )
     )
     assert {"1440/2560", "800/480"} <= ratios
 
@@ -712,19 +717,25 @@ def test_the_lineup_editor_hands_the_page_cards_each_dashboards_size(app: Flask)
     assert "--thumb-ar" in js and "is-portrait" in js
 
 
-def test_every_thumbnail_style_fits_instead_of_cropping() -> None:
-    """None of the thumbnails that carry a ratio may crop: their images fit
-    (object-fit: contain) inside a box with the dashboard's shape."""
+def test_every_thumbnail_is_one_frame_that_covers_its_box() -> None:
+    """None of the thumbnails may crop or leave a strip: they are all the one
+    ``thumb-frame`` (border drawn over the picture, picture covering the box),
+    and no surface sets its own border or object-fit on a thumbnail."""
     css = REPO_ROOT / "static" / "style"
-    decks = (css / "dx-decks.css").read_text()
+    base = (css / "base.css").read_text()
+    assert re.search(r"\.thumb-frame\s*>\s*img\s*{[^}]*object-fit: cover", base)
+    assert re.search(r"\.thumb-frame::before\s*{[^}]*border: var\(--thumb-edge-w\)", base)
+    assert re.search(r"\.thumb-frame\s*{[^}]*\n  border: 0;", base)
     lineups = (css / "dx-lineups.css").read_text()
-    dashboards = (css / "dx-dashboards.css").read_text()
-    assert re.search(r"\.lu \.lu-thumb img\s*{[^}]*object-fit: contain", lineups)
     assert re.search(r"\.lu \.lu-thumb\s*{[^}]*aspect-ratio: var\(--ar\)", lineups)
-    assert re.search(r'\.dxe-thumb\[style\*="--thumb-r"\] img\s*{[^}]*object-fit: contain', decks)
-    assert re.search(
-        r'\.dx-dash-thumb\[style\*="--thumb-r"\] img\s*{[^}]*object-fit: contain', dashboards
+    thumbs = (
+        r"(lu-thumb|dxe-thumb|dx-dash-thumb|dx-dashquick-preview|dx-hist-thumb|dx-event-thumb-link"
+        r"|dx-now-thumb|dx-next-thumb|dx-thumb-q-frame|dx-thumb|preview-frame)"
     )
+    for sheet in css.glob("*.css"):
+        text = sheet.read_text()
+        assert not re.search(r"\." + thumbs + r"[^{}]*\simg\s*{[^}]*object-fit", text), sheet.name
+        assert not re.search(r"\." + thumbs + r"\s*{[^}]*\n  border: [^;]*solid", text), sheet.name
 
 
 def test_the_firmware_vital_has_no_update_tag_without_an_update(app: Flask) -> None:

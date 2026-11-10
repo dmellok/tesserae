@@ -289,17 +289,14 @@
 .dx-event-json-placeholder {
   min-height: 1.5em;
 }
+/* The display's own shape in a 120 px wide slot (4:3 when the push went to no
+   known display). */
 .dx-event-thumb-link {
   display: block;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid var(--t-border);
   flex: 0 0 auto;
-}
-.dx-event-thumb-link img {
-  display: block;
-  width: 120px;
-  height: auto;
+  --thumb-radius: 8px;
+  --thumb-slot-w: 120px;
+  --thumb-slot-h: 120px;
 }
 @media (max-width: 720px) {
   .dx-event-expand {

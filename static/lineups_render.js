@@ -57,7 +57,7 @@
             ? "!"
             : String(name || "?").slice(0, 1)
         )}</span>`;
-    return `<span class="lu-thumb ${orientation || "l"}${cls ? " " + cls : ""}" style="--ar:${ar[0]}/${ar[1]};--arw:${ar[0]};--arh:${ar[1]}" title="${esc(title === undefined || title === null ? name : title)}" data-gamut="${esc((display && display.gamut) || "color")}" data-grey-levels="${esc((display && display.grey_levels) || 0)}">${inner}${extra || ""}</span>`;
+    return `<span class="thumb-frame lu-thumb ${orientation || "l"}${cls ? " " + cls : ""}" style="--ar:${ar[0]}/${ar[1]};--arw:${ar[0]};--arh:${ar[1]}" title="${esc(title === undefined || title === null ? name : title)}" data-gamut="${esc((display && display.gamut) || "color")}" data-grey-levels="${esc((display && display.grey_levels) || 0)}">${inner}${extra || ""}</span>`;
   }
   const im = (icon, value, title, cls) =>
     `<span class="lu-im${cls ? " " + cls : ""}" title="${esc(title)}" aria-label="${esc(title)}">${ico(icon)}<span>${esc(value)}</span></span>`;
@@ -460,7 +460,7 @@
               d,
               zoomH
             )
-          : `<span class="lu-thumb ${d.orientation || "l"} empty note-${esc(ph.state)}" style="--ar:${d.width || 16}/${d.height || 10};--arw:${d.width || 16};--arh:${d.height || 10}" role="img" aria-label="${esc(ph.title)}" title="${esc(ph.title)}"><span class="lu-thumb-note">${ico(phIcon[ph.state] || "screen")}<b>${esc(ph.label)}</b>${ph.sub ? `<small>${esc(ph.sub)}</small>` : ""}</span></span>`;
+          : `<span class="thumb-frame lu-thumb ${d.orientation || "l"} empty note-${esc(ph.state)}" style="--ar:${d.width || 16}/${d.height || 10};--arw:${d.width || 16};--arh:${d.height || 10}" role="img" aria-label="${esc(ph.title)}" title="${esc(ph.title)}"><span class="lu-thumb-note">${ico(phIcon[ph.state] || "screen")}<b>${esc(ph.label)}</b>${ph.sub ? `<small>${esc(ph.sub)}</small>` : ""}</span></span>`;
     let tags = `<span class="lu-im" title="${esc(d.link.title)}">${ico(linkIcon)}<span>${esc(d.link.label)}</span></span>`;
     if (d.size_label)
       tags += `<span class="lu-im" title="${esc(d.spec)}">${ico(d.orientation === "p" ? "portrait" : "landscape")}<span>${esc(d.size_label)}</span></span>`;
@@ -552,7 +552,7 @@
       // its initial, never the step's picture standing in for it.
       const url = it && it.key ? it.thumb_url : (it && it.thumb_url) || s.thumb_url;
       items.push(
-        `<li class="lu-pk-item">${thumb(s.name, url, s.aspect, d.orientation || s.orientation, "", label, false, d)}` +
+        `<li class="lu-pk-item">${thumb(s.name, url, s.aspect, d.orientation || s.orientation, "thumb-frame--letterbox", label, false, d)}` +
           "</li>"
       );
     }
