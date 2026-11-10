@@ -6,6 +6,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.510.0], 2026-11-10
+
 ### Added
 
 - Fraimic: a `fraimic` kind for Fraimic colour e-paper canvases (31.5" Large Canvas and 13.3"), over the frame's local REST API with no app, cloud or firmware change. Tesserae sets the frame's own wake schedule (hourly to daily, or up to four set times), uploads the latest frame at each wake as the `.bin` the frame takes, in the panel controllers' byte order (a new `fraimic_bin` renderer), and puts it back to sleep. A frame that is awake anyway gets new frames within seconds. The device card shows its battery, Wi-Fi and next wake. See `docs/quickstart/fraimic.md`.
