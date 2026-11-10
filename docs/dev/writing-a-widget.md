@@ -230,6 +230,12 @@ drawing render also carries hidden options `_draw` (a token) and `_browse`
 (how many turns past the current one, for a widget that keeps its own turn:
 show that turn and move nothing).
 
+Two optional extras for the lineup editor, which lists a dashboard's items in its
+rows: `"lineups": { "noun": "papers" }` names them ("6 papers" instead of "6 items"),
+and a draw widget can report how many items it draws from with
+`lineup_item_count(options)` in `server.py` (an int, or `None` when it can't say;
+without it the editor shows "draw" instead of a count).
+
 ## Submitting
 
 You have two paths, pick the one that matches your widget's audience:
