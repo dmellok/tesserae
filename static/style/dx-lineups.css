@@ -38,6 +38,8 @@ main.page.lu-page {
   --lu-r-pill: 10px;
   --lu-r-xs: 4px;
   --lu-wb-gap: 6px; /* between the thumbs in an open timeline block */
+  --lu-blk-min: 4px; /* the narrowest a day bar block draws */
+  --lu-blk-pad: 7px; /* a day bar block's label inset */
   --lu-live-wash: color-mix(in oklab, var(--lu-acc) 6%, var(--t-surface));
   --lu-sched-bg: var(--t-surface-sunk);
   --lu-blk-bg: color-mix(in oklab, var(--t-border-strong) 60%, var(--t-border));
@@ -921,7 +923,10 @@ main.page.lu-page {
   bottom: 2px;
   display: flex;
   align-items: center;
-  padding: 0 7px;
+  /* No padding: a block is exactly its slot, however short (the label keeps
+     its own margin). A padded block grew past a short slot and slid under
+     the next one. */
+  padding: 0;
   overflow: hidden;
   border-radius: 6px;
   font: 600 11px/1 var(--t-font);
@@ -930,10 +935,15 @@ main.page.lu-page {
   background: var(--lu-blk-bg);
   color: var(--lu-blk-fg);
   box-shadow: inset 0 0 0 1px var(--lu-blk-edge);
-  /* A hairline of track between neighbouring blocks, so they never touch:
-     half a pixel of transparent border each side, with the fill kept inside. */
-  border-inline: 0.5px solid transparent;
+  /* One pixel of track after every block, at any width and pixel density:
+     a transparent end edge with the fill kept inside it. */
+  border-inline-end: 1px solid transparent;
   background-clip: padding-box;
+  /* A short slot still reads as a sliver: it grows to the minimum to the
+     left (--w is its width in % of the day), so its end, and the gap to
+     the next block, stay where they are. */
+  min-width: var(--lu-blk-min);
+  margin-left: min(0px, calc(var(--w, 100) * 1% - var(--lu-blk-min)));
   transition:
     filter 150ms ease-out,
     box-shadow 150ms ease-out;
@@ -960,8 +970,15 @@ main.page.lu-page {
   background: color-mix(in oklab, var(--lu-acc) 30%, transparent);
 }
 .lu .lu-blk.push {
-  min-width: 5px;
-  padding: 0;
+  min-width: max(5px, var(--lu-blk-min));
+}
+/* A short block or a push rides above its neighbours, never under them; one
+   that starts where another ends grows right, off that block's end. */
+.lu .lu-blk.is-thin {
+  z-index: 3;
+}
+.lu .lu-blk.grow-r {
+  margin-left: 0;
 }
 .lu .lu-blk:not(.hold):hover,
 .lu .lu-blk.is-linked {
@@ -986,7 +1003,8 @@ main.page.lu-page {
   pointer-events: none;
   display: block;
   min-width: 0;
-  max-width: 100%;
+  max-width: calc(100% - 2 * var(--lu-blk-pad));
+  margin-inline: var(--lu-blk-pad);
   overflow: hidden;
   text-overflow: ellipsis;
   font: 600 12px/1.2 var(--t-font);
@@ -3652,7 +3670,7 @@ main.page.lu-page {
 }
 
 .lu .lu-today .lu-blk {
-  padding-inline: 4px;
+  --lu-blk-pad: 4px;
 }
 .lu .lu-today .lu-blk-l {
   font-size: 11px;

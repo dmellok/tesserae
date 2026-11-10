@@ -90,11 +90,23 @@
     return h ? `Update in ${h} h${m ? ` ${m} min` : ""}` : `Update in ${m} min`;
   }
 
+  // A block's place on the bar; --w lets a short one keep its end when it
+  // grows to the minimum width (dx-lineups.css .lu-blk). A block under
+  // about 15 minutes, or a push, is thin: it draws above its neighbours.
+  // One that starts where the block before it ends grows to the right
+  // instead (grow-r), so it never covers that block's end.
+  const blkStyle = (s) => `left:${s.left_pct}%;width:${s.width_pct}%;--w:${s.width_pct}`;
+  const thin = (s) => s.kind === "push" || (s.kind !== "hold" && s.width_pct < 1);
+  const growsRight = (segs, k) => {
+    const prev = segs[k - 1];
+    return !!prev && prev.kind !== "hold" && prev.end_min >= segs[k].start_min;
+  };
+
   function dayTrack(d, day, editableIds, tall, extraCls) {
     if (tall === undefined) tall = true;
     let html = "";
     let flag = null; // the next advance's flag, when the bar shows one
-    (day.segments || []).forEach((s) => {
+    (day.segments || []).forEach((s, k) => {
       const hold = s.kind === "hold";
       const push = s.kind === "push";
       const ed = tall && !hold && editableIds.includes(s.lineup_id);
@@ -105,6 +117,8 @@
         s.live ? "live" : "",
         s.planned && tall ? "plan" : "",
         s.pending ? "is-pending" : "",
+        thin(s) ? "is-thin" : "",
+        thin(s) && growsRight(day.segments, k) ? "grow-r" : "",
       ]
         .filter(Boolean)
         .join(" ");
@@ -124,7 +138,7 @@
           flag = `<span class="lu-nflag" style="--bl:${s.left_pct};--bw:${s.width_pct};--tp:${nt.pct}" data-in="${nt.in_sec}">${text}</span>`;
         }
       }
-      html += `<div class="${cls}" style="left:${s.left_pct}%;width:${s.width_pct}%" data-lineup="${esc(s.lineup_id)}" data-display="${esc(d.id)}" title="${esc(s.title)}"${edAttr}>${inner}</div>`;
+      html += `<div class="${cls}" style="${blkStyle(s)}" data-lineup="${esc(s.lineup_id)}" data-display="${esc(d.id)}" title="${esc(s.title)}"${edAttr}>${inner}</div>`;
       if (push && tall)
         html += `<span class="lu-blk-side" style="left:calc(${s.left_pct}% + 9px)" title="${esc(s.title)}">${esc(s.label)}</span>`;
     });
@@ -665,7 +679,7 @@
       const hold = s.kind === "hold";
       const push = s.kind === "push";
       if (hold) {
-        html += `<div class="lu-blk hold${s.live ? " live" : ""}" style="left:${s.left_pct}%;width:${s.width_pct}%" data-lineup="${esc(s.lineup_id)}" data-display="${esc(d.id)}" title="${esc(s.title)}"></div>`;
+        html += `<div class="lu-blk hold${s.live ? " live" : ""}" style="${blkStyle(s)}" data-lineup="${esc(s.lineup_id)}" data-display="${esc(d.id)}" title="${esc(s.title)}"></div>`;
         if (s.end_min - s.start_min >= 20) {
           const past = nowAbs !== null && nowAbs >= s.start_min;
           const acc = s.is_current || s.live;
@@ -688,6 +702,8 @@
         s.live ? "live" : "",
         s.planned ? "plan" : "",
         open && !push ? "open" : "",
+        thin(s) ? "is-thin" : "",
+        thin(s) && growsRight(day.segments, k) ? "grow-r" : "",
       ]
         .filter(Boolean)
         .join(" ");
@@ -722,7 +738,7 @@
         });
         inner += `<span class="lu-blk-l">${esc(s.label)}${s.pending ? '<i class="lu-edot" title="Unsaved change"></i>' : ""}</span>`;
       }
-      html += `<div class="${cls}" style="left:${s.left_pct}%;width:${s.width_pct}%" data-b="${k}" data-lineup="${esc(s.lineup_id)}" data-display="${esc(d.id)}" title="${esc(s.title)}"${edAttr}${role}>${inner}</div>`;
+      html += `<div class="${cls}" style="${blkStyle(s)}" data-b="${k}" data-lineup="${esc(s.lineup_id)}" data-display="${esc(d.id)}" title="${esc(s.title)}"${edAttr}${role}>${inner}</div>`;
     });
     (day.pause || []).forEach((p) => {
       html += `<i class="lu-pz" style="left:${p.left_pct}%;width:${p.width_pct}%" title="${esc(p.title)}">${ico("moon")}</i>`;
@@ -1094,6 +1110,7 @@
       if (!apply || !g.p || (g.p.s === g.os && g.p.e === g.oe) || !g.blk.isConnected) {
         g.blk.style.left = g.left;
         g.blk.style.width = g.width;
+        g.blk.style.setProperty("--w", String(parseFloat(g.width)));
         return;
       }
       const s = Math.max(0, Math.min(DAY_MIN - SNAP, g.p.s));
@@ -1169,7 +1186,10 @@
       drag.p = p;
       const pc = (m) => (m / DAY_MIN) * 100;
       drag.blk.style.left = pc(p.s) + "%";
-      if (!drag.l.window.is_point) drag.blk.style.width = pc(p.e - p.s) + "%";
+      if (!drag.l.window.is_point) {
+        drag.blk.style.width = pc(p.e - p.s) + "%";
+        drag.blk.style.setProperty("--w", String(pc(p.e - p.s)));
+      }
       drag.blk.classList.toggle("is-stopped", !!p.stop);
       drag.tip.innerHTML = tipText(drag.l, p, drag.grid);
       if (drag.grid) {

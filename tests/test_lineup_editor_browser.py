@@ -1623,3 +1623,64 @@ def test_the_item_stack_follows_the_dark_theme(real: tuple[str, Flask]) -> None:
         assert max(dark) < 0.35, dark
         assert errors == []
         browser.close()
+
+
+def test_day_bar_blocks_keep_a_gap_and_a_minimum_width(real: tuple[str, Flask]) -> None:
+    """A short slot before another block is a sliver of its own: at least the
+    minimum width, its end where it was, a 1px gap to the next block, never
+    drawn under it. On the Lineups page and in the editor (today and all days)."""
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    decks = app.config["DECK_STORE"]
+    decks.upsert(decks.get("morning").model_copy(update={"enabled": False}))
+    for did, start, end in (
+        ("early", "05:50", "06:00"),
+        ("day", "06:00", "12:00"),
+        ("blip", "12:00", "12:02"),
+    ):
+        decks.upsert(
+            Deck(
+                id=did, name=did.title(), device_ids=["hall"], advance="timer",
+                advance_trigger="cycle", advance_anchor=start, advance_end_at=end,
+                advance_days_of_week=ALL_DAYS, pages=[DeckPage(page_id="weather")],
+            )
+        )  # fmt: skip
+    # Each lineup's block on the first bar under `host`: its box, and whether
+    # it is the topmost element at its own middle.
+    js = """(host) => {
+        const trk = document.querySelector(host + ' .lu-trk');
+        const out = {};
+        for (const b of trk.querySelectorAll('.lu-blk:not(.hold)')) {
+            const r = b.getBoundingClientRect();
+            const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+            out[b.dataset.lineup] = {l: r.left, r: r.right, w: r.width, top: !!top && b.contains(top)};
+        }
+        return out;
+    }"""
+
+    def check(boxes: dict[str, dict[str, Any]]) -> None:
+        early, day, blip = boxes["early"], boxes["day"], boxes["blip"]
+        assert early["w"] >= 4 and blip["w"] >= 4, boxes
+        assert early["top"] and blip["top"] and day["top"], boxes
+        # The fill stops a pixel short of the next block: the 1px of track.
+        assert early["r"] <= day["l"] + 0.01, boxes
+        assert blip["l"] >= day["r"] - 0.01, boxes
+
+    with sync_playwright() as p:
+        for width in (1280, 700):
+            browser, page, errors = _open(p, base, "/decks/day/edit", width)
+            check(page.evaluate(js, ".dxe-daybar"))
+            # The fill: the transparent end edge is the gap.
+            gap = page.evaluate(
+                "() => getComputedStyle(document.querySelector('.dxe-daybar .lu-blk[data-lineup=early]')).borderRightWidth"
+            )
+            assert gap == "1px"
+            page.locator("[data-week-toggle]").click()
+            check(page.evaluate(js, ".dxe-wk-row"))
+            _settle(page)
+            page.goto(base + "/decks", wait_until="load")
+            check(page.evaluate(js, '[data-display="hall"]'))
+            page.wait_for_timeout(300)
+            assert errors == []
+            browser.close()

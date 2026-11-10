@@ -185,10 +185,12 @@ def test_day_bar_is_prerendered(page: str) -> None:
     assert 'aria-label="Wed: Breakfast 06:30, Dinner (Mon–Wed) 17:00, Night 22:00"' in b
     # The live window wears the accent class; holds are rods; a push is a sliver.
     assert re.search(
-        r'class="lu-blk live" style="left:70\.8333%;width:12\.5%" data-lineup="dinner"', b
+        r'class="lu-blk live" style="left:70\.8333%;width:12\.5%;--w:12\.5" data-lineup="dinner"',
+        b,
     )
     assert b.count('class="lu-blk hold"') == 4  # night, breakfast, dinner, night
-    assert re.search(r'class="lu-blk push" [^>]*data-lineup="night"', b)
+    # A push is thin: it draws above a block that starts where it does.
+    assert re.search(r'class="lu-blk push is-thin" [^>]*data-lineup="night"', b)
     # Every non-hold block is a drag/keyboard target with resize handles.
     assert b.count('data-edit tabindex="0"') == 3
     assert b.count('<i class="lu-h" data-h="l"') == 2  # the push has no handles
