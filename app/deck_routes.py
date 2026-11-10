@@ -3321,11 +3321,14 @@ def _editor_state(deck: Deck | None) -> dict[str, Any]:
         "now": (vm or {}).get("now"),
         "timeCycle": (vm or {}).get("time_cycle") or _time_cycle(),
         "lineup": lineup,
+        # Every lineup's priority: the editor names the ones that overlap.
+        "priorities": {d.id: d.advance_priority for d in all_decks},
         "urls": {
             "save": url_for("decks.editor_save"),
             "create": url_for("decks.create_lineup"),
             "items": url_for("decks.dashboard_items"),
             "lineups": url_for("decks.index"),
+            "view": url_for("decks.view_json"),
             "newDashboard": url_for("pages.index"),
             "pushStep": url_for("decks.push_step", deck_id=deck.id) if deck is not None else "",
             "stepItem": url_for("decks.step_item", deck_id=deck.id) if deck is not None else "",

@@ -270,7 +270,7 @@ def test_when_an_end_time_turns_a_push_into_a_rotation(real: tuple[str, Flask]) 
         lead = page.locator("#dxe-h-when + .dxe-lead")
         assert lead.inner_text().startswith("Sends at ")
         warn = page.locator(".dxe-warn")
-        assert warn.count() == 1 and "Only dashboard 1 is ever sent." in warn.inner_text()
+        assert warn.count() == 1 and "Only the first dashboard is sent." in warn.inner_text()
         assert page.locator(".dxe-step.is-muted").count() == 2  # not sent by a push
         warn.locator("[data-end=add]").click()
         assert page.locator(".dxe-warn").count() == 0
@@ -363,13 +363,16 @@ def test_pace_shows_only_the_options_a_display_has(real: tuple[str, Flask]) -> N
         # A push-only TV: one line, no options.
         assert "always on, no buttons" in page.locator(".dxe-opts-none").inner_text()
         assert page.locator('[data-fold="options"]').count() == 0
-        assert "Only for a window." in page.locator(".dxe-pace").inner_text()
+        # A push of several: no time per dashboard, just the way to a rotation.
+        pace = page.locator(".dxe-pace").inner_text()
+        assert "Add end time to show them in turn." in pace and "shows for" not in pace
         _settle(page)
         page.goto(base + "/decks/morning/edit", wait_until="load")
         page.locator('[data-fold="options"] summary').click()
         opts = page.locator('[data-fold="options"]').inner_text()
-        assert "Taps also flip" in opts and "Send just before it wakes" in opts
-        assert page.locator("[data-taps]").is_checked()
+        # Buttons always flip; the touch switch is only for a display with touch.
+        assert "Touch also flips" not in opts and page.locator("[data-taps]").count() == 0
+        assert "Send just before it wakes" in opts
         page.locator("[data-smart]").click()
         assert not page.locator("[data-smart]").is_checked()
         _save(page)
@@ -643,12 +646,12 @@ def test_the_audit_hides_what_does_nothing(real: tuple[str, Flask]) -> None:
         Deck(id="hand", name="Hand", device_ids=["hall"], pages=[DeckPage(page_id="weather")])
     )
     with sync_playwright() as p:
-        # A daily push on a TV: no Keep ready, no pre-render claim, no Mode.
+        # A daily push on a TV: no Keep ready, no pre-render claim, no Mode,
+        # no Min hold, no Priority (nothing overlaps it).
         browser, page, errors = _open(p, base, "/decks/art/edit")
-        adv = page.locator('[data-fold="advanced"]')
-        adv.locator("summary").click()
-        assert "Keep ready" not in adv.inner_text() and "Mode" not in adv.inner_text()
-        assert "pre-rendered" not in page.locator(".dxe-pace").inner_text()
+        text = page.locator("#dxe-sections").inner_text()
+        for gone in ("Keep ready", "Picks", "Min hold", "Priority", "pre-rendered", "Advanced"):
+            assert gone not in text, gone
         page.locator('[data-expand="clock"]').click()
         page.locator('[data-edit="clock"]').click()
         assert page.locator('[data-cond="clock"]').count() == 0  # no conditions, no editor
@@ -657,7 +660,7 @@ def test_the_audit_hides_what_does_nothing(real: tuple[str, Flask]) -> None:
         page.goto(base + "/decks/hand/edit", wait_until="load")
         assert page.locator(".dxe-days").count() == 0
         assert "shows for" not in page.locator(".dxe-pace").inner_text()
-        assert page.locator(".dxe-live-line").inner_text() == "By hand: taps and buttons flip it."
+        assert page.locator(".dxe-live-line").inner_text() == "By hand: buttons flip it."
         _settle(page)
         assert errors == []
         browser.close()
@@ -1452,6 +1455,12 @@ def test_pace_names_the_dashboards_with_their_own_time_and_links_to_them(
         browser, page, errors = _open(p, base, "/decks/morning/edit")
         line = page.locator(".dxe-overridden")
         assert line.inner_text() == "Overridden by: Weather (50 min), Agenda (1 h 3 min)"
+        # Every dashboard has its own time: said, the default greyed, a warning icon.
+        assert page.locator("#dxe-h-timing + .dxe-lead").inner_text() == (
+            "Every dashboard has its own time."
+        )
+        assert "is-unused" in page.locator("[data-interval]").get_attribute("class")
+        assert line.locator(".lu-ico").count() == 1
         line.locator('[data-overridden="agenda"]').click()
         assert page.locator('[data-step="agenda"].is-open').count() == 1
         assert page.locator('[data-step="agenda"].is-flash').count() == 1
@@ -1684,3 +1693,142 @@ def test_day_bar_blocks_keep_a_gap_and_a_minimum_width(real: tuple[str, Flask]) 
             page.wait_for_timeout(300)
             assert errors == []
             browser.close()
+
+
+def test_priority_and_min_hold_show_only_when_they_apply(real: tuple[str, Flask]) -> None:
+    """Priority sits in When it runs only while another lineup on the display
+    runs at the same time; Min hold sits under Timing only for a rotation
+    that a press, a rule or another lineup can cut short. A new overlap is
+    refused on Save, so the edit says so instead of offering Priority."""
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    decks = app.config["DECK_STORE"]
+
+    def eve(start: str) -> Deck:
+        return Deck(
+            id="eve", name="Eve", device_ids=["tv"], advance="timer", advance_trigger="cycle",
+            advance_anchor=start, advance_end_at="23:00", advance_days_of_week=ALL_DAYS,
+            pages=[DeckPage(page_id="clock"), DeckPage(page_id="climate")],
+        )  # fmt: skip
+
+    nbsp = "\u202f"
+    decks.upsert(eve("18:00"))
+    with sync_playwright() as p:
+        # A TV with no buttons, nothing overlapping, no rules: neither.
+        browser, page, errors = _open(p, base, "/decks/eve/edit")
+        assert page.locator("#dxe-prio").count() == 0
+        assert page.locator("#dxe-hold").count() == 0
+        # Moved over Art's 6 AM push: a clash the save would refuse.
+        page.locator('[data-time="start"]').fill("05:00")
+        page.locator('[data-time="start"]').dispatch_event("change")
+        warn = page.locator(".dxe-warn.is-err").inner_text().replace(nbsp, " ")
+        assert warn == "Clashes with Art at 6 AM; move it to save."
+        assert page.locator("#dxe-prio").count() == 0
+        _settle(page)
+        browser.close()
+        # An overlap it already has: Priority and Min hold, each saying why.
+        decks.upsert(eve("05:00"))
+        browser, page, errors = _open(p, base, "/decks/eve/edit")
+        assert page.locator(".dxe-warn.is-err").count() == 0
+        assert page.locator("#dxe-prio-why").inner_text().replace(nbsp, " ") == (
+            "Overlaps Art at 6 AM (priority 0). Higher number wins."
+        )
+        assert page.locator("#dxe-hold-why").inner_text() == (
+            "Stays at least 5 min before another lineup can replace it."
+        )
+        page.locator("#dxe-prio").fill("3")
+        page.locator("#dxe-hold").fill("10")
+        _save(page)
+        saved = decks.get("eve")
+        assert saved.advance_priority == 3 and saved.advance_min_hold_minutes == 10
+        # A daily push: Min hold does nothing there.
+        page.goto(base + "/decks/art/edit", wait_until="load")
+        assert page.locator("#dxe-hold").count() == 0
+        assert "Overlaps Eve" in page.locator("#dxe-prio-why").inner_text()
+        _settle(page)
+        # A rotation on a display with buttons: a press can cut it short.
+        page.goto(base + "/decks/morning/edit", wait_until="load")
+        assert page.locator("#dxe-prio").count() == 0
+        assert "before a button can replace it" in page.locator("#dxe-hold-why").inner_text()
+        _settle(page)
+        assert errors == []
+        browser.close()
+
+
+def test_updates_are_said_on_the_dashboard_not_in_timing(real: tuple[str, Flask]) -> None:
+    """No "Fresh pictures" line: a dashboard that updates while shown says so
+    on its tile and in its details; the usual "drawn when sent" is not said."""
+    from playwright.sync_api import sync_playwright
+
+    base, _app = real
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/art/edit")
+        text = page.locator("#dxe-sections").inner_text()
+        assert "Fresh pictures" not in text and "pre-rendered" not in text
+        tag = page.locator('[data-step="photos"] .dxe-step-tags .dxe-tag.time')
+        assert tag.inner_text() == "30 min"
+        assert tag.get_attribute("title") == "Updates every 30 min while shown"
+        assert page.locator('[data-step="clock"] .dxe-step-tags .lu-ico').count() == 0
+        page.locator('[data-step="photos"] .dxe-sel').click()
+        assert "Updates every 30 min while shown" in page.locator(".dxe-sum").inner_text()
+        page.locator('[data-step="clock"] .dxe-sel').click()
+        detail = page.locator("#dxe-detail").inner_text()
+        assert "Redrawn" not in detail and "updates" not in detail.lower()
+        _settle(page)
+        assert errors == []
+        browser.close()
+
+
+def test_quiet_hours_count_only_on_their_days(real: tuple[str, Flask]) -> None:
+    """Quiet hours on other days than the push runs don't skip it; on some of
+    its days, the warning names them."""
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/art/edit")
+        today = int(page.locator(".dxe-days .lu-dt.is-today").get_attribute("data-day"))
+        _settle(page)
+        browser.close()
+        others = [d for d in ALL_DAYS if d != today]
+        app.config["DEVICE_REGISTRY"].get("tv").manifest["quiet_hours"] = {
+            "enabled": True, "start": "23:00", "end": "08:00", "days": others,
+        }  # fmt: skip
+        decks = app.config["DECK_STORE"]
+        decks.upsert(decks.get("art").model_copy(update={"advance_days_of_week": [today]}))
+        browser, page, errors = _open(p, base, "/decks/art/edit")
+        # Today it isn't quiet at 6 AM: not skipped.
+        assert "Skipped" not in page.locator("#dxe-status-lines").inner_text()
+        assert "quiet hours" not in page.locator("#dxe-sections").inner_text()
+        # Run it every day: skipped on the quiet ones, and only those are named.
+        for d in others:
+            page.locator(f'.dxe-days [data-day="{d}"]').click()
+        warn = page.locator(".dxe-warn", has_text="quiet").inner_text().replace("\u202f", " ")
+        assert "6 AM is in quiet hours on " in warn and "so it's skipped then" in warn
+        assert "Start at 8:15 AM" in warn
+        _settle(page)
+        assert errors == []
+        browser.close()
+
+
+def test_edited_timing_drops_next_until_it_is_saved(real: tuple[str, Flask]) -> None:
+    """NOW and NEXT are the saved plan's: a timing edit keeps NOW and drops
+    NEXT and the header's next time until Save."""
+    from playwright.sync_api import sync_playwright
+
+    base, _app = real
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/morning/edit")
+        assert page.locator(".dxe-tiles .lu-pill.p-now").count() == 1
+        assert page.locator(".dxe-tiles .lu-pill.p-next").count() == 1
+        page.locator("[data-interval]").select_option("45")
+        assert page.locator(".dxe-tiles .lu-pill.p-now").count() == 1
+        assert page.locator(".dxe-tiles .lu-pill.p-next").count() == 0
+        assert page.locator(".dxe-next-line").inner_text() == "New times start when you save."
+        assert page.locator(".dxe-daybar .lu-nflag").count() == 0
+        page.locator("[data-discard]").click()
+        assert page.locator(".dxe-tiles .lu-pill.p-next").count() == 1
+        _settle(page)
+        assert errors == []
+        browser.close()

@@ -184,22 +184,50 @@
     const v = viewOf(st.display);
     return v && v.pause ? v.pause : null;
   };
-  function inPause(m) {
+  // Quiet hours on weekday `day` as [start, end) day-minute spans: the
+  // server's rule (lineups_view._pause_parts), each weekday on its own
+  // clock, with its weekday and all-day masks.
+  function pauseParts(day) {
     const p = pause();
-    if (!p || !Number.isFinite(m)) return false;
-    return R.overlapsPause(p, m, m);
+    if (!p) return [];
+    if (p.all_day && p.all_day[day]) return [[0, DAY_MIN]];
+    if (p.days && !p.days[day]) return [];
+    const a = p.start_min % DAY_MIN;
+    const b = p.end_min % DAY_MIN;
+    return a <= b
+      ? [[a, b]]
+      : [
+          [0, b],
+          [a, DAY_MIN],
+        ];
   }
-  // The whole of s..e (minutes, e up to 1440) inside quiet hours.
+  // The days it runs (every day for a new lineup with none picked yet).
+  const runDays = () => {
+    const on = [0, 1, 2, 3, 4, 5, 6].filter((i) => st.when.days[i]);
+    return on.length ? on : [0, 1, 2, 3, 4, 5, 6];
+  };
+  // The run days on which minute `m` is quiet.
+  const quietDaysAt = (m) =>
+    Number.isFinite(m)
+      ? runDays().filter((d) => pauseParts(d).some(([a, b]) => m >= a && m < b))
+      : [];
+  // Minute `m` is quiet on every day it runs.
+  const inPause = (m) => {
+    const q = quietDaysAt(m);
+    return q.length > 0 && q.length === runDays().length;
+  };
+  // The whole of s..e (minutes, e up to 1440) is quiet on every day it runs.
   function allInPause(s, e) {
-    const p = pause();
-    if (!p || !Number.isFinite(s) || !Number.isFinite(e) || e <= s) return false;
-    const a = p.start_min;
-    const b = p.end_min;
-    return a < b ? s >= a && e <= b : e <= b || s >= a;
+    if (!pause() || !Number.isFinite(s) || !Number.isFinite(e) || e <= s) return false;
+    return runDays().every((d) => pauseParts(d).some(([a, b]) => s >= a && e <= b));
   }
-  // The first quarter hour at or after quiet hours end (or `m` when it's out).
+  // "Sat, Sun" when only some of the run days are named.
+  const someDays = (days) =>
+    days.length === runDays().length ? "" : daysText(DAYS.map((_, i) => days.includes(i)));
+  // The first quarter hour after quiet hours end: the scheduler counts the
+  // end minute as quiet, so a push exactly at the end is still held.
   function slotAfterPause(m) {
-    let t = Math.ceil(m / 15) * 15;
+    let t = Math.ceil((m + 1) / 15) * 15;
     for (let i = 0; i < 96 && inPause(t % DAY_MIN); i++) t += 15;
     return t % DAY_MIN;
   }
@@ -214,6 +242,77 @@
   }
   const takesInput = () => !!capsOf(st.display).inputs;
   const sleeps = () => !!capsOf(st.display).sleeps;
+  // What flips it by hand: buttons always do; touch does too.
+  function flipWord() {
+    const c = capsOf(st.display);
+    if (c.buttons && !c.touch) return "buttons";
+    if (c.touch && !c.buttons) return "taps";
+    return "taps and buttons";
+  }
+  // The other lineups on display `x.display` that run at the same time as
+  // lineup state `x` on a shared day. [{l, days}]
+  function overlapsOf(x) {
+    const v = viewOf(x.display);
+    const mode = x.when.mode;
+    if (!v || mode === "manual" || !x.enabled) return [];
+    const s = T(x.when.start);
+    const e = mode === "between" ? (x.when.end === "24:00" ? DAY_MIN : T(x.when.end)) : s;
+    if (!Number.isFinite(s) || !Number.isFinite(e)) return [];
+    const spans = (a, b, point) =>
+      point
+        ? [[a, a + 1]]
+        : b > a
+          ? [[a, b]]
+          : [
+              [a, DAY_MIN],
+              [0, b],
+            ];
+    const mine = spans(s, e, mode === "at");
+    return (v.lineups || [])
+      .filter((l) => l.id !== S.deckId && l.enabled && l.window)
+      .map((l) => {
+        const days = [0, 1, 2, 3, 4, 5, 6].filter((i) => x.when.days[i] && l.days[i]);
+        const theirs = spans(l.window.start_min, l.window.end_min, l.window.is_point);
+        const hit = days.length && mine.some(([a, b]) => theirs.some(([c, d]) => a < d && c < b));
+        return hit ? { l, days } : null;
+      })
+      .filter(Boolean);
+  }
+  // Overlaps it already had are kept, and Priority decides between them;
+  // a save that makes a new one is refused (app.deck_routes), so the edit
+  // says so instead. {known: [{l, days}], fresh: [{l, days}]}
+  const savedOverlaps = new Set();
+  function overlaps() {
+    if (S.isNew) return { known: [], fresh: [] };
+    if (!savedOverlaps.size)
+      overlapsOf(initial()).forEach(({ l, days }) =>
+        days.forEach((d) => savedOverlaps.add(`${l.id}:${d}`))
+      );
+    const known = [];
+    const fresh = [];
+    overlapsOf(st).forEach(({ l, days }) => {
+      const old = days.filter((d) => savedOverlaps.has(`${l.id}:${d}`));
+      const added = days.filter((d) => !savedOverlaps.has(`${l.id}:${d}`));
+      if (old.length) known.push({ l, days: old });
+      if (added.length) fresh.push({ l, days: added });
+    });
+    return { known, fresh };
+  }
+  // Timing as saved vs as edited: NOW / NEXT and the header's next line are
+  // the saved plan's, so they wait for Save once the timing changes.
+  const timingOf = (x) =>
+    JSON.stringify([
+      x.enabled,
+      x.display,
+      x.when.mode,
+      x.when.start,
+      x.when.end,
+      x.when.days,
+      x.interval,
+      x.mode,
+      x.steps.map((s) => [s.id, s.dwell]),
+    ]);
+  const timingDirty = () => !S.isNew && timingOf(st) !== timingOf(initial());
 
   /* ------------------------------------------------------------ binding (consent) */
   const strandedFor = (id, dev) => {
@@ -391,7 +490,10 @@
       const bits = [];
       if (dev && dev.model) bits.push(dev.model);
       if (d && d.link && d.link.label) bits.push(d.link.label.toLowerCase());
-      if (d && d.pause) bits.push(`quiet ${d.pause.label}`);
+      if (d && d.pause) {
+        const qd = d.pause.days && d.pause.days.some((x) => !x) ? daysText(d.pause.days) : "";
+        bits.push(`quiet ${d.pause.label}${qd ? ` ${qd}` : ""}`);
+      }
       model.textContent = S.isNew ? "A display, a time, then dashboards." : bits.join(" · ");
     }
     const now = $("dxe-now");
@@ -457,7 +559,7 @@
     if (!st.enabled) return line("Off, nothing runs.", "off");
     if (!l || !d) return "";
     if (S.when.mode === "manual" && l.status !== "live")
-      return line("<b>By hand: taps and buttons flip it.</b>");
+      return line(`<b>By hand: ${esc(flipWord())} flip it.</b>`);
     // A daily push in quiet hours is skipped, not held: the scheduler counts
     // it as done for the day (as the When section says).
     if (
@@ -477,11 +579,13 @@
         : `Live: ${l.live_now && l.live_now.on_screen_name ? l.live_now.on_screen_name : "on screen"}`;
       const nextAt =
         nx && nx.pill && /\d/.test(nx.pill.label) ? nx.pill.label.replace(/^Next\s*/, "") : "";
-      const second = nx
-        ? `Next: ${nx.name}${nextAt ? ` at ${nextAt}` : ""}.`
-        : nl.before
-          ? `${nl.before}${nl.at ? ` ${nl.at}` : ""}${nl.after ? ` ${nl.after}` : ""}.`
-          : "";
+      const second = timingDirty()
+        ? "New times start when you save."
+        : nx
+          ? `Next: ${nx.name}${nextAt ? ` at ${nextAt}` : ""}.`
+          : nl.before
+            ? `${nl.before}${nl.at ? ` ${nl.at}` : ""}${nl.after ? ` ${nl.after}` : ""}.`
+            : "";
       return (
         `<p class="dxe-live-line is-live"><i class="dxe-dot" aria-hidden="true"></i><b>${esc(first)}</b></p>` +
         (second ? `<p class="dxe-next-line">${esc(second)}</p>` : "")
@@ -649,6 +753,17 @@
         );
       }
     });
+    // The "Update in" flag is this lineup's next advance, as saved: another
+    // lineup's, or one the edits have moved, isn't said here.
+    bar.querySelectorAll(".lu-trk").forEach((trk) => {
+      const flag = trk.querySelector(".lu-nflag");
+      if (!flag) return;
+      const mine = trk.querySelector(`.lu-blk[data-lineup="${CSS.escape(id)}"] .lu-tick.next`);
+      if (!mine || timingDirty()) {
+        flag.remove();
+        trk.classList.remove("flagged");
+      }
+    });
     bar.querySelectorAll(".lu-blk-side").forEach((b) => {
       if (b.title && b.title.startsWith(st.name || "This lineup")) b.classList.add("is-mine");
     });
@@ -687,7 +802,7 @@
   function whenLead() {
     const dev = deviceOf(st.display);
     const on = dev ? ` on ${dev.name}` : "";
-    if (st.when.mode === "manual") return `No set time${on}; taps and buttons flip it.`;
+    if (st.when.mode === "manual") return `No set time${on}; ${flipWord()} flip it.`;
     const days = daysText(st.when.days);
     if (st.when.mode === "at") return `Sends at ${clockOf(st.when.start)}${on}, ${days}.`;
     const w = window_();
@@ -740,19 +855,33 @@
       );
     if (st.when.mode === "at" && st.steps.length > 1)
       out.push(
-        `<p class="dxe-warn">${ico("info")}<span>Only dashboard 1 is ever sent.</span><button type="button" class="dxe-link" data-end="add">Add end time</button></p>`
+        `<p class="dxe-warn">${ico("info")}<span>Only the first dashboard is sent.</span><button type="button" class="dxe-link" data-end="add">Add end time</button></p>`
       );
+    // A new overlap is refused on Save: say so here, with what it meets.
+    overlaps()
+      .fresh.slice(0, 1)
+      .forEach(({ l, days }) => {
+        const on = days.length === 7 ? "" : ` on ${daysText(DAYS.map((_, i) => days.includes(i)))}`;
+        const at = l.window.is_point
+          ? `at ${R.clock(l.window.start_min)}`
+          : R.clockRange(l.window.start_min, l.window.end_min);
+        out.push(
+          `<p class="dxe-warn is-err">${ico("layers")}<span>Clashes with ${esc(l.name)} ${esc(at)}${esc(on)}; move it to save.</span></p>`
+        );
+      });
     const p = pause();
-    if (p && st.when.mode === "at" && inPause(w.s)) {
-      const after = R.hhmm(p.end_min + 2);
+    const quiet = p ? quietDaysAt(w.s) : [];
+    const on = someDays(quiet);
+    if (p && st.when.mode === "at" && quiet.length) {
+      const after = slotAfterPause(p.end_min);
       out.push(
-        `<p class="dxe-warn">${ico("moon")}<span>${esc(clockOf(st.when.start))} is in quiet hours, so it's skipped.</span><button type="button" class="dxe-link" data-start="${esc(after)}" data-fk="start-fix">Start at ${esc(R.clock(p.end_min + 2))}</button></p>`
+        `<p class="dxe-warn">${ico("moon")}<span>${esc(clockOf(st.when.start))} is in quiet hours${on ? ` on ${esc(on)}` : ""}, so it's skipped${on ? " then" : ""}.</span><button type="button" class="dxe-link" data-start="${esc(R.hhmm(after))}" data-fk="start-fix">Start at ${esc(R.clock(after))}</button></p>`
       );
     } else if (p && st.when.mode === "between" && !endBeforeStart() && allInPause(w.s, w.e)) {
       out.push(`<p class="dxe-warn">${ico("moon")}<span>All of this is in quiet hours.</span></p>`);
-    } else if (p && st.when.mode === "between" && inPause(w.s)) {
+    } else if (p && st.when.mode === "between" && quiet.length) {
       out.push(
-        `<p class="dxe-note">${ico("moon")}<span>Quiet until ${esc(R.clock(p.end_min))}; it picks up then.</span></p>`
+        `<p class="dxe-note">${ico("moon")}<span>Quiet until ${esc(R.clock(p.end_min))}${on ? ` on ${esc(on)}` : ""}; it picks up then.</span></p>`
       );
     }
     return out.join("");
@@ -768,7 +897,28 @@
       `<div class="dxe-card">` +
       days +
       `<div class="dxe-field"><span class="dxe-label">Time</span><div class="dxe-ctl">${timeHtml()}${whenWarnings()}</div></div>` +
+      priorityHtml() +
       `</div>`
+    );
+  }
+
+  // Priority only matters where another lineup runs at the same time.
+  function priorityHtml() {
+    const over = overlaps().known;
+    if (!over.length) return "";
+    const named = over.slice(0, 2).map(({ l, days }) => {
+      const p = (S.priorities || {})[l.id];
+      const on = days.length === 7 ? "" : daysText(DAYS.map((_, i) => days.includes(i)));
+      const when = l.window.is_point
+        ? `at ${R.clock(l.window.start_min)}`
+        : R.clockRange(l.window.start_min, l.window.end_min);
+      return `${l.name} ${on ? `${on} ` : ""}${when}${p !== undefined ? ` (priority ${p})` : ""}`;
+    });
+    const more = over.length > 2 ? ` and ${over.length - 2} more` : "";
+    return (
+      `<div class="dxe-field"><label class="dxe-label" for="dxe-prio">Priority</label><div class="dxe-ctl">` +
+      `<input type="number" class="dxe-in dxe-num" id="dxe-prio" data-fk="prio" data-priority min="-1000" max="1000" value="${esc(st.priority)}" aria-describedby="dxe-prio-why">` +
+      `<p class="dxe-note" id="dxe-prio-why">${ico("layers")}<span>Overlaps ${esc(named.join(" and "))}${esc(more)}. Higher number wins.</span></p></div></div>`
     );
   }
 
@@ -786,12 +936,14 @@
     if (!n) return "No dashboards yet.";
     const k = kind();
     if (k === "manual") return "Taps and buttons step through them.";
-    if (k === "daily") return n > 1 ? "A push only sends the first one." : "Sent once, then held.";
+    if (k === "daily") return n > 1 ? "Only the first dashboard is sent." : "Sent once, then held.";
     if (k === "interval") return `Sent again every ${mins(st.interval)}.`;
     const same = st.steps.every((s) => dwellOf(s) === st.interval);
+    // Rules can skip a dashboard, so the loop is only the plan.
+    const loop = st.steps.some(hasConditions) ? "planned loop" : "full loop";
     return same
-      ? `${mins(st.interval)} each, full loop ${mins(loopMinutes())}.`
-      : `Full loop ${mins(loopMinutes())}.`;
+      ? `${mins(st.interval)} each, ${loop} ${mins(loopMinutes())}.`
+      : `${loop.charAt(0).toUpperCase()}${loop.slice(1)} ${mins(loopMinutes())}.`;
   }
 
   // NOW / NEXT from the Lineups view, only while the steps are as saved.
@@ -799,9 +951,9 @@
     const l = S.lineup;
     if (!l || dirtySteps()) return {};
     const s = l.steps.find((x) => x.dashboard_id === id);
-    return s
-      ? { now: !!s.current, next: !!s.next, nextLabel: s.pill && s.next ? s.pill.label : "" }
-      : {};
+    if (!s) return {};
+    if (timingDirty()) return { now: !!s.current };
+    return { now: !!s.current, next: !!s.next, nextLabel: s.pill && s.next ? s.pill.label : "" };
   }
   const savedIds = S.steps.map((s) => s.id).join(",");
   const dirtySteps = () => st.steps.map((s) => s.id).join(",") !== savedIds;
@@ -815,11 +967,14 @@
     const k = kind();
     const home = st.home === s.id || (!st.home && i === 0);
     let tags = "";
-    if (k === "daily" && i > 0) tags += `<span class="dxe-tag mute">Not sent by a push</span>`;
+    if (k === "daily" && i > 0) tags += `<span class="dxe-tag mute">Not sent</span>`;
     if (strandedFor(s.id, st.display))
       tags += `<span class="dxe-tag warn" title="Bound to another display; saving asks to bind it here">Not on this display</span>`;
     if (s.dwell && s.dwell !== st.interval && k === "cycle")
       tags += `<span class="dxe-tag time" title="Shows ${esc(mins(s.dwell))}, not the lineup's ${esc(mins(st.interval))}">${ico("clock")}${esc(mins(s.dwell))}</span>`;
+    // Only an unusual Updates is said: a dashboard that redraws while shown.
+    if (s.refresh)
+      tags += `<span class="dxe-tag time" title="Updates every ${esc(mins(s.refresh))} while shown">${ico("refresh")}${esc(mins(s.refresh))}</span>`;
     if (home && (takesInput() || k === "manual") && n > 1)
       tags += `<span class="dxe-tag home" title="Home dashboard">★ home</span>`;
     if (p.missing) tags += `<span class="dxe-tag warn">Deleted</span>`;
@@ -1051,12 +1206,12 @@
         .join("");
       return (
         `<div class="dxe-kids"><div class="dxe-kids-head"><span class="dxe-mono">${esc(it.count ? plural(it.count, it.noun || "items") : "Draw")}</span>` +
-        `<span class="dxe-soft">${c && c.note ? esc(c.note) : "A new one each render."}</span>` +
+        `<span class="dxe-soft">${c && c.note ? esc(c.note) : "A new one each time it's sent."}</span>` +
         `<button type="button" class="lu-btn-ghost sm dxe-draw" data-draw="${esc(p.id)}" data-fk="draw-${esc(p.id)}"${ok && !(hist.length && hist[hist.length - 1].state === "loading") ? "" : ` disabled title="${ok ? "Drawing…" : "Save first to draw"}"`}>${ico("refresh")}<span>Draw another</span></button></div>` +
         `<div class="dxe-strip">${last}${drawn}</div></div>`
       );
     }
-    return `<p class="dxe-one">${ico("refresh")}<span>${esc(p.fresh || "")}</span></p>`;
+    return "";
   }
 
   function gridHtml(s, p) {
@@ -1104,13 +1259,20 @@
     );
   }
 
-  /* --- per-dashboard settings, one summary line and an Edit */
+  /* --- per-dashboard settings: what differs, in one line, and its actions */
   function settingsHtml(s, p, i) {
     const k = kind();
     const window = k === "cycle";
     const bits = [];
-    if (window && s.dwell && s.dwell !== st.interval) bits.push(`shows ${mins(s.dwell)}`);
-    bits.push(s.refresh ? `updates every ${mins(s.refresh)}` : "updates when sent");
+    if (window)
+      bits.push(
+        s.dwell && s.dwell !== st.interval
+          ? `shows ${mins(s.dwell)}`
+          : `shows ${mins(st.interval)}, the default`
+      );
+    if (s.refresh) bits.push(`updates every ${mins(s.refresh)} while shown`);
+    if (showKeepReady() && s.override !== null && s.override !== undefined)
+      bits.push(s.override ? `kept ready every ${mins(s.override)}` : "not kept ready");
     let nCond = 0;
     try {
       nCond = s.conditions.trim() ? JSON.parse(s.conditions).length : 0;
@@ -1140,24 +1302,35 @@
           `</select></label>`
         : "";
       const upd =
-        `<label class="dxe-mini"><span>Updates</span><select class="dxe-in dxe-select" data-fk="upd-${esc(s.id)}" data-updates="${esc(s.id)}">` +
+        `<label class="dxe-mini"><span>Updates while shown</span><select class="dxe-in dxe-select" data-fk="upd-${esc(s.id)}" data-updates="${esc(s.id)}">` +
         (UPDATES.includes(s.refresh)
           ? ""
           : `<option value="${s.refresh}" selected>every ${esc(mins(s.refresh))}</option>`) +
         UPDATES.map(
           (v) =>
-            `<option value="${v}"${s.refresh === v ? " selected" : ""}>${v ? `every ${esc(mins(v))}` : "only when sent"}</option>`
+            `<option value="${v}"${s.refresh === v ? " selected" : ""}>${v ? `every ${esc(mins(v))}` : "no, only when sent"}</option>`
         ).join("") +
         `</select><small class="dxe-soft">Changes this dashboard everywhere.</small></label>`;
+      // Keep ready, for this dashboard: where the display flips by press.
+      let keep = "";
+      if (showKeepReady()) {
+        const cur = s.override === null || s.override === undefined ? "" : String(s.override);
+        const opts = [
+          ["", `Lineup's (${st.cadence ? `every ${mins(st.cadence)}` : "off"})`],
+          ...KEEP_READY.map((v) => [String(v), v ? `every ${mins(v)}` : "off"]),
+        ];
+        if (cur && !opts.some(([v]) => v === cur)) opts.push([cur, `every ${mins(Number(cur))}`]);
+        keep = `<label class="dxe-mini"><span>Keep ready</span><select class="dxe-in dxe-select" data-fk="ov-${esc(s.id)}" data-override="${esc(s.id)}">${opts.map(([v, l]) => `<option value="${v}"${v === cur ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></label>`;
+      }
       const cond = hasConditions(s)
         ? `<div class="dxe-mini dxe-cond"><span>Conditions</span><div class="condition-picker" data-condition-picker><textarea rows="2" spellcheck="false" data-cond="${esc(s.id)}" data-fk="cond-${esc(s.id)}" placeholder="[]" aria-label="Conditions for ${esc(p.name)}">${esc(s.conditions)}</textarea></div><small class="dxe-soft">Skipped while they fail.</small></div>`
         : "";
-      edit = `<div class="dxe-edit">${showFor}${upd}${cond}</div>`;
+      edit = `<div class="dxe-edit">${showFor}${upd}${keep}${cond}</div>`;
     }
     return (
-      `<div class="dxe-sum"><span class="dxe-soft">${esc(sum.charAt(0).toUpperCase() + sum.slice(1))}</span>` +
-      `<button type="button" class="dxe-link" data-edit="${esc(s.id)}" data-fk="edit-${esc(s.id)}" aria-expanded="${editing}" aria-label="${editing ? "Done with" : "Edit"} ${esc(p.name)}">${editing ? "Done" : "Edit"}</button>` +
-      `<span class="dxe-sum-r">${homeBtn}<button type="button" class="dxe-link quiet" data-remove="${esc(s.id)}" data-fk="rm-${esc(s.id)}" aria-label="Remove ${esc(p.name)}">Remove</button></span></div>` +
+      `<div class="dxe-sum"><span class="dxe-soft dxe-sum-t">${esc(sum.charAt(0).toUpperCase() + sum.slice(1))}</span>` +
+      `<span class="dxe-sum-r"><button type="button" class="dxe-link" data-edit="${esc(s.id)}" data-fk="edit-${esc(s.id)}" aria-expanded="${editing}" aria-label="${editing ? "Done with" : "Edit"} ${esc(p.name)}">${editing ? "Done" : "Edit"}</button>` +
+      `${homeBtn}<button type="button" class="dxe-link quiet" data-remove="${esc(s.id)}" data-fk="rm-${esc(s.id)}" aria-label="Remove ${esc(p.name)}">Remove</button></span></div>` +
       edit
     );
   }
@@ -1224,30 +1397,23 @@
   }
 
   /* ------------------------------------------------------------ 3 Timing */
+  // The dashboards with their own time, not the lineup's (a cycle only).
+  const ownTime = () =>
+    kind() === "cycle" ? st.steps.filter((x) => x.dwell && x.dwell !== st.interval) : [];
   function paceLead() {
     const k = kind();
-    if (k === "manual") return "Taps flip; there's no timer.";
-    if (k === "daily") return "A push doesn't rotate.";
+    if (k === "manual") return `No timer; ${flipWord()} flip it.`;
+    if (k === "daily") return "Sent once, then held.";
     if (k === "interval") return `Sent again every ${mins(st.interval)}.`;
-    return `Next dashboard every ${mins(st.interval)}.`;
+    const own = ownTime().length;
+    if (!own) return `Next dashboard every ${mins(st.interval)}.`;
+    if (own === st.steps.length) return "Every dashboard has its own time.";
+    return `Dashboard times override the ${mins(st.interval)} default.`;
   }
-  function freshLine() {
-    const pages = st.steps.map((s) => s.refresh);
-    if (!pages.length) return "Nothing to refresh yet.";
-    const first = pages[0];
-    const same = pages.every((r) => r === first);
-    const n = pages.length;
-    // A push renders live; only a window's next dashboard is drawn ahead.
-    const ahead = kind() === "daily" ? "" : ", pre-rendered automatically";
-    if (same && first)
-      return `${n === 1 ? "It updates" : `All ${n} update`} every ${mins(first)}${ahead}.`;
-    if (same) return `Drawn when sent${ahead}.`;
-    return `Each on its own Updates (see its row)${ahead}.`;
-  }
-  function selectHtml(fk, attr, values, cur, label, fmt) {
+  function selectHtml(fk, attr, values, cur, label, fmt, cls) {
     const opts = values.includes(cur) ? values : values.concat([cur]).sort((a, b) => a - b);
     return (
-      `<select class="dxe-in dxe-select" data-fk="${fk}" ${attr} aria-label="${esc(label)}">` +
+      `<select class="dxe-in dxe-select${cls ? ` ${cls}` : ""}" data-fk="${fk}" ${attr} aria-label="${esc(label)}">` +
       opts
         .map((v) => `<option value="${v}"${v === cur ? " selected" : ""}>${esc(fmt(v))}</option>`)
         .join("") +
@@ -1258,128 +1424,163 @@
     return `<span class="switch dxe-switch"><input type="checkbox" data-fk="${fk}" ${attr}${on ? " checked" : ""} aria-label="${esc(label)}"><span class="switch-track"><span class="switch-thumb"></span></span></span>`;
   }
 
-  function optionsHtml() {
-    const dev = deviceOf(st.display);
-    if (!dev) return "";
+  // What each display option needs (the settings audit, the timing audit):
+  // touch flips only a rotation; buttons always work; wake sync only holds a
+  // rotation's or repeat's send; Keep ready only helps a display that flips
+  // by press, and a push renders live.
+  const showTaps = () => !!capsOf(st.display).touch && kind() === "cycle";
+  const showHome = () => {
+    const c = capsOf(st.display);
     const k = kind();
-    const caps = dev.caps || {};
-    const rows = [];
-    if (caps.inputs && k === "cycle")
-      rows.push(
-        `<div class="dxe-opt"><div><b>Taps also flip</b><p class="dxe-soft">A tap moves on; the timer carries on.</p></div>${switchHtml("taps", "data-taps", st.taps, "Taps also flip")}</div>`
-      );
-    if (caps.inputs && (k === "manual" || (k === "cycle" && st.taps))) {
-      const home = pageOf(st.home || (st.steps[0] || {}).id || "");
-      rows.push(
-        `<div class="dxe-opt"><div><b>Back to ★ ${esc(home.name || "home")}</b><p class="dxe-soft">Returns home when nobody taps.</p></div>${selectHtml("timeout", "data-timeout", RETURN_HOME, st.timeout, "Return home after", (v) => (v ? `after ${v} idle min` : "never"))}</div>`
-      );
-    }
-    if (caps.sleeps && k !== "manual")
-      rows.push(
-        `<div class="dxe-opt"><div><b>Send just before it wakes</b><p class="dxe-soft">${caps.wake_learned ? `${ico("check")}Wake times learned.` : "Learns wake times from check-ins."}</p></div>` +
-          `<span class="dxe-opt-ctl"><label class="dxe-lead-s"><input type="number" class="dxe-in dxe-num" min="0" max="600" data-fk="lead" data-lead value="${esc(st.lead)}" aria-label="Seconds ahead"${st.smartSync ? "" : " disabled"}><span>s</span></label>${switchHtml("smart", "data-smart", st.smartSync, "Send just before it wakes")}</span></div>`
-      );
-    if (!rows.length) {
-      const why = caps.inputs
-        ? "nothing here applies to this lineup"
-        : caps.sleeps
-          ? "nothing here applies"
-          : "always on, no buttons";
-      return `<p class="dxe-one dxe-opts-none">${ico("info")}<span>${esc(dev.name)}: ${esc(why)}.</span></p>`;
-    }
-    return (
-      `<details class="dxe-fold" data-fold="options"${ui.optOpen ? " open" : ""}><summary>${ico("caret", "dxe-caret")}<b>Options for ${esc(dev.name)}</b><span class="dxe-soft">${esc(plural(rows.length, "settings"))}</span></summary>` +
-      `<div class="dxe-fold-body">${rows.join("")}</div></details>`
-    );
-  }
-
-  // Keep ready (a hidden re-render) only helps a display that flips by button
-  // or touch; a push renders live, and a by-hand lineup on a display with no
-  // input never flips (the settings audit).
+    return !!c.inputs && (k === "manual" || (k === "cycle" && (st.taps || !!c.buttons)));
+  };
+  const showSmart = () => sleeps() && (kind() === "cycle" || kind() === "interval");
   const showKeepReady = () => takesInput() && kind() !== "daily";
   // "First whose conditions pass" is a legacy mode: offered only where set.
   const showMode = () => S.mode === "priority" && kind() === "cycle";
-  const showMinHold = () => kind() !== "manual";
-  function advancedHtml() {
-    const mode = st.mode === "priority" ? "first match" : "timed rotation";
-    const keep = st.cadence ? `keep ready ${mins(st.cadence)}` : "keep ready off";
-    const sum = [`priority ${st.priority}`];
-    if (showMode()) sum.push(mode);
-    if (showMinHold()) sum.push(`min hold ${st.minHold} min`);
-    if (showKeepReady()) sum.push(keep);
-    const overrides = st.steps
-      .map((s) => {
-        const p = pageOf(s.id);
-        const cur = s.override === null || s.override === undefined ? "" : String(s.override);
-        const opts = [
-          ["", "lineup's"],
-          ...KEEP_READY.map((v) => [String(v), v ? `every ${mins(v)}` : "never"]),
-        ];
-        if (cur && !opts.some(([v]) => v === cur)) opts.push([cur, `every ${mins(Number(cur))}`]);
-        return `<label class="dxe-mini row"><span>${esc(p.name)}</span><select class="dxe-in dxe-select" data-fk="ov-${esc(s.id)}" data-override="${esc(s.id)}">${opts.map(([v, l]) => `<option value="${v}"${v === cur ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></label>`;
-      })
-      .join("");
+  // Min hold only gates a rotation, and only matters when something can cut
+  // a dashboard short: a press, a rule, or another lineup.
+  function interrupters() {
+    const c = capsOf(st.display);
+    const out = [];
+    const tap = !!c.touch && st.taps;
+    if (c.buttons && tap) out.push("a tap or button");
+    else if (c.buttons) out.push("a button");
+    else if (tap) out.push("a tap");
+    if (st.steps.some(hasConditions)) out.push("a rule");
+    if (overlaps().known.length) out.push("another lineup");
+    return out;
+  }
+  const showMinHold = () => kind() === "cycle" && interrupters().length > 0;
+  const holdWhy = (list) => `Stays at least ${mins(st.minHold)} before ${list} can replace it.`;
+
+  function optionsHtml() {
+    const dev = deviceOf(st.display);
+    if (!dev) return "";
+    const caps = dev.caps || {};
+    const opt = (title, hint, ctl) =>
+      `<div class="dxe-opt"><div><b>${title}</b><p class="dxe-soft">${hint}</p></div>${ctl}</div>`;
+    const rows = [];
+    if (showTaps())
+      rows.push(
+        opt(
+          "Touch also flips",
+          caps.buttons ? "Buttons always work." : "A tap moves on; the timer keeps going.",
+          switchHtml("taps", "data-taps", st.taps, "Touch also flips")
+        )
+      );
+    if (showHome()) {
+      const home = pageOf(st.home || (st.steps[0] || {}).id || "");
+      rows.push(
+        opt(
+          `Back to ★ ${esc(home.name || "home")}`,
+          "When it's left alone.",
+          selectHtml(
+            "timeout",
+            "data-timeout",
+            RETURN_HOME,
+            st.timeout,
+            "Return home after",
+            (v) => (v ? `after ${v} idle min` : "never")
+          )
+        )
+      );
+    }
+    if (showSmart())
+      rows.push(
+        opt(
+          "Send just before it wakes",
+          caps.wake_learned
+            ? `${ico("check")}Wake times learned.`
+            : "Learns wake times from check-ins.",
+          `<span class="dxe-opt-ctl"><label class="dxe-lead-s"><input type="number" class="dxe-in dxe-num" min="0" max="600" data-fk="lead" data-lead value="${esc(st.lead)}" aria-label="Seconds ahead"${st.smartSync ? "" : " disabled"}><span>s</span></label>${switchHtml("smart", "data-smart", st.smartSync, "Send just before it wakes")}</span>`
+        )
+      );
+    if (showKeepReady())
+      rows.push(
+        opt(
+          "Keep ready",
+          "Draws ahead, so a press shows at once.",
+          selectHtml("cadence", "data-cadence", KEEP_READY, st.cadence, "Keep ready every", (v) =>
+            v ? `every ${mins(v)}` : "off"
+          )
+        )
+      );
+    if (!rows.length) {
+      const why = caps.inputs || caps.sleeps ? "not for this lineup" : "always on, no buttons";
+      return `<p class="dxe-one dxe-opts-none">${ico("info")}<span>Nothing to set for ${esc(dev.name)}: ${esc(why)}.</span></p>`;
+    }
     return (
-      `<details class="dxe-fold" data-fold="advanced"${ui.advOpen ? " open" : ""}><summary>${ico("caret", "dxe-caret")}<b>Advanced</b><span class="dxe-soft">${esc(sum.join(" · "))}</span></summary>` +
-      `<div class="dxe-fold-body dxe-adv">` +
-      `<label class="dxe-mini"><span>Priority</span><input type="number" class="dxe-in dxe-num" data-fk="prio" data-priority min="-1000" max="1000" value="${esc(st.priority)}"><small class="dxe-soft">Higher wins a tie.</small></label>` +
-      (showMode()
-        ? `<label class="dxe-mini"><span>Mode</span><select class="dxe-in dxe-select" data-fk="mode" data-mode-sel><option value="scheduled"${st.mode === "scheduled" ? " selected" : ""}>Timed rotation</option><option value="priority"${st.mode === "priority" ? " selected" : ""}>First whose conditions pass</option></select></label>`
-        : "") +
-      (showMinHold()
-        ? `<label class="dxe-mini"><span>Min hold</span><span class="dxe-unit"><input type="number" class="dxe-in dxe-num" data-fk="hold" data-hold min="0" max="120" value="${esc(st.minHold)}"><span>min</span></span><small class="dxe-soft">Shortest time on one.</small></label>`
-        : "") +
-      (showKeepReady()
-        ? `<label class="dxe-mini"><span>Keep ready</span>${selectHtml("cadence", "data-cadence", KEEP_READY, st.cadence, "Keep ready every", (v) => (v ? `every ${mins(v)}` : "off"))}<small class="dxe-soft">Hidden re-render for flips.</small></label>` +
-          (st.steps.length
-            ? `<div class="dxe-mini dxe-ovs"><span>Keep ready, per dashboard</span>${overrides}</div>`
-            : "")
-        : "") +
-      `</div></details>`
+      `<details class="dxe-fold" data-fold="options"${ui.optOpen ? " open" : ""}><summary>${ico("caret", "dxe-caret")}<b>Options for ${esc(dev.name)}</b></summary>` +
+      `<div class="dxe-fold-body">${rows.join("")}</div></details>`
     );
   }
 
   // The dashboards that show for their own time, not the lineup's: each name
   // takes you to its tile.
-  function overriddenLine(k) {
-    if (k !== "cycle") return "";
-    const own = st.steps.filter((s) => s.dwell && s.dwell !== st.interval);
+  function overriddenLine() {
+    const own = ownTime();
     if (!own.length) return "";
     const links = own
       .map(
         (s) =>
-          `<button type="button" class="dxe-link" data-overridden="${esc(s.id)}">${esc(pageOf(s.id).name)} (${esc(mins(s.dwell))})</button>`
+          `<button type="button" class="dxe-link quiet" data-overridden="${esc(s.id)}">${esc(pageOf(s.id).name)} (${esc(mins(s.dwell))})</button>`
       )
       .join(", ");
-    return `<span class="dxe-soft dxe-overridden">Overridden by: ${links}</span>`;
+    return `<p class="dxe-note dxe-overridden">${ico("warn")}<span>Overridden by: ${links}</span></p>`;
   }
 
   function paceHtml() {
     const k = kind();
-    let each = "";
-    if (k === "daily")
-      each = `<span class="dxe-soft">Only for a window.</span> <button type="button" class="dxe-link" data-end="add">Add an end time</button>`;
-    else if (k === "manual") each = "";
-    else
-      each =
-        selectHtml(
-          "interval",
-          "data-interval",
-          SHOW_FOR,
-          st.interval,
-          k === "interval" ? "Sent again every" : "Each dashboard shows for",
-          mins
-        ) + overriddenLine(k);
-    return (
-      `<div class="dxe-pace">` +
-      (each
-        ? `<div class="dxe-field"><span class="dxe-label">${k === "interval" ? "Sent again every" : "Each dashboard shows for"}</span><div class="dxe-ctl">${each}</div></div>`
-        : "") +
-      `<div class="dxe-field"><span class="dxe-label">Fresh pictures</span><div class="dxe-ctl"><span>${esc(freshLine())}</span></div></div>` +
-      optionsHtml() +
-      advancedHtml() +
-      `</div>`
-    );
+    const field = (label, ctl, forId) =>
+      `<div class="dxe-field"><${forId ? `label for="${forId}"` : "span"} class="dxe-label">${label}</${forId ? "label" : "span"}><div class="dxe-ctl">${ctl}</div></div>`;
+    const rows = [];
+    if (k === "cycle" || k === "interval") {
+      const label = k === "interval" ? "Sent again every" : "Each dashboard shows for";
+      // Every dashboard has its own time: the default is unused (it is what
+      // a dashboard added later starts with).
+      const unused = k === "cycle" && st.steps.length > 0 && ownTime().length === st.steps.length;
+      rows.push(
+        field(
+          label,
+          selectHtml(
+            "interval",
+            "data-interval",
+            SHOW_FOR,
+            st.interval,
+            label,
+            mins,
+            unused ? "is-unused" : ""
+          ) + overriddenLine()
+        )
+      );
+    }
+    if (showMinHold()) {
+      const who = interrupters();
+      const list =
+        who.length > 1 ? `${who.slice(0, -1).join(", ")} or ${who[who.length - 1]}` : who[0];
+      rows.push(
+        field(
+          "Min hold",
+          `<span class="dxe-unit"><input type="number" class="dxe-in dxe-num" id="dxe-hold" data-fk="hold" data-hold min="0" max="120" value="${esc(st.minHold)}" aria-describedby="dxe-hold-why"><span>min</span></span>` +
+            `<p class="dxe-note" id="dxe-hold-why">${ico("info")}<span>${esc(holdWhy(list))}</span></p>`,
+          "dxe-hold"
+        )
+      );
+    }
+    if (showMode())
+      rows.push(
+        field(
+          "Picks",
+          `<select class="dxe-in dxe-select" id="dxe-mode" data-fk="mode" data-mode-sel><option value="scheduled"${st.mode === "scheduled" ? " selected" : ""}>Each in turn</option><option value="priority"${st.mode === "priority" ? " selected" : ""}>First whose conditions pass</option></select>`,
+          "dxe-mode"
+        )
+      );
+    if (k === "daily" && st.steps.length > 1)
+      rows.push(
+        `<p class="dxe-note dxe-pace-note">${ico("info")}<span><button type="button" class="dxe-link" data-end="add">Add end time</button> to show them in turn.</span></p>`
+      );
+    return `<div class="dxe-pace">${rows.join("")}${optionsHtml()}</div>`;
   }
 
   /* ------------------------------------------------------------ the new-lineup flow */
@@ -1563,6 +1764,13 @@
     const un = root.querySelector("[data-move-undo]");
     if (un) un.disabled = ui.saving;
   }
+  // Only a change rebuilds the buttons: a redraw from a field's change event
+  // (on blur, as the pointer goes down on Save) must not swap Save under it.
+  function setButtons(el, html) {
+    if (el.dataset.html === html) return;
+    el.dataset.html = html;
+    el.innerHTML = html;
+  }
   function paintFooter() {
     const btns = $("dxe-actionbar-btns");
     const state = $("dxe-save-state");
@@ -1576,21 +1784,25 @@
           : ui.step < 3
             ? `Step ${ui.step} of 3`
             : "Add a dashboard to create it.");
-      btns.innerHTML =
+      setButtons(
+        btns,
         `<a class="lu-btn-ghost lu-btn-line" href="${esc(S.urls.lineups)}" data-fk="f-cancel">Cancel</a>` +
-        `<button type="button" class="lu-btn-primary" data-create data-fk="f-create"${ready && !ui.saving ? "" : " disabled"}>${ui.saving ? "Creating…" : "Create lineup"}</button>`;
+          `<button type="button" class="lu-btn-primary" data-create data-fk="f-create"${ready && !ui.saving ? "" : " disabled"}>${ui.saving ? "Creating…" : "Create lineup"}</button>`
+      );
       return;
     }
     const d = dirty();
     state.className =
       "dxe-actionbar-status" + (ui.msgKind ? ` is-${ui.msgKind}` : d ? " is-dirty" : "");
     state.textContent = ui.msg || (d ? "Unsaved changes" : "All changes saved");
-    btns.innerHTML =
+    setButtons(
+      btns,
       (ui.reload
         ? `<button type="button" class="lu-btn-ghost lu-btn-line" data-reload data-fk="f-reload">Reload</button>`
         : "") +
-      `<button type="button" class="lu-btn-ghost lu-btn-line" data-discard data-fk="f-discard"${d && !ui.saving ? "" : " disabled"}>Discard</button>` +
-      `<button type="button" class="lu-btn-primary" data-save data-fk="f-save"${ui.saving ? " disabled" : ""}>${ui.saving ? "Saving…" : "Save lineup"}</button>`;
+        `<button type="button" class="lu-btn-ghost lu-btn-line" data-discard data-fk="f-discard"${d && !ui.saving ? "" : " disabled"}>Discard</button>` +
+        `<button type="button" class="lu-btn-primary" data-save data-fk="f-save"${ui.saving ? " disabled" : ""}>${ui.saving ? "Saving…" : "Save lineup"}</button>`
+    );
   }
 
   /* ------------------------------------------------------------ edits */
@@ -2067,14 +2279,13 @@
       fd.append("when_start", st.when.start || "");
       fd.append("when_end", st.when.mode === "between" ? st.when.end : "");
     }
-    if (takesInput() && k === "cycle") fd.append("taps_flip", st.taps ? "1" : "0");
+    if (showTaps()) fd.append("taps_flip", st.taps ? "1" : "0");
     if (windowed) fd.append("advance_interval_minutes", String(st.interval));
     // Home: only once picked (or its dashboard removed); unpicked, it stays
     // whichever dashboard is first.
     if (st.home !== (S.home || "")) fd.append("home", st.home || "");
-    const showHome = takesInput() && (k === "manual" || (k === "cycle" && st.taps));
-    if (showHome) fd.append("timeout", String(st.timeout));
-    if (sleeps() && k !== "manual") {
+    if (showHome()) fd.append("timeout", String(st.timeout));
+    if (showSmart()) {
       fd.append("advance_smart_sync", "0");
       if (st.smartSync) fd.append("advance_smart_sync", "on");
       fd.append("advance_smart_sync_lead_s", String(st.lead));
@@ -2472,8 +2683,17 @@
       return change(() => (st.lead = Number(t.value) || 0), { draw: false });
     if (d.priority !== undefined)
       return change(() => (st.priority = Number(t.value) || 0), { draw: false });
-    if (d.hold !== undefined)
-      return change(() => (st.minHold = Number(t.value) || 0), { draw: false });
+    if (d.hold !== undefined) {
+      change(() => (st.minHold = Number(t.value) || 0), { draw: false });
+      // The line under it follows as you type; nothing else depends on it.
+      const why = root.querySelector("#dxe-hold-why span");
+      const who = interrupters();
+      if (why)
+        why.textContent = holdWhy(
+          who.length > 1 ? `${who.slice(0, -1).join(", ")} or ${who[who.length - 1]}` : who[0]
+        );
+      return;
+    }
   });
 
   root.addEventListener("change", async (e) => {
@@ -2510,7 +2730,10 @@
     if (d.smart !== undefined) return change(() => (st.smartSync = t.checked));
     if (d.cadence !== undefined) return change(() => (st.cadence = Number(t.value) || 0));
     if (d.modeSel !== undefined) return change(() => (st.mode = t.value));
-    if (d.lead !== undefined || d.priority !== undefined || d.hold !== undefined) return draw();
+    // Nothing else is drawn from these: the footer alone, so tabbing on
+    // keeps the next field in place.
+    if (d.lead !== undefined || d.priority !== undefined || d.hold !== undefined)
+      return drawFooter();
   });
 
   root.addEventListener(
@@ -2518,7 +2741,6 @@
     (e) => {
       const f = e.target.dataset && e.target.dataset.fold;
       if (f === "options") ui.optOpen = e.target.open;
-      if (f === "advanced") ui.advOpen = e.target.open;
     },
     true
   );
@@ -2693,6 +2915,38 @@
     saved = snapshot();
   }
   draw();
+
+  // What is on screen, NOW / NEXT and the bar's now mark come from the
+  // Lineups view; it is read again every minute (the edits stay as they
+  // are), so a page left open doesn't promise a time that has passed.
+  const LIVE_EVERY = 60 * 1000;
+  async function refreshLive() {
+    if (S.isNew || ui.saving || document.hidden || dragId || barEdit.active()) return;
+    if (!S.urls.view || !S.display) return;
+    let vm;
+    try {
+      const r = await fetch(`${S.urls.view}?display=${encodeURIComponent(S.display)}`, {
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
+      });
+      if (!r.ok) return;
+      vm = await r.json();
+    } catch {
+      return; // the next minute tries again
+    }
+    const d = vm && (vm.displays || []).find((x) => x.id === S.display);
+    if (!d || ui.saving) return;
+    S.views[d.id] = d;
+    if (vm.now) S.now = vm.now;
+    S.lineup = d.lineups.find((x) => x.id === S.deckId) || S.lineup;
+    // A field being typed in keeps its draw; the header alone is redrawn.
+    const a = document.activeElement;
+    if (a && root.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) drawHeader();
+    else draw();
+    syncZoom();
+  }
+  if (!S.isNew) window.setInterval(refreshLive, LIVE_EVERY);
+
   // Switching lineups from the week view lands where it was left.
   try {
     const y = Number(window.sessionStorage.getItem(SCROLL_KEY));
