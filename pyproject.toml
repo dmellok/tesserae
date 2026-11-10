@@ -169,6 +169,7 @@ module = [
     "app.visionect",
     "app.samsung_frame",
     "app.samsung_frame_art",
+    "app.fraimic",
 ]
 strict = true
 

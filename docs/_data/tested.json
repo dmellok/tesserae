@@ -44,6 +44,11 @@
     "pico_bin": {
       "status": "Tested",
       "hardware": "Pimoroni Inky Frame 7.3\" Spectra 6 (E673, Pico 2 W) running tesserae-device-inkyframe; the 7-colour ACeP revision with partridgeworks/tesserae.inkyframe"
+    },
+    "fraimic_bin": {
+      "status": "Partial",
+      "hardware": "Fraimic 31.5\" Large Canvas (EL315), firmware 0.2.31",
+      "notes": "Byte order and colour codes confirmed on the 31.5\" panel with an asymmetric test pattern uploaded to /api/image. The wake-schedule loop and the 13.3\" layout have not been run on hardware yet."
     }
   }
 }
