@@ -55,7 +55,7 @@ mypy --strict applies to this module, see pyproject.toml.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, time, timedelta, tzinfo
 
@@ -166,6 +166,12 @@ class ProjectionInputs:
     # update is reported as a change, which is the safe way to be unsure.
     current_page_id: str | None = None
     quiet_window: QuietHoursWindow | None = None
+    # The scheduler's own step picker (``Scheduler._pick_eligible_step``):
+    # given a record, the clock's step and the moment, which step it will
+    # actually send, or ``None`` to hold. Without one the projection assumes
+    # no conditions are wired: priority mode sends the first step, scheduled
+    # mode the clock's.
+    pick_step: Callable[[Rotation, int, datetime], int | None] | None = None
 
 
 @dataclass(frozen=True)
@@ -322,6 +328,11 @@ def _cycle_windows(record: CycleRecord, inputs: ProjectionInputs) -> list[tuple[
     return windows
 
 
+def _default_pick(rotation: Rotation, time_step_index: int, _when: datetime) -> int | None:
+    """``Scheduler._pick_eligible_step`` with no condition evaluator."""
+    return 0 if rotation.mode == "priority" else time_step_index
+
+
 def _project_cycle(record: CycleRecord, inputs: ProjectionInputs) -> list[_Candidate]:
     """Replay ``find_due_rotations``' gates over this record's dwell grid."""
     rotation = record.rotation
@@ -362,10 +373,17 @@ def _project_cycle(record: CycleRecord, inputs: ProjectionInputs) -> list[_Candi
         )
 
     caught_up: set[datetime] = set()
-    for window_start, step_index in _cycle_windows(record, inputs):
+    pick = inputs.pick_step or _default_pick
+    for window_start, clock_step in _cycle_windows(record, inputs):
         fire_at = max(window_start, inputs.now)
         if fire_at > inputs.through:
             break
+        # The step the scheduler sends for this window: the clock's slot run
+        # through its condition / priority picker. None holds the panel.
+        picked = pick(rotation, clock_step, fire_at)
+        if picked is None:
+            continue
+        step_index = picked
         if prev_step == step_index:
             # A record rotating onto itself re-fires once per new dwell
             # window (the single-step "keep this page fresh" shape) and

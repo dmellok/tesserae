@@ -5,8 +5,20 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
+from app.deck_routes import _lineup_input
+from app.lineups_view import (
+    DashboardInfo,
+    DisplayInput,
+    OnScreenInput,
+    PublishedInput,
+    UpcomingInput,
+    build_view,
+)
+from app.next_update import MODE_CONNECTED, MODE_SLEEPS, Reach
 from app.push import PushResult
 from app.scheduler import Scheduler
+from app.scheduler_conditions import ConditionEvaluator
+from app.state.conditions import ha_condition
 from app.state.deck_model import Deck, DeckPage
 from app.state.deck_nav_store import DeckNavStore
 from app.state.deck_store import DeckStore
@@ -144,3 +156,99 @@ def test_smart_sync_on_interval_lineup_uses_its_targets(tmp_path):
     sched._device_ids_for_page = lambda _pid: ["panel", "other"]
     _telemetry(sched, (T + timedelta(minutes=10)).timestamp())
     assert sched.find_due(T) == []
+
+
+def _view(sched, deck, now, reach=None, on="a"):
+    """The Lineups display view fed by the scheduler's own projection."""
+    events = sched.upcoming_for_device("panel", now=now, hours=3, limit=12)
+    display = DisplayInput(
+        "panel",
+        "Panel",
+        100,
+        100,
+        reach or Reach(MODE_CONNECTED, live=True),
+        (_lineup_input(deck, runtime=None, with_urls=False),),
+        on_screen=OnScreenInput(on, T.timestamp()),
+        published=PublishedInput(on, T.timestamp()),
+        published_known=True,
+        upcoming=tuple(
+            UpcomingInput(e.scheduled_at.timestamp(), e.lineup_id, e.dashboard_id) for e in events
+        ),
+    )
+    dashboards = {x: DashboardInfo(x, x.upper()) for x in "abc"}
+    return build_view([display], dashboards, now=now).displays[0]
+
+
+def _next_pill(view):
+    return next(x.pill for x in view.lineups[0].steps if x.next)
+
+
+def _next_ticks(view):
+    return [t for seg in view.day.segments for t in seg.ticks if t.next]
+
+
+def test_next_marks_follow_min_hold_like_the_engine(tmp_path):
+    sched, _push, deck, _ds = _rig(tmp_path, dwells=(5, 5, 5), advance_min_hold_minutes=10)
+    _tick(sched, T)
+    now = T + timedelta(minutes=1)
+    view = _view(sched, deck, now)
+    assert view.next_update.at_label == "06:10"
+    # Nothing is sent at 06:05, so the pill and the countdown say 06:10 / C.
+    assert _next_pill(view).label == "Next 06:10"
+    assert [x.dashboard_id for x in view.lineups[0].steps if x.next] == ["c"]
+    assert [t.minute for t in _next_ticks(view)] == [370]
+    assert _next_ticks(view)[0].in_min == 9
+    assert _tick(sched, T + timedelta(minutes=5)) == []
+    assert _tick(sched, T + timedelta(minutes=10)) == [("lu", 2)]
+
+
+def test_next_countdown_runs_to_the_check_in_of_a_sleeping_display(tmp_path):
+    sched, _push, deck, _ds = _rig(tmp_path, dwells=(30, 30, 30))
+    _tick(sched, T)
+    now = T + timedelta(minutes=1)
+    reach = Reach(
+        MODE_SLEEPS,
+        next_checkin_at=(T + timedelta(minutes=40)).timestamp(),
+        gap_s=1200,
+        cadence_stable=True,
+    )
+    view = _view(sched, deck, now, reach=reach)
+    assert view.next_update.at_label == "~06:40"
+    (tick,) = _next_ticks(view)
+    assert tick.in_min == 39  # to the 06:40 check-in, not the 06:30 send
+
+
+def _failing_rule_evaluator():
+    ev = ConditionEvaluator(
+        ha_get_states=lambda: [{"entity_id": "sensor.x", "state": "off"}],
+        timezone_provider=lambda: UTC,
+        location_provider=lambda: (None, None),
+    )
+    ev.refresh_ha_states()
+    return ev
+
+
+def test_next_names_the_dashboard_the_conditions_will_send(tmp_path):
+    sched, _push, deck, ds = _rig(tmp_path, dwells=(5, 5, 5))
+    sched._condition_evaluator = _failing_rule_evaluator()
+    pages = list(deck.pages)
+    pages[1] = pages[1].model_copy(update={"conditions": [ha_condition("sensor.x", "==", "on")]})
+    deck = deck.model_copy(update={"pages": pages})
+    ds.upsert(deck)
+    _tick(sched, T)
+    view = _view(sched, deck, T + timedelta(minutes=1))
+    assert view.next_update.name == "C"
+    assert [x.dashboard_id for x in view.lineups[0].steps if x.next] == ["c"]
+    assert _tick(sched, T + timedelta(minutes=5)) == [("lu", 2)]
+
+
+def test_priority_mode_does_not_promise_the_next_dashboard(tmp_path):
+    sched, push, deck, ds = _rig(tmp_path, dwells=(5, 5, 5))
+    deck = deck.model_copy(update={"advance_mode": "priority"})
+    ds.upsert(deck)
+    _tick(sched, T)
+    view = _view(sched, deck, T + timedelta(minutes=1))
+    assert view.next_update.name == "A"
+    assert [x.dashboard_id for x in view.lineups[0].steps if x.next] == ["a"]
+    _tick(sched, T + timedelta(minutes=5))
+    assert [c[0] for c in push.calls] == ["a", "a"]

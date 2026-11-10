@@ -3365,6 +3365,7 @@ class Scheduler:
                 page_names=page_names,
                 current_page_id=current_page_id,
                 quiet_window=quiet_window,
+                pick_step=self._pick_eligible_step,
             ),
             limit=limit,
         )

@@ -1992,12 +1992,16 @@ def build_display(
         if runtime.next_at is not None:
             next_adv = clk.week_minute(runtime.next_at)
 
-    # An advance that comes due inside quiet hours (or a pause) doesn't happen
-    # then. The scheduler's projection knows when this lineup really fires next
-    # (the first grid step after the hold, not the moment it ends); without a
-    # projection, the end of the hold stands in. The bar and the pill mark that
-    # step, and "Update in" counts to when it lands on the display.
+    # The advance as the scheduler will really send it. Its projection replays
+    # the engine's own gates (minimum hold, quiet hours and pauses, the
+    # condition / priority picker), so when there is one the next advance, its
+    # dashboard and the countdown come from it rather than from the raw dwell
+    # boundary, which the engine can skip or move. The same event tells when
+    # the frame reaches a display that sleeps between check-ins. Without a
+    # projection, a boundary inside quiet hours (or a pause) is moved to the end
+    # of the hold.
     adv_lands: _Lands | None = None
+    adv_dash: str | None = None
     if next_adv is not None and lb is not None:
         adv_epoch = (
             runtime.next_at
@@ -2005,24 +2009,21 @@ def build_display(
             else clk.epoch_of(next_adv)
         )
         held_adv = _lands_at(d, clk, adv_epoch)
-        if held_adv.held and held_adv.epoch is not None:
-            if d.upcoming is None:
+        if d.upcoming is None:
+            if held_adv.held and held_adv.epoch is not None:
                 adv_lands = held_adv
                 next_adv = clk.week_minute(held_adv.epoch)
-            else:
-                fires = next(
-                    (
-                        ev.at
-                        for ev in d.upcoming
-                        if ev.at > clk.epoch and ev.lineup_id == lb.lineup.id
-                    ),
-                    None,
-                )
-                if fires is None:
-                    next_adv = None
-                else:
-                    adv_lands = _lands_at(d, clk, fires)
-                    next_adv = clk.week_minute(fires)
+        else:
+            fires = next(
+                (ev for ev in d.upcoming if ev.at > clk.epoch and ev.lineup_id == lb.lineup.id),
+                None,
+            )
+            if fires is not None:
+                adv_dash = fires.dashboard_id
+                adv_lands = _lands_at(d, clk, fires.at)
+                next_adv = clk.week_minute(fires.at)
+            elif held_adv.held:
+                next_adv = None
 
     # A daily push that fired after the live window's latest step owns the
     # panel (a noon override inside an hourly rotation); windows alone miss
@@ -2291,6 +2292,7 @@ def build_display(
                 dashboards,
                 sched=sched,
                 next_adv=next_adv,
+                next_dash=adv_dash,
                 on_id=on_id,
                 queued=queued,
                 fold_default=fold_default,
@@ -2402,6 +2404,7 @@ def _lineup_view(
     *,
     sched: _Scheduled | None,
     next_adv: int | None,
+    next_dash: str | None = None,
     on_id: str | None,
     queued: QueuedView | None,
     fold_default: bool,
@@ -2569,6 +2572,17 @@ def _lineup_view(
                 (p.i for p in lb.pts if p.t % WEEK_MIN == next_adv % WEEK_MIN),
                 (intended + 1) % n,
             )
+            if next_dash is not None and lineup.steps[nxt].dashboard_id != next_dash:
+                # The engine's picker sends another dashboard than the clock's
+                # slot names (a rule skips it, priority mode keeps the first).
+                nxt = next(
+                    (
+                        j
+                        for k in range(1, n + 1)
+                        if lineup.steps[j := (nxt + k) % n].dashboard_id == next_dash
+                    ),
+                    nxt,
+                )
             next_at = clock(next_adv)
     steps: list[StepView] = []
     loops = lineup.kind == "cycle" and n > 1
