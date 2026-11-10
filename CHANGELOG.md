@@ -13,6 +13,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - A timer-only lineup ("Taps also flip" off) no longer follows its page links or touch zones.
 - The lineup's current step follows its conditions and priority mode, and reads as held when every rule fails, instead of showing the clock's slot.
 - The Lineups Next pill, tick and countdown follow what the scheduler will send: minimum hold, rules, priority mode and a sleeping display's check-in.
+- "Next update" counts a dashboard's own Updates refresh, not only the next lineup change.
 
 ## [0.510.1], 2026-11-11
 

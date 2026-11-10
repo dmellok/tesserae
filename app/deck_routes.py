@@ -1327,7 +1327,7 @@ def _upcoming_inputs(device: Any, now_utc: datetime) -> tuple[UpcomingInput, ...
         )
         # A week and a day, so a once-a-week lineup still shows up; the
         # projection caps its own walk per record, and the limit caps the rest.
-        events = fn(device.id, now=now_utc, hours=8 * 24, limit=12, quiet_window=window)
+        events = fn(device.id, now=now_utc, hours=8 * 24, limit=24, quiet_window=window)
     except Exception:
         # Logged, then the view falls back to its own schedule model.
         current_app.logger.exception("lineups: projection failed for %s", device.id)

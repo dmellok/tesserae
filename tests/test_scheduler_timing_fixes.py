@@ -48,11 +48,18 @@ class _Push:
         return False
 
 
-def _rig(tmp_path, devices=("panel",), dwells=(50, 63, 63), **deck_kw):
+def _rig(tmp_path, devices=("panel",), dwells=(50, 63, 63), refresh=0, **deck_kw):
     ds = DeckStore(tmp_path / "decks.json")
     ps = PageStore(tmp_path / "pages.json")
     for pid in ("a", "b", "c"):
-        ps.save(Page(id=pid, name=pid.upper(), device_ids=list(devices)))
+        ps.save(
+            Page(
+                id=pid,
+                name=pid.upper(),
+                device_ids=list(devices),
+                refresh_minutes=refresh if pid == "a" else 0,
+            )
+        )
     deck = Deck(
         id="lu",
         name="Lu",
@@ -252,3 +259,37 @@ def test_priority_mode_does_not_promise_the_next_dashboard(tmp_path):
     assert [x.dashboard_id for x in view.lineups[0].steps if x.next] == ["a"]
     _tick(sched, T + timedelta(minutes=5))
     assert [c[0] for c in push.calls] == ["a", "a"]
+
+
+def test_next_update_includes_the_dashboards_own_updates_refresh(tmp_path):
+    sched, push, deck, _ds = _rig(tmp_path, dwells=(50, 63, 63), refresh=5)
+    _tick(sched, T)
+    sched._page_last_refresh["a"] = T.timestamp()
+    now = T + timedelta(minutes=1)
+    events = sched.upcoming_for_device("panel", now=now, hours=3, limit=6)
+    assert (events[0].cause, events[0].dashboard_id) == ("dashboard_refresh", "a")
+    assert events[0].effect == "refresh_screen"
+    assert events[0].scheduled_at == T + timedelta(minutes=5)
+    assert events[1].cause == "cycle" and events[1].scheduled_at == T + timedelta(minutes=50)
+    view = _view(sched, deck, now)
+    assert view.next_update.at_label == "06:05"
+    # The scheduler really does repaint A at 06:05.
+    sched._maybe_refresh_pages(T + timedelta(minutes=5))
+    assert push.calls[-1][0] == "a"
+
+
+def test_updates_refresh_is_not_projected_for_a_page_with_updates_off(tmp_path):
+    sched, _push, _deck, _ds = _rig(tmp_path, dwells=(50, 63, 63), refresh=0)
+    _tick(sched, T)
+    events = sched.upcoming_for_device("panel", now=T + timedelta(minutes=1), hours=3, limit=6)
+    assert [e.cause for e in events][:1] == ["cycle"]
+    assert all(e.cause != "dashboard_refresh" for e in events)
+
+
+def test_updates_refresh_is_projected_for_every_stretch_the_dashboard_is_shown(tmp_path):
+    sched, _push, _deck, _ds = _rig(tmp_path, dwells=(20, 20, 20), refresh=15)
+    _tick(sched, T)
+    sched._page_last_refresh["a"] = T.timestamp()
+    events = sched.upcoming_for_device("panel", now=T + timedelta(minutes=1), hours=3, limit=20)
+    refreshes = [e.scheduled_at for e in events if e.cause == "dashboard_refresh"]
+    assert refreshes == [T + timedelta(minutes=m) for m in (15, 75, 135)]

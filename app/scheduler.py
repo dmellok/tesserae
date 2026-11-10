@@ -3343,6 +3343,13 @@ class Scheduler:
                     )
                 )
 
+        with self._lock:
+            page_last_refresh = dict(self._page_last_refresh)
+        page_refresh_minutes = {
+            p.id: int(p.refresh_minutes)
+            for p in pages
+            if getattr(p, "refresh_minutes", 0) > 0 and not getattr(p, "archived", False)
+        }
         current_page_id: str | None = None
         try:
             for page_id, device_ids in self._devices_showing_pages(now).items():
@@ -3366,6 +3373,8 @@ class Scheduler:
                 current_page_id=current_page_id,
                 quiet_window=quiet_window,
                 pick_step=self._pick_eligible_step,
+                page_refresh_minutes=page_refresh_minutes,
+                page_last_refresh=page_last_refresh,
             ),
             limit=limit,
         )
