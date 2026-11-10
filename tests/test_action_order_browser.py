@@ -139,6 +139,8 @@ _SWEEP_JS = r"""
       && !el.matches('a.dx-qtile--link')
       // a thumbnail or QR code that is a link, and corner close / dismiss icons
       && !(el.tagName === 'A' && el.querySelector('img') && !el.textContent.trim())
+      // a lineup editor tile's full-cover button is the tile itself, not an action in a row
+      && !el.matches('.dxe-sel')
       && !/^(close|dismiss|hide)\b/i.test(el.getAttribute('aria-label') || '')
       && el.getAttribute('type') !== 'hidden' && vis(el))
     .filter((el, _, all) => !all.some((o) => o !== el && o.contains(el)));
