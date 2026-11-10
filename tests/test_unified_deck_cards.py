@@ -89,11 +89,11 @@ def test_every_shape_renders_as_a_unified_card(app: Flask) -> None:
     # The old listings stay gone.
     assert "Saved schedules" not in body
     assert 'class="card deck-card"' not in body
-    # Filter tabs and the per-kind creation links are gone; the wizard is
+    # Filter tabs and the per-kind creation links are gone; New lineup is
     # the one entry point.
     assert "data-kind-filter" not in body
     assert "New timed send" not in body and "New timer cycle" not in body
-    assert "data-open-timed-wizard" in body
+    assert '<a class="lu-btn-primary" href="/decks/new">' in body
     # With no registered displays, everything sits in the unbound group.
     assert "Not on a display yet" in body
 

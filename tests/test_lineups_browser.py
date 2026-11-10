@@ -4175,9 +4175,9 @@ def test_grey_rows_carry_a_tag_saying_why(live: str, redraw: bool) -> None:
 
 
 def test_a_displays_plus_starts_a_lineup_for_that_display(real: tuple[str, Flask]) -> None:
-    """Each display header has a "+" beside its fold chevron that opens the setup wizard
-    (the page's one creation path) with that display chosen, and the lineup it creates
-    lands on that display. The "+" survives the page's redraws."""
+    """Each display header has a "+" beside its fold chevron that opens the new-lineup
+    flow with that display chosen, and the lineup it creates lands on that display.
+    The "+" survives the page's redraws."""
     from playwright.sync_api import sync_playwright
 
     from app.state.deck_model import Deck, DeckPage
@@ -4228,28 +4228,14 @@ def test_a_displays_plus_starts_a_lineup_for_that_display(real: tuple[str, Flask
             page.evaluate("() => window.TesseraeLineups.refresh()")
         check_buttons()
 
-        # The button never folds its display.
-        page.locator('.lu-ds-add[data-wizard-display="hall"]').click()
-        wiz = page.locator("#timed-wizard")
-        assert wiz.evaluate("e => e.open")
-        assert (
-            page.locator(".lu-ds-hdr [data-collapse]").first.get_attribute("aria-expanded")
-            == "true"
-        )
-        assert wiz.locator("[data-wizard-device]").input_value() == "hall"
-        assert "New lineup for" in wiz.locator("#timed-wizard-title").inner_text()
-        # A single-dashboard mode would otherwise follow the dashboard's own display.
-        wiz.locator('[data-wizard-mode="interval"]').click()
-        wiz.locator("[data-wizard-forward]").click()
-        wiz.locator("[data-wizard-dash]").select_option("news")  # bound to "panel"
-        assert wiz.locator("[data-wizard-device]").input_value() == "hall"
-        wiz.locator("[data-wizard-dash]").select_option("free")
-        assert wiz.locator("[data-wizard-device]").input_value() == "hall"
-        wiz.locator("[data-wizard-forward]").click()
-        wiz.locator("[data-wizard-forward]").click()  # create
-        page.wait_for_function(
-            "() => document.querySelector('#timed-wizard [data-wizard-view=created]:not([hidden])')"
-        )
+        # The button opens the new-lineup flow on that display.
+        with page.expect_navigation():
+            page.locator('.lu-ds[data-display="hall"] .lu-ds-add').click()
+        assert page.url.endswith("/decks/new?display=hall")
+        page.locator("[data-goto='3']").click()  # its display is chosen: When is open
+        page.locator('[data-add="free"]').click()
+        with page.expect_navigation():
+            page.locator("[data-create]").click()
         made = [d for d in app.config["DECK_STORE"].all() if d.id not in before]
         assert len(made) == 1 and made[0].device_ids == ["hall"], made
         assert errors == []

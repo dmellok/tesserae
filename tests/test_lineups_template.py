@@ -451,7 +451,9 @@ def test_page_shell_and_progressive_enhancement(page: str) -> None:
     assert "lineup_fold.js" not in page
     assert "/static/style/dx-lineups.css" in page
     assert 'data-view-url="/decks/view.json"' in page and 'data-edits-url="/decks/edits"' in page
-    # The wizard and the schedule forms are still on the page.
+    # New lineup opens the lineup editor's new-lineup flow; the setup wizard
+    # and the schedule forms are still on the page.
+    assert '<a class="lu-btn-primary" href="/decks/new">' in page
     assert "data-open-timed-wizard" in page and 'id="timed-wizard"' in page
     assert 'id="schedule-form-card"' in page
 

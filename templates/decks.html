@@ -35,7 +35,8 @@
   {% if not automation_paused %}
   <a class="lu-hint-link" href="{{ automation_url }}" data-automation-hint title="Pause everything from Settings › Server › Automation">{{ lu.ico('pausec') }}Pause everything</a>
   {% endif %}
-  <button type="button" class="lu-btn-primary" data-open-timed-wizard>{{ lu.ico('plus') }}<span>Set up a display</span></button>
+  <button type="button" class="lu-btn-ghost lu-btn-line" data-open-timed-wizard>Set up a display</button>
+  <a class="lu-btn-primary" href="{{ url_for('decks.editor') }}">{{ lu.ico('plus') }}<span>New lineup</span></a>
 </header>
 {% if automation_paused %}
 <div class="dx-warn-band lu-paused-band" role="status" data-automation-paused>
