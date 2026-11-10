@@ -83,7 +83,8 @@ class StepItems:
     option: str
     count: int
     items: tuple[ItemInfo, ...]
-    #: "pick": items are named and listed; "draw": no list, the arrows draw again
+    #: "pick": items are named and listed; "draw": no list, the arrows draw again;
+    #: "empty": a widget that lists its items listed none
     mode: str = "pick"
 
 
@@ -278,7 +279,11 @@ def _declared_items(
         except Exception:
             current_app.logger.warning("%s: lineup_items failed", plugin_id, exc_info=True)
             return None
-        if len(listed) <= 1:
+        if not listed:
+            # Nothing to list (a cold cache or filters that match nothing; a hook
+            # cannot say which): not choosable, but not a plain single picture.
+            return StepItems(str(cell.id), option, 0, (), mode="empty")
+        if len(listed) == 1:
             return None
         items = tuple(_declared_infos(listed, MAX_STEP_ITEMS))
         return StepItems(str(cell.id), option, len(listed), items)
@@ -305,7 +310,16 @@ def _provider(plugin_id: str) -> Callable[[Any, dict[str, Any] | None], StepItem
         declared = {}
     pin = declared.get("pin_option")
     if isinstance(pin, str) and pin:
-        return _declared_items(plugin_id, pin)
+        listed = _declared_items(plugin_id, pin)
+        if declared.get("draw") is not True:
+            return listed
+
+        def list_or_draw(cell: Any, ctx: dict[str, Any] | None = None) -> StepItems | None:
+            # Declares a list and a draw: with nothing to list, it draws at random.
+            found = listed(cell, ctx)
+            return _draw_items(cell, ctx) if found is not None and found.mode == "empty" else found
+
+        return list_or_draw
     if declared.get("draw") is True or plugin_id in _KNOWN_DRAW_WIDGETS:
         return _draw_items
     return None
@@ -364,6 +378,33 @@ def step_draws(page: Any, device_id: str | None = None) -> bool:
     """True when the arrows draw the dashboard again rather than choose."""
     found = step_choices(page, device_id)
     return found is not None and found.mode == "draw"
+
+
+_DRAW_COUNTS: dict[str, tuple[float, int]] = {}
+_DRAW_COUNT_TTL_S = 300.0
+
+
+def step_draw_count(page: Any, device_id: str | None = None) -> int:
+    """How many items a draw widget says it draws from (its optional
+    ``lineup_item_count``), or 0 when it does not say. Remembered for a few
+    minutes: the Lineups page asks on every view and a count may be a network call."""
+    import time
+
+    key = str(getattr(page, "id", ""))
+    now = time.monotonic()
+    hit = _DRAW_COUNTS.get(key)
+    if hit is not None and now - hit[0] < _DRAW_COUNT_TTL_S:
+        return hit[1]
+    found = list_items(page, limit=1, device_id=device_id)
+    n = int(found.total) if found.mode == "draw" else 0
+    _DRAW_COUNTS[key] = (now, n)
+    return n
+
+
+def step_empty(page: Any, device_id: str | None = None) -> bool:
+    """True when the dashboard's widget lists its items and listed none."""
+    found = step_choices(page, device_id)
+    return found is not None and found.mode == "empty"
 
 
 def step_fit(page: Any) -> bool:
@@ -446,6 +487,8 @@ class ItemPage:
     pinned: str = ""
     pinned_label: str = ""
     fit: bool = False
+    #: the widget lists its items (and is not pinned to one) but listed none
+    empty: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -459,6 +502,7 @@ class ItemPage:
             "pinned": self.pinned,
             "pinned_label": self.pinned_label,
             "fit": self.fit,
+            "empty": self.empty,
             "items": [
                 {"index": it.index, "label": it.label, "key": it.key, "thumb_url": it.thumb_url}
                 for it in self.items
@@ -549,9 +593,13 @@ def list_items(
         )
     declared = _declared(plugin_id)
     option = declared.get("pin_option")
+    every: list[ItemInfo] = []
+    pinned = ""
     if isinstance(option, str) and option:
         every = _declared_listing(plugin_id, option, options, ctx)
         pinned = str(options.get(option) or "").strip()
+    # A widget that declares a list and a draw, with nothing to list, draws.
+    if isinstance(option, str) and option and (every or pinned or declared.get("draw") is not True):
         label = next((it.label for it in every if it.key == pinned), pinned)
         kept = [it for it in every if not q or q in it.label.casefold() or q in it.key.casefold()]
         return ItemPage(
@@ -565,6 +613,7 @@ def list_items(
             pinnable=True,
             pinned=pinned,
             pinned_label=label if pinned else "",
+            empty=not every and not pinned,
         )
     count = _draw_count(plugin_id, options, ctx)
     return ItemPage("draw", count, count, 0, (), noun, plugin_id)
@@ -583,6 +632,7 @@ def item_summary(page: Any, device_id: str | None = None) -> dict[str, Any]:
         "pinned": found.pinned,
         "pinned_label": found.pinned_label,
         "fit": found.fit,
+        "empty": found.empty,
     }
 
 

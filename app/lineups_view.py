@@ -138,6 +138,10 @@ class DashboardInfo:
     composition_digest: str | None = None
     #: the arrows draw it again (a widget that cannot name its items but differs per render)
     draw: bool = False
+    #: how many items a draw widget says it draws from (0 = it does not say)
+    draw_count: int = 0
+    #: the widget lists its items and listed none right now
+    empty_list: bool = False
     #: the widget letterboxes its pictures (a gallery set to fit), so item previews do too
     item_fit: bool = False
     missing: bool = False  # a lineup step still points at a deleted dashboard
@@ -666,6 +670,9 @@ class StepView(_Dict):
     pick_items: bool = False
     #: "draw next": the arrows render the dashboard again; there is no list to choose from
     draw_items: bool = False
+    draw_count: int = 0
+    #: lists its items, listed none, but has been sent before: still a collection
+    stacked: bool = False
     item_fit: bool = False
     missing: bool = False  # its dashboard was deleted; the scheduler cannot show it
     #: its dashboard is bound only to other displays, so this one never shows it
@@ -2660,6 +2667,8 @@ def _lineup_view(
                 items=[ItemView(it.index, it.label, it.thumb_url, it.key) for it in items],
                 pick_items=not (off_display or scr.missing) and any(it.key for it in items),
                 draw_items=not (off_display or scr.missing) and bool(dash and dash.draw),
+                draw_count=dash.draw_count if dash and dash.draw else 0,
+                stacked=bool(dash and dash.empty_list and dash.composition_digest),
                 item_fit=bool(dash and dash.item_fit),
                 current=i == intended,
                 next=i == nxt,

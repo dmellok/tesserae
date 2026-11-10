@@ -3213,7 +3213,11 @@ def test_a_declared_widget_with_nothing_to_list_offers_no_arrows(
     def boom(options: dict[str, Any]) -> list[dict[str, str]]:
         raise RuntimeError("no list")
 
-    for lister in (lambda o: [], lambda o: [{"key": "only"}], boom):
+    for lister, empty in (
+        (lambda o: [], True),
+        (lambda o: [{"key": "only"}], False),
+        (boom, False),
+    ):
         _install_widgets(
             app,
             monkeypatch,
@@ -3223,7 +3227,9 @@ def test_a_declared_widget_with_nothing_to_list_offers_no_arrows(
             },
         )
         with app.test_request_context():
-            assert step_choices(_declared_page(app)) is None
+            found = step_choices(_declared_page(app))
+            # An empty list is flagged (no arrows, not a plain tile); the rest offer nothing.
+            assert (found is not None and found.mode == "empty") if empty else found is None
     # Declared, but the module has no lineup_items: nothing to offer either.
     _install_widgets(app, monkeypatch, papers={"manifest": {"lineups": {"pin_option": "paper"}}})
     with app.test_request_context():

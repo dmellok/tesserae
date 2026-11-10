@@ -900,9 +900,9 @@ def test_a_drawing_dashboards_arrows_draw_another_and_go_back(
         page.route("**/_img/**", lambda r: r.fulfill(path=icon))
         page.route("**/step-item?**", item)
         tile = page.locator('[data-step="album"]')
-        # It cannot count its photos, so no stack and no badge; it still draws.
-        assert tile.locator(".lu-count").count() == 0
-        assert tile.locator(".lu-tile.stacked").count() == 0
+        # It is a collection that cannot count its photos: a stack, badged "random".
+        assert tile.locator(".lu-count").inner_text() == "random"
+        assert tile.locator(".lu-tile.stacked").count() == 1
         back = tile.locator('.lu-it[aria-label="Previous picture"]')
         assert back.is_disabled()  # nothing drawn here yet
         tile.hover()
@@ -920,6 +920,12 @@ def test_a_drawing_dashboards_arrows_draw_another_and_go_back(
         page.locator('[data-draw="album"]').click()
         page.wait_for_function(f"({src})() === '/_img/d2.png'")
         assert page.locator('[data-panel="album"] .dxe-strip .dxe-it').count() == 3
+        kids = page.locator('[data-panel="album"] .dxe-kids')
+        assert kids.locator(".dxe-mono").text_content() == "Recent photos"
+        assert "A random photo each time it's sent." in kids.inner_text()
+        # Newest first: the second draw leads, the picture as sent is last.
+        labels = kids.locator(".dxe-it-l").all_inner_texts()
+        assert labels == ["Draw 2", "Draw 1", "Last sent"]
         # Back walks through them without drawing again, then to the picture as sent.
         tile.hover()
         back.click()
@@ -927,6 +933,114 @@ def test_a_drawing_dashboards_arrows_draw_another_and_go_back(
         back.click()
         page.wait_for_function(f"!({src})()?.startsWith('/_img/')")
         assert len(drawn) == 2
+        _settle(page)
+        assert errors == []
+        browser.close()
+
+
+def test_collection_widgets_stack_and_plain_ones_do_not(
+    real: tuple[str, Flask], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from types import SimpleNamespace
+
+    from playwright.sync_api import sync_playwright
+
+    import app.deck_routes as routes
+
+    base, app = real
+    reg = app.config["PLUGIN_REGISTRY"]
+    real_get = reg.get
+    widgets = {
+        "fake_draw": ({"lineups": {"draw": True}}, SimpleNamespace()),
+        "fake_counted": (
+            {"lineups": {"draw": True}},
+            SimpleNamespace(lineup_item_count=lambda options: 212),
+        ),
+        "fake_plain": ({}, SimpleNamespace()),
+        "fake_list": (
+            {"lineups": {"pin_option": "pick"}},
+            SimpleNamespace(lineup_items=lambda options: []),
+        ),
+        "fake_listdraw": (
+            {"lineups": {"pin_option": "pick", "draw": True}},
+            SimpleNamespace(lineup_items=lambda options: []),
+        ),
+        "fake_list_cold": (
+            {"lineups": {"pin_option": "pick"}},
+            SimpleNamespace(lineup_items=lambda options: []),
+        ),
+    }
+
+    def get(pid: str) -> Any:
+        if pid in widgets:
+            manifest, module = widgets[pid]
+            return SimpleNamespace(manifest=manifest, server_module=module)
+        return real_get(pid)
+
+    monkeypatch.setattr(reg, "get", get)
+    recent = [{"thumb": f"/_img/r{i}.png", "at": 100.0 - i} for i in range(1, 10)]
+    monkeypatch.setattr(
+        routes,
+        "_recent_sent",
+        lambda page_id, limit=8: recent[:limit] if page_id != "list_cold" else [],
+    )
+    pages = app.config["PAGE_STORE"]
+    decks = app.config["DECK_STORE"]
+    ids = {"draw": "fake_draw", "counted": "fake_counted", "plain": "fake_plain",
+           "listdraw": "fake_listdraw", "list": "fake_list", "list_cold": "fake_list_cold"}  # fmt: skip
+    for pid, plugin in ids.items():
+        cell = Cell(id="c", plugin=plugin, x=0, y=0, w=10, h=10, options={})
+        pages.save(Page(id=pid, name=pid, device_ids=["tv"], cells=[cell]))
+    art = decks.get("art")
+    decks.upsert(
+        art.model_copy(update={"pages": [*art.pages, *[DeckPage(page_id=i) for i in ids]]})
+    )
+
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/art/edit")
+        icon = str(REPO_ROOT / "static/brand/icon-192.png")
+        page.route("**/_img/**", lambda r: r.fulfill(path=icon))
+
+        def step(pid: str) -> Any:
+            return page.locator(f'[data-step="{pid}"]')
+
+        assert step("draw").locator(".lu-count").inner_text() == "random"
+        assert step("draw").locator(".lu-tile.stacked").count() == 1
+        assert step("counted").locator(".lu-count").inner_text() == "×212"
+        assert step("counted").locator(".lu-tile.stacked").count() == 1
+        # Declares a list and a draw, lists nothing: it draws, with arrows.
+        assert step("listdraw").locator(".lu-count").inner_text() == "random"
+        assert step("listdraw").locator(".lu-it").count() == 2
+        assert step("plain").locator(".lu-count").count() == 0
+        assert step("plain").locator(".lu-tile.stacked").count() == 0
+        # A list widget that listed nothing: a stack only because it has sent before,
+        # no arrows, and its recent pictures can be looked at but not chosen.
+        assert step("list").locator(".lu-tile.stacked").count() == 1
+        assert step("list").locator(".lu-it").count() == 0
+        assert step("list_cold").locator(".lu-tile.stacked").count() == 0
+        step("list").locator(".dxe-sel").click()
+        kids = page.locator('[data-panel="list"] .dxe-kids')
+        assert kids.locator(".dxe-mono").text_content() == "Recent photos"
+        assert "No matches to list right now." in kids.inner_text()
+        assert kids.locator(".dxe-it").count() == 8
+        assert kids.locator("button.dxe-it, [data-pin-item], [data-draw-pos]").count() == 0
+        assert kids.locator(".dxe-it-l").first.inner_text() in ("Last sent", "On screen")
+        step("listdraw").locator(".dxe-sel").click()
+        dd = page.locator('[data-panel="listdraw"]')
+        assert "No matches" not in dd.inner_text()
+        assert dd.locator('[data-draw="listdraw"]').count() == 1
+        step("list_cold").locator(".dxe-sel").click()
+        cold = page.locator('[data-panel="list_cold"] .dxe-kids')
+        assert "No matches to list right now." in cold.inner_text()
+        assert cold.locator(".dxe-it").count() == 0
+        # A draw widget's details: up to eight recent photos, newest first.
+        step("draw").locator(".dxe-sel").click()
+        strip = page.locator('[data-panel="draw"] .dxe-strip .dxe-it')
+        assert strip.count() == 8
+        assert page.locator('[data-panel="draw"] .dxe-it-l').first.inner_text() in (
+            "Last sent",
+            "On screen",
+        )
         _settle(page)
         assert errors == []
         browser.close()
@@ -1894,3 +2008,49 @@ def test_the_open_tile_is_framed_round_its_stack_in_the_accent(real: tuple[str, 
         _settle(page)
         assert errors == []
         browser.close()
+
+
+def test_now_and_next_pills_sit_above_the_stack_and_the_selection_outline(
+    real: tuple[str, Flask], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from types import SimpleNamespace
+
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    reg = app.config["PLUGIN_REGISTRY"]
+    real_get = reg.get
+    draw = SimpleNamespace(manifest={"lineups": {"draw": True}}, server_module=SimpleNamespace())
+    monkeypatch.setattr(reg, "get", lambda pid: draw if pid == "fake_draw" else real_get(pid))
+    pages = app.config["PAGE_STORE"]
+    for pid in ("weather", "agenda"):  # both tiles are stacks, so the stack and frame are tall
+        cell = Cell(id="c", plugin="fake_draw", x=0, y=0, w=10, h=10, options={})
+        pages.save(Page(id=pid, name=pid.title(), device_ids=["hall"], cells=[cell]))
+
+    visible = """(sel) => {
+        const pill = document.querySelector(sel);
+        if (!pill) return "missing";
+        const r = pill.getBoundingClientRect();
+        for (const [x, y] of [[r.left + 1, r.top + 1], [r.right - 1, r.top + 1],
+                              [r.left + 1, r.bottom - 1], [r.right - 1, r.bottom - 1]]) {
+          const hit = document.elementFromPoint(x, y);
+          if (!hit || !(hit === pill || pill.contains(hit))) return `covered by ${hit && hit.className}`;
+        }
+        return "ok";
+    }"""
+    with sync_playwright() as p:
+        for width in (1280, 420):
+            for theme in ("light", "dark"):
+                browser, page, errors = _open(p, base, "/decks/morning/edit", width=width)
+                page.evaluate(f"document.documentElement.dataset.theme = '{theme}'")
+                for pick in (None, "now", "next"):
+                    if pick:
+                        page.locator(f".dxe-tiles .lu-step:has(.lu-pill.p-{pick}) .dxe-sel").click()
+                        assert page.locator(".dxe-tiles .lu-step.is-open").count() == 1
+                    for kind in ("now", "next"):
+                        sel = f".dxe-tiles .lu-pill.p-{kind}"
+                        page.locator(sel).scroll_into_view_if_needed()
+                        assert page.evaluate(visible, sel) == "ok", (width, theme, pick, kind)
+                _settle(page)
+                assert errors == []
+                browser.close()

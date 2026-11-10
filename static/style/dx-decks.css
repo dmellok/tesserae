@@ -834,6 +834,12 @@ main.page.dxe-page {
 /* The open dashboard: an accent frame round the whole tile, its stack
    included (the tile's own button grows over the back cards), so it never
    cuts through them; the accent is the primary buttons', in both themes. */
+/* The pill's row clears the accent frame (the stack's rise, the 4px offset, the
+   2px line) so the frame never runs through NOW / NEXT. */
+.lu.dxe .dxe-tiles .lu-slot {
+  height: calc(20px + var(--dxe-stack) + 8px);
+  align-items: flex-start;
+}
 .lu.dxe .dxe-tiles .lu-tile.stacked .dxe-sel {
   inset: calc(-1 * var(--dxe-stack)) calc(-1 * var(--dxe-stack)) 0 0;
 }

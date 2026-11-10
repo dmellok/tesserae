@@ -938,3 +938,95 @@ def test_a_gallery_set_to_fit_says_its_previews_are_letterboxed(
         app, "picture_gallery", {"folder": "trip", "mode": "sequential", "scale": "fill"}, "fills"
     )
     assert c.get("/decks/dashboard-items?page_id=fills").get_json()["fit"] is False
+
+
+def test_a_list_widget_that_lists_nothing_is_flagged_empty_not_plain(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.lineup_editor import dashboard_summary
+    from app.step_items import step_choices, step_empty
+
+    _install(
+        app,
+        monkeypatch,
+        none={
+            "manifest": {"lineups": {"pin_option": "pick"}},
+            "module": SimpleNamespace(lineup_items=lambda options: []),
+        },
+        one={
+            "manifest": {"lineups": {"pin_option": "pick"}},
+            "module": SimpleNamespace(lineup_items=lambda options: [{"key": "a", "label": "A"}]),
+        },
+    )
+    with app.test_request_context():
+        empty_page = _widget_page(app, "none", {}, "p1")
+        one_page = _widget_page(app, "one", {}, "p2")
+        assert step_empty(empty_page) and not step_empty(one_page)
+        found = step_choices(empty_page)
+        assert found is not None and found.mode == "empty"
+        summary = dashboard_summary(empty_page)["items"]
+    assert summary["mode"] == "none" and summary["empty"] is True
+
+
+def test_a_widget_declaring_a_list_and_a_draw_draws_when_it_lists_nothing(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.lineup_editor import dashboard_summary
+    from app.step_items import step_choices, step_draws
+
+    manifest = {"lineups": {"pin_option": "pinned_asset", "draw": True}}
+    _install(
+        app,
+        monkeypatch,
+        bare={"manifest": manifest, "module": SimpleNamespace(lineup_items=lambda o: [])},
+        counted={
+            "manifest": manifest,
+            "module": SimpleNamespace(lineup_items=lambda o: [], lineup_item_count=lambda o: 40),
+        },
+        listed={
+            "manifest": manifest,
+            "module": SimpleNamespace(
+                lineup_items=lambda o: [{"key": "a", "label": "A"}, {"key": "b", "label": "B"}]
+            ),
+        },
+    )
+    with app.test_request_context():
+        bare = _widget_page(app, "bare", {}, "p1")
+        assert step_draws(bare)
+        found = step_choices(bare)
+        assert found is not None and found.mode == "draw"
+        assert dashboard_summary(bare)["items"]["mode"] == "draw"
+        assert dashboard_summary(bare)["items"]["empty"] is False
+        assert dashboard_summary(_widget_page(app, "counted", {}, "p2"))["items"]["count"] == 40
+        listed = _widget_page(app, "listed", {}, "p3")
+        assert not step_draws(listed)
+        assert dashboard_summary(listed)["items"]["mode"] == "pick"
+
+
+def test_recent_sent_lists_the_pictures_a_dashboard_sent_newest_first(app: Flask) -> None:
+    import hashlib
+    import io
+
+    from PIL import Image
+
+    from app.deck_routes import _recent_sent
+
+    digests = []
+    for i in range(10):
+        buf = io.BytesIO()
+        Image.new("RGB", (8, 8), (i * 20, 0, 0)).save(buf, "PNG")
+        digest = hashlib.sha256(buf.getvalue()).hexdigest()[:16]
+        (app.config["RENDERS_DIR"] / f"{digest}.png").write_bytes(buf.getvalue())
+        app.config["EVENT_LOG"].record(
+            type="push",
+            source="page",
+            target="album",
+            status="sent",
+            extra={"composition_digest": digest},
+        )
+        digests.append(digest)
+    with app.test_request_context():
+        got = _recent_sent("album")
+        assert _recent_sent("elsewhere") == []
+    assert len(got) == 8
+    assert [r["thumb"].split("/")[-1].split(".")[0] for r in got] == digests[::-1][:8]

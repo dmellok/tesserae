@@ -72,7 +72,9 @@ from app.next_update import DeviceTiming, reach_for_device, tracks_held_frame
 from app.state.deck_model import Deck, DeckPage
 from app.state.deck_store import DeckStore
 from app.state.page_store import PageStore
+from app.step_items import step_draw_count as _step_draw_count
 from app.step_items import step_draws as _step_draws
+from app.step_items import step_empty as _step_empty
 from app.step_items import step_fit as _step_fit
 from app.step_items import step_items as _step_items
 
@@ -1493,6 +1495,7 @@ def _build_lineups_view(
         count, items = _step_items(page) if page is not None else (1, ())
         w, h = shapes.get(pid, (0, 0))
         bound_ids = tuple(page.device_ids) if page is not None else ()
+        draws = _step_draws(page) if page is not None else False
         dashboards[pid] = DashboardInfo(
             id=pid,
             name=page.name if page is not None else pid,
@@ -1505,8 +1508,10 @@ def _build_lineups_view(
             height=h,
             item_count=count,
             items=items,
-            draw=_step_draws(page) if page is not None else False,
+            draw=draws,
+            draw_count=_step_draw_count(page) if draws and page is not None else 0,
             item_fit=_step_fit(page) if page is not None else False,
+            empty_list=_step_empty(page) if page is not None else False,
         )
 
     by_display: dict[str, list[LineupInput]] = {d.id: [] for d in devices}
@@ -3136,6 +3141,34 @@ def _when_of(deck: Deck | None) -> dict[str, Any]:
     return {"mode": "between", "start": start, "end": end, "days": days, "kind": kind}
 
 
+def _recent_sent(page_id: str, limit: int = 8) -> list[dict[str, Any]]:
+    """The pictures this dashboard last sent, newest first (``[{thumb, at}]``):
+    a draw widget's recent photos, from the push log. Only frames still on disk."""
+    from app.lineup_thumbs import sent_thumb_url
+
+    events = current_app.config.get("EVENT_LOG")
+    if events is None:
+        return []
+    try:
+        rows = events.list(type="push", target=page_id, statuses=("sent", "ok"), limit=40)
+    except Exception:
+        return []
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for row in rows:
+        digest = row.extra.get("composition_digest") or row.digest
+        if not isinstance(digest, str) or digest in seen:
+            continue
+        thumb = sent_thumb_url(digest)
+        if not thumb:
+            continue
+        seen.add(digest)
+        out.append({"thumb": thumb, "at": float(row.timestamp)})
+        if len(out) >= limit:
+            break
+    return out
+
+
 def _editor_page(
     page: Any, dims: tuple[int, int], token: str, device_id: str | None = None
 ) -> dict[str, Any]:
@@ -3156,6 +3189,12 @@ def _editor_page(
         "subtitle": summary.get("subtitle", ""),
         "icon": summary.get("icon", ""),
         "items": summary.get("items", {}),
+        "recent": (
+            _recent_sent(page.id)
+            if (summary.get("items") or {}).get("mode") == "draw"
+            or (summary.get("items") or {}).get("empty")
+            else []
+        ),
         "fresh": summary.get("fresh", ""),
         "refresh": int(page.refresh_minutes or 0),
         "missing": False,

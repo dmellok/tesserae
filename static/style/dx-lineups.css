@@ -2452,6 +2452,9 @@ main.page.lu-page {
   align-items: flex-start;
 }
 .lu .lu-slot {
+  /* NOW / NEXT sit above the stack cards and the selection outline, never under them. */
+  position: relative;
+  z-index: 3;
   height: 20px;
   display: flex;
   align-items: center;
@@ -2617,6 +2620,10 @@ main.page.lu-page {
 .lu .lu-count[aria-expanded="true"] {
   background: var(--lu-acc);
   color: var(--lu-acc-fg);
+}
+
+.lu .lu-count.is-draw {
+  cursor: default;
 }
 
 /* Hover / focus: push this dashboard now. */

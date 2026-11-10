@@ -463,12 +463,17 @@
   // the count on its corner.
   function stackedThumb(p) {
     const it = p.items || {};
-    const many = (it.mode === "pick" && it.count > 1) || it.mode === "draw";
+    const many =
+      (it.mode === "pick" && it.count > 1) ||
+      it.mode === "draw" ||
+      (!!it.empty && !!(p.recent && p.recent.length));
     if (!many) return `<span class="dxe-th">${thumbOf(p)}</span>`;
     const badge =
-      it.mode === "draw" && !it.count
-        ? `<span class="dxe-badge" title="A fresh draw each time">draw</span>`
-        : `<span class="dxe-badge" title="${esc(plural(it.count, it.noun || "items"))}">×${esc(it.count)}</span>`;
+      it.mode !== "pick" && it.mode !== "draw"
+        ? ""
+        : it.mode === "draw" && !(it.count > 1)
+          ? `<span class="dxe-badge" title="A random photo each time it's sent">random</span>`
+          : `<span class="dxe-badge" title="${esc(plural(it.count, it.noun || "items"))}">×${esc(it.count)}</span>`;
     return `<span class="dxe-th is-stack">${thumbOf(p)}${badge}</span>`;
   }
   // The display's shape, for the thumbnail boxes (dx-decks.css --dxe-tw).
@@ -1024,7 +1029,9 @@
       name: p.name,
       thumb_url: p.missing ? "" : p.thumb,
       aspect: d.aspect,
-      item_count: pick || it.mode === "draw" ? Number(it.count) || 0 : 1,
+      item_count: pick ? Number(it.count) || 0 : 1,
+      draw_count: it.mode === "draw" ? Number(it.count) || 0 : 0,
+      stacked: !!it.empty && !!(p.recent && p.recent.length),
       pick_items: pick,
       draw_items: it.mode === "draw",
       items: { length: Number(it.count) || 0 },
@@ -1202,6 +1209,24 @@
       }
       return `<div class="dxe-kids${it.fit ? " is-fit" : ""}"${shapeVars()} aria-busy="${!strip || !!strip.busy}">${head}<div class="dxe-strip">${tiles}</div>${gridHtml(s, p)}</div>`;
     }
+    if (it.empty) {
+      // A list widget that listed nothing: what it last sent, to look at only (those may
+      // be filtered out now or the wrong shape), and a line saying why there is no list.
+      const sent = (Array.isArray(p.recent) ? p.recent : []).slice(0, STRIP);
+      const lastLabel = liveFlags(s.id).now ? "On screen" : "Last sent";
+      const tiles = sent
+        .map(
+          (r, k) =>
+            `<span class="dxe-it is-render" title="${k === 0 ? lastLabel : "Sent earlier"}"><span class="dxe-it-pic"><img src="${esc(r.thumb)}" alt="" loading="lazy" referrerpolicy="no-referrer"></span><span class="dxe-it-l">${k === 0 ? lastLabel : "Sent earlier"}</span></span>`
+        )
+        .join("");
+      return (
+        `<div class="dxe-kids dxe-recent is-empty"${shapeVars()}><div class="dxe-kids-head">${sent.length ? `<span class="dxe-mono">Recent photos</span>` : ""}` +
+        `<span class="dxe-soft">No matches to list right now.</span></div>` +
+        (tiles ? `<div class="dxe-strip">${tiles}</div>` : "") +
+        `</div>`
+      );
+    }
     if (it.mode === "draw") {
       const c = ui.choice[p.id];
       const hist = c && c.mode === "draw" ? c.hist : [];
@@ -1209,12 +1234,10 @@
       const ok = canPick(s.id);
       const tile = (k, pic, label, on) =>
         `<button type="button" class="dxe-it is-render${on ? " is-marked" : ""}" data-draw-pos="${esc(p.id)}" data-pos="${k}" data-fk="dpos-${esc(p.id)}-${k}" aria-pressed="${on}"${ok ? "" : " disabled"} title="${esc(label)}"><span class="dxe-it-pic">${pic}</span><span class="dxe-it-l">${esc(label)}</span></button>`;
-      const last = tile(
-        -1,
-        p.thumb ? `<img src="${esc(p.thumb)}" alt="" loading="lazy">` : "",
-        "As last sent",
-        pos < 0
-      );
+      // Newest first: pictures drawn here and not sent yet, then what this dashboard
+      // actually sent (the push log), the latest marked. Up to STRIP in all.
+      const sent = Array.isArray(p.recent) ? p.recent : [];
+      const lastLabel = liveFlags(s.id).now ? "On screen" : "Last sent";
       const drawn = hist
         .map((e, k) =>
           tile(
@@ -1226,11 +1249,18 @@
             k === pos
           )
         )
-        .join("");
+        .reverse();
+      const sentTiles = (sent.length ? sent : p.thumb ? [{ thumb: p.thumb }] : []).map((r, k) => {
+        const pic = `<img src="${esc(r.thumb)}" alt="" loading="lazy" referrerpolicy="no-referrer">`;
+        return k === 0
+          ? tile(-1, pic, lastLabel, pos < 0)
+          : `<span class="dxe-it is-render" title="Sent earlier"><span class="dxe-it-pic">${pic}</span><span class="dxe-it-l">Sent earlier</span></span>`;
+      });
+      const strip = [...drawn, ...sentTiles].slice(0, STRIP).join("");
       return (
-        `<div class="dxe-kids"><div class="dxe-kids-head"><span class="dxe-mono">${esc(it.count ? plural(it.count, it.noun || "items") : "Draw")}</span>` +
-        `<span class="dxe-soft">${c && c.note ? esc(c.note) : "A new one each time it's sent."}</span></div>` +
-        `<div class="dxe-strip">${last}${drawn}</div></div>`
+        `<div class="dxe-kids dxe-recent"${shapeVars()}><div class="dxe-kids-head"><span class="dxe-mono">Recent photos</span>` +
+        `<span class="dxe-soft">${c && c.note ? esc(c.note) : "A random photo each time it's sent."}</span></div>` +
+        `<div class="dxe-strip">${strip}</div></div>`
       );
     }
     return "";

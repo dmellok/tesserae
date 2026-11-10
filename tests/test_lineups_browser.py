@@ -3864,10 +3864,11 @@ def test_draw_next_end_to_end_with_a_real_chromium_render(
         tile.hover()
         prev_btn = tile.locator('[data-item="drawdeck:0:-1"]')
         next_btn = tile.locator('[data-item="drawdeck:0:1"]')
-        # Draw mode: arrows exist, no count anywhere, "previous" waits for something drawn.
+        # Draw mode: arrows exist, a stack badged "random", "previous" waits for something drawn.
         assert next_btn.get_attribute("aria-label") == "Draw the next picture"
         assert prev_btn.is_disabled() and tile.locator(".lu-it-pos").inner_text() == ""
-        assert step.locator(".lu-count").count() == 0
+        assert step.locator(".lu-count").inner_text() == "random"
+        assert "stacked" in tile.get_attribute("class")
 
         def shown() -> str:
             return str(tile.locator("img").get_attribute("src"))
@@ -3972,8 +3973,9 @@ def test_draw_arrows_draw_again_go_back_without_drawing_and_show_no_count(live: 
         )
         assert prev_btn.get_attribute("aria-label") == "Previous picture" and prev_btn.is_disabled()
         assert next_btn.get_attribute("aria-label") == "Draw the next picture"
-        assert tile.locator(".lu-count, .lu-it-pos:not(:empty)").count() == 0  # no unknown total
-        assert "stacked" not in tile.get_attribute("class")
+        assert tile.locator(".lu-it-pos:not(:empty)").count() == 0  # no unknown total
+        assert tile.locator(".lu-count").inner_text() == "random"  # a collection, not a count
+        assert "stacked" in tile.get_attribute("class")
         # Next draws one: the dashboard rendered once more under a new key, not an item name.
         api.item_pending = 1
         next_btn.click()
@@ -5035,4 +5037,28 @@ def test_real_routes_an_end_on_a_push_of_four_dashboards_makes_a_rotation(
         assert deck.advance_trigger == "daily" and deck.advance_fires_at == "06:00"
         assert deck.page_ids == list(pages)
         assert errors == []
+        browser.close()
+
+
+def test_pills_are_never_covered_by_a_stack(live: str) -> None:
+    from playwright.sync_api import sync_playwright
+
+    check = """() => {
+        const bad = [];
+        for (const pill of document.querySelectorAll(".lu-step .lu-pill")) {
+          pill.scrollIntoView({ block: "center", inline: "center" });
+          const r = pill.getBoundingClientRect();
+          for (const [x, y] of [[r.left + 1, r.top + 1], [r.right - 1, r.top + 1],
+                                [r.left + 1, r.bottom - 1], [r.right - 1, r.bottom - 1]]) {
+            const hit = document.elementFromPoint(x, y);
+            if (!hit || !(hit === pill || pill.contains(hit))) bad.push(String(hit && hit.className));
+          }
+        }
+        return bad;
+    }"""
+    with sync_playwright() as p:
+        browser, page, _api = _open(p, live, pics=True)
+        assert page.locator(".lu-step .lu-pill").count() > 0
+        assert page.locator(".lu-tile.stacked").count() > 0
+        assert page.evaluate(check) == []
         browser.close()
