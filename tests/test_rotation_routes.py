@@ -373,3 +373,83 @@ def test_projection_covers_full_window_for_short_dwells(app: Flask) -> None:
         f"projection only covers {coverage_minutes} of {24 * 60} minutes; "
         "likely hit the iter cap mid-cycle"
     )
+
+
+def _snapshot_with(app: Flask, rotation: Rotation, passing: bool, time_idx: int = 0):
+    """``_current_step_for_each`` at a fixed clock slot, with a stub HA
+    sensor that is on (``passing``) or off."""
+    from datetime import UTC, datetime, timedelta
+
+    from app.rotation_routes import _current_step_for_each
+    from app.scheduler import Scheduler, StepState
+    from app.scheduler_conditions import ConditionEvaluator
+
+    evaluator = ConditionEvaluator(
+        ha_get_states=lambda: [{"entity_id": "sensor.x", "state": "on" if passing else "off"}],
+    )
+    evaluator.refresh_ha_states()
+    sched = Scheduler(
+        store=app.config["SCHEDULE_STORE"],
+        push_manager=lambda: None,  # type: ignore[arg-type,return-value]
+        condition_evaluator=evaluator,
+    )
+    start = datetime(2026, 6, 15, 6, 0, tzinfo=UTC)
+    sched.compute_step_state = lambda r, now: StepState(  # type: ignore[method-assign]
+        step_index=time_idx,
+        step_started_at=start,
+        next_transition_at=start + timedelta(minutes=5),
+        cycle_position_minutes=0.0,
+        forced_at=None,
+    )
+    app.config["SCHEDULER"] = sched
+    with app.app_context():
+        return _current_step_for_each([rotation])[rotation.id]
+
+
+def _cond() -> list[Condition]:
+    return [Condition(source_kind="ha_entity", source_id="sensor.x", operator="==", value="on")]
+
+
+def test_current_step_snapshot_reports_the_step_the_engine_will_show(app: Flask) -> None:
+    rotation = Rotation(
+        id="lu",
+        name="Lu",
+        steps=[
+            RotationStep(page_id="a", dwell_minutes=5, conditions=_cond()),
+            RotationStep(page_id="b", dwell_minutes=5),
+        ],
+    )
+    cur = _snapshot_with(app, rotation, passing=False)
+    assert (cur["time_step_index"], cur["step_index"], cur["page_id"]) == (0, 1, "b")
+    assert cur["held"] is False
+    cur = _snapshot_with(app, rotation, passing=True)
+    assert (cur["step_index"], cur["page_id"]) == (0, "a")
+
+
+def test_current_step_snapshot_reports_held_when_every_rule_fails(app: Flask) -> None:
+    rotation = Rotation(
+        id="lu",
+        name="Lu",
+        steps=[
+            RotationStep(page_id="a", dwell_minutes=5, conditions=_cond()),
+            RotationStep(page_id="b", dwell_minutes=5, conditions=_cond()),
+        ],
+    )
+    cur = _snapshot_with(app, rotation, passing=False)
+    assert cur["held"] is True
+    assert cur["step_index"] is None and cur["page_id"] is None
+    assert cur["active"] is True
+
+
+def test_current_step_snapshot_follows_priority_mode(app: Flask) -> None:
+    rotation = Rotation(
+        id="lu",
+        name="Lu",
+        mode="priority",
+        steps=[
+            RotationStep(page_id="a", dwell_minutes=5),
+            RotationStep(page_id="b", dwell_minutes=5),
+        ],
+    )
+    cur = _snapshot_with(app, rotation, passing=True, time_idx=1)
+    assert (cur["time_step_index"], cur["step_index"]) == (1, 0)

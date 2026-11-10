@@ -11,6 +11,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - A lineup send that failed is retried on the next tick instead of being counted as done, so a failed 06:00 send no longer misses its whole slot.
 - Smart sync waits for the displays a lineup sends to, not every display its dashboards are bound to.
 - A timer-only lineup ("Taps also flip" off) no longer follows its page links or touch zones.
+- The lineup's current step follows its conditions and priority mode, and reads as held when every rule fails, instead of showing the clock's slot.
 
 ## [0.510.1], 2026-11-11
 

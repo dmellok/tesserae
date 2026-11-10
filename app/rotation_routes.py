@@ -266,7 +266,13 @@ def _current_step_for_each(rotations: list[Rotation]) -> dict[str, dict[str, Any
     edges (epoch seconds) so the index template can render a live
     countdown bar. Uses the scheduler's override-aware
     ``compute_step_state`` so a manual "play step N" poke reflects
-    in the UI immediately."""
+    in the UI immediately.
+
+    ``step_index`` / ``page_id`` are the step the engine will actually
+    show: the clock's slot run through the same condition / priority picker
+    the scheduler fires from. ``time_step_index`` keeps the clock's slot;
+    ``held`` is True (with no step) when every step's conditions fail and
+    the engine holds what is on screen."""
     sched = _scheduler()
     now = datetime.now(UTC)
     pages_by_id = {p.id: p.name for p in _pages().list()}
@@ -284,15 +290,19 @@ def _current_step_for_each(rotations: list[Rotation]) -> dict[str, dict[str, Any
                 "override_in_effect": False,
             }
             continue
-        step = r.steps[state.step_index]
+        time_step = r.steps[state.step_index]
+        picked = sched._pick_eligible_step(r, state.step_index, now)
+        step = r.steps[picked] if picked is not None else None
         out[r.id] = {
             "active": True,
-            "step_index": state.step_index,
-            "page_id": step.page_id,
-            "page_name": pages_by_id.get(step.page_id, step.page_id),
+            "step_index": picked,
+            "time_step_index": state.step_index,
+            "held": picked is None,
+            "page_id": step.page_id if step is not None else None,
+            "page_name": pages_by_id.get(step.page_id, step.page_id) if step is not None else None,
             "step_started_epoch": state.step_started_at.timestamp(),
             "next_transition_epoch": state.next_transition_at.timestamp(),
-            "dwell_seconds": step.dwell_minutes * 60,
+            "dwell_seconds": time_step.dwell_minutes * 60,
             "override_in_effect": state.forced_at is not None,
         }
     return out
