@@ -151,7 +151,6 @@ main.page.dxe-page {
 .lu.dxe {
   container: dxe / inline-size;
   --dxe-gap: 20px;
-  --dxe-th-h: 54px;
   max-width: 1000px;
   margin: 0 auto;
   padding-bottom: 24px;
@@ -693,105 +692,306 @@ main.page.dxe-page {
 .lu.dxe .dxe-time-in.is-bad {
   border-color: var(--t-danger);
 }
-/* 2 Dashboards: rows */
+/* 2 Dashboards: the Lineups page's own step tiles (lineups_render.js stepHtml,
+ * dx-lineups.css), bigger and wrapping; a tile opens its details under the strip.
+ * --dxe-arw/--dxe-arh are the display's shape (deck_editor.js shapeVars). */
 .lu.dxe .dxe-steps-card {
+  --dxe-tile-h: 200px;
+  /* a drawn picture in the details: the display's shape, small */
+  --dxe-tw: min(112px, calc(84px * var(--dxe-arw, 16) / var(--dxe-arh, 10)));
   padding: 0;
 }
-.lu.dxe .dxe-steps {
+.lu.dxe .dxe-tiles-scroll {
+  padding: 22px 20px 14px;
+}
+.lu.dxe .dxe-tiles {
+  --tile-h: var(--dxe-tile-h);
+  --fig-min: 96px;
+  flex-wrap: wrap;
+  width: auto;
+  row-gap: 26px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lu.dxe .dxe-tiles .lu-step figure {
+  gap: 10px;
+}
+.lu.dxe .dxe-tiles .lu-step figcaption {
+  gap: 3px;
+  cursor: pointer;
+  max-width: max(132px, calc(var(--th) * var(--dxe-arw, 16) / var(--dxe-arh, 10)));
+}
+.lu.dxe .dxe-tiles .lu-step-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 13.5px;
+}
+.lu.dxe .dxe-tiles .lu-step-meta {
+  font-size: 11.5px;
+}
+/* Every tile reads at full strength here: the editor is about all of them. */
+.lu.dxe .lu-strip.has-now .lu-step:not(.is-now):not(:hover):not(:focus-within),
+.lu.dxe .lu-strip.has-now .lu-step:is(.is-next, .is-waiting):not(:hover) {
+  opacity: 1;
+}
+.lu.dxe .dxe-tiles .lu-step.is-muted:not(:hover):not(:focus-within) {
+  opacity: 0.55;
+}
+.lu.dxe .dxe-tiles .lu-step.is-dragging {
+  opacity: 0.35;
+}
+/* The whole tile is its button; the zoom, the arrows and the count sit above it. */
+.lu.dxe .dxe-sel {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  padding: 0;
+  border: 0;
+  border-radius: var(--lu-r-xs);
+  background: transparent;
+  cursor: pointer;
+}
+.lu.dxe .dxe-sel:focus-visible {
+  outline: 2px solid var(--t-fg);
+  outline-offset: 4px;
+}
+.lu.dxe .dxe-tiles .lu-step.is-open .lu-thumb {
+  outline: 3px solid var(--t-fg);
+  outline-offset: 3px;
+}
+.lu.dxe .dxe-tiles .lu-step.is-open .lu-step-name {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+/* Many items: two card edges behind the picture, clear in light and dark. */
+/* Every tile keeps room for the stack, so tiles line up across the lines. */
+.lu.dxe .dxe-tiles .lu-tile {
+  margin: 0 12px 0 0;
+}
+.lu.dxe .dxe-tiles .lu-tile.stacked::before,
+.lu.dxe .dxe-tiles .lu-tile.stacked::after {
+  opacity: 1;
+  border: 1px solid color-mix(in oklab, var(--t-fg) 42%, transparent);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.18);
+}
+.lu.dxe .dxe-tiles .lu-tile.stacked::before {
+  transform: translate(12px, -12px);
+  background: color-mix(in oklab, var(--lu-paper) 78%, var(--t-fg));
+}
+.lu.dxe .dxe-tiles .lu-tile.stacked::after {
+  transform: translate(6px, -6px);
+  background: color-mix(in oklab, var(--lu-paper) 90%, var(--t-fg));
+}
+.lu.dxe .dxe-tiles .lu-count {
+  right: -10px;
+  bottom: -9px;
+  height: 24px;
+  min-width: 36px;
+  padding: 0 8px;
+  font: 700 12px/24px var(--t-font-mono);
+  box-shadow: 0 0 0 2px var(--t-surface);
+}
+.lu.dxe .dxe-tiles .lu-count.is-draw {
+  cursor: pointer;
+  letter-spacing: 0.04em;
+}
+/* The item arrows, as on the Lineups page: on hover or focus, always on touch,
+   over a shade at the foot of the picture only. */
+.lu.dxe .dxe-tiles .lu-scrim {
+  background: linear-gradient(to top, rgb(21 20 18 / 0.62), transparent 48%);
+}
+.lu.dxe .dxe-tiles .lu-tile:not(.has-items) .lu-scrim {
+  display: none;
+}
+.lu.dxe .dxe-tiles .lu-items {
+  bottom: 8px;
+  gap: 4px;
+}
+.lu.dxe .dxe-tiles .lu-it {
+  width: 30px;
+  height: 30px;
+  font-size: 15px;
+  background: rgb(21 20 18 / 0.55);
+}
+.lu.dxe .dxe-tiles .lu-it-pos {
+  font-size: 11px;
+}
+@media (hover: none) {
+  .lu.dxe .dxe-tiles .lu-tile.has-items .lu-scrim,
+  .lu.dxe .dxe-tiles .lu-tile.has-items .lu-items {
+    opacity: 1;
+  }
+}
+.lu.dxe .dxe-step-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin-top: 3px;
+}
+.lu.dxe .dxe-step-tags .dxe-tag:is(.time, .home) {
+  padding-left: 0;
+}
+/* + Add dashboard: a tile at the end, the same size as the others, a step's
+   arrow-width away from the last one. */
+.lu.dxe .dxe-add-step {
+  margin-left: 34px;
+}
+.lu.dxe .dxe-add-tile {
   display: flex;
   flex-direction: column;
-}
-.lu.dxe .dxe-step + .dxe-step {
-  border-top: 1px solid var(--t-border);
-}
-.lu.dxe .dxe-step.is-dragging {
-  opacity: 0.5;
-}
-.lu.dxe .dxe-step-head {
-  display: grid;
-  grid-template-columns: 24px 32px auto minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 10px 14px;
-  padding: 12px 16px 12px 8px;
+  justify-content: center;
+  gap: 8px;
+  height: var(--th);
+  width: max(110px, calc(var(--th) * var(--dxe-arw, 16) / var(--dxe-arh, 10)));
+  padding: 8px;
+  border: 1.5px dashed var(--t-border-strong);
+  border-radius: var(--lu-r-xs);
+  background: transparent;
+  color: var(--t-fg-soft);
+  font: 600 13px/1.25 var(--t-font);
+  text-align: center;
+  cursor: pointer;
 }
-.lu.dxe .dxe-grip {
+.lu.dxe .dxe-add-tile .lu-ico {
+  width: 20px;
+  height: 20px;
+}
+.lu.dxe .dxe-add-tile:hover,
+.lu.dxe .dxe-add-tile[aria-expanded="true"] {
+  border-color: var(--t-fg);
+  color: var(--t-fg);
+  background: color-mix(in oklab, var(--t-fg) 4%, transparent);
+}
+.lu.dxe .dxe-add-tile:focus-visible {
+  outline: 2px solid var(--t-fg);
+  outline-offset: 3px;
+}
+
+/* The open dashboard's details: a band under the strip, not a card in the card. */
+.lu.dxe .dxe-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px 20px 20px;
+  border-top: 1px solid var(--t-border);
+  background: color-mix(in oklab, var(--t-fg) 3%, var(--t-surface));
+}
+.lu.dxe .dxe-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.lu.dxe .dxe-plug {
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 32px;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--t-border-strong);
   border-radius: var(--lu-r);
-  color: var(--t-muted);
-  cursor: grab;
-}
-.lu.dxe .dxe-grip:hover {
+  background: var(--t-surface);
   color: var(--t-fg);
-  background: color-mix(in oklab, var(--t-fg) 6%, transparent);
+  font-size: 22px;
 }
-.lu.dxe .dxe-pos {
-  font: 12px var(--t-font-mono);
-  color: var(--t-muted);
+.lu.dxe .dxe-detail-t {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.lu.dxe .dxe-detail-t b {
+  font-size: 15px;
+  font-weight: 600;
+}
+.lu.dxe .dxe-detail-t b,
+.lu.dxe .dxe-detail-t span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lu.dxe .dxe-detail-t span {
+  font-size: 13px;
+}
+.lu.dxe .dxe-detail-acts {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+}
+.lu.dxe .dxe-push {
+  border: 1px solid var(--t-border-strong);
+  color: var(--t-fg);
+}
+
+/* The add picker's cards keep a small thumbnail box of the display's shape. */
+.lu.dxe .dxe-pick-th {
+  display: block;
+  padding: 8px 8px 0 0;
 }
 .lu.dxe .dxe-th {
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 96px;
-  height: var(--dxe-th-h);
+  display: block;
+  width: var(--dxe-tw);
+  aspect-ratio: var(--dxe-arw, 16) / var(--dxe-arh, 10);
 }
 .lu.dxe .dxe-th .lu-thumb {
-  max-width: 96px;
-  max-height: var(--dxe-th-h);
-  height: var(--dxe-th-h);
-  width: auto;
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
 }
-.lu.dxe .dxe-th .lu-thumb.l {
-  height: auto;
-  width: 96px;
+.lu.dxe .dxe-th.is-stack::before,
+.lu.dxe .dxe-th.is-stack::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--lu-r-xs);
+  border: 1px solid color-mix(in oklab, var(--t-fg) 42%, transparent);
+  background: color-mix(in oklab, var(--lu-paper) 85%, var(--t-fg));
 }
-/* Several items: a second sheet behind, and the count. */
-.lu.dxe .dxe-th.is-stack .lu-thumb {
-  box-shadow:
-    3px -3px 0 -1px var(--t-surface),
-    3px -3px 0 0 var(--t-border-strong);
+.lu.dxe .dxe-th.is-stack::before {
+  transform: translate(7px, -7px);
+}
+.lu.dxe .dxe-th.is-stack::after {
+  transform: translate(3.5px, -3.5px);
 }
 .lu.dxe .dxe-badge {
   position: absolute;
   right: -6px;
   bottom: -6px;
   z-index: 2;
-  padding: 1px 6px;
+  height: 20px;
+  min-width: 26px;
+  padding: 0 6px;
   border-radius: var(--lu-r-pill);
   background: var(--t-fg);
-  color: var(--t-surface);
-  font: 600 11px var(--t-font-mono);
+  color: var(--t-bg);
+  font: 700 10.5px/20px var(--t-font-mono);
+  text-align: center;
+  white-space: nowrap;
+  box-shadow: 0 0 0 2px var(--t-surface);
 }
 .lu.dxe .dxe-step-text {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
-.lu.dxe .dxe-step-name,
 .lu.dxe .dxe-step-text > b {
   font-weight: 600;
-  font-size: 14.5px;
-  overflow-wrap: anywhere;
+  font-size: 14px;
 }
 .lu.dxe .dxe-step-sub,
 .lu.dxe .dxe-where {
   font-size: 12.5px;
   color: var(--t-fg-soft);
-}
-.lu.dxe .dxe-step.is-muted .dxe-th,
-.lu.dxe .dxe-step.is-muted .dxe-step-text {
-  opacity: 0.55;
-}
-.lu.dxe .dxe-step-tags {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 6px;
 }
 .lu.dxe .dxe-tag {
   display: inline-flex;
@@ -830,23 +1030,6 @@ main.page.dxe-page {
 .lu.dxe .dxe-tag.warn {
   border-color: var(--lu-warn-text);
   color: var(--lu-warn-text);
-}
-.lu.dxe .dxe-step-acts {
-  display: flex;
-  gap: 2px;
-}
-.lu.dxe .dxe-exp .lu-ico {
-  transition: transform 160ms cubic-bezier(0.25, 1, 0.5, 1);
-  transform: rotate(-90deg);
-}
-.lu.dxe .dxe-step.is-open .dxe-exp .lu-ico {
-  transform: none;
-}
-.lu.dxe .dxe-step-body {
-  padding: 0 20px 16px 78px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
 }
 .lu.dxe .dxe-one {
   display: flex;
@@ -894,30 +1077,49 @@ main.page.dxe-page {
 .lu.dxe .dxe-grid-items {
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;
   gap: 12px;
 }
 .lu.dxe .dxe-grid-items {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
 }
+/* Every tile the same size: a 16:10 box for a photo or a named item, the
+   display's shape (as the row's thumbnail) for a drawn render. */
 .lu.dxe .dxe-it {
   display: flex;
+  flex: none;
   flex-direction: column;
-  gap: 4px;
+  align-items: stretch;
+  gap: 5px;
   width: 104px;
+  min-width: 0;
   font-size: 11.5px;
   color: var(--t-fg-soft);
   text-align: left;
+}
+.lu.dxe .dxe-it.is-render {
+  width: max(var(--dxe-tw), 64px);
 }
 .lu.dxe .dxe-grid-items .dxe-it {
   width: auto;
 }
 .lu.dxe button.dxe-it {
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 11.5px;
+  line-height: normal;
   cursor: pointer;
 }
 .lu.dxe .dxe-it-pic {
   display: grid;
   place-items: center;
+  width: 100%;
   aspect-ratio: 16 / 10;
   border-radius: var(--lu-r-xs);
   border: 1px solid var(--t-border-strong);
@@ -929,9 +1131,20 @@ main.page.dxe-page {
   height: 100%;
   object-fit: cover;
 }
+.lu.dxe .dxe-it.is-render .dxe-it-pic {
+  width: var(--dxe-tw);
+  aspect-ratio: var(--dxe-arw, 16) / var(--dxe-arh, 10);
+}
+.lu.dxe .dxe-it.is-render .dxe-it-pic img {
+  object-fit: contain;
+}
 .lu.dxe .dxe-it-word {
-  padding: 6px;
-  font: 600 12px/1.25 var(--t-font);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  padding: 0 8px;
+  font: 600 11.5px/1.25 var(--t-font);
   color: #3b3934;
   text-align: center;
   overflow-wrap: anywhere;
@@ -955,7 +1168,7 @@ main.page.dxe-page {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 66px;
+  height: 65px;
   padding: 0 14px;
   border: 1px dashed var(--t-border-strong);
   border-radius: var(--lu-r);
@@ -1117,6 +1330,7 @@ main.page.dxe-page {
   font-size: 12.5px;
 }
 .lu.dxe .dxe-picker {
+  --dxe-tw: min(80px, calc(60px * var(--dxe-arw, 16) / var(--dxe-arh, 10)));
   padding: 14px 16px 16px;
   border-top: 1px solid var(--t-border);
   display: flex;
@@ -1409,37 +1623,32 @@ main.page.dxe-page {
   .lu.dxe .dxe-pace {
     margin-left: 0;
   }
-  .lu.dxe .dxe-step-head {
-    grid-template-columns: 22px auto minmax(0, 1fr) auto;
-    gap: 8px 10px;
-    padding: 10px 10px 10px 4px;
+  /* The tiles: one line that scrolls sideways, as on the Lineups page. */
+  .lu.dxe .dxe-steps-card {
+    --dxe-tile-h: 150px;
+    padding: 0;
+    --dxe-tw: min(84px, calc(64px * var(--dxe-arw, 16) / var(--dxe-arh, 10)));
   }
-  .lu.dxe .dxe-pos {
-    display: none;
+  .lu.dxe .dxe-tiles-scroll {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding: 20px 14px 12px;
   }
-  .lu.dxe .dxe-th {
-    width: 64px;
-    --dxe-th-h: 44px;
+  .lu.dxe .dxe-tiles {
+    flex-wrap: nowrap;
+    width: max-content;
   }
-  .lu.dxe .dxe-th .lu-thumb.l {
-    width: 64px;
-  }
-  .lu.dxe .dxe-step-tags {
-    grid-column: 3 / -1;
-    grid-row: 2;
-    justify-content: flex-start;
-  }
-  .lu.dxe .dxe-step-tags:empty {
-    display: none;
-  }
-  .lu.dxe .dxe-step-body {
-    padding: 0 12px 14px;
+  .lu.dxe .dxe-detail {
+    padding: 16px 12px 18px;
   }
   .lu.dxe .dxe-picks {
     grid-template-columns: minmax(0, 1fr);
   }
   .lu.dxe .dxe-it {
     width: 84px;
+  }
+  .lu.dxe .dxe-more {
+    height: 53px;
   }
   .lu.dxe .dxe-hint {
     margin-left: 0;

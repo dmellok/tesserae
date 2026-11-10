@@ -1490,7 +1490,7 @@ def test_editor_shows_deleted_step_and_remove_persists(real: tuple[str, Flask]) 
         assert "Missing dashboard (deleted)" in first.inner_text()
         # Unchanged, it is kept; Remove drops just that step and survives a save.
         first.locator("[data-expand]").click()
-        first.locator("[data-remove]").click()
+        page.locator("[data-panel] [data-remove]").click()
         assert [r.get_attribute("data-step") for r in rows.all()] == ["news"]
         with page.expect_navigation():
             page.locator("[data-save]").click()

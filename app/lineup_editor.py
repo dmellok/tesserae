@@ -11,6 +11,7 @@ Pure reads of the page, plugin and device registries; nothing here writes.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from flask import current_app
@@ -44,6 +45,14 @@ def _plugin_name(plugin_id: str) -> str:
     return f"{family} {variant.lower()}"
 
 
+def _plugin_icon(plugin_id: str) -> str:
+    """A widget's Phosphor icon class ("ph-images"), from its manifest."""
+    reg = current_app.config.get("PLUGIN_REGISTRY")
+    plugin = reg.get(plugin_id) if reg is not None else None
+    icon = str((getattr(plugin, "manifest", None) or {}).get("icon") or "")
+    return icon if re.fullmatch(r"ph-[a-z0-9-]+", icon) else ""
+
+
 def _every(minutes: int) -> str:
     if minutes % 1440 == 0:
         n = minutes // 1440
@@ -59,9 +68,10 @@ def _count(n: int, noun: str) -> str:
 
 
 def dashboard_summary(page: Any) -> dict[str, Any]:
-    """``{kind, facts, subtitle, items, fresh}`` for one dashboard.
+    """``{kind, icon, facts, subtitle, items, fresh}`` for one dashboard.
 
-    ``kind`` names what it is (the widget, or the first two of several);
+    ``kind`` names what it is (the widget, or the first two of several) and
+    ``icon`` is that widget's Phosphor icon ("" for several or none);
     ``facts`` the key numbers ("412 photos, in order", "12 entities");
     ``items`` is ``app.step_items.item_summary``; ``fresh`` the one line on
     what keeps it current, from its own Updates (``Page.refresh_minutes``)."""
@@ -70,10 +80,13 @@ def dashboard_summary(page: Any) -> dict[str, Any]:
         item_summary(page) if widgets else {"mode": "none", "count": 1, "noun": "items"}
     )
     lister = items.get("plugin") or ""
+    icon = ""
     if lister:
         kind = _plugin_name(lister)
+        icon = _plugin_icon(lister)
     elif len(widgets) == 1:
         kind = _plugin_name(widgets[0][0])
+        icon = _plugin_icon(widgets[0][0])
     elif widgets:
         names = list(dict.fromkeys(_plugin_name(pid) for pid, _ in widgets))
         kind = " & ".join(names[:2]) + (f" +{len(names) - 2}" if len(names) > 2 else "")
@@ -120,6 +133,7 @@ def dashboard_summary(page: Any) -> dict[str, Any]:
         fresh = "Redrawn each time it is sent."
     return {
         "kind": kind,
+        "icon": icon,
         "facts": ", ".join(facts),
         "subtitle": " · ".join(x for x in (kind, ", ".join(facts)) if x),
         "items": items,

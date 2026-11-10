@@ -339,6 +339,11 @@
 
   // ``ui.itemChoice(d, l, s)`` is the item the person picked with the arrows on this step
   // (lineups.js), or null: {key, idx, state: "loading" | "ready" | "error" | "busy", thumb_url}.
+  // The lineup editor (deck_editor.js) draws its dashboards with this too and adds, all
+  // optional: ``ui.stepKey(s)`` (data-step), ``ui.stepClass(s)`` and ``ui.stepAttrs(s)`` on
+  // the step, ``ui.tileExtra(s)`` inside the tile, ``ui.captionExtra(s)`` in the caption,
+  // ``ui.pushOverlay === false`` (Push now lives elsewhere; the arrows stay) and
+  // ``ui.drawBadge`` (a widget that draws shows a stacked tile and "draw").
   function stepHtml(d, l, s, ui) {
     const choice = (ui && ui.itemChoice && ui.itemChoice(d, l, s)) || null;
     const canPush = !!(d.id && l.actions.push_step_url && !s.missing && !s.off_display);
@@ -355,18 +360,25 @@
     const pill = s.pill
       ? `<span class="lu-pill p-${esc(s.pill.kind)}" title="${esc(s.pill.title)}">${s.pill.kind === "now" ? ico("play") : ""}${esc(s.pill.label)}</span>`
       : "";
-    const push = canPush
-      ? `<form method="post" action="${esc(l.actions.push_step_url)}" class="lu-push-form"><input type="hidden" name="index" value="${s.index}"><input type="hidden" name="display_id" value="${esc(d.id)}"><input type="hidden" name="page_id" value="${esc(s.dashboard_id)}"><input type="hidden" name="composition_digest" value="${esc(choice ? "" : s.composition_digest || "")}">${choice ? `<input type="hidden" name="item" value="${esc(choice.key)}">` : ""}<button type="submit" class="lu-push-ov" data-push="${esc(l.id)}:${s.index}" title="${esc(s.push_title)}" aria-label="${esc(s.push_title)}"><i>${ico("send")}</i><span>Push now</span></button></form>`
-      : "";
-    const prevLabel = draw ? "Previous picture" : "Previous item";
-    const nextLabel = draw ? "Draw the next picture" : "Next item";
+    const push =
+      canPush && !(ui && ui.pushOverlay === false)
+        ? `<form method="post" action="${esc(l.actions.push_step_url)}" class="lu-push-form"><input type="hidden" name="index" value="${s.index}"><input type="hidden" name="display_id" value="${esc(d.id)}"><input type="hidden" name="page_id" value="${esc(s.dashboard_id)}"><input type="hidden" name="composition_digest" value="${esc(choice ? "" : s.composition_digest || "")}">${choice ? `<input type="hidden" name="item" value="${esc(choice.key)}">` : ""}<button type="submit" class="lu-push-ov" data-push="${esc(l.id)}:${s.index}" title="${esc(s.push_title)}" aria-label="${esc(s.push_title)}"><i>${ico("send")}</i><span>Push now</span></button></form>`
+        : "";
+    // (The editor names them: s.item_noun "photo", s.draw_label "Draw another".)
+    const noun = s.item_noun || "item";
+    const prevLabel = draw ? "Previous picture" : `Previous ${noun}`;
+    const nextLabel = draw ? s.draw_label || "Draw the next picture" : `Next ${noun}`;
     const items = canPick
       ? `<span class="lu-items" role="group" aria-label="${draw ? `Draw another ${esc(s.name)} picture` : `Choose which ${esc(s.name)} item to push`}"><button type="button" class="lu-it" data-item="${esc(l.id)}:${s.index}:-1" aria-label="${prevLabel}" title="${prevLabel}"${draw && !choice ? " disabled" : ""}>${ico("chevl")}</button><span class="lu-it-pos" aria-hidden="true">${choice && !draw ? `${choice.idx + 1}/${s.items.length}` : ""}</span><button type="button" class="lu-it" data-item="${esc(l.id)}:${s.index}:1" aria-label="${nextLabel}" title="${nextLabel}">${ico("chev")}</button></span>`
       : "";
+    const drawMark = !!(ui && ui.drawBadge) && draw && !(s.item_count > 1);
     const count =
       s.item_count > 1
         ? `<button type="button" class="lu-count" data-peek="${esc(l.id)}:${s.index}" aria-haspopup="dialog" aria-expanded="false" title="${s.item_count} items in this step. Show them">×${s.item_count}</button>`
-        : "";
+        : drawMark
+          ? `<span class="lu-count is-draw" title="A fresh draw each time">draw</span>`
+          : "";
+    const hook = (name) => (ui && ui[name] ? ui[name](s) || "" : "");
     const cond = s.conditional
       ? ` <span title="Shows only while its conditions pass">${ico("funnel")}</span>`
       : "";
@@ -384,9 +396,9 @@
           ? `<span class="lu-sep loop" title="Loops back to ${esc(l.steps[0].name)}">${ico("loop")}</span>`
           : "";
     return (
-      `<li class="lu-step${cls ? " " + cls : ""}${s.missing ? " is-missing" : ""}${s.off_display ? " is-offdisplay" : ""}" data-step="${s.index}"${s.missing ? ' title="This dashboard was deleted; remove it from the lineup"' : s.off_display ? ` title="${esc(s.off_display_note)}"` : ""}><figure><span class="lu-slot">${pill}</span>` +
-      `<span class="lu-tile${s.item_count > 1 ? " stacked" : ""}${canPick ? " has-items" : ""}${choice && choice.state === "loading" ? " is-loading" : ""}${choice && (choice.state === "error" || choice.state === "busy") ? " is-itemfail" : ""}">${thumb(s.name, picked || s.thumb_url, s.aspect, d.orientation || s.orientation, s.missing ? "missing" : s.off_display ? "offdisplay" : "", null, false, d, s.thumb_url && !s.missing && !s.off_display ? zoomBtn(`step:${l.id}:${s.index}`, `Zoom ${s.name}`) : "")}<span class="lu-scrim" aria-hidden="true"></span>${push}${items}<span class="lu-pushed-msg" aria-hidden="true"></span>${count}</span>` +
-      `<figcaption><span class="lu-step-name">${esc(s.name)}</span><span class="lu-step-meta">${esc(s.position)}${cond}</span>${off}</figcaption></figure>${sep}</li>`
+      `<li class="lu-step${cls ? " " + cls : ""}${s.missing ? " is-missing" : ""}${s.off_display ? " is-offdisplay" : ""}${hook("stepClass") ? " " + hook("stepClass") : ""}" data-step="${esc(ui && ui.stepKey ? ui.stepKey(s) : s.index)}"${hook("stepAttrs")}${s.missing ? ' title="This dashboard was deleted; remove it from the lineup"' : s.off_display ? ` title="${esc(s.off_display_note)}"` : ""}><figure><span class="lu-slot">${pill}</span>` +
+      `<span class="lu-tile${s.item_count > 1 || drawMark ? " stacked" : ""}${canPick ? " has-items" : ""}${choice && choice.state === "loading" ? " is-loading" : ""}${choice && (choice.state === "error" || choice.state === "busy") ? " is-itemfail" : ""}">${thumb(s.name, picked || s.thumb_url, s.aspect, d.orientation || s.orientation, s.missing ? "missing" : s.off_display ? "offdisplay" : "", null, false, d, s.thumb_url && !s.missing && !s.off_display ? zoomBtn(`step:${l.id}:${s.index}`, `Zoom ${s.name}`) : "")}<span class="lu-scrim" aria-hidden="true"></span>${push}${items}<span class="lu-pushed-msg" aria-hidden="true"></span>${count}${hook("tileExtra")}</span>` +
+      `<figcaption><span class="lu-step-name">${esc(s.name)}</span><span class="lu-step-meta">${esc(s.position)}${cond}</span>${off}${hook("captionExtra")}</figcaption></figure>${sep}</li>`
     );
   }
 
@@ -1226,6 +1238,7 @@
     scopeEmpty,
     dayPop,
     row,
+    stepHtml,
     header,
     display,
     unassigned,

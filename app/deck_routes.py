@@ -3148,6 +3148,7 @@ def _editor_page(page: Any, dims: tuple[int, int], token: str) -> dict[str, Any]
         "thumb": url_for("composer.compose_preview", page_id=page.id) + f"?v={token}&refresh=300",
         "devices": list(page.device_ids),
         "subtitle": summary.get("subtitle", ""),
+        "icon": summary.get("icon", ""),
         "items": summary.get("items", {}),
         "fresh": summary.get("fresh", ""),
         "refresh": int(page.refresh_minutes or 0),

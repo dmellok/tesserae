@@ -211,14 +211,14 @@ def test_a_redraw_from_an_item_list_keeps_the_raw_conditions_open(
         page.route("**/decks/dashboard-items?**", lambda route: held.append(route))
         page.locator('[data-expand="photos"]').click()
         page.locator('[data-edit="photos"]').click()
-        picker = page.locator('[data-step="photos"] [data-condition-picker]')
+        picker = page.locator('[data-panel="photos"] [data-condition-picker]')
         picker.locator("summary").click()
         raw = picker.locator("textarea")
         raw.focus()
         assert raw.is_visible() and _fk(page) == "cond-photos"
         assert held, "the item list should still be on its way"
         held[0].continue_()  # its response redraws the editor
-        page.wait_for_function("() => document.querySelector('[data-step=photos] img')")
+        page.wait_for_function("() => document.querySelector('[data-panel=photos] .dxe-strip img')")
         page.wait_for_timeout(100)  # the pickers start just after the redraw
         assert page.locator('[data-cond="photos"]').is_visible()
         assert _fk(page) == "cond-photos"
@@ -308,8 +308,8 @@ def test_dashboards_reorder_items_add_remove_and_discard(real: tuple[str, Flask]
         browser, page, errors = _open(p, base, "/decks/art/edit")
         assert _steps(page) == ["photos", "clock", "climate"]
         row = page.locator('[data-step="photos"]')
-        assert "Gallery · 31 photos" in row.inner_text()
-        assert row.locator(".dxe-badge").inner_text() == "×31"
+        assert row.locator(".lu-count").inner_text() == "×31"
+        assert row.locator(".lu-tile.stacked").count() == 1
         # Alt+Down moves it; the live region says where it went.
         row.locator("[data-grip]").focus()
         page.keyboard.press("Alt+ArrowDown")
@@ -317,7 +317,9 @@ def test_dashboards_reorder_items_add_remove_and_discard(real: tuple[str, Flask]
         assert page.locator("[data-step]:focus-within").get_attribute("data-step") == "photos"
         # Its items: the first few, then every one in a searchable, paged grid.
         page.locator('[data-expand="photos"]').click()
-        strip = page.locator('[data-step="photos"] .dxe-strip .dxe-it')
+        head = page.locator('[data-panel="photos"] .dxe-detail-head')
+        assert "Gallery · 31 photos" in head.inner_text()
+        strip = page.locator('[data-panel="photos"] .dxe-strip .dxe-it')
         strip.first.wait_for()
         assert strip.count() == 5
         page.locator('[data-grid="photos"]').click()
@@ -588,8 +590,8 @@ def test_a_save_in_flight_a_cancelled_drag_and_a_double_push(real: tuple[str, Fl
             const dt = new DataTransfer();
             rows[0].dispatchEvent(new DragEvent('dragstart', {bubbles: true, dataTransfer: dt}));
             const r = rows[2].getBoundingClientRect();
-            rows[2].dispatchEvent(new DragEvent('dragover',
-                {bubbles: true, cancelable: true, dataTransfer: dt, clientY: r.bottom - 1}));
+            rows[2].dispatchEvent(new DragEvent('dragover', {bubbles: true, cancelable: true,
+                dataTransfer: dt, clientX: r.right - 1, clientY: r.top + 5}));
             dt.dropEffect = effect;
             rows[0].dispatchEvent(new DragEvent('dragend', {bubbles: true, dataTransfer: dt}));
         }"""
@@ -601,12 +603,13 @@ def test_a_save_in_flight_a_cancelled_drag_and_a_double_push(real: tuple[str, Fl
         box = climate.bounding_box()
         assert box is not None
         page.locator('[data-step="photos"] [data-grip]').drag_to(
-            climate, target_position={"x": 20, "y": box["height"] - 3}
+            climate, target_position={"x": box["width"] - 30, "y": 40}
         )
         assert _steps(page) == ["clock", "climate", "photos"]
         assert page.locator("#dxe-save-state").inner_text() == "Unsaved changes"
         page.locator("[data-discard]").click()
-        # Push now: one request however fast it is clicked.
+        # Push now (in the open dashboard's details): one request however fast it is clicked.
+        page.locator('[data-step="photos"] .dxe-sel').click()
         pushes: list[Any] = []
         page.route("**/push-step", lambda route: pushes.append(route))
         page.locator('[data-push="photos"]').click()
@@ -853,6 +856,37 @@ _BOXES = """(sel) => [...document.querySelectorAll(sel)].map((t) => {
 
 @pytest.mark.parametrize("width", [1280, 420])
 def test_the_header_thumbnail_is_the_displays_exact_shape(
+# -- the Dashboards strip: the Lineups page's tiles, bigger ---------------------------
+
+_TILE_GEOMETRY = """(id) => {
+  const tile = document.querySelector(`[data-step="${id}"]`);
+  const box = (el) => {
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { x: r.x, y: r.y, w: r.width, h: r.height, r: r.right, b: r.bottom };
+  };
+  const sheet = getComputedStyle(tile.querySelector('.lu-tile'), '::before');
+  return {
+    thumb: box(tile.querySelector('.lu-thumb')),
+    count: box(tile.querySelector('.lu-count')),
+    stacked: tile.querySelector('.lu-tile').classList.contains('stacked'),
+    sheet: { transform: sheet.transform, opacity: sheet.opacity, border: sheet.borderTopColor },
+  };
+}"""
+
+
+def _register(app: Flask, dev: str, kind: str) -> None:
+    code = app.config["PAIRING_STORE"].issue(note="t").code
+    resp = app.test_client().post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+        data=json.dumps({"device_id": dev, "kind": kind}),
+    )
+    assert resp.status_code == 201
+
+
+@pytest.mark.parametrize("width", [1280, 420])
+def test_dashboards_are_big_display_shaped_tiles_that_open_their_details(
     real: tuple[str, Flask], width: int
 ) -> None:
     from playwright.sync_api import sync_playwright
@@ -868,6 +902,77 @@ def test_the_header_thumbnail_is_the_displays_exact_shape(
             assert h <= 200
             if portrait and width == 1280:
                 page.screenshot(path="/tmp/lu-move/header-portrait.png")
+    # A portrait panel (Visionect 1440x2560) next to the landscape TV.
+    _register(app, "frame", "visionect")
+    folder = {"folder": "trip"}
+    gallery = Cell(id="g", plugin="picture_gallery", x=0, y=0, w=10, h=10, options=folder)
+    pages = app.config["PAGE_STORE"]
+    pages.save(Page(id="tall", name="Tall photos", device_ids=["frame"], cells=[gallery]))
+    long = "A very long dashboard name that never runs past its tile in the strip"
+    pages.save(Page(id="note", name=long, device_ids=["frame"]))
+    app.config["DECK_STORE"].upsert(
+        Deck(id="hallway", name="Hallway", device_ids=["frame"], advance="timer",
+             advance_trigger="cycle", advance_anchor="06:00",
+             pages=[DeckPage(page_id="tall"), DeckPage(page_id="note")])
+    )  # fmt: skip
+    with sync_playwright() as p:
+        for path, first, other, portrait in (
+            ("/decks/art/edit", "photos", "clock", False),
+            ("/decks/hallway/edit", "tall", "note", True),
+        ):
+            browser, page, errors = _open(p, base, path, width=width)
+            a = page.evaluate(_TILE_GEOMETRY, first)
+            b = page.evaluate(_TILE_GEOMETRY, other)
+            th = a["thumb"]
+            # The tile is the display's shape, and much bigger than a Lineups tile.
+            if portrait:
+                assert th["h"] > th["w"] and abs(th["w"] / th["h"] - 1440 / 2560) < 0.03, th
+                assert th["h"] >= (140 if width < 600 else 190), th
+            else:
+                assert th["w"] > th["h"] and abs(th["w"] / th["h"] - 800 / 480) < 0.03, th
+                assert th["w"] >= (150 if width < 600 else 200), th
+            assert abs(b["thumb"]["h"] - th["h"]) < 1 and abs(b["thumb"]["y"] - th["y"]) < 1
+            # Many items: a stacked card with real edges and the count on its corner.
+            assert a["stacked"] and not b["stacked"]
+            assert a["sheet"]["opacity"] == "1" and a["sheet"]["transform"] != "none"
+            c = a["count"]
+            assert page.locator(f'[data-step="{first}"] .lu-count').inner_text() == "×31"
+            assert th["x"] < c["x"] < th["r"] < c["r"] <= th["r"] + 14, (c, th)
+            assert th["y"] < c["y"] < th["b"] < c["b"] <= th["b"] + 14, (c, th)
+            # Desktop wraps onto more lines; a phone scrolls the strip sideways, not the page.
+            wrap = page.evaluate(
+                "() => getComputedStyle(document.getElementById('dxe-steps')).flexWrap"
+            )
+            assert wrap == ("nowrap" if width < 600 else "wrap")
+            assert page.evaluate(
+                "() => document.documentElement.scrollWidth <= document.documentElement.clientWidth"
+            )
+            if portrait:
+                name = page.locator(f'[data-step="{other}"] .lu-step-name')
+                assert name.evaluate("(e) => e.getBoundingClientRect().height") < 44  # two lines
+            # Clicking a tile opens its details under the strip, without its picture again.
+            page.locator(f'[data-step="{first}"] .dxe-sel').click()
+            panel = page.locator(f'[data-panel="{first}"]')
+            assert page.locator(f'[data-step="{first}"]').get_attribute("class").count("is-open")
+            head = panel.locator(".dxe-detail-head")
+            assert "Gallery · 31 photos" in head.inner_text()
+            assert head.locator(".dxe-plug i.ph-images").count() == 1
+            assert panel.locator(".lu-thumb").count() == 0
+            strip_bottom = page.evaluate(
+                "() => document.querySelector('.dxe-tiles').getBoundingClientRect().bottom"
+            )
+            assert panel.bounding_box()["y"] >= strip_bottom
+            # One open at a time; Esc closes and goes back to the tile.
+            page.locator(f'[data-step="{other}"] .lu-step-name').click()
+            assert page.locator("[data-panel]").count() == 1
+            assert page.locator(f'[data-panel="{other}"]').count() == 1
+            page.keyboard.press("Escape")
+            assert page.locator("[data-panel]").count() == 0
+            assert page.evaluate("() => document.activeElement.dataset.fk") == f"sel-{other}"
+            # Alt+Right moves the focused tile along the strip.
+            page.keyboard.press("Alt+ArrowLeft")
+            assert _steps(page)[0] == other
+            _settle(page)
             assert errors == []
             browser.close()
 
@@ -1018,4 +1123,132 @@ def test_a_pushes_block_only_moves_and_the_bar_is_read_only_when_narrow(
         browser.close()
         browser, page, _errors = _open(p, base, "/decks/art/edit", 420)
         assert page.locator(".dxe-daybar .lu-blk[data-edit]").count() == 0
+def test_a_tiles_arrows_choose_the_item_that_push_now_sends(real: tuple[str, Flask]) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, _app = real
+    asked: list[str] = []
+    pushed: list[dict[str, Any]] = []
+
+    def item(route: Any) -> None:
+        from urllib.parse import parse_qs, urlparse
+
+        key = parse_qs(urlparse(route.request.url).query)["item"][0]
+        asked.append(key)
+        route.fulfill(
+            json={"ok": True, "state": "ready", "item": key, "thumb_url": f"/_img/{key}.png",
+                  "large_url": f"/_img/{key}.png?lg=1", "sig": key}
+        )  # fmt: skip
+
+    def push(route: Any) -> None:
+        pushed.append(json.loads(route.request.post_data or "{}"))
+        route.fulfill(json={"ok": True, "message": "Sent."})
+
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/art/edit")
+        page.route(
+            "**/_img/**", lambda r: r.fulfill(path=str(REPO_ROOT / "static/brand/icon-192.png"))
+        )
+        page.route("**/step-item?**", item)
+        page.route("**/push-step", push)
+        tile = page.locator('[data-step="photos"]')
+        # Only a dashboard with items has the arrows, inside its picture, named for them.
+        assert page.locator('[data-step="clock"] .lu-items').count() == 0
+        nxt = tile.locator('.lu-it[aria-label="Next photo"]')
+        prev = tile.locator('.lu-it[aria-label="Previous photo"]')
+        assert nxt.count() == 1 and prev.count() == 1
+        assert tile.locator(".lu-items").evaluate("(e) => getComputedStyle(e).opacity") == "0"
+        tile.hover()
+        page.wait_for_function(
+            "() => getComputedStyle(document.querySelector('[data-step=photos] .lu-items')).opacity === '1'"
+        )
+        th = tile.locator(".lu-thumb").bounding_box()
+        it = tile.locator(".lu-items").bounding_box()
+        assert th["x"] <= it["x"] and it["x"] + it["width"] <= th["x"] + th["width"]
+        assert th["y"] <= it["y"] and it["y"] + it["height"] <= th["y"] + th["height"]
+        nxt.click()
+        nxt.click()
+        page.wait_for_function(
+            "() => document.querySelector('[data-step=photos] .lu-thumb img')?.getAttribute('src') === '/_img/IMG_001.jpg.png'"
+        )
+        assert asked == ["IMG_001.jpg"]  # the arrows rested on the second photo
+        assert tile.locator(".lu-it-pos").inner_text() == "2/31"
+        # Push now sends the photo shown.
+        tile.locator(".dxe-sel").click()
+        page.locator('[data-push="photos"]').click()
+        page.wait_for_function("() => !document.querySelector('[data-push=\"photos\"]').disabled")
+        assert pushed == [{"page_id": "photos", "display_id": "tv", "item": "IMG_001.jpg"}]
+        # The keyboard reaches them too.
+        prev.focus()
+        page.keyboard.press("Enter")
+        page.wait_for_function(
+            "() => document.querySelector('[data-step=photos] .lu-thumb img')?.getAttribute('src') === '/_img/IMG_000.jpg.png'"
+        )
+        _settle(page)
+        assert errors == []
+        browser.close()
+
+
+def test_a_drawing_dashboards_arrows_draw_another_and_go_back(
+    real: tuple[str, Flask], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from types import SimpleNamespace
+
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    reg = app.config["PLUGIN_REGISTRY"]
+    real_get = reg.get
+    album = SimpleNamespace(manifest={"name": "Google album"}, server_module=SimpleNamespace())
+    monkeypatch.setattr(
+        reg, "get", lambda pid: album if pid == "picture_google_album" else real_get(pid)
+    )
+    cell = Cell(id="a", plugin="picture_google_album", x=0, y=0, w=10, h=10, options={})
+    app.config["PAGE_STORE"].save(Page(id="album", name="Album", device_ids=["tv"], cells=[cell]))
+    decks = app.config["DECK_STORE"]
+    art = decks.get("art")
+    decks.upsert(art.model_copy(update={"pages": [*art.pages, DeckPage(page_id="album")]}))
+    drawn: list[str] = []
+
+    def item(route: Any) -> None:
+        from urllib.parse import parse_qs, urlparse
+
+        key = parse_qs(urlparse(route.request.url).query)["item"][0]
+        drawn.append(key)
+        n = len(drawn)
+        route.fulfill(
+            json={"ok": True, "state": "ready", "item": key, "thumb_url": f"/_img/d{n}.png",
+                  "large_url": f"/_img/d{n}.png", "sig": f"s{n}"}
+        )  # fmt: skip
+
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/art/edit")
+        icon = str(REPO_ROOT / "static/brand/icon-192.png")
+        page.route("**/_img/**", lambda r: r.fulfill(path=icon))
+        page.route("**/step-item?**", item)
+        tile = page.locator('[data-step="album"]')
+        # It cannot count its photos: a stacked tile that says "draw".
+        assert tile.locator(".lu-count").inner_text() == "draw"
+        assert tile.locator(".lu-tile.stacked").count() == 1
+        back = tile.locator('.lu-it[aria-label="Previous picture"]')
+        assert back.is_disabled()  # nothing drawn here yet
+        tile.hover()
+        tile.locator('.lu-it[aria-label="Draw another"]').click()
+        src = "() => document.querySelector('[data-step=album] .lu-thumb img')?.getAttribute('src')"
+        page.wait_for_function(f"({src})() === '/_img/d1.png'")
+        assert drawn[0].startswith("draw:")
+        # Its details list what was drawn; Draw another there draws one more.
+        tile.locator(".dxe-sel").click()
+        page.locator('[data-draw="album"]').click()
+        page.wait_for_function(f"({src})() === '/_img/d2.png'")
+        assert page.locator('[data-panel="album"] .dxe-strip .dxe-it').count() == 3
+        # Back walks through them without drawing again, then to the picture as sent.
+        tile.hover()
+        back.click()
+        page.wait_for_function(f"({src})() === '/_img/d1.png'")
+        back.click()
+        page.wait_for_function(f"!({src})()?.startsWith('/_img/')")
+        assert len(drawn) == 2
+        _settle(page)
+        assert errors == []
         browser.close()

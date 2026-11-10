@@ -137,7 +137,10 @@
     rawOpen: new Set(), // step ids whose conditions' raw JSON is open
     grid: {}, // page id -> {q, offset, data, busy, open}
     strip: {}, // page id -> {data} (the first few items)
-    draws: {}, // page id -> [{key, state, thumb, note}]
+    // page id -> the item chosen with a tile's arrows, as on the Lineups page:
+    // {mode: "pick", idx, key, label, state, thumb, large, note} or
+    // {mode: "draw", hist: [{key, state, thumb, large, note, sig}], pos, n, note}
+    choice: {},
     picker: false,
     elsewhere: false,
     step: S.isNew ? (S.display ? 2 : 1) : 0, // the new flow's open step
@@ -356,6 +359,9 @@
       extra || ""
     );
   }
+  // A row's thumbnail sits in a fixed box the display's shape (shapeVars), the
+  // picture fitted inside it; several items stack sheets behind it and put
+  // the count on its corner.
   function stackedThumb(p) {
     const it = p.items || {};
     const many = (it.mode === "pick" && it.count > 1) || it.mode === "draw";
@@ -365,6 +371,13 @@
         ? `<span class="dxe-badge" title="A fresh draw each time">draw</span>`
         : `<span class="dxe-badge" title="${esc(plural(it.count, it.noun || "items"))}">×${esc(it.count)}</span>`;
     return `<span class="dxe-th is-stack">${thumbOf(p)}${badge}</span>`;
+  }
+  // The display's shape, for the thumbnail boxes (dx-decks.css --dxe-tw).
+  function shapeVars() {
+    const v = viewOf(st.display) || {};
+    const w = Number(v.width) || 16;
+    const h = Number(v.height) || 10;
+    return ` style="--dxe-arw:${w};--dxe-arh:${h}"`;
   }
 
   /* ------------------------------------------------------------ header */
@@ -736,48 +749,165 @@
   const isSavedStep = (id) =>
     !S.isNew && S.steps.some((s) => s.id === id) && st.display === S.display;
 
-  function rowHtml(s, i) {
+  // The tags a dashboard carries in its caption: what differs from the rest.
+  function stepTags(s, i) {
     const p = pageOf(s.id);
     const n = st.steps.length;
     const k = kind();
-    const open = ui.open.has(s.id);
-    const f = liveFlags(s.id);
-    const notSent = k === "daily" && i > 0;
     const home = st.home === s.id || (!st.home && i === 0);
-    const stranded = strandedFor(s.id, st.display);
     let tags = "";
-    if (f.now) tags += `<span class="dxe-tag now">Now</span>`;
-    if (f.next) tags += `<span class="dxe-tag next" title="${esc(f.nextLabel)}">Next</span>`;
-    if (notSent) tags += `<span class="dxe-tag mute">Not sent by a push</span>`;
-    if (stranded)
+    if (k === "daily" && i > 0) tags += `<span class="dxe-tag mute">Not sent by a push</span>`;
+    if (strandedFor(s.id, st.display))
       tags += `<span class="dxe-tag warn" title="Bound to another display; saving asks to bind it here">Not on this display</span>`;
     if (s.dwell && s.dwell !== st.interval && k === "cycle")
       tags += `<span class="dxe-tag time" title="Shows ${esc(mins(s.dwell))}, not the lineup's ${esc(mins(st.interval))}">${ico("clock")}${esc(mins(s.dwell))}</span>`;
     if (home && (takesInput() || k === "manual") && n > 1)
       tags += `<span class="dxe-tag home" title="Home dashboard">★ home</span>`;
-    const pushOk = isSavedStep(s.id) && !p.missing && !stranded;
+    if (p.missing) tags += `<span class="dxe-tag warn">Deleted</span>`;
+    return tags;
+  }
+  const canPush = (id) => isSavedStep(id) && !pageOf(id).missing && !strandedFor(id, st.display);
+  // Its items can be stepped through (the Lineups arrows): a saved step on this display.
+  function canPick(id) {
+    const it = pageOf(id).items || {};
     return (
-      `<li class="dxe-step${open ? " is-open" : ""}${notSent ? " is-muted" : ""}${p.missing ? " is-missing" : ""}" data-step="${esc(s.id)}" draggable="true">` +
-      `<div class="dxe-step-head">` +
-      `<button type="button" class="dxe-grip" data-grip data-fk="grip-${esc(s.id)}" aria-label="Move ${esc(p.name)}, ${i + 1} of ${n}. Alt+Up or Alt+Down" title="Drag, or Alt+↑↓">${gripIco}</button>` +
-      `<span class="dxe-pos" aria-hidden="true">${i + 1}/${n}</span>` +
-      stackedThumb(p) +
-      `<span class="dxe-step-text"><b class="dxe-step-name">${esc(p.name)}</b><span class="dxe-step-sub">${esc(p.subtitle || "")}</span></span>` +
-      `<span class="dxe-step-tags">${tags}</span>` +
-      (S.isNew
-        ? `<span class="dxe-step-acts"><button type="button" class="lu-ibtn" data-remove="${esc(s.id)}" data-fk="rm-${esc(s.id)}" title="Remove ${esc(p.name)}" aria-label="Remove ${esc(p.name)}">${ico("x")}</button></span></div>`
-        : `<span class="dxe-step-acts">` +
-          `<button type="button" class="lu-ibtn" data-push="${esc(s.id)}" data-fk="push-${esc(s.id)}"${pushOk && !ui.pushing ? "" : " disabled"} title="${pushOk ? `Push ${esc(p.name)} now` : "Save first to push it"}" aria-label="Push ${esc(p.name)} now">${ico("send")}</button>` +
-          `<button type="button" class="lu-ibtn dxe-exp" data-expand="${esc(s.id)}" data-fk="exp-${esc(s.id)}" aria-expanded="${open}" aria-controls="dxe-sp-${esc(s.id)}" aria-label="${open ? "Hide" : "Show"} ${esc(p.name)} details">${ico("caret")}</button>` +
-          `</span></div>`) +
-      (open && !S.isNew
-        ? `<div class="dxe-step-body" id="dxe-sp-${esc(s.id)}">${childrenHtml(s, p)}${settingsHtml(s, p, i)}</div>`
-        : "") +
-      `</li>`
+      canPush(id) &&
+      !!S.urls.stepItem &&
+      ((it.mode === "pick" && it.count > 1) || it.mode === "draw")
     );
   }
-  const gripIco =
-    '<svg class="lu-ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="6" cy="4" r="1.1" fill="currentColor"/><circle cx="10" cy="4" r="1.1" fill="currentColor"/><circle cx="6" cy="8" r="1.1" fill="currentColor"/><circle cx="10" cy="8" r="1.1" fill="currentColor"/><circle cx="6" cy="12" r="1.1" fill="currentColor"/><circle cx="10" cy="12" r="1.1" fill="currentColor"/></svg>';
+
+  /* --- the strip: the Lineups page's own step tiles (lineups_render.js stepHtml),
+     bigger, in order; a tile opens its details under the strip. */
+  function displayModel() {
+    const v = viewOf(st.display) || {};
+    const w = Number(v.width) || 16;
+    const h = Number(v.height) || 10;
+    const dev = deviceOf(st.display) || {};
+    return {
+      id: st.display || "",
+      name: dev.name || "",
+      orientation: h > w ? "p" : "l",
+      gamut: v.gamut,
+      grey_levels: v.grey_levels,
+      width: w,
+      height: h,
+      aspect: `${w}/${h}`,
+    };
+  }
+  function stepModel(s, i, d) {
+    const p = pageOf(s.id);
+    const it = p.items || {};
+    const n = st.steps.length;
+    const f = liveFlags(s.id);
+    const pick = it.mode === "pick" && it.count > 1;
+    return {
+      index: i,
+      dashboard_id: s.id,
+      name: p.name,
+      thumb_url: p.missing ? "" : p.thumb,
+      aspect: d.aspect,
+      item_count: pick || it.mode === "draw" ? Number(it.count) || 0 : 1,
+      pick_items: pick,
+      draw_items: it.mode === "draw",
+      items: { length: Number(it.count) || 0 },
+      item_noun: String(it.noun || "items").replace(/s$/, ""),
+      draw_label: "Draw another",
+      position: `${i + 1}/${n}`,
+      separator: i < n - 1 ? "arrow" : "",
+      pill: f.now
+        ? { kind: "now", label: "Now", title: "On screen now" }
+        : f.next
+          ? { kind: "next", label: "Next", title: f.nextLabel || "Next" }
+          : null,
+      on_screen: !!f.now,
+      current: !!f.now,
+      next: !!f.next,
+      missing: !!p.missing,
+      off_display: false,
+      composition_digest: "",
+      push_title: `Push ${p.name} now`,
+      conditional: hasConditions(s),
+    };
+  }
+  function stripHtml() {
+    const d = displayModel();
+    const n = st.steps.length;
+    const vms = st.steps.map((s, i) => stepModel(s, i, d));
+    const lineup = (id) => ({
+      id: S.deckId || "new",
+      name: st.name,
+      steps: vms,
+      actions: {
+        push_step_url: canPick(id) ? S.urls.pushStep : "",
+        step_item_url: S.urls.stepItem,
+      },
+    });
+    const hooks = {
+      pushOverlay: false,
+      drawBadge: true,
+      itemChoice: (_d, _l, vm) => choiceView(vm.dashboard_id),
+      stepKey: (vm) => vm.dashboard_id,
+      stepAttrs: () => ` draggable="true"`,
+      stepClass: (vm) =>
+        [
+          "dxe-step",
+          ui.open.has(vm.dashboard_id) ? "is-open" : "",
+          kind() === "daily" && vm.index > 0 ? "is-muted" : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
+      tileExtra: (vm) => {
+        const open = ui.open.has(vm.dashboard_id);
+        return `<button type="button" class="dxe-sel" data-expand="${esc(vm.dashboard_id)}" data-grip data-fk="sel-${esc(vm.dashboard_id)}" aria-expanded="${open}" aria-controls="dxe-detail" aria-label="${esc(vm.name)}, ${vm.index + 1} of ${n}. ${open ? "Hide" : "Show"} its details; Alt+arrows move it"></button>`;
+      },
+      captionExtra: (vm) => {
+        const tags = stepTags(st.steps[vm.index], vm.index);
+        return tags ? `<span class="dxe-step-tags">${tags}</span>` : "";
+      },
+    };
+    // Every tile's picture loads at once: a strip that scrolls sideways is short.
+    const tiles = st.steps
+      .map((s, i) => R.stepHtml(d, lineup(s.id), vms[i], hooks))
+      .join("")
+      .replaceAll(' loading="lazy"', ' loading="eager"');
+    const addTile =
+      st.display && !S.isNew
+        ? `<li class="lu-step dxe-add-step"><figure><span class="lu-slot"></span><button type="button" class="dxe-add-tile" data-picker data-fk="picker" aria-expanded="${ui.picker}" aria-controls="dxe-picker">${ico(ui.picker ? "x" : "plus")}<span>${ui.picker ? "Close" : "Add dashboard"}</span></button></figure></li>`
+        : "";
+    const now = vms.some((x) => x.pill) ? " has-now" : "";
+    return (
+      `<div class="dxe-tiles-scroll"><ol class="lu-strip dxe-tiles ${d.orientation}${now}" id="dxe-steps" aria-label="Dashboards in order">${tiles}${addTile}</ol></div>` +
+      detailHtml()
+    );
+  }
+
+  // The open dashboard's details, under the strip: what it is (its widget's icon and
+  // one line), what it shows one of, then its own settings and actions.
+  function detailHtml() {
+    const id = [...ui.open][0];
+    const i = st.steps.findIndex((s) => s.id === id);
+    if (i < 0) return "";
+    const s = st.steps[i];
+    const p = pageOf(id);
+    const c = choiceView(id);
+    const ready = !c || c.state === "ready";
+    const label = c && c.label ? `Push ${c.label}` : "Push now";
+    const push = S.isNew
+      ? ""
+      : `<button type="button" class="lu-btn-ghost sm dxe-push" data-push="${esc(id)}" data-fk="push-${esc(id)}"${canPush(id) && !ui.pushing && ready ? "" : " disabled"} title="${!canPush(id) ? "Save first to push it" : ready ? `Push ${esc(p.name)} to the display now` : "Wait for this picture to finish"}">${ico("send")}<span>${esc(label)}</span></button>`;
+    const body = S.isNew
+      ? `<div class="dxe-sum"><span class="dxe-sum-r"><button type="button" class="dxe-link quiet" data-remove="${esc(id)}" data-fk="rm-${esc(id)}" aria-label="Remove ${esc(p.name)}">Remove</button></span></div>`
+      : `${childrenHtml(s, p)}${settingsHtml(s, p, i)}`;
+    return (
+      `<section class="dxe-detail" id="dxe-detail" data-panel="${esc(id)}" aria-label="${esc(p.name)}">` +
+      `<div class="dxe-detail-head"><span class="dxe-plug" aria-hidden="true"><i class="ph ${esc(p.icon || "ph-squares-four")}"></i></span>` +
+      `<span class="dxe-detail-t"><b>${esc(p.name)}</b><span class="dxe-soft">${esc(p.subtitle || "")}</span></span>` +
+      `<span class="dxe-detail-acts">${push}<button type="button" class="lu-ibtn" data-expand="${esc(id)}" data-fk="close-${esc(id)}" aria-label="Close ${esc(p.name)} details" title="Close (Esc)">${ico("x")}</button></span></div>` +
+      body +
+      `</section>`
+    );
+  }
 
   /* --- children: what a dashboard shows one of */
   function pinnedKey(s, p) {
@@ -805,7 +935,7 @@
       const pinMode = !!it.pinnable && !!pinned;
       const head =
         `<div class="dxe-kids-head"><span class="dxe-mono">${esc(plural(it.count, it.noun || "items"))}</span>` +
-        `<span class="dxe-soft">${pinned ? `Pinned: the others are skipped.` : `One per visit, ${it.order === "random" ? "random" : "in turn"}.`}</span>` +
+        `<span class="dxe-soft">${pinned ? `Pinned: the others are skipped.` : it.order === "random" ? `A random one each visit.` : `One per visit, in turn.`}</span>` +
         (it.pinnable
           ? `<span class="lu-seg dxe-seg sm" role="group" aria-label="${esc(p.name)}: one per visit or pinned"><button type="button" data-pin-mode="${esc(p.id)}" data-mode="walk" data-fk="pinmode-${esc(p.id)}-walk" aria-pressed="${!pinned}">One per visit</button><button type="button" data-pin-mode="${esc(p.id)}" data-mode="pin" data-fk="pinmode-${esc(p.id)}-pin" aria-pressed="${!!pinned}">Pinned</button></span>`
           : "") +
@@ -832,20 +962,35 @@
       return `<div class="dxe-kids">${head}<div class="dxe-strip">${tiles}</div>${gridHtml(s, p)}</div>`;
     }
     if (it.mode === "draw") {
-      const draws = ui.draws[p.id] || [];
-      const canDraw = isSavedStep(s.id) && !!st.display;
-      const latest = `<span class="dxe-it is-marked"><span class="dxe-it-pic">${p.thumb ? `<img src="${esc(p.thumb)}" alt="" loading="lazy">` : ""}</span><span class="dxe-it-l">Latest</span></span>`;
-      const drawn = draws
-        .map(
-          (d, i) =>
-            `<span class="dxe-it"><span class="dxe-it-pic">${d.thumb ? `<img src="${esc(d.thumb)}" alt="">` : `<span class="dxe-it-word">${d.state === "error" ? "!" : "…"}</span>`}</span><span class="dxe-it-l">${esc(d.state === "error" ? d.note : d.state === "ready" ? `Draw ${i + 1}` : "Drawing…")}</span></span>`
+      const c = ui.choice[p.id];
+      const hist = c && c.mode === "draw" ? c.hist : [];
+      const pos = c && c.mode === "draw" ? c.pos : -1;
+      const ok = canPick(s.id);
+      const tile = (k, pic, label, on) =>
+        `<button type="button" class="dxe-it is-render${on ? " is-marked" : ""}" data-draw-pos="${esc(p.id)}" data-pos="${k}" data-fk="dpos-${esc(p.id)}-${k}" aria-pressed="${on}"${ok ? "" : " disabled"} title="${esc(label)}"><span class="dxe-it-pic">${pic}</span><span class="dxe-it-l">${esc(label)}</span></button>`;
+      const last = tile(
+        -1,
+        p.thumb ? `<img src="${esc(p.thumb)}" alt="" loading="lazy">` : "",
+        "As last sent",
+        pos < 0
+      );
+      const drawn = hist
+        .map((e, k) =>
+          tile(
+            k,
+            e.thumb
+              ? `<img src="${esc(e.thumb)}" alt="">`
+              : `<span class="dxe-it-word">${e.state === "error" ? "!" : "…"}</span>`,
+            e.state === "error" ? e.note : e.state === "ready" ? `Draw ${e.n}` : "Drawing…",
+            k === pos
+          )
         )
         .join("");
       return (
         `<div class="dxe-kids"><div class="dxe-kids-head"><span class="dxe-mono">${esc(it.count ? plural(it.count, it.noun || "items") : "Draw")}</span>` +
-        `<span class="dxe-soft">A new one each render.</span>` +
-        `<button type="button" class="lu-btn-ghost sm dxe-draw" data-draw="${esc(p.id)}" data-fk="draw-${esc(p.id)}"${canDraw ? "" : ' disabled title="Save first to draw"'}>${ico("refresh")}<span>Draw another</span></button></div>` +
-        `<div class="dxe-strip">${drawn}${latest}</div></div>`
+        `<span class="dxe-soft">${c && c.note ? esc(c.note) : "A new one each render."}</span>` +
+        `<button type="button" class="lu-btn-ghost sm dxe-draw" data-draw="${esc(p.id)}" data-fk="draw-${esc(p.id)}"${ok && !(hist.length && hist[hist.length - 1].state === "loading") ? "" : ` disabled title="${ok ? "Drawing…" : "Save first to draw"}"`}>${ico("refresh")}<span>Draw another</span></button></div>` +
+        `<div class="dxe-strip">${last}${drawn}</div></div>`
       );
     }
     return `<p class="dxe-one">${ico("refresh")}<span>${esc(p.fresh || "")}</span></p>`;
@@ -990,7 +1135,7 @@
         : "") +
       `</p>`;
     return (
-      `<div class="dxe-picker" id="dxe-picker">${none}<ul class="dxe-picks">${cards(here, false)}</ul>${more}` +
+      `<div class="dxe-picker" id="dxe-picker"${shapeVars()}>${none}<ul class="dxe-picks">${cards(here, false)}</ul>${more}` +
       (ui.elsewhere && other.length
         ? `<ul class="dxe-picks is-other">${cards(other, true)}</ul>`
         : "") +
@@ -999,20 +1144,18 @@
   }
 
   function stepsCard() {
-    const rows = st.steps.map(rowHtml).join("");
     const empty = st.steps.length
       ? ""
       : `<p class="dxe-empty">${ico("layers")}<span>No dashboards yet.</span></p>`;
-    const addRow =
-      `<div class="dxe-add-row"><button type="button" class="lu-btn-ghost dxe-add" data-picker data-fk="picker" aria-expanded="${ui.picker}" aria-controls="dxe-picker"${st.display ? "" : " disabled"}>${ico(ui.picker ? "x" : "plus")}<span>${ui.picker ? "Close" : "Add dashboard"}</span></button>` +
-      (st.steps.length > 1
-        ? `<span class="dxe-soft dxe-hint">Drag or Alt+↑↓ to reorder.</span>`
-        : "") +
-      `</div>`;
+    const addRow = st.steps.length
+      ? st.steps.length > 1
+        ? `<div class="dxe-add-row"><span class="dxe-soft dxe-hint">Drag or Alt+←→ to reorder.</span></div>`
+        : ""
+      : `<div class="dxe-add-row"><button type="button" class="lu-btn-ghost dxe-add" data-picker data-fk="picker" aria-expanded="${ui.picker}" aria-controls="dxe-picker"${st.display ? "" : " disabled"}>${ico(ui.picker ? "x" : "plus")}<span>${ui.picker ? "Close" : "Add dashboard"}</span></button></div>`;
     return (
-      `<div class="dxe-card dxe-steps-card">${empty}<ol class="dxe-steps" id="dxe-steps" aria-label="Dashboards in order">${rows}</ol>` +
-      addRow +
+      `<div class="dxe-card dxe-steps-card"${shapeVars()}>${empty}${st.steps.length ? stripHtml() : ""}` +
       (ui.picker ? pickerHtml() : "") +
+      addRow +
       `</div>`
     );
   }
@@ -1227,11 +1370,11 @@
     // 3 Dashboards
     if (ui.step === 3) {
       const chosen = st.steps.length
-        ? `<ol class="dxe-steps" id="dxe-steps" aria-label="Dashboards in order">${st.steps.map(rowHtml).join("")}</ol>`
+        ? stripHtml()
         : `<p class="dxe-empty">${ico("layers")}<span>No dashboards yet.</span></p>`;
       html +=
         `<section class="dxe-sec" aria-labelledby="dxe-h-dash">${secHead(3, "Dashboards", "Pick what it shows, in order.", "dxe-h-dash")}` +
-        `<div class="dxe-card dxe-steps-card">${chosen}${st.steps.length > 1 ? `<div class="dxe-add-row"><span class="dxe-soft dxe-hint">Drag or Alt+↑↓ to reorder.</span></div>` : ""}</div>` +
+        `<div class="dxe-card dxe-steps-card"${shapeVars()}>${chosen}${st.steps.length > 1 ? `<div class="dxe-add-row"><span class="dxe-soft dxe-hint">Drag or Alt+←→ to reorder.</span></div>` : ""}</div>` +
         pickerHtml() +
         `</section>`;
     } else html += waitingHead(3, "Dashboards", "Choose when it runs first.");
@@ -1472,10 +1615,11 @@
       st.steps = st.steps.filter((s) => s.id !== id);
       if (st.home === id) st.home = "";
       ui.open.delete(id);
+      delete ui.choice[id];
     });
     live(`Removed ${pageOf(id).name}.`);
     const next = root.querySelectorAll("[data-step]")[Math.max(0, i - 1)];
-    (next ? next.querySelector("[data-expand]") : root.querySelector("[data-picker]"))?.focus();
+    (next ? next.querySelector(".dxe-sel") : root.querySelector("[data-picker]"))?.focus();
   }
 
   /* --- item lists (dashboard-items) */
@@ -1533,8 +1677,13 @@
     ui.msg = `Pushing ${pageOf(id).name}…`;
     ui.msgKind = "";
     draw();
+    syncZoom();
+    // The item shown on its tile (chosen with the arrows) is the one sent.
+    const c = choiceView(id);
+    const body = { page_id: id, display_id: st.display };
+    if (c && c.key && c.state === "ready") body.item = c.key;
     try {
-      const res = await postJSON(S.urls.pushStep, { page_id: id, display_id: st.display });
+      const res = await postJSON(S.urls.pushStep, body);
       ui.msg = res.message || "Pushed.";
       ui.msgKind = "ok";
     } catch (err) {
@@ -1543,48 +1692,258 @@
     } finally {
       ui.pushing = false;
     }
+    if (zoom) zoom.msg = { text: ui.msg, kind: ui.msgKind === "ok" ? "ok" : "err" };
     draw();
     refocus(mark);
+    syncZoom();
     live(ui.msg);
   }
-  async function drawAnother(id) {
-    const list = (ui.draws[id] = ui.draws[id] || []);
-    const entry = { key: `draw:${nonce()}:1`, state: "loading", thumb: "", note: "" };
-    list.unshift(entry);
+  /* --- a tile's arrows: choose which item to show and push (the Lineups page's
+     rules, lineups.js stepItem / drawStep). A named item is asked for once the
+     arrows rest; a draw renders the dashboard once more, one at a time, and the
+     previous arrow walks back through what was drawn here. */
+  const ITEM_DEBOUNCE = 280;
+  const ITEM_POLL = 1500;
+  const ITEM_POLLS = 40;
+  const DRAW_KEEP = 8;
+  let pickSeq = 0;
+  function choiceView(id) {
+    const c = ui.choice[id];
+    if (!c) return null;
+    if (c.mode === "draw") {
+      const e = c.pos >= 0 ? c.hist[c.pos] : null;
+      return e
+        ? {
+            mode: "draw",
+            key: e.key,
+            state: e.state,
+            thumb_url: e.thumb,
+            large_url: e.large,
+            note: e.note,
+            label: "",
+            pos: c.pos,
+            of: c.hist.length,
+          }
+        : null;
+    }
+    return {
+      mode: "pick",
+      idx: c.idx,
+      key: c.key,
+      label: c.label,
+      state: c.state,
+      thumb_url: c.thumb,
+      large_url: c.large,
+      note: c.note,
+    };
+  }
+  function itemChanged() {
+    const mark = focusMark();
     draw();
-    const u = new URLSearchParams({ page_id: id, item: entry.key, display_id: st.display });
-    for (let tries = 0; tries < 60; tries++) {
+    refocus(mark);
+    syncZoom();
+  }
+  // Ask for ``e``'s picture until it is drawn; ``alive()`` says it is still wanted.
+  async function pollItem(id, e, alive) {
+    const u = new URLSearchParams({ page_id: id, item: e.key, display_id: st.display });
+    for (let n = 0, busy = 0; n < ITEM_POLLS; n++) {
+      let r;
+      let data = {};
       try {
-        const r = await fetch(`${S.urls.stepItem}?${u}`, {
+        r = await fetch(`${S.urls.stepItem}?${u}`, {
           credentials: "same-origin",
           headers: { Accept: "application/json" },
         });
-        const data = await r.json().catch(() => ({}));
-        if (r.status === 200 && data.state === "ready") {
-          entry.state = "ready";
-          entry.thumb = data.thumb_url;
-          break;
-        }
-        if (r.status >= 400 && r.status !== 503) {
-          entry.state = "error";
-          entry.note = data.error || "Could not draw it";
-          break;
-        }
+        data = await r.json().catch(() => ({}));
       } catch {
-        /* try again */
+        r = null; // offline for a moment: ask again
       }
-      await new Promise((ok) => window.setTimeout(ok, 1500));
+      if (!alive()) return;
+      if (r && r.status === 200 && data.state === "ready") {
+        e.state = "ready";
+        e.thumb = data.thumb_url;
+        e.large = data.large_url;
+        e.sig = data.sig || "";
+        return;
+      }
+      if (r && r.status === 503 && busy++ < 8) {
+        // Other previews are being drawn; wait our turn instead of piling on.
+        await new Promise((ok) => window.setTimeout(ok, 5000));
+        continue;
+      }
+      if (r && r.status >= 400) {
+        e.state = "error";
+        e.note =
+          r.status === 503
+            ? "Too many previews are being drawn; try again in a moment."
+            : data.error || "It could not be drawn.";
+        return;
+      }
+      await new Promise((ok) => window.setTimeout(ok, ITEM_POLL));
+      if (!alive()) return;
     }
-    if (entry.state === "loading") {
-      entry.state = "error";
-      entry.note = "Took too long";
+    e.state = "error";
+    e.note = "It took too long to draw.";
+  }
+  async function drawItem(id, fresh) {
+    const p = pageOf(id);
+    let c = ui.choice[id];
+    if (!c || c.mode !== "draw") c = ui.choice[id] = { mode: "draw", hist: [], pos: -1, n: 0 };
+    c.note = "";
+    if (!fresh && c.pos < c.hist.length - 1) {
+      c.pos++;
+      return itemChanged();
+    }
+    if (c.hist.some((x) => x.state === "loading")) return;
+    const e = { key: `draw:${nonce()}:1`, state: "loading", thumb: "", large: "", note: "" };
+    e.n = ++c.n;
+    c.hist.push(e);
+    if (c.hist.length > DRAW_KEEP) c.hist.shift();
+    c.pos = c.hist.length - 1;
+    live(`${p.name}: drawing another picture.`);
+    itemChanged();
+    await pollItem(id, e, () => ui.choice[id] === c && c.hist.includes(e));
+    if (ui.choice[id] !== c || !c.hist.includes(e)) return;
+    const twin = e.sig && c.hist.find((x) => x !== e && x.sig === e.sig);
+    if (twin) {
+      // The widget drew what it already drew: not a new picture, so it is not kept.
+      c.hist.splice(c.hist.indexOf(e), 1);
+      c.pos = Math.min(c.pos, c.hist.length - 1);
+      c.note = "That came out the same as one already drawn.";
     }
     live(
-      entry.state === "ready"
-        ? `${pageOf(id).name}: drew another.`
-        : `${pageOf(id).name}: ${entry.note}.`
+      e.state === "ready" ? `${p.name}: ${twin ? c.note : "drew another."}` : `${p.name}: ${e.note}`
     );
-    draw();
+    itemChanged();
+  }
+  function stepItem(id, delta) {
+    const p = pageOf(id);
+    const it = p.items || {};
+    if (!canPick(id)) return;
+    if (it.mode === "draw") {
+      const c = ui.choice[id];
+      if (delta < 0) {
+        if (!c || c.mode !== "draw" || c.pos < 0) return;
+        c.pos--;
+        c.note = "";
+        return itemChanged();
+      }
+      return drawItem(id, false);
+    }
+    const n = Number(it.count) || 0;
+    if (n < 2) return;
+    const cur = ui.choice[id];
+    const idx = cur && cur.mode === "pick" ? (cur.idx + delta + n) % n : delta > 0 ? 0 : n - 1;
+    const c = {
+      mode: "pick",
+      idx,
+      key: "",
+      label: "",
+      state: "loading",
+      thumb: "",
+      large: "",
+      note: "",
+      token: ++pickSeq,
+    };
+    ui.choice[id] = c;
+    if (cur && cur.timer) window.clearTimeout(cur.timer);
+    const alive = () => ui.choice[id] === c;
+    c.timer = window.setTimeout(async () => {
+      try {
+        const data = await fetchItems(id, idx, 1, "");
+        const x = data.items && data.items[0];
+        if (!alive()) return;
+        if (!x) throw new Error("That item is gone.");
+        c.key = x.key;
+        c.label = x.label || `#${idx + 1}`;
+        live(`${p.name}: ${c.label}, ${idx + 1} of ${n}. Drawing it.`);
+        itemChanged();
+        await pollItem(id, c, alive);
+      } catch (err) {
+        if (!alive()) return;
+        c.state = "error";
+        c.note = err.message;
+      }
+      if (alive()) itemChanged();
+    }, ITEM_DEBOUNCE);
+    itemChanged();
+  }
+
+  /* --- zoom: the Lineups lightbox, with the arrows and Push now */
+  const LB = window.TesseraeLineupsLightbox;
+  let zoom = null; // {id, msg}
+  function zoomModel() {
+    const id = zoom && zoom.id;
+    const i = st.steps.findIndex((s) => s.id === id);
+    if (i < 0) return null;
+    const p = pageOf(id);
+    const it = p.items || {};
+    const d = displayModel();
+    const c = choiceView(id);
+    const big = (u) => (u ? u + (u.includes("?") ? "&" : "?") + "lg=1" : "");
+    const url = c && c.state === "ready" ? c.large_url || c.thumb_url : big(p.thumb);
+    let nav = null;
+    if (canPick(id) && it.mode === "draw")
+      nav = {
+        text: c ? `Drawn here: ${c.pos + 1} of ${c.of}` : "As last sent",
+        label: `Draw another ${p.name} picture`,
+        prev: "Previous picture",
+        next: "Draw the next picture",
+        hasPrev: !!c,
+        hasNext: !(c && c.pos === c.of - 1 && c.state === "loading"),
+      };
+    else if (canPick(id))
+      nav = {
+        text: c
+          ? `${c.idx + 1} of ${it.count}${c.label ? ` · ${c.label}` : ""}`
+          : `As last sent · ${it.count} ${it.noun || "items"}`,
+        label: `Choose which ${p.name} item to push`,
+      };
+    return {
+      title: p.name,
+      sub: `${d.name} · ${i + 1}/${st.steps.length}`,
+      img: url ? { src: url, alt: c && c.label ? `${p.name}: ${c.label}` : p.name } : null,
+      loading: !!c && c.state === "loading",
+      notice: c && c.state === "error" ? `Could not draw this one: ${c.note}` : "",
+      aspect: d.aspect,
+      orientation: d.orientation,
+      gamut: d.gamut,
+      greyLevels: d.grey_levels,
+      nav,
+      push: canPush(id)
+        ? {
+            label: "Push now",
+            title:
+              c && c.state !== "ready" ? "Wait for this picture to finish" : `Push ${p.name} now`,
+            busy: ui.pushing,
+            disabled: !!c && c.state !== "ready",
+          }
+        : null,
+      msg: zoom.msg || null,
+      onStep: (delta) => stepItem(id, delta),
+      onPush: () => pushNow(id),
+      onClose: () => {
+        zoom = null;
+        root.querySelector(`[data-step="${CSS.escape(id)}"] [data-zoom]`)?.focus();
+      },
+    };
+  }
+  function syncZoom() {
+    if (!zoom || !LB || !LB.isOpen()) return;
+    const m = zoomModel();
+    if (m) LB.update(m);
+  }
+  function openZoom(id) {
+    if (!LB) return;
+    zoom = { id, msg: null };
+    const m = zoomModel();
+    // The rest of the editor sits still behind it.
+    if (m)
+      LB.open(root, m, () => {
+        form.inert = true;
+        return () => (form.inert = false);
+      });
+    else zoom = null;
   }
 
   /* --- save, create, discard */
@@ -1754,9 +2113,31 @@
   }
 
   /* ------------------------------------------------------------ events */
+  // A dashboard's tile opens its details under the strip (one at a time); again, or
+  // Esc, closes them.
+  function select(id, toggle) {
+    if (!id) return;
+    const open = ui.open.has(id);
+    if (open && !toggle) return;
+    ui.open.clear();
+    if (!open) {
+      ui.open.add(id);
+      ui.picker = false;
+      loadStrip(id);
+    }
+    draw();
+    root.querySelector(`[data-step="${CSS.escape(id)}"] .dxe-sel`)?.focus();
+  }
+
   root.addEventListener("click", async (e) => {
     const t = e.target.closest("button, [data-goto]");
-    if (!t || t.disabled) return;
+    if (!t) {
+      // Anywhere on a tile or its caption opens it, as its button does.
+      const tile = e.target.closest && e.target.closest(".dxe-step[data-step]");
+      if (tile) select(tile.dataset.step, true);
+      return;
+    }
+    if (t.disabled) return;
     const d = t.dataset;
     if (d.day !== undefined && t.classList.contains("lu-dt")) {
       const i = Number(d.day);
@@ -1839,6 +2220,7 @@
     }
     if (d.picker !== undefined) {
       ui.picker = !ui.picker;
+      if (ui.picker) ui.open.clear(); // one panel under the strip at a time
       draw();
       (ui.picker ? root.querySelector("[data-add]") : root.querySelector("[data-picker]"))?.focus();
       return;
@@ -1857,16 +2239,25 @@
       live(`${pageOf(d.home).name} is home.`);
       return;
     }
-    if (d.expand) {
-      const id = d.expand;
-      if (ui.open.has(id)) ui.open.delete(id);
-      else {
-        ui.open.add(id);
-        loadStrip(id);
-      }
-      draw();
-      root.querySelector(`[data-expand="${CSS.escape(id)}"]`)?.focus();
+    if (d.expand) return select(d.expand, true);
+    if (d.peek) return select(st.steps[Number(d.peek.split(":")[1])]?.id, false);
+    if (d.item) {
+      const [, i, delta] = d.item.split(":");
+      const s = st.steps[Number(i)];
+      if (s) stepItem(s.id, Number(delta));
       return;
+    }
+    if (d.zoom) {
+      const s = st.steps[Number(d.zoom.split(":")[2])];
+      if (s) openZoom(s.id);
+      return;
+    }
+    if (d.drawPos) {
+      const c = ui.choice[d.drawPos];
+      const pos = Number(d.pos);
+      if (pos < 0) delete ui.choice[d.drawPos];
+      else if (c && c.mode === "draw") c.pos = pos;
+      return itemChanged();
     }
     if (d.edit) {
       if (ui.editing.has(d.edit)) ui.editing.delete(d.edit);
@@ -1918,7 +2309,7 @@
       live(`Pinned ${d.key}.`);
       return;
     }
-    if (d.draw) return drawAnother(d.draw);
+    if (d.draw) return drawItem(d.draw, true);
     if (d.push) return pushNow(d.push);
     if (d.pushLineup !== undefined) return pushNow(st.home || st.steps[0].id);
     if (d.reload !== undefined) return window.location.reload();
@@ -2023,10 +2414,19 @@
   // Alt+Up / Alt+Down move a dashboard; Enter in a field never submits the form.
   root.addEventListener("keydown", (e) => {
     const row = e.target.closest && e.target.closest("[data-step]");
-    if (row && e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+    if (row && e.altKey && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
       e.preventDefault();
-      move(row.dataset.step, e.key === "ArrowUp" ? -1 : 1);
+      move(row.dataset.step, e.key === "ArrowUp" || e.key === "ArrowLeft" ? -1 : 1);
       return;
+    }
+    // Esc closes the open details and goes back to its tile.
+    if (e.key === "Escape" && ui.open.size && !(LB && LB.isOpen())) {
+      const inside = e.target.closest && e.target.closest("#dxe-detail, .dxe-tiles");
+      if (inside && !e.target.matches("input, textarea, select")) {
+        e.preventDefault();
+        select([...ui.open][0], true);
+        return;
+      }
     }
     // The display cards are a radio group: arrows move between them.
     const card = e.target.closest && e.target.closest("[data-pick-display]");
@@ -2066,8 +2466,10 @@
     if (!over) return;
     const dragged = list.querySelector(`[data-step="${CSS.escape(dragId)}"]`);
     if (!dragged || over === dragged) return;
+    // Tiles wrap: across a line, left or right half; between lines, the upper or lower.
     const r = over.getBoundingClientRect();
-    const after = e.clientY > r.top + r.height / 2;
+    const after =
+      e.clientY > r.bottom ? true : e.clientY < r.top ? false : e.clientX > r.left + r.width / 2;
     list.insertBefore(dragged, after ? over.nextSibling : over);
   });
   root.addEventListener("drop", (e) => {
@@ -2117,6 +2519,7 @@
     true
   );
 
+  root.classList.add("is-enhanced"); // the tiles' zoom and item arrows (dx-lineups.css)
   if (S.isNew && S.displayLocked) ui.step = 2;
   if (S.isNew) {
     newStartAfterPause();
