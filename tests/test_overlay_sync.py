@@ -6,6 +6,8 @@ tests/test_rest_overlay.py."""
 
 from __future__ import annotations
 
+import pytest
+
 from app import overlay_sync
 
 # -- advertised_overlay ---------------------------------------------------
@@ -97,6 +99,93 @@ def test_underscan_insets_toward_centre() -> None:
         underscan=10,
     )
     assert out == (10, 10, 780, 460)
+
+
+# -- point_from_wire (touch_space=fb, firmware #21) -------------------------
+
+
+@pytest.mark.parametrize(
+    "geo",
+    [
+        # identity: landscape composition at native dims
+        {
+            "comp_w": 960,
+            "comp_h": 540,
+            "native_w": 960,
+            "native_h": 540,
+            "flip": False,
+            "underscan": 0,
+        },
+        # PaperS3 portrait: 540x960 canvas turned CW onto the 960x540 buffer
+        {
+            "comp_w": 540,
+            "comp_h": 960,
+            "native_w": 960,
+            "native_h": 540,
+            "flip": False,
+            "underscan": 0,
+        },
+        # either flipped orientation
+        {
+            "comp_w": 960,
+            "comp_h": 540,
+            "native_w": 960,
+            "native_h": 540,
+            "flip": True,
+            "underscan": 0,
+        },
+        {
+            "comp_w": 540,
+            "comp_h": 960,
+            "native_w": 960,
+            "native_h": 540,
+            "flip": True,
+            "underscan": 0,
+        },
+        # scaled composition
+        {
+            "comp_w": 480,
+            "comp_h": 270,
+            "native_w": 960,
+            "native_h": 540,
+            "flip": False,
+            "underscan": 0,
+        },
+        # underscan inset
+        {
+            "comp_w": 960,
+            "comp_h": 540,
+            "native_w": 960,
+            "native_h": 540,
+            "flip": False,
+            "underscan": 12,
+        },
+    ],
+)
+def test_point_from_wire_inverts_rect_to_wire(geo: dict) -> None:
+    # Every canvas pixel sent forward, then back, lands on itself.
+    for cx, cy in [(0, 0), (geo["comp_w"] - 1, 0), (0, geo["comp_h"] - 1), (37, 211), (201, 119)]:
+        wire = overlay_sync.rect_to_wire((cx, cy, 1, 1), **geo)
+        assert wire is not None
+        assert overlay_sync.point_from_wire(wire[0], wire[1], **geo) == (cx, cy)
+
+
+def test_point_from_wire_papers3_portrait_corners() -> None:
+    # The buffer's top-right is the portrait canvas's top-left: the
+    # renderer turns the canvas clockwise onto the buffer.
+    geo = {
+        "comp_w": 540,
+        "comp_h": 960,
+        "native_w": 960,
+        "native_h": 540,
+        "flip": False,
+        "underscan": 0,
+    }
+    assert overlay_sync.point_from_wire(959, 0, **geo) == (0, 0)
+    assert overlay_sync.point_from_wire(0, 0, **geo) == (0, 959)
+    assert overlay_sync.point_from_wire(959, 539, **geo) == (539, 0)
+    # Off-buffer input clamps onto the canvas.
+    assert overlay_sync.point_from_wire(5000, -40, **geo) == (0, 0)
 
 
 def test_offscreen_rect_degenerates_to_none() -> None:

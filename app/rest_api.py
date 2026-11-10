@@ -514,6 +514,26 @@ def _parse_touch_query() -> TouchStroke | None:
     )
 
 
+def _touch_stroke_to_canvas(device: Device, stroke: TouchStroke) -> TouchStroke:
+    """A stroke the firmware reported in framebuffer pixels
+    (``touch_space=fb``), turned onto the composition canvas through the
+    same rotate / flip / scale / underscan the .bin renderer used to draw
+    it. That keeps touch right whichever orientation the device page sets:
+    the glass never moves relative to the buffer, only the canvas does
+    (firmware #21, the PaperS3 in landscape). A panel block without usable
+    geometry leaves the stroke as reported."""
+    from dataclasses import replace
+
+    from app.overlay_sync import _panel_geometry, point_from_wire
+
+    geo = _panel_geometry(getattr(device, "panel", None) or {})
+    if geo is None:
+        return stroke
+    x0, y0 = point_from_wire(stroke.x0, stroke.y0, **geo)
+    x1, y1 = point_from_wire(stroke.x1, stroke.y1, **geo)
+    return replace(stroke, x0=x0, y0=y0, x1=x1, y1=y1)
+
+
 def _configured_poll_s(device: Device) -> int:
     """The device's configured wake interval. Reads the stored
     ``sleep_interval_s`` from settings when present (matches the
@@ -1158,6 +1178,8 @@ def get_frame(device_id: str) -> Response:
     button_svc = _button_service()
     button_raw = request.args.get("button", "").strip()
     touch_stroke = _parse_touch_query()
+    if touch_stroke is not None and request.args.get("touch_space", "").strip().lower() == "fb":
+        touch_stroke = _touch_stroke_to_canvas(device, touch_stroke)
     if button_svc is not None:
         if button_raw or request.args.get("page", "").strip():
             button_result = _dispatch_query_button(device, route="/frame")

@@ -600,3 +600,86 @@ def test_frame_non_webhook_touch_wake_serves_newer_render(app: Flask) -> None:
     )
     assert resp.status_code == 200
     assert resp.get_json()["render_id"] == "art999"
+
+
+# -- touch_space=fb (firmware #21: PaperS3 touch follows orientation) -------
+
+
+def _register_papers3(app: Flask, client, rotation: int) -> str:
+    """A PaperS3 declaring its 960x540 framebuffer: rotation 90 composes
+    the 540x960 portrait canvas, rotation 0 the landscape one."""
+    code = app.config["PAIRING_STORE"].issue(note="test").code
+    resp = client.post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+        data=json.dumps(
+            {
+                "device_id": "paper_s3",
+                "kind": "m5stack_papers3",
+                "panel_w": 960,
+                "panel_h": 540,
+                "rotation": rotation,
+                "fw_version": "1.65.0",
+            }
+        ),
+    )
+    assert resp.status_code == 201, resp.get_data(as_text=True)
+    return resp.get_json()["device_token"]
+
+
+def _fb_tap(client, token: str, x: int, y: int, *, fb: bool, event_id: int) -> None:
+    space = "&touch_space=fb" if fb else ""
+    resp = client.get(
+        f"/api/v1/device/paper_s3/frame?touch_x0={x}&touch_y0={y}"
+        f"&touch_digest=art123&touch_event_id={event_id}{space}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+
+
+def _top_left_region() -> dict:
+    return {**WEBHOOK_REGION, "w": 200, "h": 200}
+
+
+def _last_touch(app: Flask):
+    return next(iter(app.config["EVENT_LOG"].list(type="touch", source="touch", limit=1)))
+
+
+def test_framebuffer_touch_maps_onto_the_portrait_canvas(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    token = _register_papers3(app, client, rotation=90)
+    panel = app.config["DEVICE_REGISTRY"].get("paper_s3").panel
+    assert (panel["w"], panel["h"]) == (540, 960)
+    _seed_frame(app, "paper_s3", regions=[_top_left_region()])
+
+    # The portrait canvas's top-left sits at the buffer's top-right.
+    _fb_tap(client, token, 859, 100, fb=True, event_id=1)
+    assert _last_touch(app).status == "webhook_dispatched"
+
+
+def test_framebuffer_touch_maps_onto_the_landscape_canvas(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    token = _register_papers3(app, client, rotation=0)
+    panel = app.config["DEVICE_REGISTRY"].get("paper_s3").panel
+    assert (panel["w"], panel["h"]) == (960, 540)
+    _seed_frame(app, "paper_s3", regions=[_top_left_region()])
+
+    # Landscape is the buffer itself: the top-left tap stays top-left.
+    _fb_tap(client, token, 100, 100, fb=True, event_id=1)
+    assert _last_touch(app).status == "webhook_dispatched"
+    # And the buffer's top-right is not the canvas's top-left any more.
+    _fb_tap(client, token, 859, 100, fb=True, event_id=2)
+    assert _last_touch(app).status != "webhook_dispatched"
+
+
+def test_touch_without_a_space_is_read_as_canvas_pixels(app: Flask) -> None:
+    # Older firmware (and every other board) sends canvas pixels: unchanged.
+    client = app.test_client()
+    _sign_in(client)
+    token = _register_papers3(app, client, rotation=90)
+    _seed_frame(app, "paper_s3", regions=[_top_left_region()])
+
+    _fb_tap(client, token, 100, 100, fb=False, event_id=1)
+    assert _last_touch(app).status == "webhook_dispatched"

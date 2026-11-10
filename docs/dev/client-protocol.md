@@ -612,6 +612,7 @@ GET /api/v1/device/kitchen/frame?touch_x0=512&touch_y0=300&touch_x1=512&touch_y1
 | `touch_ms` | optional | Stroke duration in milliseconds |
 | `touch_digest` | yes | The frame digest currently displayed (your `ETag`, quotes optional). A stroke against a frame the server has since replaced is dropped, never dispatched against the wrong content |
 | `touch_event_id` | optional | Monotonic wake-event counter, shares the button counter; used for retry dedup |
+| `touch_space` | optional | `fb` says the coordinates are framebuffer pixels (the shape of the downloaded `.bin`, `native_w` x `native_h`) instead of canvas pixels. The server turns them onto the canvas through the same rotate / flip / scale / underscan it drew the frame with, so touch follows whatever orientation the device page sets without the firmware knowing it. Omit it to send canvas pixels as before. Since 0.510.0; an older server ignores it and reads the points as canvas pixels |
 
 The resolved action dispatches synchronously before the frame lookup
 (same contract as button wakes), so a `page:` / rotate action's
