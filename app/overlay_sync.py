@@ -184,6 +184,50 @@ def rect_to_wire(
     return (x, y, x2 - x, y2 - y)
 
 
+def point_from_wire(
+    x: float,
+    y: float,
+    *,
+    comp_w: int,
+    comp_h: int,
+    native_w: int,
+    native_h: int,
+    flip: bool,
+    underscan: int,
+) -> tuple[int, int]:
+    """A wire-framebuffer pixel back to the composition pixel drawn there:
+    ``rect_to_wire``'s chain run in reverse (underscan, scale, 180 flip,
+    rotation), so a firmware that reports touch in framebuffer pixels
+    (``touch_space=fb``) hit-tests against whatever canvas the device's
+    current orientation composes. Works on pixel centres and clamps to the
+    canvas, so an edge tap stays on it."""
+    px, py = float(x) + 0.5, float(y) + 0.5
+    cur_w, cur_h = float(native_w), float(native_h)
+
+    if underscan > 0 and native_w - 2 * underscan > 0 and native_h - 2 * underscan > 0:
+        u = float(underscan)
+        px = (px - u) * cur_w / (cur_w - 2 * u)
+        py = (py - u) * cur_h / (cur_h - 2 * u)
+
+    firmware_landscape = native_w > native_h
+    comp_landscape = comp_w > comp_h
+    rotated = firmware_landscape != comp_landscape
+    # The canvas shape just before the scale step: transposed when rotated.
+    pre_w, pre_h = (float(comp_h), float(comp_w)) if rotated else (float(comp_w), float(comp_h))
+    if (pre_w, pre_h) != (cur_w, cur_h):
+        px, py = px * pre_w / cur_w, py * pre_h / cur_h
+        cur_w, cur_h = pre_w, pre_h
+    if flip:
+        px, py = cur_w - px, cur_h - py
+    if rotated:
+        # Forward: (x, y) in comp_w x comp_h -> (comp_h - y, x).
+        px, py = py, float(comp_h) - px
+
+    cx = max(0, min(comp_w - 1, int(px)))
+    cy = max(0, min(comp_h - 1, int(py)))
+    return cx, cy
+
+
 def _panel_geometry(panel: dict[str, Any]) -> dict[str, Any] | None:
     """The transform inputs from a device's panel block: composition
     dims, firmware-native dims (falling back to composition, same

@@ -3201,6 +3201,16 @@ def test_papers3_heal_runs_once_so_a_later_landscape_choice_sticks(app: Flask) -
     )
 
 
+@pytest.mark.parametrize("fw", ["1.65.0", "1.66.2"])
+def test_papers3_heal_leaves_firmware_with_framebuffer_touch_alone(app: Flask, fw: str) -> None:
+    # 1.65.0 maps touch for any orientation, so a landscape PaperS3 stays
+    # landscape: moving it would only override the owner (firmware #21).
+    client = app.test_client()
+    token = _register_papers3(app, client, "paper_s3")
+    _post_status(client, "paper_s3", token, {"fw_version": fw})
+    assert (_panel(app, "paper_s3")["w"], _panel(app, "paper_s3")["h"]) == (960, 540)
+
+
 @pytest.mark.parametrize("fw", ["", "99.0.0-bench", "1.63.0-3-gabc", None])
 def test_papers3_heal_ignores_unparseable_versions(app: Flask, fw: Any) -> None:
     client = app.test_client()

@@ -573,6 +573,11 @@ def update_instance_gamut(
 # canvas and its taps would land in the wrong place.
 _PAPERS3_KIND = "m5stack_papers3"
 _PAPERS3_PORTRAIT_FW = "1.63.0"
+# From 1.65.0 the PaperS3 reports touch in framebuffer pixels
+# (``touch_space=fb``) and the server maps it onto whatever canvas the
+# orientation composes, so a landscape PaperS3 no longer needs moving:
+# forcing portrait on it would only override the owner's choice.
+_PAPERS3_TOUCH_FB_FW = "1.65.0"
 _PAPERS3_HEALED_KEY = "papers3_portrait_healed"
 
 
@@ -585,7 +590,10 @@ def heal_papers3_portrait(
     fw_version: Any,
 ) -> bool:
     """Move an already-paired PaperS3 onto the 540x960 portrait canvas the
-    first time it reports firmware 1.63.0 or later.
+    first time it reports firmware 1.63.0 or 1.64.x, the builds that map
+    touch onto the portrait canvas. 1.65.0 and later report touch in
+    framebuffer pixels, which works in any orientation, so they are left
+    where the owner put them.
 
     Only the exact panel the old registration produced is touched (960x540,
     landscape), and only once: the instance is marked, so an owner who later
@@ -599,8 +607,12 @@ def heal_papers3_portrait(
         return False
     if not isinstance(fw_version, str) or not fw_version.strip():
         return False
-    older = is_strictly_newer(_PAPERS3_PORTRAIT_FW, fw_version.strip().lstrip("vV"))
+    fw = fw_version.strip().lstrip("vV")
+    older = is_strictly_newer(_PAPERS3_PORTRAIT_FW, fw)
     if older is None or older:
+        return False
+    # Only the builds whose touch is pinned to the portrait canvas.
+    if not is_strictly_newer(_PAPERS3_TOUCH_FB_FW, fw):
         return False
     panel = device.manifest.get("panel") or {}
     if (panel.get("w"), panel.get("h")) != (960, 540):
