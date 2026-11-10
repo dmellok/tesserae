@@ -477,3 +477,51 @@ def test_native_token_free_mcp_bridges_without_origin_still_work(gated_app, user
     )
     assert response.status_code == 200
     assert gated_app.config["PAGE_STORE"].get(response.json["id"]).name == "Native client"
+
+
+def _blocked_body(app, headers) -> str:
+    client = app.test_client()
+    client.set_cookie("session", "test")
+    response = client.post("/_csrf_probe/one", headers=headers)
+    assert response.status_code == 403
+    return response.get_data(as_text=True)
+
+
+def test_the_403_shows_the_origin_the_browser_sent_and_the_one_expected(app) -> None:
+    body = _blocked_body(app, {"Origin": "http://192.168.88.5:8123"})
+    assert "Browser sent: Origin: http://192.168.88.5:8123" in body
+    assert "Expected:     http://localhost" in body
+    assert "Public URL" in body
+
+
+@pytest.mark.parametrize("origin", ["null", "file://"])
+def test_a_stripped_origin_points_at_software_on_the_computer(app, origin) -> None:
+    # Privacy extensions, antivirus web shields and no-referrer settings make
+    # a same-site POST carry ``Origin: null``. A sandboxed attacker frame sends
+    # the same thing, so it stays refused; the message has to say why.
+    body = _blocked_body(app, {"Origin": origin})
+    assert "Browser sent: Origin: null (no usable origin)" in body
+    assert "extension" in body and "antivirus" in body
+    assert "X-Forwarded-Host" not in body
+
+
+def test_a_cross_site_fetch_metadata_rejection_says_so(app) -> None:
+    body = _blocked_body(app, {"Sec-Fetch-Site": "cross-site"})
+    assert "Browser sent: Sec-Fetch-Site: cross-site" in body
+    assert "another site" in body
+
+
+def test_the_log_carries_bare_origins_only(app, caplog) -> None:
+    client = app.test_client()
+    client.set_cookie("session", "test")
+    with caplog.at_level(logging.WARNING, logger="app.csrf"):
+        client.post(
+            "/_csrf_probe/x",
+            headers={"Referer": "http://[fd00::5]:8123/api/hassio_ingress/secret/?t=private"},
+        )
+        client.post("/_csrf_probe/y", headers={"Origin": "null"})
+    messages = [r.message for r in caplog.records if r.name == "app.csrf"]
+    assert len(messages) == 2  # a different kind of failure on one route logs again
+    assert "Referer: http://[fd00::5]:8123" in messages[0]
+    assert "expected http://localhost" in messages[0]
+    assert not any("secret" in m or "private" in m for m in messages)

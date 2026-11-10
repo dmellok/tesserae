@@ -51,9 +51,52 @@ def _origin(url: str) -> tuple[str, str, int] | None:
         return None
 
 
+def _format(origin: tuple[str, str, int]) -> str:
+    """``scheme://host[:port]`` with the default port left off, brackets on IPv6."""
+    scheme, host, port = origin
+    if ":" in host:
+        host = f"[{host}]"
+    default = 443 if scheme == "https" else 80
+    return f"{scheme}://{host}" if port == default else f"{scheme}://{host}:{port}"
+
+
+_FIX_PROXY = (
+    "If you reach Tesserae through a reverse proxy, the usual cause is that the proxy "
+    "doesn't forward the scheme and host. Set Settings → Server → Public URL to the "
+    "address you use in the browser, or make the proxy send X-Forwarded-Proto and "
+    "X-Forwarded-Host."
+)
+_FIX_OPAQUE = (
+    "Your browser sent this request without saying where it came from. That's usually "
+    "something on this computer stripping it: a privacy or ad-blocking extension, "
+    'antivirus or "web protection" software, a VPN or work security client, or a browser '
+    "setting that removes referrers. Allow Tesserae's address in that tool, or try a private "
+    "window with extensions off to confirm. Serving Tesserae over HTTPS also avoids it."
+)
+_FIX_CROSS_SITE = (
+    "Your browser reported that this request was started by a page on another site. If you "
+    "didn't just click something on another site, open Tesserae directly at its own address "
+    "and try again."
+)
+
+
+def _explain(kind: str, seen: str, expected: str) -> str:
+    """The 403 body: what happened, what Tesserae saw, and what to do."""
+    advice = {"opaque": _FIX_OPAQUE, "fetch-site": _FIX_CROSS_SITE}.get(kind, _FIX_PROXY)
+    return (
+        "Forbidden: cross-origin admin request blocked (CSRF).\n\n"
+        "This request looks like it came from another site. "
+        f"{advice}\n\n"
+        "If Settings can't be saved from this browser, change it from a device that works.\n\n"
+        "What Tesserae saw (include this if you ask for help):\n"
+        f"  Browser sent: {seen}\n"
+        f"  Expected:     {expected}\n"
+    )
+
+
 def install_protection(app: Flask) -> None:
     """Check unsafe admin requests before auth or route handlers can mutate."""
-    logged_routes: set[str] = set()
+    logged_routes: set[tuple[str, str]] = set()
     log_lock = Lock()
 
     @app.before_request
@@ -76,36 +119,53 @@ def install_protection(app: Flask) -> None:
                     return None
 
         fetch_site = request.headers.get("Sec-Fetch-Site")
+        actual_origin = request.environ.get("tesserae.request_origin", request.host_url)
+        expected = [o for o in (_origin(actual_origin), _origin(request.host_url)) if o]
+        source_header = None
+        source_origin = None
         if fetch_site is not None:
             allowed = fetch_site in {"same-origin", "none"}
         else:
+            source_header = "Origin"
             source = request.headers.get("Origin")
             if source is None:
+                source_header = "Referer"
                 source = request.headers.get("Referer")
             # Preserve header-less legacy browsers and scripted session clients.
             source_origin = _origin(source) if source is not None else None
-            actual_origin = request.environ.get("tesserae.request_origin", request.host_url)
-            allowed = source is None or (
-                source_origin is not None
-                and source_origin in {_origin(actual_origin), _origin(request.host_url)}
-            )
+            allowed = source is None or (source_origin is not None and source_origin in expected)
         if allowed:
             return None
 
+        # What the browser said vs what Tesserae expected, as bare origins
+        # only: never a path, query or user-supplied segment, so it is safe to
+        # log and to show. This is what turns a support thread into one reply.
+        expected_text = " or ".join(dict.fromkeys(_format(o) for o in expected)) or "unknown"
+        if fetch_site is not None:
+            seen = f"Sec-Fetch-Site: {fetch_site[:32]}"
+            kind = "fetch-site"
+        elif source_origin is None:
+            seen = f"{source_header}: null (no usable origin)"
+            kind = "opaque"
+        else:
+            seen = f"{source_header}: {_format(source_origin)}"
+            kind = "mismatch"
+
         # Route patterns bound cardinality and avoid logging tokens, referrers,
-        # ingress prefixes or user-provided path segments. Once per app process.
+        # ingress prefixes or user-provided path segments. Once per app process
+        # per route and kind of failure.
         route = request.url_rule.rule if request.url_rule is not None else "<unmatched>"
         with log_lock:
-            if route not in logged_routes:
-                logged_routes.add(route)
-                logger.warning("CSRF: blocked cross-origin admin request to %s", route)
+            if (route, kind) not in logged_routes:
+                logged_routes.add((route, kind))
+                logger.warning(
+                    "CSRF: blocked cross-origin admin request to %s (browser sent %s; expected %s)",
+                    route,
+                    seen,
+                    expected_text,
+                )
         return Response(
-            "Forbidden: cross-origin admin request blocked (CSRF).\n\n"
-            "This request looks like it came from another site. "
-            "If you reached Tesserae through a reverse proxy, the usual cause is that "
-            "the proxy doesn't forward the scheme and host. Set Settings → Server → "
-            "Public URL to the address you use in the browser, or make the proxy send "
-            "X-Forwarded-Proto and X-Forwarded-Host.",
+            _explain(kind, seen, expected_text),
             status=403,
             content_type="text/plain; charset=utf-8",
         )
