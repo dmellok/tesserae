@@ -140,661 +140,1255 @@
   margin-bottom: var(--t-space-3);
 }
 
-/* ---- deck editor (design-handoff rebuild, mapped to app tokens) --------- */
-.dxe {
-  --dxe-ctl-h: 36px;
-  max-width: 1120px;
-  margin: 0 auto;
-  padding-bottom: 96px;
+/* ---- the lineup editor (templates/deck_editor.html, static/deck_editor.js) ----
+ * Scoped under .lu.dxe: the day bar, day tiles, thumbnails, segmented controls
+ * and buttons are the Lineups page's own (dx-lineups.css); this adds the page
+ * column, the three numbered sections, the dashboard rows and the save bar.
+ * Type steps: title 26, section 18, body 14, label 13, help 12.5, mono 11. */
+main.page.dxe-page {
+  padding-bottom: 0;
 }
-.dxe-mono-label {
-  font-family: var(--t-font-mono);
-  font-size: 10px;
-  letter-spacing: 0.1em;
+.lu.dxe {
+  container: dxe / inline-size;
+  --dxe-gap: 20px;
+  --dxe-th-h: 54px;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding-bottom: 24px;
+}
+.lu.dxe .dxe-soft {
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-k,
+.lu.dxe .dxe-mono {
+  font: 600 11px var(--t-font-mono);
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--t-muted);
 }
-.dxe-help {
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--t-fg-soft);
-  margin: 0;
-}
-.dxe-h2 {
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  margin: 0;
+.lu.dxe .dxe-noscript {
+  padding: 16px 0;
+  color: var(--t-warn);
 }
 
-/* header */
-.dxe-head {
+/* -- top: breadcrumb and the on switch */
+.lu.dxe .dxe-top {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: flex-start;
-  padding-bottom: 20px;
-  gap: 16px;
+  gap: 12px;
+  min-height: 32px;
 }
-.dxe-head-left {
+.lu.dxe .dxe-crumb {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-crumb a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.lu.dxe .dxe-crumb a:hover {
+  color: var(--t-fg);
+}
+.lu.dxe .dxe-switch {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+.lu.dxe .dxe-switch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  z-index: 1;
+  cursor: pointer;
+}
+.lu.dxe .dxe-on {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--t-fg-soft);
+  cursor: pointer;
+}
+
+/* -- hero: what is on screen, the name, live status, the day bar */
+.lu.dxe .dxe-hero {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 16px 28px;
+  margin: 14px 0 0;
+}
+.lu.dxe .dxe-now {
+  margin: 0;
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lu.dxe .dxe-now .lu-thumb {
+  max-width: 220px;
+  max-height: 200px;
+  width: 100%;
+}
+.lu.dxe .dxe-now .lu-thumb.p {
+  width: auto;
+  height: 200px;
+}
+.lu.dxe .dxe-now figcaption {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 12.5px;
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-now figcaption b {
+  color: var(--t-fg);
+  font-weight: 600;
+}
+.lu.dxe .dxe-now[hidden] + .dxe-hero-main {
+  grid-column: 1 / -1;
+}
+.lu.dxe .dxe-hero-main {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
-.dxe-crumb {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-family: var(--t-font-mono);
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--t-muted);
+.lu.dxe .dxe-h1 {
+  margin: 0;
+  font: inherit;
 }
-.dxe-crumb a {
-  color: var(--t-muted);
-  text-decoration: none;
-}
-.dxe-crumb a:hover {
-  color: var(--t-fg-soft);
-}
-.dxe-title-input {
-  border: none;
-  border-bottom: 1px dashed transparent;
+#deck-editor .dxe-h1 input.dxe-title {
+  width: 100%;
+  margin: 0 0 0 -8px;
+  padding: 2px 8px;
+  height: auto;
+  min-height: 0;
+  border: 1px solid transparent;
+  border-radius: var(--lu-r);
   background: transparent;
-  font-family: inherit;
-  font-size: 30px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font: 600 26px/1.25 var(--t-font);
+  letter-spacing: -0.01em;
   color: var(--t-fg);
-  width: 380px;
-  max-width: 100%;
-  padding: 0 0 2px;
+  box-shadow: none;
 }
-.dxe-title-input::placeholder {
+#deck-editor .dxe-h1 input.dxe-title::placeholder {
   color: var(--t-muted);
-}
-.dxe-title-input:hover {
-  border-bottom-color: var(--t-border-strong);
-}
-.dxe-title-input:focus {
-  outline: none;
-  border-bottom-color: var(--t-fg);
-}
-.dxe-head-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding-top: 20px;
-}
-.dxe-status-word {
-  font-family: var(--t-font-mono);
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--t-muted);
-}
-.dxe .switch input {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-/* two-column body */
-.dxe-body {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 312px);
-  gap: 20px;
-  align-items: start;
-}
-@media (max-width: 1040px) {
-  .dxe-body {
-    grid-template-columns: 1fr;
-  }
-}
-.dxe-card {
-  background: var(--t-surface);
-  border: 1px solid var(--t-border);
-  border-radius: var(--t-radius-lg);
-  padding: 20px 22px 24px;
-}
-
-/* flip order card */
-.dxe-main-head {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  padding-bottom: 18px;
-}
-.dxe-meta {
-  font-size: 13px;
-  color: var(--t-muted);
-}
-.dxe-wraps {
-  margin-left: auto;
-  font-family: var(--t-font-mono);
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  color: var(--t-muted);
-}
-
-/* advance bar */
-.dxe-advance {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  background: var(--t-inset);
-  border: 1px solid var(--t-border);
-  border-radius: var(--t-radius-md);
-  padding: 12px 14px;
-  margin-bottom: 20px;
-}
-.dxe-seg-track {
-  display: inline-flex;
-  align-items: stretch;
-  height: var(--dxe-ctl-h, 36px);
-  box-sizing: border-box;
-  gap: 3px;
-  background: var(--t-border);
-  border-radius: 9px;
-  padding: 3px;
-}
-.dxe-seg {
-  position: relative;
-  display: inline-flex;
-}
-.dxe-seg input {
-  position: absolute;
-  opacity: 0;
-}
-.dxe-seg span {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 14px;
-  font-size: 13px;
   font-weight: 500;
-  border-radius: 7px;
-  cursor: pointer;
-  color: var(--t-fg-soft);
 }
-.dxe-seg input:checked + span {
+#deck-editor .dxe-h1 input.dxe-title:hover {
+  border-color: var(--t-border);
+}
+#deck-editor .dxe-h1 input.dxe-title:focus {
+  outline: none;
+  border-color: var(--lu-acc);
   background: var(--t-surface);
-  color: var(--t-fg);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
 }
-.dxe-seg input:focus-visible + span {
-  outline: 2px solid var(--t-accent);
-  outline-offset: 1px;
-}
-.dxe-interval {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-.dxe-every {
+.lu.dxe .dxe-model {
+  margin: 0;
   font-size: 13px;
   color: var(--t-fg-soft);
 }
-.dxe-adv-hint {
-  font-size: 13px;
-  color: var(--t-fg-soft);
+.lu.dxe .dxe-status {
+  margin-top: 8px;
 }
-.dxe-switch-row {
+.lu.dxe .dxe-status p {
+  margin: 0;
+}
+.lu.dxe .dxe-live-line {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  gap: 9px;
+  font-size: 15px;
 }
-
-/* Tuning card: timing + conditions folds below the page rail. */
-.dxe-main-col {
+.lu.dxe .dxe-live-line b {
+  font-weight: 600;
+}
+.lu.dxe .dxe-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px var(--t-fg-soft);
+}
+.lu.dxe .dxe-live-line.is-live .dxe-dot {
+  background: var(--lu-acc);
+  box-shadow: none;
+}
+.lu.dxe .dxe-live-line.off {
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-next-line {
+  margin: 3px 0 0 17px;
+  font-size: 13px;
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-daybar {
+  grid-column: 1 / -1;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  min-width: 0;
+  gap: 4px;
+  margin-top: 6px;
 }
-.dxe-tuning {
-  background: var(--t-surface-sunk);
-  padding: 8px 22px;
-}
-.dxe-tuning-hint {
-  padding: 8px 0;
-}
-.dxe-fold {
-  font-size: 13px;
-}
-.dxe-fold + .dxe-fold {
-  border-top: 1px solid color-mix(in oklab, var(--t-border) 80%, transparent);
-}
-.dxe-fold > summary {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  padding: 12px 0;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--t-fg);
-  list-style: none;
-}
-.dxe-fold > summary::-webkit-details-marker {
+.lu.dxe .dxe-daybar[hidden] {
   display: none;
 }
-.dxe-fold > summary:hover {
-  color: var(--t-accent);
-}
-.dxe-fold-caret {
-  font-size: 12px;
-  color: var(--t-fg-soft);
-  transition: transform 0.15s;
-}
-.dxe-fold[open] > summary .dxe-fold-caret {
-  transform: rotate(90deg);
-}
-.dxe-fold-hint {
-  margin-left: auto;
-  font: 12px var(--t-font-mono);
-  font-weight: 400;
+.lu.dxe .dxe-bar-day {
+  margin: 0;
+  font: 600 11px var(--t-font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--t-muted);
 }
-.dxe-fold > .dxe-adv-grid,
-.dxe-fold > .dxe-advanced-body {
-  padding: 2px 0 14px;
-}
-@media (prefers-reduced-motion: reduce) {
-  .dxe-fold-caret {
-    transition: none;
-  }
-}
-.dxe-adv-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 14px;
-  padding: 12px 2px 4px;
-}
-.dxe-days {
+.lu.dxe .dxe-daybar .lu-today-bar {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 4px;
 }
-.dxe-day {
-  position: relative;
-  display: inline-flex;
+/* This lineup in the accent; the display's other lineups stay neutral. */
+.lu.dxe .dxe-daybar .lu-blk:not(.hold) {
+  cursor: default;
 }
-.dxe-day input {
-  position: absolute;
-  opacity: 0;
+.lu.dxe .dxe-daybar .lu-blk.live:not(.is-mine):not(.hold) {
+  background: var(--lu-blk-bg);
+  color: var(--lu-blk-fg);
 }
-.dxe-day span {
-  display: inline-flex;
-  align-items: center;
-  height: var(--dxe-ctl-h, 36px);
-  box-sizing: border-box;
-  padding: 0 11px;
-  font-size: 12px;
-  border: 1px solid var(--t-border-strong);
-  border-radius: var(--t-radius-sm);
-  cursor: pointer;
-  color: var(--t-fg-soft);
+.lu.dxe .dxe-daybar .lu-blk.live:not(.is-mine) .lu-blk-l {
+  color: var(--lu-blk-fg);
 }
-.dxe-day input:checked + span {
-  background: var(--t-fg);
-  color: var(--t-bg);
-  border-color: var(--t-fg);
+.lu.dxe .dxe-daybar .lu-blk.is-mine:not(.hold) {
+  background: var(--lu-acc-soft);
+  color: var(--lu-acc-text);
+  box-shadow: inset 0 0 0 1.5px var(--lu-acc);
 }
-.dxe-smart {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  cursor: pointer;
+.lu.dxe .dxe-daybar .lu-blk.is-mine.live:not(.hold) {
+  background: var(--lu-acc);
+  color: var(--lu-acc-fg);
+}
+.lu.dxe .dxe-daybar .lu-blk.is-mine .lu-blk-l {
+  color: inherit;
+  font-weight: 600;
+}
+.lu.dxe .dxe-daybar .lu-blk.is-mine.push {
+  background: var(--lu-acc);
+}
+.lu.dxe .dxe-daybar .lu-blk-side.is-mine {
+  color: var(--lu-acc-text);
+  font-weight: 600;
 }
 
-/* page grid */
-.dxe-rail {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
-  gap: 12px;
+/* -- sections */
+.lu.dxe .dxe-sections {
+  display: flex;
+  flex-direction: column;
 }
-.dxe-pcard {
-  position: relative;
+.lu.dxe .dxe-sec {
+  margin-top: 40px;
+}
+.lu.dxe .dxe-sec-head {
+  margin-bottom: 14px;
+}
+.lu.dxe .dxe-h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font: 600 18px/1.3 var(--t-font);
+  color: var(--t-fg);
+}
+.lu.dxe .dxe-n {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: 50%;
+  border: 1.5px solid var(--t-fg);
+  font: 600 12px var(--t-font-mono);
+}
+.lu.dxe .dxe-n.is-done {
+  background: var(--t-fg);
+  color: var(--t-surface);
+}
+.lu.dxe .dxe-n.is-done .lu-ico {
+  width: 12px;
+  height: 12px;
+}
+.lu.dxe .dxe-lead {
+  margin: 4px 0 0 34px;
+  font-size: 14px;
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-sec-head.is-wait {
+  margin-top: 28px;
+  opacity: 0.55;
+}
+.lu.dxe .dxe-sec-head.is-wait .dxe-n {
+  border-color: var(--t-muted);
+}
+.lu.dxe .dxe-card {
   background: var(--t-surface);
   border: 1px solid var(--t-border);
-  border-radius: 12px;
-  padding: 9px;
-  cursor: grab;
-  transition:
-    box-shadow 140ms,
-    transform 140ms;
+  border-radius: var(--lu-r-card);
+  padding: 0 20px;
 }
-.dxe-pcard:hover {
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.09);
-  transform: translateY(-1px);
+.lu.dxe .dxe-field {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px 16px;
+  padding: 16px 0;
 }
-.dxe-pcard.is-selected::after {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  border: 2px solid var(--t-fg);
-  border-radius: 13px;
-  pointer-events: none;
+.lu.dxe .dxe-field + .dxe-field {
+  border-top: 1px solid var(--t-border);
 }
-.dxe-pcard.is-dragging {
+.lu.dxe .dxe-label {
+  padding-top: 8px;
+  font-size: 13px;
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-ctl {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-height: 36px;
+}
+
+/* controls */
+.lu.dxe .dxe-in {
+  height: 36px;
+  margin: 0;
+  padding: 0 10px;
+  border: 1px solid var(--t-border-strong);
+  border-radius: var(--lu-r);
+  background: var(--t-surface);
+  color: var(--t-fg);
+  font: 14px var(--t-font);
+  box-shadow: none;
+}
+.lu.dxe .dxe-in:hover {
+  border-color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-in:focus-visible {
+  outline: 2px solid var(--lu-acc);
+  outline-offset: 1px;
+}
+.lu.dxe .dxe-in:disabled {
   opacity: 0.5;
 }
-.dxe-thumb {
-  height: 112px;
-  border-radius: 7px;
-  overflow: hidden;
-  border: 1px solid var(--t-border);
-  background: var(--t-inset);
+.lu.dxe .dxe-select {
+  padding-right: 28px;
+  width: auto;
+  max-width: 100%;
+}
+.lu.dxe .dxe-num {
+  width: 84px;
+}
+.lu.dxe .dxe-time-in {
+  width: 132px;
+}
+.lu.dxe .dxe-link {
+  display: inline;
+  color: var(--lu-acc-text);
+  font-weight: 600;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.lu.dxe .dxe-link:hover {
+  color: var(--t-fg);
+}
+.lu.dxe .dxe-link.quiet {
+  color: var(--t-fg-soft);
+  font-weight: 500;
+}
+.lu.dxe .dxe-link:disabled {
+  text-decoration: none;
+  opacity: 1;
+  color: var(--t-fg-soft);
+}
+.lu.dxe .lu-btn-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* 1 When: bigger day tiles (the Lineups ones, with their check and x marks) */
+.lu.dxe .dxe-days {
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.lu.dxe .dxe-days .lu-dt {
+  width: 48px;
+  height: 34px;
+  border-radius: var(--lu-r);
+  font: 600 12.5px var(--t-font);
+  border: 1px solid var(--t-border-strong);
+  background: var(--t-surface);
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-days .lu-dt.on {
+  background: var(--t-fg);
+  border-color: var(--t-fg);
+  color: var(--t-surface);
+}
+.lu.dxe .dxe-days .lu-dt.is-today {
+  box-shadow: inset 0 -3px 0 var(--lu-acc);
+}
+.lu.dxe .dxe-days .lu-dt::before,
+.lu.dxe .dxe-days .lu-dt::after {
+  top: -5px;
+  right: -5px;
+  width: 12px;
+  height: 12px;
+}
+.lu.dxe .dxe-days .lu-dt.just-on,
+.lu.dxe .dxe-days .lu-dt.just-off {
+  color: transparent;
+}
+.lu.dxe .dxe-time {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.lu.dxe .dxe-time-fields {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.lu.dxe .dxe-to {
+  font-size: 13px;
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-seg.sm {
+  height: 30px;
+}
+.lu.dxe .dxe-seg.sm button {
+  font-size: 12.5px;
+  padding: 0 9px;
+}
+.lu.dxe .lu-win-end {
+  font: 500 13px var(--t-font);
+  border: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: var(--lu-r);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--t-fg);
+  cursor: pointer;
+}
+.lu.dxe .lu-win-end:hover {
+  background: color-mix(in oklab, var(--t-fg) 6%, transparent);
+}
+.lu.dxe .lu-win-end.is-rm {
+  width: 36px;
+  justify-content: center;
+  padding: 0;
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-warn,
+.lu.dxe .dxe-note {
+  flex: 1 1 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 0;
+  font-size: 13px;
+}
+.lu.dxe .dxe-warn {
+  padding: 8px 12px;
+  border-radius: var(--lu-r);
+  background: color-mix(in oklab, var(--t-warn) 13%, var(--t-surface));
+  color: var(--t-fg);
+}
+.lu.dxe .dxe-warn > .lu-ico,
+.lu.dxe .dxe-note > .lu-ico {
+  width: 14px;
+  height: 14px;
+  color: var(--lu-warn-text);
+}
+.lu.dxe .dxe-note {
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-disp {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+.lu.dxe .dxe-disp b {
+  font-weight: 600;
+}
+
+/* 2 Dashboards: rows */
+.lu.dxe .dxe-steps-card {
+  padding: 0;
+}
+.lu.dxe .dxe-steps {
+  display: flex;
+  flex-direction: column;
+}
+.lu.dxe .dxe-step + .dxe-step {
+  border-top: 1px solid var(--t-border);
+}
+.lu.dxe .dxe-step.is-dragging {
+  opacity: 0.5;
+}
+.lu.dxe .dxe-step-head {
+  display: grid;
+  grid-template-columns: 24px 32px auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 12px 16px 12px 8px;
+}
+.lu.dxe .dxe-grip {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 32px;
+  border-radius: var(--lu-r);
+  color: var(--t-muted);
+  cursor: grab;
+}
+.lu.dxe .dxe-grip:hover {
+  color: var(--t-fg);
+  background: color-mix(in oklab, var(--t-fg) 6%, transparent);
+}
+.lu.dxe .dxe-pos {
+  font: 12px var(--t-font-mono);
+  color: var(--t-muted);
+}
+.lu.dxe .dxe-th {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 96px;
+  height: var(--dxe-th-h);
 }
-.dxe-thumb img {
+.lu.dxe .dxe-th .lu-thumb {
+  max-width: 96px;
+  max-height: var(--dxe-th-h);
+  height: var(--dxe-th-h);
+  width: auto;
+}
+.lu.dxe .dxe-th .lu-thumb.l {
+  height: auto;
+  width: 96px;
+}
+/* Several items: a second sheet behind, and the count. */
+.lu.dxe .dxe-th.is-stack .lu-thumb {
+  box-shadow:
+    3px -3px 0 -1px var(--t-surface),
+    3px -3px 0 0 var(--t-border-strong);
+}
+.lu.dxe .dxe-badge {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  z-index: 2;
+  padding: 1px 6px;
+  border-radius: var(--lu-r-pill);
+  background: var(--t-fg);
+  color: var(--t-surface);
+  font: 600 11px var(--t-font-mono);
+}
+.lu.dxe .dxe-step-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lu.dxe .dxe-step-name,
+.lu.dxe .dxe-step-text > b {
+  font-weight: 600;
+  font-size: 14.5px;
+  overflow-wrap: anywhere;
+}
+.lu.dxe .dxe-step-sub,
+.lu.dxe .dxe-where {
+  font-size: 12.5px;
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-step.is-muted .dxe-th,
+.lu.dxe .dxe-step.is-muted .dxe-step-text {
+  opacity: 0.55;
+}
+.lu.dxe .dxe-step-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.lu.dxe .dxe-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: var(--lu-r-xs);
+  font: 600 10.5px var(--t-font-mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border: 1px solid var(--t-border-strong);
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-tag .lu-ico {
+  width: 11px;
+  height: 11px;
+}
+.lu.dxe .dxe-tag.now {
+  background: var(--lu-acc);
+  border-color: var(--lu-acc);
+  color: var(--lu-acc-fg);
+}
+.lu.dxe .dxe-tag.next {
+  border-color: var(--t-fg);
+  color: var(--t-fg);
+}
+.lu.dxe .dxe-tag.time,
+.lu.dxe .dxe-tag.home {
+  text-transform: none;
+  letter-spacing: 0;
+  font: 600 12px var(--t-font);
+  border-color: transparent;
+  color: var(--t-fg);
+}
+.lu.dxe .dxe-tag.warn {
+  border-color: var(--lu-warn-text);
+  color: var(--lu-warn-text);
+}
+.lu.dxe .dxe-step-acts {
+  display: flex;
+  gap: 2px;
+}
+.lu.dxe .dxe-exp .lu-ico {
+  transition: transform 160ms cubic-bezier(0.25, 1, 0.5, 1);
+  transform: rotate(-90deg);
+}
+.lu.dxe .dxe-step.is-open .dxe-exp .lu-ico {
+  transform: none;
+}
+.lu.dxe .dxe-step-body {
+  padding: 0 20px 16px 78px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.lu.dxe .dxe-one {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-one .lu-ico {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+/* children: what a dashboard shows one of */
+.lu.dxe .dxe-kids {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.lu.dxe .dxe-kids-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  font-size: 13px;
+}
+.lu.dxe .dxe-kids-head .lu-seg,
+.lu.dxe .dxe-kids-head .dxe-draw {
+  margin-left: auto;
+}
+.lu.dxe .dxe-draw {
+  border: 1px solid var(--t-border-strong);
+  color: var(--t-fg);
+}
+.lu.dxe .dxe-strip,
+.lu.dxe .dxe-grid-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.lu.dxe .dxe-grid-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+}
+.lu.dxe .dxe-it {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 104px;
+  font-size: 11.5px;
+  color: var(--t-fg-soft);
+  text-align: left;
+}
+.lu.dxe .dxe-grid-items .dxe-it {
+  width: auto;
+}
+.lu.dxe button.dxe-it {
+  cursor: pointer;
+}
+.lu.dxe .dxe-it-pic {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 10;
+  border-radius: var(--lu-r-xs);
+  border: 1px solid var(--t-border-strong);
+  background: var(--lu-paper);
+  overflow: hidden;
+}
+.lu.dxe .dxe-it-pic img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
-/* A page card keeps the dashboard's own shape: wide for landscape, tall for a
-   portrait panel, whole picture shown. */
-.dxe-thumb[style*="--thumb-r"] {
-  --dxe-h: 112px;
-  width: min(100%, calc(var(--dxe-h) * var(--thumb-r)));
-  height: auto;
-  aspect-ratio: var(--thumb-ar);
-  margin-inline: auto;
+.lu.dxe .dxe-it-word {
+  padding: 6px;
+  font: 600 12px/1.25 var(--t-font);
+  color: #3b3934;
+  text-align: center;
+  overflow-wrap: anywhere;
 }
-.dxe-thumb.is-portrait[style*="--thumb-r"] {
-  --dxe-h: 190px;
+.lu.dxe .dxe-it.is-marked .dxe-it-pic {
+  outline: 2px solid var(--lu-acc);
+  outline-offset: 1px;
 }
-.dxe-thumb[style*="--thumb-r"] img {
-  object-fit: contain;
+.lu.dxe button.dxe-it:hover .dxe-it-pic {
+  border-color: var(--t-fg);
 }
-.dxe-thumb.is-ph {
-  font-family: var(--t-font-mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  color: var(--t-muted);
-  background-image:
-    linear-gradient(var(--t-border) 1px, transparent 1px),
-    linear-gradient(90deg, var(--t-border) 1px, transparent 1px);
-  background-size: 14px 14px;
-}
-.dxe-badge {
-  position: absolute;
-  top: 7px;
-  left: 7px;
-  width: 19px;
-  height: 19px;
-  border-radius: 50%;
-  background: var(--t-fg);
-  color: var(--t-bg);
-  font-size: 11px;
-  font-weight: 600;
-  display: grid;
-  place-items: center;
-}
-.dxe-grip {
-  position: absolute;
-  top: 6px;
-  right: 7px;
-  font-family: var(--t-font-mono);
-  font-size: 12px;
-  color: var(--t-muted);
-  cursor: grab;
-}
-.dxe-pcard.is-missing {
-  border: 1px dashed var(--t-warn);
-  background: color-mix(in oklab, var(--t-warn) 10%, var(--t-surface));
-}
-.dxe-pcard.is-missing .dxe-thumb {
-  color: var(--t-warn);
-  font-weight: 700;
-}
-.dxe-pcard.is-missing .dxe-pcard-name {
-  white-space: normal;
-  color: var(--t-fg);
-}
-.dxe-missing-id {
-  display: block;
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--t-muted, var(--t-fg));
-  opacity: 0.7;
+.lu.dxe .dxe-it-l {
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.dxe-remove-missing {
-  margin-left: auto;
-  padding: 3px 8px;
+.lu.dxe .dxe-it .dxe-tag {
+  align-self: flex-start;
 }
-/* A step bound to another display: same dashed warning rim as a deleted one,
-   but the thumbnail stays (it is a real dashboard) and the tag says why. */
-.dxe-pcard.is-offdisplay {
-  border: 1px dashed var(--t-warn);
-  background: color-mix(in oklab, var(--t-warn) 8%, var(--t-surface));
-}
-.dxe-offdisplay {
-  flex-shrink: 0;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: color-mix(in oklab, var(--t-warn) 18%, var(--t-surface));
-  color: color-mix(in oklab, var(--t-warn) 75%, var(--t-fg));
-}
-.dxe-pcard-foot {
+.lu.dxe .dxe-more {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 9px 3px 2px;
-}
-.dxe-pcard-name {
-  flex: 1;
-  font-size: 13px;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.dxe-star {
-  color: var(--t-fg);
-  font-size: 12px;
-}
-.dxe-add {
-  min-height: 156px;
+  height: 66px;
+  padding: 0 14px;
   border: 1px dashed var(--t-border-strong);
-  border-radius: 12px;
-  background: none;
-  color: var(--t-muted);
+  border-radius: var(--lu-r);
+  font-size: 13px;
   cursor: pointer;
+}
+.lu.dxe .dxe-more span {
   display: flex;
   flex-direction: column;
+}
+.lu.dxe .dxe-more small {
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-more:hover {
+  border-color: var(--t-fg);
+}
+.lu.dxe .dxe-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--t-border);
+  border-radius: var(--lu-r);
+  background: var(--t-surface-soft);
+}
+.lu.dxe .dxe-grid-tb {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
+  gap: 8px 16px;
+}
+.lu.dxe .dxe-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 280px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--t-border-strong);
+  border-radius: var(--lu-r);
+  background: var(--t-surface);
+}
+/* (an id: the app's own input rules are long :is() chains) */
+#deck-editor .dxe-search input {
+  min-height: 0;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--t-fg);
+  font: 14px var(--t-font);
+  box-shadow: none;
+  outline: none;
+}
+.lu.dxe .dxe-search:focus-within {
+  outline: 2px solid var(--lu-acc);
+  outline-offset: 1px;
+}
+.lu.dxe .dxe-range {
+  margin-left: auto;
+}
+.lu.dxe .dxe-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.lu.dxe .dxe-pg {
+  min-width: 30px;
+  height: 30px;
+  border-radius: var(--lu-r);
+  font: 13px var(--t-font-mono);
+  text-align: center;
+  cursor: pointer;
+}
+.lu.dxe .dxe-pg:hover {
+  background: color-mix(in oklab, var(--t-fg) 6%, transparent);
+}
+.lu.dxe .dxe-pg[aria-current="page"] {
+  box-shadow: inset 0 0 0 1.5px var(--t-fg);
+  font-weight: 600;
+}
+.lu.dxe .dxe-loading {
   font-size: 13px;
 }
-.dxe-add:hover:not(:disabled) {
-  border-color: var(--t-fg);
+
+/* per-dashboard settings: one summary line, the editor under it */
+.lu.dxe .dxe-sum {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--t-border);
+  font-size: 13px;
+}
+.lu.dxe .dxe-sum-r {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 16px;
+}
+.lu.dxe .dxe-edit {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px 20px;
+}
+.lu.dxe .dxe-mini {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-mini > span:first-child {
+  font-weight: 500;
   color: var(--t-fg);
-  background: var(--t-inset);
 }
-.dxe-add:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.lu.dxe .dxe-mini small {
+  font-size: 12px;
 }
-.dxe-add-plus {
-  font-size: 19px;
+.lu.dxe .dxe-mini.row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.lu.dxe .dxe-mini.row > span:first-child {
+  font-weight: 400;
+}
+.lu.dxe .dxe-cond {
+  grid-column: 1 / -1;
+}
+.lu.dxe .dxe-unit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
-/* selected-page panel */
-.dxe-panel {
-  margin-top: 18px;
-  border: 1px solid var(--t-border);
-  border-radius: 12px;
-  background: var(--t-inset);
-  overflow: hidden;
+/* add-dashboard row and picker */
+.lu.dxe .dxe-add-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--t-border);
 }
-.dxe-panel-head {
+.lu.dxe .dxe-steps-card > .dxe-add-row:first-child,
+.lu.dxe .dxe-steps:empty + .dxe-add-row {
+  border-top: 0;
+}
+.lu.dxe .dxe-add {
+  color: var(--t-fg);
+  font-weight: 500;
+}
+.lu.dxe .dxe-hint {
+  margin-left: auto;
+  font-size: 12.5px;
+}
+.lu.dxe .dxe-picker {
+  padding: 14px 16px 16px;
+  border-top: 1px solid var(--t-border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.lu.dxe .dxe-sec > .dxe-picker {
+  padding: 16px 0 0;
+  border-top: 0;
+}
+.lu.dxe .dxe-picks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 10px;
+}
+.lu.dxe .dxe-pick {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--t-border);
+  border-radius: var(--lu-r);
+  background: var(--t-surface);
+}
+.lu.dxe .dxe-add-btn {
+  border: 1px solid var(--t-border-strong);
+  color: var(--t-fg);
+}
+.lu.dxe .dxe-pick-more {
+  margin: 0;
+  font-size: 13px;
+}
+.lu.dxe .dxe-pick-more a {
+  color: var(--lu-acc-text);
+  font-weight: 600;
+}
+.lu.dxe .dxe-empty {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 13px 16px;
-  border-bottom: 1px solid var(--t-border);
+  margin: 0;
+  padding: 16px;
+  border: 1px dashed var(--t-border-strong);
+  border-radius: var(--lu-r);
+  font-size: 13.5px;
+  color: var(--t-fg-soft);
 }
-.dxe-panel-name {
+.lu.dxe .dxe-steps-card > .dxe-empty {
+  margin: 12px 16px 4px;
+}
+
+/* 3 Pace: no card, a quiet list */
+.lu.dxe .dxe-pace {
+  margin-left: 34px;
+}
+.lu.dxe .dxe-pace > .dxe-field {
+  border-top: 0;
+  padding: 10px 0;
+}
+.lu.dxe .dxe-pace > .dxe-field .dxe-ctl {
+  font-size: 13.5px;
+}
+.lu.dxe .dxe-pace .dxe-opts-none {
+  padding: 14px 0;
+  border-top: 1px solid var(--t-border);
+}
+.lu.dxe .dxe-fold {
+  border-top: 1px solid var(--t-border);
+}
+.lu.dxe .dxe-fold > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 14px 0;
   font-size: 14px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.dxe-remove {
-  margin-left: auto;
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--t-danger);
-  background: transparent;
-  border: 1px solid transparent;
-  padding: 5px 10px;
-  border-radius: 7px;
   cursor: pointer;
+  list-style: none;
 }
-.dxe-remove:hover {
-  background: var(--t-danger-bg);
-  border-color: var(--t-pill-danger-border);
+.lu.dxe .dxe-fold > summary::-webkit-details-marker {
+  display: none;
 }
-.dxe-fieldgrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
-  gap: 14px;
-  padding: 15px 16px 17px;
+.lu.dxe .dxe-fold > summary .dxe-soft {
+  font-size: 13px;
 }
-.dxe-field {
+.lu.dxe .dxe-caret {
+  width: 14px;
+  height: 14px;
+  transform: rotate(-90deg);
+  transition: transform 160ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+.lu.dxe .dxe-fold[open] > summary .dxe-caret {
+  transform: none;
+}
+.lu.dxe .dxe-fold-body {
+  padding: 0 0 18px 26px;
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 14px;
 }
-.dxe-fbtn {
+.lu.dxe .dxe-fold-body.dxe-adv {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px 24px;
+}
+.lu.dxe .dxe-ovs {
+  grid-column: 1 / -1;
+  max-width: 480px;
+}
+.lu.dxe .dxe-opt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.lu.dxe .dxe-opt b {
+  font-weight: 600;
+  font-size: 14px;
+}
+.lu.dxe .dxe-opt p {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.lu.dxe .dxe-opt p .lu-ico {
+  width: 12px;
+  height: 12px;
+  color: var(--t-ok);
+}
+.lu.dxe .dxe-opt-ctl {
   display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: var(--dxe-ctl-h);
-  box-sizing: border-box;
-  background: var(--t-surface);
-  border: 1px solid var(--t-border-strong);
-  border-radius: var(--t-radius-sm);
-  padding: 0 11px;
-  font-size: 13px;
-  color: var(--t-fg);
-  cursor: pointer;
-}
-.dxe-fbtn:hover:not(:disabled) {
-  border-color: var(--t-fg);
-}
-.dxe-fbtn:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-.dxe-home-btn {
-  justify-content: flex-start;
-  white-space: nowrap;
-}
-.dxe-pos-btns {
-  display: flex;
-  gap: 6px;
-}
-.dxe-pos-btns .dxe-fbtn {
-  flex: 1;
-}
-.dxe-dwell-box {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-.dxe-dwell-inp {
-  flex: 1;
-  min-width: 0;
-}
-.dxe-dwell-suf {
-  font-size: 12px;
-  color: var(--t-fg-soft);
-  flex: none;
-}
-.dxe-slider-row {
-  display: flex;
   align-items: center;
   gap: 12px;
 }
-.dxe-slider-row input[type="range"] {
-  flex: 1;
-  min-width: 60px;
-  accent-color: var(--t-accent);
+.lu.dxe .dxe-lead-s {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
 }
-.dxe-num-box {
-  flex: none;
-  width: 118px;
+.lu.dxe .dxe-lead-s .dxe-num {
+  width: 72px;
 }
 
-/* right rail */
-.dxe-rail-col {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-.dxe-rail-card {
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.dxe-set {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-.dxe-avail-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-}
-.dxe-avail-count {
-  font-size: 12px;
-  color: var(--t-fg-soft);
-}
-.dxe-chips {
+/* the new-lineup flow */
+.lu.dxe .dxe-done {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
+  align-items: center;
+  gap: 6px 12px;
+  margin-top: 24px;
+  font-size: 14.5px;
 }
-/* Addable dashboards: .tg tags that act as buttons (chips.css). */
-.dxe-chip {
+.lu.dxe .dxe-done b {
+  font-weight: 600;
+}
+.lu.dxe .dxe-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+#deck-editor .dxe-dcard {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px;
+  border: 1px solid var(--t-border);
+  border-radius: var(--lu-r-card);
+  background: var(--t-surface);
+  text-align: left;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.lu.dxe .dxe-dcard:hover {
+  border-color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-dcard[aria-checked="true"] {
+  border-color: var(--lu-acc);
+  box-shadow: inset 0 0 0 1px var(--lu-acc);
+}
+.lu.dxe .dxe-dcard b {
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.lu.dxe .dxe-dcard-th {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 96px;
+  border-radius: var(--lu-r);
+  background: var(--t-surface-sunk);
+}
+.lu.dxe .dxe-dcard-th .lu-thumb {
+  height: 80px;
+  width: auto;
+  max-width: 90%;
+}
+.lu.dxe .dxe-next-step {
+  margin-top: 14px;
+}
+
+/* the save bar */
+.lu.dxe .dxe-actionbar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  margin-top: 36px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  padding: 12px 0;
+  background: var(--t-bg);
+  border-top: 1px solid var(--t-border);
+}
+.lu.dxe .dxe-actionbar-status {
+  flex: 1 1 200px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-actionbar-status.is-dirty {
+  color: var(--t-fg);
+  font-weight: 500;
+}
+.lu.dxe .dxe-actionbar-status.is-err {
+  color: var(--t-danger);
+  font-weight: 500;
+}
+.lu.dxe .dxe-actionbar-status.is-ok {
   color: var(--t-fg);
 }
-.dxe-chip:hover {
-  background: color-mix(in oklab, var(--t-fg) 12%, var(--t-surface));
-  filter: none;
+.lu.dxe .dxe-actionbar-btns {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
-.dxe-chip-plus {
-  color: var(--t-fg-soft);
+.lu.dxe .dxe-actionbar-btns .lu-btn-ghost {
+  color: var(--t-fg);
 }
-.dxe-avail-other {
-  flex-basis: 100%;
-  margin: 6px 0 0;
+.lu.dxe .dxe-more-menu .lu-more-menu {
+  bottom: calc(100% + 6px);
+  top: auto;
 }
-.dxe-chip--other {
-  border: 1px dashed var(--t-border-strong);
-  background: transparent;
+
+/* narrow: one column */
+@container dxe (max-width: 640px) {
+  .lu.dxe .dxe-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lu.dxe .dxe-now {
+    width: auto;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+  }
+  .lu.dxe .dxe-now .lu-thumb {
+    width: 120px;
+    flex: none;
+  }
+  .lu.dxe .dxe-now .lu-thumb.p {
+    width: auto;
+    height: 120px;
+  }
+  #deck-editor .dxe-h1 input.dxe-title {
+    font-size: 22px;
+  }
+  .lu.dxe .dxe-card {
+    padding: 0 14px;
+  }
+  .lu.dxe .dxe-field {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+  .lu.dxe .dxe-label {
+    padding-top: 0;
+  }
+  .lu.dxe .dxe-days .lu-dt {
+    width: 40px;
+  }
+  .lu.dxe .dxe-lead,
+  .lu.dxe .dxe-pace {
+    margin-left: 0;
+  }
+  .lu.dxe .dxe-step-head {
+    grid-template-columns: 22px auto minmax(0, 1fr) auto;
+    gap: 8px 10px;
+    padding: 10px 10px 10px 4px;
+  }
+  .lu.dxe .dxe-pos {
+    display: none;
+  }
+  .lu.dxe .dxe-th {
+    width: 64px;
+    --dxe-th-h: 44px;
+  }
+  .lu.dxe .dxe-th .lu-thumb.l {
+    width: 64px;
+  }
+  .lu.dxe .dxe-step-tags {
+    grid-column: 3 / -1;
+    grid-row: 2;
+    justify-content: flex-start;
+  }
+  .lu.dxe .dxe-step-tags:empty {
+    display: none;
+  }
+  .lu.dxe .dxe-step-body {
+    padding: 0 12px 14px;
+  }
+  .lu.dxe .dxe-picks {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lu.dxe .dxe-it {
+    width: 84px;
+  }
+  .lu.dxe .dxe-hint {
+    margin-left: 0;
+  }
+  .lu.dxe .dxe-actionbar-btns {
+    width: 100%;
+  }
+  .lu.dxe .dxe-actionbar-btns .lu-btn-primary {
+    margin-left: auto;
+  }
 }
-.dxe-chip-where {
-  margin-left: 6px;
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--t-fg-soft);
+@media (prefers-reduced-motion: reduce) {
+  .lu.dxe .dxe-exp .lu-ico,
+  .lu.dxe .dxe-caret {
+    transition: none;
+  }
 }
 
 /* "Bind to this display?" prompt (static/bind_prompt.js), on the wizard's
@@ -839,145 +1433,6 @@
   .bind-dialog .wizard-footer button {
     flex: 1 1 100%;
   }
-}
-
-/* form controls reuse the app's field styling, all one height */
-.dxe input[type="text"]:not(.dxe-title-input),
-.dxe input[type="number"],
-.dxe input[type="time"],
-.dxe select {
-  width: 100%;
-  height: var(--dxe-ctl-h);
-  box-sizing: border-box;
-  padding: 0 var(--t-space-3);
-  border: 1px solid var(--t-border-strong);
-  border-radius: var(--t-radius-sm);
-  background: var(--t-surface);
-  font: inherit;
-  font-size: 13px;
-  color: var(--t-fg);
-  transition:
-    border-color var(--t-trans-fast),
-    box-shadow var(--t-trans-fast);
-}
-.dxe .dxe-fb-row input[type="number"] {
-  width: 60px;
-}
-.dxe select {
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--t-fg-soft) 50%),
-    linear-gradient(135deg, var(--t-fg-soft) 50%, transparent 50%);
-  background-position:
-    calc(100% - 18px) 50%,
-    calc(100% - 12px) 50%;
-  background-size:
-    6px 6px,
-    6px 6px;
-  background-repeat: no-repeat;
-  padding-right: 30px;
-  cursor: pointer;
-}
-.dxe input:hover,
-.dxe select:hover {
-  border-color: var(--t-fg);
-}
-.dxe input:focus,
-.dxe select:focus {
-  outline: none;
-  border-color: var(--t-accent);
-  box-shadow: var(--t-ring);
-}
-.dxe-interval select {
-  width: auto;
-}
-
-/* fallback (hidden when JS) */
-.dxe-fallback.js-hidden {
-  display: none;
-}
-.dxe-fallback {
-  border: 1px dashed var(--t-border);
-  border-radius: var(--t-radius-sm);
-  margin-top: 14px;
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.dxe-fb-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  font-size: 13px;
-}
-
-/* sticky action bar */
-/* The status text grows with the deck's page chain, and the buttons can't
-   shrink below their labels, so without wrapping the group is pushed past the
-   right edge and Save becomes unreachable (issue #192, phone portrait). Wrap
-   rather than scroll: a sticky bar you have to scroll sideways is no better
-   than one you can't see. ``min-width: 0`` lets the status give up space
-   before that happens. */
-.dxe-actionbar {
-  position: sticky;
-  bottom: 0;
-  margin-top: 20px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 18px;
-  background: color-mix(in oklab, var(--t-bg) 86%, transparent);
-  backdrop-filter: blur(8px);
-  border-top: 1px solid var(--t-border);
-}
-.dxe-actionbar-status {
-  font-size: 12.5px;
-  color: var(--t-muted);
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.dxe-actionbar-btns {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-}
-.dxe-btn-ghost {
-  background: var(--t-surface);
-  border: 1px solid var(--t-border-strong);
-  border-radius: 9px;
-  padding: 9px 16px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--t-fg);
-  cursor: pointer;
-}
-.dxe-btn-ghost:hover {
-  border-color: var(--t-fg);
-}
-.dxe-btn-danger {
-  color: var(--t-danger);
-}
-.dxe-btn-primary {
-  background: var(--t-fg);
-  color: var(--t-bg);
-  border: 1px solid var(--t-fg);
-  border-radius: 9px;
-  padding: 9px 20px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.dxe-btn-primary:hover {
-  opacity: 0.9;
 }
 
 /* ---- "Updates" cadence control on the dashboards list ------------------ */

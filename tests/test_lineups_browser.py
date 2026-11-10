@@ -1483,22 +1483,17 @@ def test_editor_shows_deleted_step_and_remove_persists(real: tuple[str, Flask]) 
         errors: list[str] = []
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.goto(base + "/decks/gone/edit", wait_until="load")
-        cards = page.locator("#dxe-rail .dxe-pcard")
-        assert cards.count() == 2
-        first = cards.nth(0)
+        rows = page.locator("[data-step]")
+        assert rows.count() == 2
+        first = rows.nth(0)
         assert "is-missing" in first.get_attribute("class")
         assert "Missing dashboard (deleted)" in first.inner_text()
-        assert "f68e0c3b23bd" in first.locator(".dxe-missing-id").inner_text()
-        assert page.locator("#dxe-pages-field").input_value() == "f68e0c3b23bd,news"
         # Unchanged, it is kept; Remove drops just that step and survives a save.
-        first.locator(".dxe-remove-missing").click()
-        assert page.locator("#dxe-rail .dxe-pcard").count() == 1
-        assert page.locator("#dxe-pages-field").input_value() == "news"
-        assert page.locator("#dxe-avail .dxe-chip", has_text="Missing").count() == 0
-        page.locator("#deck-form").evaluate("f => f.requestSubmit()")
-        # ``/decks/gone/edit`` already matches ``.*/decks.*``: wait until the save
-        # redirected away from the editor, or the store is read before the POST lands.
-        page.wait_for_url(lambda url: "/edit" not in url)
+        first.locator("[data-expand]").click()
+        first.locator("[data-remove]").click()
+        assert [r.get_attribute("data-step") for r in rows.all()] == ["news"]
+        with page.expect_navigation():
+            page.locator("[data-save]").click()
         assert [p_.page_id for p_ in app.config["DECK_STORE"].get("gone").pages] == ["news"]
         assert errors == []
         browser.close()

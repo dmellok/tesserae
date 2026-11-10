@@ -709,7 +709,8 @@ def test_the_lineup_editor_hands_the_page_cards_each_dashboards_size(app: Flask)
     assert re.search(r'"h":\s*2560', body) and re.search(r'"w":\s*1440', body)
     assert re.search(r'"h":\s*480', body) and re.search(r'"w":\s*800', body)
     js = (REPO_ROOT / "static" / "deck_editor.js").read_text()
-    assert "--thumb-ar" in js and "is-portrait" in js
+    # Drawn with the Lineups page's thumbnail, in the dashboard's own ratio.
+    assert "R.thumb(" in js and "`${w}/${h}`" in js
 
 
 def test_every_thumbnail_style_fits_instead_of_cropping() -> None:
@@ -721,7 +722,7 @@ def test_every_thumbnail_style_fits_instead_of_cropping() -> None:
     dashboards = (css / "dx-dashboards.css").read_text()
     assert re.search(r"\.lu \.lu-thumb img\s*{[^}]*object-fit: contain", lineups)
     assert re.search(r"\.lu \.lu-thumb\s*{[^}]*aspect-ratio: var\(--ar\)", lineups)
-    assert re.search(r'\.dxe-thumb\[style\*="--thumb-r"\] img\s*{[^}]*object-fit: contain', decks)
+    assert ".dxe-thumb" not in decks  # the lineup editor draws .lu-thumb (above)
     assert re.search(
         r'\.dx-dash-thumb\[style\*="--thumb-r"\] img\s*{[^}]*object-fit: contain', dashboards
     )

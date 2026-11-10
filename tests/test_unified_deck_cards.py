@@ -167,8 +167,9 @@ def test_edit_paths_open_the_right_editor(app: Flask) -> None:
     # including the per-page conditions fold and the old-URL deep link.
     body = client.get("/decks/loop/edit").get_data(as_text=True)
     assert "Kitchen loop" in body
-    assert "Page conditions" in body
-    assert 'name="conditions[kitchen]"' in body
+    state = json.loads(body.split('id="dxe-data">', 1)[1].split("</script>", 1)[0])
+    assert "kitchen" in [s["id"] for s in state["steps"]]
+    assert all("conditions" in s for s in state["steps"])
     resp = client.get("/rotations?edit=loop", follow_redirects=False)
     assert resp.status_code in (302, 303) and "/decks/loop/edit" in resp.location
     # Timed sends keep their inline form via sedit.
@@ -258,13 +259,20 @@ def test_editor_saves_per_page_conditions_and_lead(app: Flask) -> None:
     assert deck.pages[0].conditions[0].source_id == "binary_sensor.printer"
 
 
-def test_new_timer_cycle_entry_preselects_timer(app: Flask) -> None:
+def test_new_lineup_for_a_display_starts_on_it(app: Flask) -> None:
+    """The Lineups page's "+" beside a display opens the new-lineup flow on it."""
     client = app.test_client()
     _sign_in(client)
-    body = client.get("/decks/new?mode=timer").get_data(as_text=True)
-    assert 'value="timer" checked' in body
-    body = client.get("/decks/new").get_data(as_text=True)
-    assert 'value="manual" checked' in body
+    _register_display(app, client, "panel_a")
+
+    def state(url: str) -> dict:
+        body = client.get(url).get_data(as_text=True)
+        return json.loads(body.split('id="dxe-data">', 1)[1].split("</script>", 1)[0])
+
+    picked = state("/decks/new?display=panel_a")
+    assert picked["isNew"] and picked["display"] == "panel_a" and picked["displayLocked"]
+    assert state("/decks/new")["display"] == ""
+    assert state("/decks/new?display=nope")["display"] == ""
 
 
 def test_manual_stepper_moves_the_display(app: Flask) -> None:
@@ -410,9 +418,11 @@ def test_deleted_display_lineup_remains_manageable(
     # the first dashboard once the wiped page vanished from the list.
     if intent in ("manual", "cycle"):
         # Preview attributes may sit between the value and ``selected``.
-        assert re.search(
-            r'<option value="kobo"[^>]* selected>kobo \(unavailable\)</option>', editor_html
-        )
+        state = json.loads(editor_html.split('id="dxe-data">', 1)[1].split("</script>", 1)[0])
+        assert state["display"] == "kobo"
+        assert {"id": "kobo", "name": "kobo (unavailable)"}.items() <= next(
+            d for d in state["devices"] if d["id"] == "kobo"
+        ).items()
         saved = client.post(
             "/decks/editor-save",
             data={

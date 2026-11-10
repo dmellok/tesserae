@@ -216,6 +216,7 @@ main.page.lu-page {
   text-decoration: underline;
 }
 .lu .lu-btn-primary {
+  text-decoration: none;
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -350,6 +351,12 @@ main.page.lu-page {
   color: var(--lu-acc-text);
   background: color-mix(in oklab, var(--t-fg) 6%, transparent);
 }
+/* A ghost button with an outline: a second action beside a primary one. */
+.lu .lu-btn-ghost.lu-btn-line {
+  border: 1px solid var(--t-border-strong);
+  color: var(--t-fg);
+  text-decoration: none;
+}
 .lu .lu-tb-count {
   margin-left: auto;
   font: 12px var(--t-font-mono);
@@ -432,6 +439,7 @@ main.page.lu-page {
   width: var(--lu-fold-w);
   height: var(--lu-fold-w);
   color: var(--t-muted);
+  text-decoration: none;
 }
 .lu .lu-ds-hdr .lu-now-thumb {
   grid-area: thumb;

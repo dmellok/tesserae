@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 
 import pytest
@@ -43,6 +42,11 @@ GRAPH = json.dumps(
 
 def _decks(app: Flask) -> list:
     return app.config["DECK_STORE"].all()
+
+
+def _state(html: str) -> dict:
+    """The lineup editor's JSON island (``app.deck_routes._editor_state``)."""
+    return json.loads(html.split('id="dxe-data">', 1)[1].split("</script>", 1)[0])
 
 
 def test_editor_save_persists_timer_advance(app: Flask) -> None:
@@ -315,15 +319,17 @@ def test_push_requires_bound_devices(app: Flask) -> None:
 def test_editor_renders_blank_and_existing(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
-    assert client.get("/decks/new").status_code == 200
+    blank = _state(client.get("/decks/new").get_data(as_text=True))
+    assert blank["isNew"] and blank["steps"] == [] and blank["when"]["mode"] == "at"
     client.post(
         "/decks/new",
         data={"name": "Live", "graph_json": GRAPH, "device_ids": ""},
     )
     deck = _decks(app)[0]
-    html = client.get(f"/decks/{deck.id}/edit").get_data(as_text=True)
-    assert "Flip order" in html and "dxe-data" in html
-    assert 'name="member" value="overview" checked' in html.replace("\n", " ") or "overview" in html
+    state = _state(client.get(f"/decks/{deck.id}/edit").get_data(as_text=True))
+    assert not state["isNew"] and state["deckId"] == deck.id
+    assert [s["id"] for s in state["steps"]] == ["overview", "calendar"]
+    assert state["when"]["mode"] == "manual"
 
 
 def test_editor_save_js_shape_creates_deck_with_home(app: Flask) -> None:
@@ -552,33 +558,31 @@ def _daily_deck(app: Flask, fires_at: str = "06:00"):
 
 
 def test_editor_of_a_daily_lineup_edits_its_fire_time(app: Flask) -> None:
-    """A daily lineup runs on advance_fires_at. The editor must show that time,
-    and saving a new one (6 AM to 6 PM) must store it; the cycle's anchor and
-    stop, which a daily lineup ignores, stay as they were."""
+    """A daily lineup runs on advance_fires_at. The editor shows that time as
+    "At a time", and saving a new one stores it; the cycle's anchor and stop,
+    which a daily lineup ignores, stay as they were. (The old form's
+    ``advance_fires_at`` field still saves the same way.)"""
     client, store, deck = _daily_deck(app)
-    body = client.get(f"/decks/{deck.id}/edit").get_data(as_text=True)
-    assert 'name="advance_fires_at"' in body
-    assert 'value="06:00"' in body
-    assert 'name="advance_anchor"' not in body
-    assert 'name="advance_end_at"' not in body
-
+    state = _state(client.get(f"/decks/{deck.id}/edit").get_data(as_text=True))
+    assert state["when"] == {
+        "mode": "at",
+        "start": "06:00",
+        "end": "",
+        "days": [0, 1, 2, 3, 4, 5, 6],
+        "kind": "daily",
+    }
+    base = {"deck_id": deck.id, "name": "Mixed", "pages": "overview,calendar"}
     resp = client.post(
         "/decks/editor-save",
-        data={
-            "deck_id": deck.id,
-            "name": "Mixed",
-            "pages": "overview,calendar",
-            "advance": "timer",
-            "advance_interval_minutes": "20",
-            "advance_fires_at": "18:00",
-        },
+        data={**base, "when_changed": "1", "when_mode": "at", "when_start": "18:00"},
         follow_redirects=True,
     )
     assert resp.status_code == 200
     d = store.get(deck.id)
-    assert d.advance_trigger == "daily"
-    assert d.advance_fires_at == "18:00"
+    assert (d.advance, d.advance_trigger, d.advance_fires_at) == ("timer", "daily", "18:00")
     assert (d.advance_anchor, d.advance_end_at) == ("09:00", "18:00")
+    client.post("/decks/editor-save", data={**base, "advance_fires_at": "07:15"})
+    assert store.get(deck.id).advance_fires_at == "07:15"
 
 
 def test_editor_save_without_the_fire_time_keeps_it(app: Flask) -> None:
@@ -610,18 +614,19 @@ def test_editor_of_an_interval_lineup_edits_its_window(app: Flask) -> None:
             }
         )
     )
-    body = client.get(f"/decks/{deck.id}/edit").get_data(as_text=True)
-    assert 'name="advance_window_start"' in body
-    assert 'name="advance_anchor"' not in body
+    state = _state(client.get(f"/decks/{deck.id}/edit").get_data(as_text=True))
+    assert state["when"]["mode"] == "between" and state["when"]["kind"] == "interval"
+    assert (state["when"]["start"], state["when"]["end"]) == ("08:00", "20:00")
     client.post(
         "/decks/editor-save",
         data={
             "deck_id": deck.id,
             "name": "Mixed",
             "pages": "overview,calendar",
-            "advance": "timer",
-            "advance_window_start": "09:30",
-            "advance_window_end": "",
+            "when_changed": "1",
+            "when_mode": "between",
+            "when_start": "09:30",
+            "when_end": "24:00",
         },
         follow_redirects=True,
     )
@@ -631,16 +636,31 @@ def test_editor_of_an_interval_lineup_edits_its_window(app: Flask) -> None:
     assert (d.advance_anchor, d.advance_end_at) == ("09:00", "18:00")
 
 
-def test_editor_exposes_the_return_home_wrapper_for_the_mode_toggle(app: Flask) -> None:
-    """deck_editor.js hides return-home for timer / both by this id. If the id
-    moves, the control silently stays visible for modes it doesn't apply to."""
+def test_editor_save_keeps_settings_the_form_leaves_out(app: Flask) -> None:
+    """The editor posts only what applies to the lineup and its display, so a
+    field it leaves out (keep ready, the lineup interval, the advance mode,
+    smart sync on a display that never sleeps) keeps its stored value."""
     client = app.test_client()
     _sign_in(client)
     _save_both_deck(client)
-    deck_id = _decks(app)[0].id
-    body = client.get(f"/decks/{deck_id}/edit").get_data(as_text=True)
-    assert 'id="dxe-returnhome-wrap"' in body
-    assert 'id="dxe-returnhome"' in body
+    store = app.config["DECK_STORE"]
+    deck = _decks(app)[0]
+    store.upsert(
+        deck.model_copy(
+            update={
+                "refresh_interval_minutes": 45,
+                "advance_smart_sync": True,
+                "advance_priority": 3,
+            }
+        )
+    )
+    client.post(
+        "/decks/editor-save",
+        data={"deck_id": deck.id, "name": "Mixed", "pages": "overview,calendar"},
+    )
+    d = store.get(deck.id)
+    assert (d.advance, d.advance_interval_minutes, d.refresh_interval_minutes) == ("both", 20, 45)
+    assert d.advance_smart_sync is True and d.advance_priority == 3
 
 
 def test_auto_advancing_save_without_a_timeout_stores_zero(app: Flask) -> None:
@@ -703,13 +723,12 @@ def test_editor_lists_a_deleted_dashboard_as_a_flagged_removable_step(app: Flask
     _deck_with_deleted_page(app)
     client = app.test_client()
     _sign_in(client)
-    html = client.get("/decks/rot/edit").get_data(as_text=True)
-    assert 'data-page="gone123"' in html and "Missing dashboard (deleted)" in html
-    # Position 1 of 2, as stored (the rail sorts by these order inputs).
-    assert re.search(r'name="order\[gone123\]"[^>]*value="1"', html)
-    assert re.search(r'name="order\[overview\]"[^>]*value="2"', html)
-    # Its stored dwell is preserved in the form, so an untouched save keeps it.
-    assert 'name="dwell[gone123]"' in html and 'value="7"' in html
+    state = _state(client.get("/decks/rot/edit").get_data(as_text=True))
+    # Position 1 of 2, as stored, with its own dwell, so an untouched save keeps it.
+    assert [s["id"] for s in state["steps"]] == ["gone123", "overview"]
+    assert state["steps"][0]["dwell"] == 7
+    assert state["pages"]["gone123"]["missing"] is True
+    assert state["pages"]["gone123"]["name"] == "Missing dashboard (deleted)"
 
 
 def test_saving_the_editor_unchanged_keeps_a_deleted_step_and_remove_persists(

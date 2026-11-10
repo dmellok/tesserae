@@ -538,7 +538,7 @@ def test_old_lineups_page_code_is_gone() -> None:
     assert not (REPO_ROOT / "static" / "lineup_fold.js").exists()
     old = (REPO_ROOT / "static" / "style" / "dx-decks.css").read_text()
     assert ".dk-row" not in old and ".dk-group" not in old
-    assert ".dxe-thumb" in old  # the lineup editor keeps its styles
+    assert ".lu.dxe" in old  # the lineup editor keeps its styles
     # Thumbnails fit inside the display's shape instead of cropping.
     assert re.search(r"\.lu \.lu-thumb img \{[^}]*object-fit: contain", CSS)
 

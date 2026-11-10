@@ -374,7 +374,9 @@ def test_bind_prompt_buttons_read_the_same_way_they_tab(
         try:
             page = browser.new_context(viewport={"width": width, "height": 900}).new_page()
             page.goto(f"{base}/decks/mine/edit", wait_until="load")
-            page.locator("#dxe-avail .dxe-chip--other", has_text="Google Photos").click()
+            page.locator("[data-picker]").click()
+            page.locator("[data-elsewhere-toggle]").click()
+            page.locator('.dxe-picks.is-other [data-add="photos"]').click()
             foot = page.locator("dialog.bind-dialog .wizard-footer button")
             foot.first.wait_for()
             labels = [b.inner_text().strip() for b in foot.all()]
