@@ -1335,6 +1335,21 @@
     );
   }
 
+  // The dashboards that show for their own time, not the lineup's: each name
+  // takes you to its tile.
+  function overriddenLine(k) {
+    if (k !== "cycle") return "";
+    const own = st.steps.filter((s) => s.dwell && s.dwell !== st.interval);
+    if (!own.length) return "";
+    const links = own
+      .map(
+        (s) =>
+          `<button type="button" class="dxe-link" data-overridden="${esc(s.id)}">${esc(pageOf(s.id).name)} (${esc(mins(s.dwell))})</button>`
+      )
+      .join(", ");
+    return `<span class="dxe-soft dxe-overridden">Overridden by: ${links}</span>`;
+  }
+
   function paceHtml() {
     const k = kind();
     let each = "";
@@ -1350,7 +1365,7 @@
           st.interval,
           k === "interval" ? "Sent again every" : "Each dashboard shows for",
           mins
-        ) + (k === "cycle" ? `<span class="dxe-soft">A row with its own time says so.</span>` : "");
+        ) + overriddenLine(k);
     return (
       `<div class="dxe-pace">` +
       (each
@@ -2207,6 +2222,16 @@
       ui.justDay = i;
       change(() => (st.when.days[i] = !st.when.days[i]));
       root.querySelector(`.lu-dt[data-day="${i}"]`)?.focus();
+      return;
+    }
+    if (d.overridden) {
+      select(d.overridden, false);
+      const tile = root.querySelector(`[data-step="${CSS.escape(d.overridden)}"]`);
+      if (tile) {
+        tile.scrollIntoView({ block: "center", behavior: "smooth" });
+        tile.classList.add("is-flash");
+        window.setTimeout(() => tile.classList.remove("is-flash"), 1800);
+      }
       return;
     }
     if (d.when) return setWhen(d.when);

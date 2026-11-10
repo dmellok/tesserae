@@ -1827,3 +1827,24 @@ html .dxe-move-dialog .wizard-footer button.primary.dxe-caution:hover {
 .lu.dxe .dxe-loc .lu-more-menu button {
   white-space: nowrap;
 }
+.lu.dxe .dxe-overridden {
+  flex: 1 1 100%;
+}
+.lu.dxe .dxe-step.is-flash {
+  animation: dxe-flash 1.8s ease-out;
+}
+@keyframes dxe-flash {
+  0%,
+  40% {
+    box-shadow: 0 0 0 3px var(--lu-acc);
+  }
+  100% {
+    box-shadow: 0 0 0 3px transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lu.dxe .dxe-step.is-flash {
+    animation: none;
+    box-shadow: 0 0 0 3px var(--lu-acc);
+  }
+}

@@ -1423,3 +1423,38 @@ def test_show_all_edits_the_whole_week_from_one_page(real: tuple[str, Flask]) ->
         page.locator("[data-week-toggle]").click()
         assert page.locator(".dxe-wk-row").count() == 0
         browser.close()
+
+
+def test_pace_names_the_dashboards_with_their_own_time_and_links_to_them(
+    real: tuple[str, Flask],
+) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    decks = app.config["DECK_STORE"]
+    morning = decks.get("morning")
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/morning/edit")
+        # No dashboard has its own time: nothing is said.
+        assert page.locator(".dxe-overridden").count() == 0
+        assert "its own time" not in page.locator("#dxe-sections").inner_text()
+        browser.close()
+        decks.upsert(
+            morning.model_copy(
+                update={
+                    "pages": [
+                        morning.pages[0].model_copy(update={"dwell_minutes": 50}),
+                        morning.pages[1].model_copy(update={"dwell_minutes": 63}),
+                    ]
+                }
+            )
+        )
+        browser, page, errors = _open(p, base, "/decks/morning/edit")
+        line = page.locator(".dxe-overridden")
+        assert line.inner_text() == "Overridden by: Weather (50 min), Agenda (1 h 3 min)"
+        line.locator('[data-overridden="agenda"]').click()
+        assert page.locator('[data-step="agenda"].is-open').count() == 1
+        assert page.locator('[data-step="agenda"].is-flash').count() == 1
+        _settle(page)
+        assert errors == []
+        browser.close()
