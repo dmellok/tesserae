@@ -173,6 +173,7 @@ def _declared_items(plugin_id: str, option: str) -> Callable[[Any], StepItems | 
         try:
             listed = [dict(x) for x in lister(dict(cell.options))]
         except Exception:
+            current_app.logger.warning("%s: lineup_items failed", plugin_id, exc_info=True)
             return None
         if len(listed) <= 1:
             return None
@@ -383,6 +384,7 @@ def _draw_count(plugin_id: str, options: dict[str, Any]) -> int:
     try:
         n = counter(dict(options))
     except Exception:
+        current_app.logger.warning("%s: lineup_item_count failed", plugin_id, exc_info=True)
         return 0
     return n if isinstance(n, int) and not isinstance(n, bool) and n > 0 else 0
 
@@ -395,6 +397,7 @@ def _declared_listing(plugin_id: str, option: str, options: dict[str, Any]) -> l
     try:
         listed = [dict(x) for x in lister(rest)]
     except Exception:
+        current_app.logger.warning("%s: lineup_items failed", plugin_id, exc_info=True)
         return []
     return [
         ItemInfo(

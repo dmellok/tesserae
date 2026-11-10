@@ -233,7 +233,12 @@
       "additionalProperties": false,
       "properties": {
         "pin_option": { "type": "string", "minLength": 1 },
-        "draw": { "type": "boolean" }
+        "draw": { "type": "boolean" },
+        "noun": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What the lineup editor calls the items, plural (\"papers\": \"6 papers\" instead of \"6 items\")."
+        }
       }
     },
     "updates": {

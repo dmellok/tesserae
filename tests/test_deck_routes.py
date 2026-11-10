@@ -622,7 +622,7 @@ def test_editor_of_an_interval_lineup_edits_its_window(app: Flask) -> None:
         data={
             "deck_id": deck.id,
             "name": "Mixed",
-            "pages": "overview,calendar",
+            "pages": "overview",  # one dashboard: it stays an interval
             "when_changed": "1",
             "when_mode": "between",
             "when_start": "09:30",

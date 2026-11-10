@@ -410,3 +410,388 @@ def test_the_new_lineup_flow_creates_through_the_lineup_path(app: Flask) -> None
     assert (one.advance_trigger, one.advance_window_start) == ("interval", "06:00")
     assert _create(app, when="between", start="09:00", end="06:00", page_ids=["a"])["ok"] is False
     assert _create(app, when="at", start="25:00", page_ids=["a"])["ok"] is False
+
+
+def test_create_refuses_days_and_times_it_cannot_take(app: Flask) -> None:
+    store = app.config["DECK_STORE"]
+    for bad in (
+        {"when": "at", "start": "06:00", "days": ""},  # no day ticked
+        {"when": "at", "start": "06:00", "days": "9"},  # not a weekday
+        {"when": "sometimes", "start": "06:00"},
+    ):
+        got = _create(app, page_ids=["a"], **bad)
+        assert got["ok"] is False, bad
+    assert store.all() == []
+
+
+def test_create_refuses_a_window_that_meets_another_lineup(app: Flask) -> None:
+    _register(app, "hall")
+    app.config["DECK_STORE"].upsert(
+        Deck(
+            id="other", name="Other", device_ids=["hall"], pages=[DeckPage(page_id="b")],
+            advance="timer", advance_trigger="cycle", advance_anchor="09:00",
+            advance_end_at="11:00",
+        )
+    )  # fmt: skip
+    form = {"device_ids": "hall", "page_ids": ["a", "c"], "when": "between"}
+    clash = app.test_client().post(
+        "/decks/new/lineup", data={"name": "New", "start": "08:00", "end": "10:00", **form}
+    )
+    assert clash.status_code == 409 and "Other" in clash.get_json()["error"]
+    assert [d.id for d in app.config["DECK_STORE"].all()] == ["other"]
+    # Touching windows don't meet.
+    assert _create(app, start="07:00", end="09:00", **form)["ok"] is True
+
+
+def test_create_warns_about_quiet_hours(app: Flask) -> None:
+    _register(app, "hall")
+    app.config["SETTINGS_STORE"].patch_section(
+        "app",
+        {"quiet_hours_enabled": True, "quiet_hours_start": "23:00", "quiet_hours_end": "07:00"},
+    )
+    got = _create(app, when="at", start="06:00", device_ids="hall", page_ids=["a"])
+    assert got["ok"] and got["warnings"] == [
+        "New at 6\u202fAM is in hall's Quiet hours (11\u202fPM–7\u202fAM), so it's skipped."
+    ]
+
+
+# -- review fixes: the save keeps what it doesn't show ----------------------------
+
+
+def test_saving_keeps_every_display_a_lineup_is_bound_to(app: Flask) -> None:
+    _register(app, "hall")
+    _register(app, "study")
+    _deck(app, device_ids=["hall", "study"])
+    html = app.test_client().get("/decks/lu/edit").get_data(as_text=True)
+    state = json.loads(html.split('id="dxe-data">', 1)[1].split("</script>", 1)[0])
+    assert (state["display"], state["displays"]) == ("hall", ["hall", "study"])
+    assert _save(app, device_ids=["hall", "study"]).get_json()["ok"]
+    assert _stored(app).device_ids == ["hall", "study"]
+    _save(app, device_ids="hall")  # an older client posts just the first
+    assert _stored(app).device_ids == ["hall", "study"]
+    _save(app, device_ids=["study", "hall"])
+    assert _stored(app).device_ids == ["study", "hall"]
+
+
+def test_a_partial_save_keeps_every_field_it_leaves_out(app: Flask) -> None:
+    _register(app, "hall")
+    _deck(
+        app, name="Morning", enabled=True, device_ids=["hall"], advance="timer",
+        advance_trigger="daily", advance_fires_at="07:00", home_page_id="b",
+        entry_page_id="b", home_timeout_minutes=20,
+        pages=[DeckPage(page_id="a"), DeckPage(page_id="b")],
+    )  # fmt: skip
+    resp = app.test_client().post(
+        "/decks/editor-save", data={"deck_id": "lu", "pages": "a,b", "respond": "json"}
+    )
+    assert resp.get_json()["ok"]
+    d = _stored(app)
+    assert (d.name, d.enabled, d.device_ids) == ("Morning", True, ["hall"])
+    assert (d.home_page_id, d.entry_page_id, d.home_timeout_minutes) == ("b", "b", 20)
+    # The switch posts a hidden "0" before "on": off is said, not left out.
+    _save(app, pages="a,b", enabled="0")
+    assert _stored(app).enabled is False
+    # A home whose dashboard leaves the lineup goes with it.
+    _save(app, pages="a")
+    assert (_stored(app).home_page_id, _stored(app).entry_page_id) == (None, None)
+
+
+def test_the_editor_state_does_not_pin_home_to_the_first_dashboard(app: Flask) -> None:
+    _deck(app, pages=[DeckPage(page_id="a"), DeckPage(page_id="b")])
+    html = app.test_client().get("/decks/lu/edit").get_data(as_text=True)
+    state = json.loads(html.split('id="dxe-data">', 1)[1].split("</script>", 1)[0])
+    assert state["home"] == ""
+    _save(app, pages="b,a")
+    assert _stored(app).home_page_id is None  # home still follows the order
+
+
+def test_a_rotation_without_a_return_home_field_stores_none(app: Flask) -> None:
+    """A rotation reclaims its display at each step, so a return home it can't
+    show is off; a daily lineup keeps the one it has."""
+    _deck(
+        app, advance="timer", advance_trigger="cycle", home_timeout_minutes=15,
+        pages=[DeckPage(page_id="a"), DeckPage(page_id="b")],
+    )  # fmt: skip
+    _save(app, pages="a,b")
+    assert _stored(app).home_timeout_minutes == 0
+
+
+# -- review fixes: a window's shape follows its dashboards ------------------------
+
+
+def test_an_interval_given_a_second_dashboard_becomes_a_rotation(app: Flask) -> None:
+    _deck(
+        app, advance="timer", advance_trigger="interval", advance_window_start="06:00",
+        advance_window_end="18:00", legacy_kind="schedule",
+    )  # fmt: skip
+    assert _save(app, pages="a,b").get_json()["ok"]  # no time edit
+    d = _stored(app)
+    assert (d.advance_trigger, d.advance_anchor, d.advance_end_at) == ("cycle", "06:00", "18:00")
+    assert (d.advance_window_start, d.advance_window_end, d.legacy_kind) == (None, None, None)
+    # Back to one dashboard: an interval again, the same window.
+    _save(app, pages="a")
+    d = _stored(app)
+    assert (d.advance_trigger, d.advance_window_start, d.advance_window_end) == (
+        "interval",
+        "06:00",
+        "18:00",
+    )
+    # With the time edited too.
+    got = _when(app, "between", "07:00", "24:00", pages="a,b")
+    d = _stored(app)
+    assert got["ok"] and (d.advance_trigger, d.advance_anchor, d.advance_end_at) == (
+        "cycle",
+        "07:00",
+        None,
+    )
+
+
+def test_an_interval_past_midnight_cannot_take_a_second_dashboard(app: Flask) -> None:
+    _deck(
+        app, advance="timer", advance_trigger="interval", advance_window_start="22:00",
+        advance_window_end="02:00",
+    )  # fmt: skip
+    got = _save(app, pages="a,b").get_json()
+    assert got["ok"] is False and "midnight" in got["error"]
+    assert _stored(app).page_ids == ["a"]
+
+
+# -- review fixes: stale and deleted saves -------------------------------------------
+
+
+def _revision(app: Flask) -> str:
+    html = app.test_client().get("/decks/lu/edit").get_data(as_text=True)
+    return json.loads(html.split('id="dxe-data">', 1)[1].split("</script>", 1)[0])["revision"]
+
+
+def test_a_save_from_a_stale_page_is_refused(app: Flask) -> None:
+    _deck(app)
+    loaded = _revision(app)
+    store = app.config["DECK_STORE"]
+    store.upsert(_stored(app).model_copy(update={"name": "Renamed elsewhere"}))
+    resp = _save(app, name="Mine", revision=loaded)
+    assert resp.status_code == 409
+    assert resp.get_json() == {
+        "ok": False,
+        "error": "Changed elsewhere; reload to see it.",
+        "reload": True,
+    }
+    assert _stored(app).name == "Renamed elsewhere"
+    assert _save(app, name="Mine", revision=_revision(app)).get_json()["ok"]
+    assert _stored(app).name == "Mine"
+
+
+def test_a_save_of_a_deleted_lineup_is_refused_not_remade(app: Flask) -> None:
+    _deck(app)
+    loaded = _revision(app)
+    app.config["DECK_STORE"].delete("lu")
+    resp = _save(app, revision=loaded)
+    assert resp.status_code == 409 and resp.get_json()["error"] == "This lineup was deleted."
+    assert app.config["DECK_STORE"].all() == []
+
+
+def test_a_save_still_carrying_another_displays_dashboard_is_refused(app: Flask) -> None:
+    _register(app, "hall")
+    _register(app, "study")
+    app.config["PAGE_STORE"].save(Page(id="b", name="B", device_ids=["study"]))
+    _deck(app, device_ids=["hall"])
+    resp = _save(app, pages="a,b", device_ids="hall")
+    assert resp.status_code == 409 and resp.get_json()["code"] == "pages_not_bound"
+    assert _stored(app).page_ids == ["a"]
+
+
+def test_a_reordered_rotation_resyncs_and_others_do_not(app: Flask) -> None:
+    calls: list[str] = []
+    app.config["SCHEDULER"] = SimpleNamespace(resync_cycle=calls.append)
+    two = [DeckPage(page_id="a"), DeckPage(page_id="b")]
+    _deck(app, advance="timer", advance_trigger="cycle", pages=two)
+    _save(app, pages="a,b")
+    assert calls == []  # same order
+    _save(app, pages="b,a")
+    assert calls == ["lu"]
+    _deck(app, advance="timer", advance_trigger="daily", advance_fires_at="07:00", pages=two)
+    _save(app, pages="a,b")
+    assert calls == ["lu"]
+
+
+# -- review fixes: overlaps that are not clashes -------------------------------------
+
+
+@pytest.mark.parametrize(
+    "other",
+    [
+        {"device_ids": ["study"]},  # another display
+        {"advance_anchor": "10:00", "advance_end_at": "12:00"},  # starts as this ends
+        {"advance_days_of_week": [5, 6]},  # other days
+    ],
+)
+def test_a_window_next_to_another_lineup_saves(app: Flask, other: dict[str, Any]) -> None:
+    _register(app, "hall")
+    _register(app, "study")
+    _deck(app, device_ids=["hall"], advance="timer", advance_trigger="daily",
+          advance_fires_at="06:00", advance_days_of_week=[0, 1, 2, 3, 4])  # fmt: skip
+    fields: dict[str, Any] = {
+        "id": "other", "name": "Other", "device_ids": ["hall"], "pages": [DeckPage(page_id="b")],
+        "advance": "timer", "advance_trigger": "cycle", "advance_anchor": "08:00",
+        "advance_end_at": "12:00", **other,
+    }  # fmt: skip
+    app.config["DECK_STORE"].upsert(Deck(**fields))
+    got = _when(app, "between", "06:00", "10:00", device_ids="hall", pages="a,c")
+    assert got["ok"] is True, got
+
+
+# -- review fixes: dashboard edits never fail a stored save ---------------------------
+
+
+def test_a_pin_the_widget_cannot_list_warns(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    def broken(options: dict[str, Any]) -> list[dict[str, Any]]:
+        raise OSError("offline")
+
+    _install(
+        app,
+        monkeypatch,
+        papers={
+            "manifest": {"lineups": {"pin_option": "paper"}},
+            "module": SimpleNamespace(lineup_items=broken),
+        },
+    )
+    _widget_page(app, "papers", {"paper": ""}, "news")
+    _deck(app, pages=[DeckPage(page_id="news")])
+    got = _save(app, pages="news", **{"pin[news]": "wsj"}).get_json()
+    assert got["ok"] and got["warnings"] == ["Couldn't pin news; its list didn't load."]
+
+
+def test_a_dashboard_write_that_fails_warns_instead_of_500(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _deck(app)
+    pages = app.config["PAGE_STORE"]
+
+    def fail(*args: Any, **kwargs: Any) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(pages, "update_if_revision", fail)
+    resp = _save(app, name="Kept", **{"page_refresh[a]": "30"})
+    assert resp.status_code == 200
+    assert resp.get_json()["warnings"] == ["Saved, but A's settings weren't applied."]
+    assert _stored(app).name == "Kept"
+
+
+def test_a_dashboard_edited_meanwhile_keeps_that_edit(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The Updates write is a compare-and-swap: a composer save between its
+    read and its write is kept, and Updates lands on top of it."""
+    _deck(app)
+    pages = app.config["PAGE_STORE"]
+    real = pages.update_if_revision
+    raced: list[bool] = []
+
+    def racing(page_id: str, revision: str, transform: Any) -> Any:
+        if not raced:
+            raced.append(True)
+            pages.save(pages.get(page_id).model_copy(update={"name": "Renamed in the composer"}))
+        return real(page_id, revision, transform)
+
+    monkeypatch.setattr(pages, "update_if_revision", racing)
+    assert _save(app, **{"page_refresh[a]": "30"}).get_json()["warnings"] == []
+    page = pages.get("a")
+    assert (page.name, page.refresh_minutes) == ("Renamed in the composer", 30)
+
+
+def test_unicode_digits_never_crash_a_request(app: Flask) -> None:
+    _deck(app)
+    c = app.test_client()
+    assert c.get("/decks/dashboard-items?page_id=a&offset=²&limit=²").status_code == 200
+    assert _save(app, **{"page_refresh[a]": "²"}).status_code == 200
+    assert _save(app, advance_days=["²", "1"]).get_json()["ok"]
+    assert _stored(app).advance_days_of_week == [1]
+
+
+def test_dashboard_items_bounds(
+    app: Flask, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from app.step_items import MAX_PAGE_ITEMS
+
+    _gallery(app, monkeypatch, tmp_path, 412)
+    c = app.test_client()
+
+    def get(query: str) -> dict[str, Any]:
+        resp = c.get(f"/decks/dashboard-items?page_id=photos&{query}")
+        assert resp.status_code == 200, query
+        return resp.get_json()
+
+    assert len(get("limit=100000")["items"]) == MAX_PAGE_ITEMS
+    assert get("offset=5000")["items"] == []
+    assert get("offset=abc&limit=2")["items"][0]["index"] == 0
+    assert get("q=" + "x" * 5000)["matched"] == 0  # a long query is cut, not refused
+
+
+def test_a_widget_whose_list_hook_raises_still_lists_nothing(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def broken(options: dict[str, Any]) -> list[dict[str, Any]]:
+        raise RuntimeError("boom")
+
+    _install(
+        app,
+        monkeypatch,
+        papers={
+            "manifest": {"lineups": {"pin_option": "paper"}},
+            "module": SimpleNamespace(lineup_items=broken),
+        },
+    )
+    _widget_page(app, "papers", {"paper": ""}, "news")
+    got = app.test_client().get("/decks/dashboard-items?page_id=news").get_json()
+    assert got["ok"] and (got["mode"], got["items"]) == ("none", [])
+    _deck(app, pages=[DeckPage(page_id="news")])
+    assert app.test_client().get("/decks/lu/edit").status_code == 200
+
+
+# -- review fixes: what the editor is told -------------------------------------------
+
+
+def test_the_editor_knows_which_dashboards_other_lineups_share(app: Flask) -> None:
+    _deck(app, pages=[DeckPage(page_id="a"), DeckPage(page_id="b")])
+    app.config["DECK_STORE"].upsert(Deck(id="other", name="O", pages=[DeckPage(page_id="b")]))
+    html = app.test_client().get("/decks/lu/edit").get_data(as_text=True)
+    state = json.loads(html.split('id="dxe-data">', 1)[1].split("</script>", 1)[0])
+    assert (state["pages"]["a"]["shared"], state["pages"]["b"]["shared"]) == (0, 1)
+
+
+def test_a_random_gallery_says_so(
+    app: Flask, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from app.lineup_editor import dashboard_summary
+
+    photos = _gallery(app, monkeypatch, tmp_path, 5)
+    shuffled = photos.model_copy(
+        update={"cells": [photos.cells[0].model_copy(update={"options": {"folder": "trip"}})]}
+    )
+    with app.test_request_context():
+        assert dashboard_summary(photos)["items"]["order"] == "in turn"
+        assert dashboard_summary(shuffled)["items"]["order"] == "random"
+
+
+def test_a_widget_may_name_its_items_in_its_manifest() -> None:
+    import jsonschema
+
+    schema = json.loads((REPO_ROOT / "schema" / "plugin.schema.json").read_text(encoding="utf-8"))
+    manifest = {
+        "tesserae_compat": "1.x",
+        "name": "Papers",
+        "version": "0.1.0",
+        "kind": "widget",
+        "description": "x",
+        "supports": {"sizes": ["lg"]},
+        "lineups": {"pin_option": "paper", "noun": "papers"},
+    }
+    jsonschema.validate(manifest, schema)
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate({**manifest, "lineups": {"noun": ""}}, schema)
+
+
+def test_deleting_says_lineup(app: Flask) -> None:
+    _deck(app)
+    resp = app.test_client().post("/decks/lu/delete", follow_redirects=True)
+    assert b"Lineup deleted." in resp.data

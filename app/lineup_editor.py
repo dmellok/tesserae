@@ -90,6 +90,8 @@ def dashboard_summary(page: Any) -> dict[str, Any]:
                 "random",
             )
             fact += ", in order" if mode == "sequential" else ", random each time"
+            # The row says how one is picked per visit.
+            items = {**items, "order": "in turn" if mode == "sequential" else "random"}
         facts.append(fact)
     elif items["mode"] == "draw":
         count = int(items["count"])
