@@ -398,6 +398,37 @@ main.page.dxe-page {
   text-transform: uppercase;
   color: var(--t-muted);
 }
+.lu.dxe .dxe-bar-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.lu.dxe .dxe-week-toggle {
+  font-size: 12px;
+}
+.lu.dxe .dxe-wk {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.lu.dxe .dxe-wk-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+.lu.dxe .dxe-wk-lab {
+  font: 600 11px var(--t-font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--t-muted);
+}
+.lu.dxe .dxe-wk-row.is-today .dxe-wk-lab {
+  color: var(--lu-acc-text);
+}
+.lu.dxe .dxe-wk-row .lu-trk {
+  height: 26px;
+}
 .lu.dxe .dxe-daybar .lu-today-bar {
   display: flex;
   flex-direction: column;
@@ -1788,3 +1819,9 @@ html .dxe-move-dialog .wizard-footer button.primary.dxe-caution:hover {
 }
 
 /* The Lineups page itself (/decks) lives in dx-lineups.css. */
+.lu.dxe .dxe-wk .lu-nflag {
+  display: none;
+}
+.lu.dxe .dxe-wk .lu-trk.flagged {
+  margin: 0;
+}

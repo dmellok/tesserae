@@ -500,6 +500,25 @@
     const bar = $("dxe-daybar");
     return phoneMQ.matches || !bar || bar.clientWidth <= 602;
   };
+  const WEEK_KEY = "tesserae.lineupEditor.week";
+  const DAY_ABBR = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const store = {
+    get: (k) => {
+      try {
+        return window.localStorage.getItem(k);
+      } catch {
+        return null;
+      }
+    },
+    set: (k, v) => {
+      try {
+        window.localStorage.setItem(k, v);
+      } catch {
+        /* private mode: the fold just isn't remembered */
+      }
+    },
+  };
+  let weekOn = store.get(WEEK_KEY) === "1"; // read before the first draw: no flash
   let shownView = null; // the display as edited: what a drag measures against
   let barRO = null;
   function drawDayBar() {
@@ -573,9 +592,26 @@
     // edit into When it runs, nothing is saved from here.
     barRO = barReadOnly();
     const editable = timed && !barRO ? [id] : [];
-    bar.innerHTML =
-      `<p class="dxe-bar-day">${esc(label)}</p>` +
-      `<div class="lu-today-bar">${R.dayTrack(shown, dd, editable, true, "dxe-trk")}${R.dayScale(dd)}</div>`;
+    const toggle = `<button type="button" class="dxe-link quiet dxe-week-toggle" data-week-toggle data-fk="bar-week" aria-expanded="${weekOn}">${weekOn ? "Show today" : "Show all"}</button>`;
+    const head = (text) =>
+      `<div class="dxe-bar-head"><p class="dxe-bar-day">${esc(text)}</p>${toggle}</div>`;
+    if (weekOn) {
+      // The Lineups page's day bars, one per day; this lineup's block edits the
+      // same start and end on every day it runs.
+      const rows = shown.week
+        .map(
+          (w) =>
+            `<div class="dxe-wk-row${w.weekday === today ? " is-today" : ""}" data-day="${w.weekday}"><span class="dxe-wk-lab" title="${esc(DAY_NAMES[w.weekday])}${w.weekday === today ? " (today)" : ""}">${DAY_ABBR[w.weekday]}</span><div class="lu-today-bar">${R.dayTrack(shown, w, editable, true, "dxe-trk")}</div></div>`
+        )
+        .join("");
+      bar.innerHTML =
+        head("This week") +
+        `<div class="dxe-wk">${rows}<div class="dxe-wk-row dxe-wk-scale"><span class="dxe-wk-lab"></span><div class="lu-today-bar">${R.dayScale({ segments: [] })}</div></div></div>`;
+    } else {
+      bar.innerHTML =
+        head(label) +
+        `<div class="lu-today-bar">${R.dayTrack(shown, dd, editable, true, "dxe-trk")}${R.dayScale(dd)}</div>`;
+    }
     const editUrlOf = (b) => {
       const l = shown.lineups.find((x) => x.id === b.dataset.lineup);
       if (l && l.name) b.dataset.name = l.name;
@@ -2513,9 +2549,23 @@
 
   // Another lineup's block on the day bar: a plain navigation, so the
   // beforeunload guard below asks first when there are unsaved edits.
+  const SCROLL_KEY = "tesserae.lineupEditor.scroll";
+  root.addEventListener("click", (e) => {
+    if (!e.target.closest || !e.target.closest("[data-week-toggle]")) return;
+    weekOn = !weekOn;
+    store.set(WEEK_KEY, weekOn ? "1" : "0");
+    drawDayBar();
+    root.querySelector("[data-week-toggle]")?.focus();
+    live(weekOn ? "Showing the whole week." : "Showing today.");
+  });
   const openBlock = (e) => {
     const blk = e.target.closest && e.target.closest(".dxe-daybar .lu-blk.is-link[data-href]");
     if (!blk) return false;
+    try {
+      window.sessionStorage.setItem(SCROLL_KEY, String(window.scrollY));
+    } catch {
+      /* the next page just opens at the top */
+    }
     window.location.href = blk.dataset.href;
     return true;
   };
@@ -2558,4 +2608,12 @@
     saved = snapshot();
   }
   draw();
+  // Switching lineups from the week view lands where it was left.
+  try {
+    const y = Number(window.sessionStorage.getItem(SCROLL_KEY));
+    window.sessionStorage.removeItem(SCROLL_KEY);
+    if (y > 0) window.scrollTo(0, y);
+  } catch {
+    /* no saved position */
+  }
 })();

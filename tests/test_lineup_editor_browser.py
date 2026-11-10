@@ -1319,3 +1319,76 @@ def test_another_lineups_block_opens_its_editor_and_guards_unsaved_edits(
         assert dialogs == ["beforeunload"]
         assert page.url.endswith("/decks/mid/edit")
         browser.close()
+
+
+def test_show_all_edits_the_whole_week_from_one_page(real: tuple[str, Flask]) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    app.config["DECK_STORE"].upsert(
+        Deck(
+            id="wk", name="Weekdays", device_ids=["tv"], advance="timer", advance_trigger="cycle",
+            advance_anchor="09:00", advance_end_at="12:00", advance_days_of_week=[0, 1, 2, 3, 4],
+            pages=[DeckPage(page_id="clock"), DeckPage(page_id="climate")],
+        )
+    )  # fmt: skip
+    app.config["DECK_STORE"].upsert(
+        Deck(
+            id="eve", name="Evening", device_ids=["tv"], advance="timer", advance_trigger="cycle",
+            advance_anchor="18:00", advance_end_at="21:00",
+            pages=[DeckPage(page_id="clock"), DeckPage(page_id="climate")],
+        )
+    )  # fmt: skip
+    mine = ".dxe-daybar .lu-blk[data-edit]"
+    with sync_playwright() as p:
+        browser, page, _errors = _open(p, base, "/decks/wk/edit")
+        assert page.locator(".dxe-wk-row").count() == 0
+        toggle = page.locator("[data-week-toggle]")
+        assert toggle.inner_text() == "Show all"
+        toggle.click()
+        assert page.locator("[data-week-toggle]").inner_text() == "Show today"
+        labels = page.locator(".dxe-wk-row:not(.dxe-wk-scale) .dxe-wk-lab").all_inner_texts()
+        assert [t.lower() for t in labels] == ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+        assert page.locator(".dxe-wk-row.is-today").count() == 1
+        # Its block is on its five days only, each draggable.
+        assert page.locator(mine).count() == 5
+        assert page.locator(".dxe-wk-row .lu-blk.is-link").count() >= 5
+        # Dragging a block on a day that is not today edits the same start and end.
+        today = int(page.locator(".dxe-wk-row.is-today").get_attribute("data-day"))
+        day = next(d for d in range(5) if d != today)
+        blk = page.locator(f'.dxe-wk-row[data-day="{day}"] .lu-blk[data-edit]')
+        box = blk.bounding_box()
+        hour = page.locator(f'.dxe-wk-row[data-day="{day}"] .lu-trk').bounding_box()["width"] / 24
+        x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+        page.mouse.move(x, y)
+        page.mouse.down()
+        page.mouse.move(x + hour * 1.1, y, steps=5)
+        page.mouse.up()
+        assert _times(page) == ("10:00", "13:00")
+        # An empty cell on a day it does not run never adds the day.
+        off = page.locator('.dxe-wk-row[data-day="6"] .lu-trk')
+        before = page.locator("[data-day].lu-dt.on").count()
+        off.click(position={"x": 60, "y": 8})
+        assert page.locator("[data-day].lu-dt.on").count() == before
+        assert page.locator(mine).count() == 5
+        # The state is remembered per browser and survives a switch to another lineup.
+        page.evaluate("window.scrollTo(0, 40)")
+        dialogs: list[str] = []
+        page.on("dialog", lambda d: (dialogs.append(d.type), d.dismiss()))
+        page.locator(".dxe-wk-row .lu-blk.is-link[data-lineup='eve']").first.evaluate(
+            "(n) => n.click()"
+        )
+        page.wait_for_timeout(300)
+        assert dialogs == ["beforeunload"]  # unsaved edits still guard the switch
+        page.locator("[data-discard]").click()
+        page.reload()
+        _settle(page)
+        assert page.locator("[data-week-toggle]").inner_text() == "Show today"
+        page.locator(".dxe-wk-row .lu-blk.is-link[data-lineup='eve']").first.click()
+        page.wait_for_url("**/decks/eve/edit")
+        _settle(page)
+        assert page.locator(".dxe-wk-row").count() == 8
+        # Show today collapses it again.
+        page.locator("[data-week-toggle]").click()
+        assert page.locator(".dxe-wk-row").count() == 0
+        browser.close()
