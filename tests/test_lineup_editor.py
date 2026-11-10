@@ -1030,3 +1030,37 @@ def test_recent_sent_lists_the_pictures_a_dashboard_sent_newest_first(app: Flask
         assert _recent_sent("elsewhere") == []
     assert len(got) == 8
     assert [r["thumb"].split("/")[-1].split(".")[0] for r in got] == digests[::-1][:8]
+
+
+def test_widget_thumbs_follow_the_ingress_prefix(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ingress = "/api/hassio_ingress/abc"
+    listed = [
+        {"key": "a", "thumb": "/plugins/picture_immich/image/l/a?thumb=1"},
+        {"key": "b", "thumb": f"{ingress}/plugins/picture_immich/image/l/b?thumb=1"},
+        {"key": "c", "thumb": "https://civitai.example/x.jpg"},
+    ]
+    module = SimpleNamespace(lineup_items=lambda options: listed)
+    _install(
+        app,
+        monkeypatch,
+        photos={"manifest": {"lineups": {"pin_option": "photo"}}, "module": module},
+    )
+    _widget_page(app, "photos", {}, "ph")
+    c = app.test_client()
+
+    def thumbs(**kw: Any) -> list[str]:
+        got = c.get("/decks/dashboard-items?page_id=ph", **kw).get_json()
+        return [it["thumb_url"] for it in got["items"]]
+
+    assert thumbs(headers={"X-Ingress-Path": ingress}) == [
+        f"{ingress}/plugins/picture_immich/image/l/a?thumb=1",
+        f"{ingress}/plugins/picture_immich/image/l/b?thumb=1",
+        "https://civitai.example/x.jpg",
+    ]
+    assert thumbs() == [
+        "/plugins/picture_immich/image/l/a?thumb=1",
+        f"{ingress}/plugins/picture_immich/image/l/b?thumb=1",
+        "https://civitai.example/x.jpg",
+    ]

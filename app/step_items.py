@@ -56,7 +56,7 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlsplit
 
-from flask import current_app, url_for
+from flask import current_app, has_request_context, request, url_for
 
 from app.lineups_view import ItemInfo
 
@@ -165,6 +165,19 @@ def _item_ctx(page: Any, placement: Any, plugin_id: str, device_id: str | None) 
     }
 
 
+def _with_script_root(path: str) -> str:
+    """An app-relative path as the browser must ask for it: under Home Assistant
+    ingress the app lives beneath a prefix (``request.script_root``), so a bare
+    ``/plugins/...`` would resolve against the host's root and 404. Already
+    prefixed paths are left alone."""
+    if not has_request_context():
+        return path
+    root = request.script_root.rstrip("/")
+    if not root or path == root or path.startswith(root + "/"):
+        return path
+    return root + path
+
+
 def _safe_thumb(raw: Any) -> str:
     """A widget-supplied preview image URL, kept only when it is http(s) or an
     app-relative path (never ``//host`` or a script scheme)."""
@@ -174,7 +187,7 @@ def _safe_thumb(raw: Any) -> str:
     if not url or len(url) > 2000 or any(ord(ch) < 32 or ch in '\\"<>' for ch in url):
         return ""
     if url.startswith("/") and not url.startswith("//"):
-        return url
+        return _with_script_root(url)
     parts = urlsplit(url)
     return url if parts.scheme in ("http", "https") and parts.netloc else ""
 

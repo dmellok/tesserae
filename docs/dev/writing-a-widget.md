@@ -231,7 +231,8 @@ drawing render also carries hidden options `_draw` (a token) and `_browse`
 show that turn and move nothing).
 
 An item may also carry `"thumb": "<image URL>"` (absolute http(s) or an app-relative
-path; anything else is dropped) to show a preview picture in the lineup editor and the
+path; anything else is dropped; core adds the app's URL prefix to an app-relative path, so it
+loads under Home Assistant ingress, and `url_for` works too) to show a preview picture in the lineup editor and the
 Lineups page; without one the item shows its rendered thumbnail or a label card. A
 `lineup_items(options, *, ctx=None)` or `lineup_item_count(options, *, ctx=None)` that
 names a `ctx` keyword also gets a plain dict with `data_dir`, `cell_w` and `cell_h` (the
