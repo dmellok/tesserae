@@ -26,15 +26,18 @@
         <span id="dxe-crumb-here">{{ 'New lineup' if not deck else '' }}</span>
       </nav>
       {% if deck %}
-      <label class="dxe-on">
-        <span id="dxe-on-word">{{ 'On' if deck.enabled else 'Off' }}</span>
-        <span class="switch dxe-switch">
-          <input type="hidden" name="enabled" value="0">
-          <input type="checkbox" name="enabled" id="dxe-enabled" {% if deck.enabled %}checked{% endif %}
-                 aria-label="Lineup on">
-          <span class="switch-track"><span class="switch-thumb"></span></span>
-        </span>
-      </label>
+      <div class="dxe-top-ctl">
+        <div class="dxe-loc" id="dxe-loc" role="group" aria-label="Display"></div>
+        <label class="dxe-on">
+          <span id="dxe-on-word">{{ 'On' if deck.enabled else 'Off' }}</span>
+          <span class="switch dxe-switch">
+            <input type="hidden" name="enabled" value="0">
+            <input type="checkbox" name="enabled" id="dxe-enabled" {% if deck.enabled %}checked{% endif %}
+                   aria-label="Lineup on">
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+          </span>
+        </label>
+      </div>
       {% endif %}
     </div>
 

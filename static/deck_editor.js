@@ -140,7 +140,6 @@
     draws: {}, // page id -> [{key, state, thumb, note}]
     picker: false,
     elsewhere: false,
-    changeDisplay: false,
     step: S.isNew ? (S.display ? 2 : 1) : 0, // the new flow's open step
     saving: false,
     pushing: false,
@@ -245,6 +244,93 @@
     need.forEach((id) => (ui.consent[id] = mode));
     return true;
   }
+  // The Move dialog: pick the display, see what it changes in one line.
+  // Resolves to the display id, or null when cancelled.
+  function askMove() {
+    return new Promise((resolve) => {
+      if (typeof HTMLDialogElement === "undefined") return resolve(null);
+      const opener = document.activeElement;
+      const choices = S.devices.filter((d) => d.id !== st.display);
+      const dlg = document.createElement("dialog");
+      dlg.className = "wizard-dialog bind-dialog dxe-move-dialog";
+      dlg.setAttribute("aria-labelledby", "dxe-move-title");
+      dlg.setAttribute("aria-describedby", "dxe-move-lines");
+      const more = otherDisplays().map(nameOf);
+      dlg.innerHTML =
+        `<div class="wizard-head"><span class="wizard-head-icon" aria-hidden="true"><i class="ph-bold ph-arrows-left-right"></i></span>` +
+        `<div class="wizard-head-text"><h2 id="dxe-move-title">Move this lineup?</h2></div></div>` +
+        `<div class="wizard-body bind-dialog-body">` +
+        `<div class="wizard-field"><label class="wizard-label" for="dxe-move-to">Move to</label>` +
+        `<select id="dxe-move-to">${choices.map((d) => `<option value="${esc(d.id)}">${esc(d.name)}</option>`).join("")}</select></div>` +
+        `<div id="dxe-move-lines" class="dxe-move-lines" aria-live="polite"></div></div>` +
+        `<div class="wizard-footer"><button type="button" class="ghost" data-cancel>Cancel</button>` +
+        `<span class="wizard-footer-spacer"></span><button type="button" class="primary dxe-caution" data-ok>Move</button></div>`;
+      document.body.append(dlg);
+      const sel = dlg.querySelector("select");
+      const lines = dlg.querySelector("#dxe-move-lines");
+      const ok = dlg.querySelector("[data-ok]");
+      const paint = () => {
+        const to = sel.value;
+        const from = S.display;
+        const rows = [];
+        if (to === from) rows.push(`Stays on ${nameOf(to)}; this drops the staged move.`);
+        else
+          rows.push(
+            from ? `Stops on ${nameOf(from)}; runs on ${nameOf(to)}.` : `Runs on ${nameOf(to)}.`
+          );
+        if (more.length) rows.push(`Only ${nameOf(S.display)} moves; ${more.join(" + ")} stays.`);
+        const n = needsConsent(
+          st.steps.map((x) => x.id),
+          to
+        ).length;
+        if (n) rows.push(`You'll be asked to bind ${plural(n, "dashboards")} to ${nameOf(to)}.`);
+        lines.innerHTML = rows.map((r) => `<p>${esc(r)}</p>`).join("");
+        ok.textContent = `Move to ${nameOf(to)}`;
+      };
+      sel.addEventListener("change", paint);
+      paint();
+      let answer = null;
+      dlg.querySelector("[data-cancel]").addEventListener("click", () => dlg.close());
+      ok.addEventListener("click", () => {
+        answer = sel.value;
+        dlg.close();
+      });
+      dlg.addEventListener("close", () => {
+        dlg.remove();
+        if (opener && typeof opener.focus === "function" && document.contains(opener))
+          opener.focus({ preventScroll: true });
+        resolve(answer);
+      });
+      dlg.addEventListener("click", (e) => {
+        if (e.target === dlg) dlg.close();
+      });
+      dlg.showModal();
+      sel.focus();
+    });
+  }
+  // The bind answers were for the display it was moving to.
+  function dropMoveConsent() {
+    if (ui.consentDisplay === S.display) return;
+    ui.consent = {};
+    ui.consentDisplay = S.display;
+  }
+  // Confirm stages the move; it applies on Save like the other edits.
+  async function moveDisplay() {
+    if (ui.saving || S.isNew) return;
+    const to = await askMove();
+    if (!to || to === st.display) return;
+    if (
+      !(await confirmBind(
+        st.steps.map((s) => s.id),
+        to
+      ))
+    )
+      return;
+    if (to === S.display) dropMoveConsent();
+    change(() => (st.display = to));
+    live(to === S.display ? "Move dropped." : `Moving to ${nameOf(to)}. Save to apply.`);
+    root.querySelector("[data-move]")?.focus();
+  }
   function consentFields(fd) {
     st.steps.forEach((s) => {
       if (!strandedFor(s.id, st.display) || !ui.consent[s.id]) return;
@@ -321,7 +407,28 @@
     }
     const lines = $("dxe-status-lines");
     if (lines) lines.innerHTML = S.isNew ? "" : statusLines(d);
+    drawLoc();
     drawDayBar();
+  }
+
+  // Top right, by the On switch: where the lineup runs, and the way to move it.
+  // A staged move shows here until it is saved, undone or discarded.
+  const nameOf = (id) => (deviceOf(id) || { name: id }).name;
+  function drawLoc() {
+    const box = $("dxe-loc");
+    if (!box) return;
+    const pending = st.display !== S.display;
+    const text = pending
+      ? `<span class="dxe-loc-txt is-pending" title="${esc(S.display ? `Now on ${nameOf(S.display)}` : "Not on a display yet")}">Moving to <b>${esc(nameOf(st.display))}</b></span>`
+      : `<span class="dxe-loc-txt">${st.display ? `On <b>${esc(displayNames())}</b>` : "<b>No display</b>"}</span>`;
+    const undo = pending
+      ? `<button type="button" class="dxe-link quiet" data-move-undo data-fk="move-undo">Undo</button>`
+      : "";
+    const can = S.devices.length > 1 && !ui.saving;
+    box.innerHTML =
+      text +
+      undo +
+      `<button type="button" class="lu-btn-ghost lu-btn-line dxe-move" data-move data-fk="move" aria-haspopup="dialog" aria-label="Move lineup to another display"${can ? "" : " disabled"}>Move…</button>`;
   }
 
   function statusLines(d) {
@@ -372,9 +479,20 @@
 
   // This lineup's slice of the display's day: the Lineups page's bar, its blocks
   // recomputed from the edits (R.withPending), the other lineups greyed.
+  // Phones and narrow bars are read-only, as on the Lineups page.
+  const phoneMQ = window.matchMedia(
+    "(pointer: coarse) and (max-width: 600px), (pointer: coarse) and (max-height: 500px)"
+  );
+  const barReadOnly = () => {
+    const bar = $("dxe-daybar");
+    return phoneMQ.matches || !bar || bar.clientWidth <= 602;
+  };
+  let shownView = null; // the display as edited: what a drag measures against
+  let barRO = null;
   function drawDayBar() {
     const bar = $("dxe-daybar");
     const d = viewOf(st.display);
+    shownView = null;
     if (!bar) return;
     if (!d || !d.week || !S.now || S.isNew) {
       bar.hidden = true;
@@ -383,11 +501,11 @@
     }
     const id = S.deckId || "__new__";
     let shown = d;
+    const timed =
+      kind() !== "manual" && st.enabled && st.steps.length && Number.isFinite(T(st.when.start));
     if (dirty() || S.isNew) {
       const copy = JSON.parse(JSON.stringify(d));
       copy.lineups = copy.lineups.filter((x) => x.id !== id);
-      const timed =
-        kind() !== "manual" && st.enabled && st.steps.length && Number.isFinite(T(st.when.start));
       if (!timed) {
         // Off, by hand or empty: nothing of this lineup runs, so none of its blocks show.
         shown = R.rebuildWeek(copy, d, S.now.weekday, S.now.minute);
@@ -437,17 +555,61 @@
     const dd = shown.week[day];
     const label = day === today ? "Today" : DAY_NAMES[day];
     bar.hidden = false;
+    shownView = shown;
+    // Only this lineup's block takes a drag or the arrow keys; it stages the
+    // edit into When it runs, nothing is saved from here.
+    barRO = barReadOnly();
+    const editable = timed && !barRO ? [id] : [];
     bar.innerHTML =
       `<p class="dxe-bar-day">${esc(label)}</p>` +
-      `<div class="lu-today-bar">${R.dayTrack(shown, dd, [], true, "dxe-trk")}${R.dayScale(dd)}</div>`;
+      `<div class="lu-today-bar">${R.dayTrack(shown, dd, editable, true, "dxe-trk")}${R.dayScale(dd)}</div>`;
     bar.querySelectorAll(".lu-blk").forEach((b) => {
       if (b.dataset.lineup === id) b.classList.add("is-mine");
-      b.removeAttribute("tabindex");
+      if (!b.hasAttribute("data-edit")) b.removeAttribute("tabindex");
+      else {
+        b.setAttribute("data-fk", "bar-mine");
+        b.setAttribute(
+          "aria-label",
+          (b.getAttribute("aria-label") || "").replace(
+            / Click to open\.$/,
+            " Enter edits the time."
+          )
+        );
+      }
     });
     bar.querySelectorAll(".lu-blk-side").forEach((b) => {
       if (b.title && b.title.startsWith(st.name || "This lineup")) b.classList.add("is-mine");
     });
   }
+
+  // A drag, resize or arrow key on this lineup's block stages the time, as if
+  // typed in the fields; Save applies it and Discard drops it.
+  const barEdit = R.barEdit({
+    host: root,
+    readOnly: () => ui.saving || S.isNew || barReadOnly(),
+    find: (blk) => {
+      const id = S.deckId;
+      if (blk.dataset.lineup !== id || !shownView) return null;
+      const l = shownView.lineups.find((x) => x.id === id);
+      return l && l.window ? { d: shownView, ed: shownView, l } : null;
+    },
+    commit: (ctx, s, e) => {
+      change(() => {
+        st.when.start = R.hhmm(s);
+        if (st.when.mode === "between") st.when.end = e >= DAY_MIN ? "24:00" : R.hhmm(e);
+        st.whenChanged = true;
+      });
+      root.querySelector(".lu-blk[data-edit]")?.focus();
+      live(
+        st.when.mode === "between"
+          ? `Runs ${R.clockRange(s, e)}. Save to apply.`
+          : `Sends at ${R.clock(s)}. Save to apply.`
+      );
+    },
+  });
+  window.addEventListener("resize", () => {
+    if (!barEdit.active() && barReadOnly() !== barRO) drawDayBar();
+  });
 
   /* ------------------------------------------------------------ 1 When it runs */
   function whenLead() {
@@ -524,25 +686,6 @@
     return out.join("");
   }
 
-  function displayRow() {
-    const dev = deviceOf(st.display);
-    if (S.isNew) return "";
-    const more = otherDisplays().map((id) => (deviceOf(id) || { name: id }).name);
-    const choose =
-      ui.changeDisplay || !dev
-        ? `<select class="dxe-in dxe-select" data-fk="display" data-display-select aria-label="Display">` +
-          `<option value="">Choose a display…</option>` +
-          S.devices
-            .map(
-              (d) =>
-                `<option value="${esc(d.id)}"${d.id === st.display ? " selected" : ""}>${esc(d.name)}</option>`
-            )
-            .join("") +
-          `</select>`
-        : `<span class="dxe-disp"><b>${esc(dev.name)}</b>${more.length ? `<b class="dxe-also">+ ${esc(more.join(" + "))}</b>` : dev.model ? `<span class="dxe-soft">${esc(dev.model)}</span>` : ""}</span><button type="button" class="dxe-link" data-change-display data-fk="change-display" aria-label="Change display${more.length ? ` (${esc(dev.name)})` : ""}">Change</button>`;
-    return `<div class="dxe-field"><span class="dxe-label">Display</span><div class="dxe-ctl">${choose}</div></div>`;
-  }
-
   function whenCard() {
     // By hand has no time, so no days either.
     const days =
@@ -553,7 +696,6 @@
       `<div class="dxe-card">` +
       days +
       `<div class="dxe-field"><span class="dxe-label">Time</span><div class="dxe-ctl">${timeHtml()}${whenWarnings()}</div></div>` +
-      displayRow() +
       `</div>`
     );
   }
@@ -1194,6 +1336,10 @@
     if (hero) hero.inert = ui.saving;
     const on = $("dxe-enabled");
     if (on) on.disabled = ui.saving;
+    const mv = root.querySelector("[data-move]");
+    if (mv) mv.disabled = ui.saving || S.devices.length < 2;
+    const un = root.querySelector("[data-move-undo]");
+    if (un) un.disabled = ui.saving;
   }
   function paintFooter() {
     const btns = $("dxe-actionbar-btns");
@@ -1592,7 +1738,8 @@
     st = initial();
     ui.consent = {};
     ui.consentDisplay = S.display;
-    ui.changeDisplay = false;
+    ui.picker = false;
+    ui.elsewhere = false;
     const title = $("dxe-title");
     if (title) title.value = st.name;
     const on = $("dxe-enabled");
@@ -1641,10 +1788,13 @@
       root.querySelector('[data-time="start"]')?.focus();
       return;
     }
-    if (d.changeDisplay !== undefined) {
-      ui.changeDisplay = true;
-      draw();
-      root.querySelector("[data-display-select]")?.focus();
+    if (d.move !== undefined) return moveDisplay();
+    if (d.moveUndo !== undefined) {
+      const was = (deviceOf(st.display) || { name: st.display }).name;
+      dropMoveConsent();
+      change(() => (st.display = S.display));
+      live(`Move to ${was} undone.`);
+      root.querySelector("[data-move]")?.focus();
       return;
     }
     if (d.pickDisplay) {
@@ -1831,20 +1981,6 @@
       return change(() => (st.enabled = t.checked));
     }
     if (d.time) return draw();
-    if (d.displaySelect !== undefined) {
-      const dev = t.value;
-      if (
-        !(await confirmBind(
-          st.steps.map((s) => s.id),
-          dev
-        ))
-      ) {
-        t.value = st.display;
-        return;
-      }
-      ui.changeDisplay = false;
-      return change(() => (st.display = dev));
-    }
     if (d.cond) {
       const s = stepOf(d.cond);
       if (s) change(() => (s.conditions = t.value), { draw: false });
@@ -1947,6 +2083,13 @@
     const order = [...list.querySelectorAll("[data-step]")].map((n) => n.dataset.step);
     change(() => (st.steps = order.map((x) => stepOf(x)).filter(Boolean)));
     live(`Moved ${pageOf(id).name} to ${order.indexOf(id) + 1} of ${order.length}.`);
+  });
+
+  root.addEventListener("keydown", (e) => {
+    const blk = e.target.closest && e.target.closest(".lu-blk[data-edit]");
+    if (!blk || (e.key !== "Enter" && e.key !== " ")) return;
+    e.preventDefault();
+    root.querySelector('[data-time="start"]')?.focus();
   });
 
   window.addEventListener("beforeunload", (e) => {

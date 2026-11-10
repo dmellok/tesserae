@@ -193,6 +193,54 @@ main.page.dxe-page {
 .lu.dxe .dxe-crumb a:hover {
   color: var(--t-fg);
 }
+.lu.dxe .dxe-top {
+  flex-wrap: wrap;
+}
+.lu.dxe .dxe-top-ctl {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px 18px;
+  margin-left: auto;
+}
+/* Where it runs, and the way to move it: set apart from the On switch
+   because moving is not a toggle. */
+.lu.dxe .dxe-loc {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 13px;
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-loc b {
+  color: var(--t-fg);
+  font-weight: 600;
+}
+.lu.dxe .dxe-loc-txt.is-pending,
+.lu.dxe .dxe-loc-txt.is-pending b {
+  color: var(--lu-warn-text);
+}
+.lu.dxe .dxe-move {
+  height: 32px;
+  background: transparent;
+  border-color: color-mix(in oklab, var(--t-warn) 55%, var(--t-border-strong));
+  color: var(--lu-warn-text);
+}
+.lu.dxe .dxe-move:hover {
+  background: color-mix(in oklab, var(--t-warn) 12%, transparent);
+  color: var(--lu-warn-text);
+}
+.lu.dxe .dxe-move:focus-visible,
+.lu.dxe .dxe-link:focus-visible {
+  outline: 2px solid var(--lu-acc);
+  outline-offset: 2px;
+}
+.lu.dxe .dxe-move:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
 .lu.dxe .dxe-switch {
   position: relative;
   display: inline-flex;
@@ -231,14 +279,19 @@ main.page.dxe-page {
   flex-direction: column;
   gap: 8px;
 }
-.lu.dxe .dxe-now .lu-thumb {
-  max-width: 220px;
-  max-height: 200px;
-  width: 100%;
+/* The box is the display's exact shape inside a 220 x 200 bound: portrait
+   panels get taller than wide, never a wide box with bars. */
+.lu.dxe .dxe-now {
+  --now-w: 220px;
+  --now-h: 200px;
 }
-.lu.dxe .dxe-now .lu-thumb.p {
-  width: auto;
-  height: 200px;
+.lu.dxe .dxe-now .lu-thumb {
+  align-self: flex-start;
+  width: min(var(--now-w), calc(var(--now-h) * var(--arw) / var(--arh)));
+  height: auto;
+}
+.lu.dxe .dxe-now .lu-thumb img {
+  object-fit: cover;
 }
 .lu.dxe .dxe-now figcaption {
   display: flex;
@@ -354,6 +407,12 @@ main.page.dxe-page {
 /* This lineup in the accent; the display's other lineups stay neutral. */
 .lu.dxe .dxe-daybar .lu-blk:not(.hold) {
   cursor: default;
+}
+.lu.dxe .dxe-daybar .lu-blk[data-edit] {
+  cursor: grab;
+}
+.lu.dxe .dxe-daybar .lu-blk.is-drag {
+  cursor: grabbing;
 }
 .lu.dxe .dxe-daybar .lu-blk.live:not(.is-mine):not(.hold) {
   background: var(--lu-blk-bg);
@@ -634,16 +693,6 @@ main.page.dxe-page {
 .lu.dxe .dxe-time-in.is-bad {
   border-color: var(--t-danger);
 }
-.lu.dxe .dxe-disp {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 10px;
-}
-.lu.dxe .dxe-disp b {
-  font-weight: 600;
-}
-
 /* 2 Dashboards: rows */
 .lu.dxe .dxe-steps-card {
   padding: 0;
@@ -1264,10 +1313,13 @@ main.page.dxe-page {
   border-radius: var(--lu-r);
   background: var(--t-surface-sunk);
 }
+.lu.dxe .dxe-dcard-th {
+  container-type: inline-size;
+  width: 100%;
+}
 .lu.dxe .dxe-dcard-th .lu-thumb {
-  height: 80px;
-  width: auto;
-  max-width: 90%;
+  width: min(90cqw, calc(80px * var(--arw) / var(--arh)));
+  height: auto;
 }
 .lu.dxe .dxe-next-step {
   margin-top: 14px;
@@ -1330,13 +1382,12 @@ main.page.dxe-page {
     align-items: center;
     gap: 12px;
   }
-  .lu.dxe .dxe-now .lu-thumb {
-    width: 120px;
-    flex: none;
+  .lu.dxe .dxe-now {
+    --now-w: 120px;
+    --now-h: 120px;
   }
-  .lu.dxe .dxe-now .lu-thumb.p {
-    width: auto;
-    height: 120px;
+  .lu.dxe .dxe-now .lu-thumb {
+    flex: none;
   }
   #deck-editor .dxe-h1 input.dxe-title {
     font-size: 22px;
@@ -1438,6 +1489,28 @@ main.page.dxe-page {
   display: flex;
   flex-direction: column;
   gap: 3px;
+}
+/* The Move dialog (deck_editor.js askMove): the warn tint, not red. */
+.dxe-move-dialog .dxe-move-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dxe-move-dialog .dxe-move-lines p {
+  margin: 0;
+}
+.dxe-move-dialog .dxe-move-lines p + p {
+  color: var(--t-fg-soft);
+  font-size: 12.5px;
+}
+html .dxe-move-dialog .wizard-footer button.primary.dxe-caution {
+  background: color-mix(in oklab, var(--t-warn) 30%, var(--t-surface));
+  border-color: color-mix(in oklab, var(--t-warn) 65%, var(--t-border-strong));
+  color: var(--t-fg);
+  box-shadow: none;
+}
+html .dxe-move-dialog .wizard-footer button.primary.dxe-caution:hover {
+  background: color-mix(in oklab, var(--t-warn) 42%, var(--t-surface));
 }
 @media (max-width: 480px) {
   .bind-dialog .wizard-footer {

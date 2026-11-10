@@ -968,6 +968,245 @@
     return copy;
   }
 
+  /* ------------------------------------------------------------ editing a block on the bar */
+  // Drag, resize and arrow-key a lineup's block. Shared by the Lineups page
+  // (which saves from it) and the lineup editor (which stages it). The caller
+  // says which block is which (find) and what a change does (commit).
+  const SNAP = 15;
+  const winOf = (l) => [
+    l.window.start_min,
+    l.window.is_point ? l.window.start_min : l.window.end_min,
+  ];
+
+  // Other lineups' windows on the given days (points for single pushes).
+  function obstacles(ed, l, days) {
+    const out = [];
+    ed.lineups.forEach((o) => {
+      if (o.id === l.id || !o.window || !o.enabled || o.window.wraps) return;
+      if (!o.days.some((on, i) => on && days[i])) return;
+      const [s, e] = winOf(o);
+      out.push({ s, e, o });
+    });
+    return out;
+  }
+  function clash(ed, l, s, e, days) {
+    return obstacles(ed, l, days).find((b) =>
+      b.s === b.e
+        ? b.s >= s && b.s < Math.max(e, s + 1)
+        : s === e
+          ? s >= b.s && s < b.e
+          : s < b.e && e > b.s
+    );
+  }
+  function room(ed, l, os, oe) {
+    let lo = 0;
+    let hi = DAY_MIN;
+    let loBy = null;
+    let hiBy = null;
+    obstacles(ed, l, l.days).forEach((b) => {
+      if (b.e <= os && b.e >= lo) {
+        lo = b.s === b.e ? b.s + SNAP : b.e;
+        loBy = b.o;
+      }
+      if (b.s >= oe && b.s <= hi && !(b.s === oe && b.s === b.e && os === oe)) {
+        hi = b.s;
+        hiBy = b.o;
+      }
+    });
+    return { lo, hi, loBy, hiBy };
+  }
+  function proposal(ed, l, mode, os, oe, dm) {
+    const { lo, hi, loBy, hiBy } = room(ed, l, os, oe);
+    const push = !!l.window.is_point;
+    const maxE = push ? Math.min(hi, DAY_MIN - SNAP) : hi;
+    let s = os;
+    let e = oe;
+    let stop = null;
+    if (mode === "move") {
+      s = os + dm;
+      e = oe + dm;
+      if (s < lo) {
+        e += lo - s;
+        s = lo;
+        stop = loBy;
+      }
+      if (e > maxE) {
+        s -= e - maxE;
+        e = maxE;
+        stop = hiBy;
+      }
+    } else if (mode === "l") {
+      s = Math.min(Math.max(os + dm, lo), oe - SNAP);
+      if (os + dm < lo) stop = loBy;
+    } else {
+      e = Math.max(Math.min(oe + dm, hi), os + SNAP);
+      if (oe + dm > hi) stop = hiBy;
+    }
+    return { s, e, stop, pause: overlapsPause(ed.pause, s, e) };
+  }
+
+  const tipText = (l, p, grid) => {
+    const t = l.window.is_point ? `at ${clock(p.s)}` : clockRange(p.s, p.e);
+    const days = l.days.map((on, i) => (on ? DAYS[i] : "")).filter(Boolean);
+    const applies =
+      grid && days.length > 1
+        ? `<span class="lu-tip-stop">applies to ${days.join(", ")}</span>`
+        : "";
+    return `<b>${t}</b>${applies}${p.stop ? `<span class="lu-tip-stop">stops at ${esc(p.stop.name)}</span>` : ""}${p.pause ? `<span class="lu-tip-warn">${ico("pause")}Quiet hours</span>` : ""}`;
+  };
+
+  // cfg: host (the page's bars), readOnly() -> bool,
+  // find(blk) -> {ed, l, ...} | null (ed: the display as edited, l: the lineup in it),
+  // commit(ctx, start_min, end_min). Returns {active(), justDragged()}.
+  function barEdit(cfg) {
+    const host = cfg.host;
+    let drag = null;
+    let justDragged = false;
+    const blkOf = (e) => e.target.closest && e.target.closest(".lu .lu-blk[data-edit]");
+    function endDrag(apply) {
+      const g = drag;
+      drag = null;
+      if (!g) return;
+      if (g.tip) g.tip.remove();
+      (g.ghosts || []).forEach((x) => x.remove());
+      g.trk.classList.remove("dragging");
+      g.blk.classList.remove("is-drag", "is-stopped");
+      try {
+        if (g.blk.hasPointerCapture && g.blk.hasPointerCapture(g.pid))
+          g.blk.releasePointerCapture(g.pid);
+      } catch {
+        /* already released */
+      }
+      if (!g.moved) return;
+      justDragged = true;
+      setTimeout(() => {
+        justDragged = false;
+      }, 0);
+      if (!apply || !g.p || (g.p.s === g.os && g.p.e === g.oe) || !g.blk.isConnected) {
+        g.blk.style.left = g.left;
+        g.blk.style.width = g.width;
+        return;
+      }
+      const s = Math.max(0, Math.min(DAY_MIN - SNAP, g.p.s));
+      const e = g.l.window.is_point ? s : Math.max(s + SNAP, Math.min(DAY_MIN, g.p.e));
+      if ([s, e].every(Number.isFinite)) cfg.commit(g.ctx, s, e);
+    }
+    document.addEventListener("pointerdown", (e) => {
+      if (drag) endDrag(false); // a lost pointerup never leaves a drag stuck
+      const blk = blkOf(e);
+      if (!blk || e.button !== 0) return;
+      const trk = blk.closest(".lu-trk");
+      if (!trk || cfg.readOnly() || trk.clientWidth <= 0) return;
+      const ctx = cfg.find(blk);
+      if (!ctx) return;
+      const { ed, l } = ctx;
+      const [os, oe] = winOf(l);
+      const h = e.target.closest(".lu-h");
+      const mode = h ? h.dataset.h : "move";
+      trk.insertAdjacentHTML("beforeend", '<span class="lu-drag-tip" role="status"></span>');
+      const tip = trk.lastElementChild;
+      const grid = trk.classList.contains("tl");
+      const ghosts = [];
+      if (grid) {
+        trk.classList.add("dragging");
+        host.querySelectorAll(`.lu-tlg-trk`).forEach((other) => {
+          if (other === trk || !other.closest(`.lu-ds[data-display="${CSS.escape(ctx.d.id)}"]`))
+            return;
+          if (!l.days[Number(other.dataset.day)]) return;
+          other.insertAdjacentHTML(
+            "beforeend",
+            `<i class="lu-ghost" style="left:${(os / DAY_MIN) * 100}%;width:${((oe - os) / DAY_MIN) * 100}%" title="Applies here too"></i>`
+          );
+          ghosts.push(other.lastElementChild);
+        });
+      }
+      drag = {
+        grid,
+        ghosts,
+        blk,
+        trk,
+        ctx,
+        ed,
+        l,
+        os,
+        oe,
+        mode,
+        x0: e.clientX,
+        W: trk.clientWidth,
+        moved: false,
+        left: blk.style.left,
+        width: blk.style.width,
+        tip,
+        pid: e.pointerId,
+      };
+      try {
+        blk.setPointerCapture(e.pointerId);
+      } catch {
+        /* the document listeners still drive the drag */
+      }
+      blk.classList.add("is-drag");
+      e.preventDefault();
+    });
+    document.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      if (!drag.blk.isConnected) {
+        endDrag(false);
+        return;
+      }
+      let dm = Math.round((((e.clientX - drag.x0) / drag.W) * DAY_MIN) / SNAP) * SNAP;
+      if (!Number.isFinite(dm)) dm = 0;
+      if (dm) drag.moved = true;
+      const p = proposal(drag.ed, drag.l, drag.mode, drag.os, drag.oe, dm);
+      drag.p = p;
+      const pc = (m) => (m / DAY_MIN) * 100;
+      drag.blk.style.left = pc(p.s) + "%";
+      if (!drag.l.window.is_point) drag.blk.style.width = pc(p.e - p.s) + "%";
+      drag.blk.classList.toggle("is-stopped", !!p.stop);
+      drag.tip.innerHTML = tipText(drag.l, p, drag.grid);
+      if (drag.grid) {
+        // The window belongs to the lineup: ghost the change on its other days.
+        drag.ghosts.forEach((g) => {
+          g.style.left = pc(p.s) + "%";
+          g.style.width = drag.l.window.is_point ? "10px" : pc(p.e - p.s) + "%";
+        });
+      }
+      const mid = ((pc(p.s) + pc(p.e)) / 2 / 100) * drag.W;
+      const w = drag.tip.offsetWidth;
+      drag.tip.style.left = Math.max(0, Math.min(drag.W - w, mid - w / 2)) + "px";
+    });
+    document.addEventListener("pointerup", () => drag && endDrag(true));
+    document.addEventListener("pointercancel", () => drag && endDrag(false));
+    window.addEventListener("blur", () => drag && endDrag(false));
+    document.addEventListener(
+      "keydown",
+      (e) => {
+        if (e.key === "Escape" && drag) {
+          drag.moved = true;
+          endDrag(false);
+          e.stopPropagation();
+          return;
+        }
+        if (!["ArrowLeft", "ArrowRight"].includes(e.key) || cfg.readOnly()) return;
+        const blk = blkOf(e);
+        if (!blk) return;
+        e.preventDefault();
+        const ctx = cfg.find(blk);
+        if (!ctx) return;
+        const { ed, l } = ctx;
+        const [os, oe] = winOf(l);
+        const dm = e.key === "ArrowLeft" ? -SNAP : SNAP;
+        const mode = e.shiftKey && !l.window.is_point ? (e.altKey ? "l" : "r") : "move";
+        const p = proposal(ed, l, mode, os, oe, dm);
+        if (p.s === os && p.e === oe) return;
+        const s = Math.max(0, Math.min(DAY_MIN - SNAP, p.s));
+        const en = l.window.is_point ? s : Math.max(s + SNAP, Math.min(DAY_MIN, p.e));
+        if ([s, en].every(Number.isFinite)) cfg.commit(ctx, s, en);
+      },
+      true
+    );
+    return { active: () => !!drag, justDragged: () => justDragged };
+  }
+
   window.TesseraeLineupsRender = {
     DAYS,
     esc,
@@ -996,5 +1235,11 @@
     withPending,
     rebuildWeek,
     overlapsPause,
+    SNAP,
+    winOf,
+    room,
+    clash,
+    proposal,
+    barEdit,
   };
 })();

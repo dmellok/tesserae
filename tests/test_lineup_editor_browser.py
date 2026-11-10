@@ -472,7 +472,7 @@ def test_a_lineup_on_two_displays_keeps_both_and_a_stale_save_is_refused(
     with sync_playwright() as p:
         browser, page, errors = _open(p, base, "/decks/shared/edit")
         assert page.locator("#dxe-crumb-here").inner_text() == "hall + tv"
-        assert "+ tv" in page.locator(".dxe-disp").inner_text()
+        assert "hall + tv" in page.locator("#dxe-loc").inner_text()
         _save(page)  # no edits
         assert store.get("shared").device_ids == ["hall", "tv"]
         # Renamed elsewhere (another tab) after this page loaded: refused.
@@ -597,6 +597,7 @@ def test_a_save_in_flight_a_cancelled_drag_and_a_double_push(real: tuple[str, Fl
         assert _steps(page) == ["photos", "clock", "climate"]
         assert page.locator("#dxe-save-state").inner_text() == "All changes saved"
         climate = page.locator('[data-step="climate"]')
+        climate.evaluate("(e) => e.scrollIntoView({ block: 'center' })")
         box = climate.bounding_box()
         assert box is not None
         page.locator('[data-step="photos"] [data-grip]').drag_to(
@@ -670,4 +671,351 @@ def test_the_phone_bar_shows_the_lineups_name(real: tuple[str, Flask]) -> None:
         assert page.locator("[data-page-bar-title]").text_content() == "Art day"
         _settle(page)
         assert errors == []
+        browser.close()
+
+
+# -- Move: the display control in the header ----------------------------------------
+
+
+def _loc(page: Any) -> str:
+    return page.locator("#dxe-loc").inner_text().replace("\n", " ")
+
+
+def _open_move(page: Any) -> Any:
+    page.locator("[data-move]").click()
+    dlg = page.locator("dialog.dxe-move-dialog")
+    dlg.wait_for(state="visible")
+    return dlg
+
+
+def test_the_display_row_is_gone_and_move_sits_by_the_on_switch(real: tuple[str, Flask]) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, _app = real
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/morning/edit")
+        assert page.locator("[data-display-select], [data-change-display]").count() == 0
+        assert "Display" not in page.locator(".dxe-sections").inner_text()
+        assert _loc(page).startswith("On hall")
+        move = page.locator("[data-move]")
+        assert move.inner_text() == "Move…"
+        assert move.get_attribute("aria-label") == "Move lineup to another display"
+        # Beside the On switch, top right.
+        a, b = move.bounding_box(), page.locator("#dxe-enabled").locator("xpath=..").bounding_box()
+        assert abs((a["y"] + a["height"] / 2) - (b["y"] + b["height"] / 2)) < 20
+        assert a["x"] < b["x"] and a["x"] > 600
+        _settle(page)
+        assert errors == []
+        browser.close()
+
+
+def test_move_stages_shows_pending_saves_and_cancel_and_discard_reset(
+    real: tuple[str, Flask],
+) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    store = app.config["DECK_STORE"]
+    state = "#dxe-save-state"
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/morning/edit")
+        # Cancel (and Escape) leave everything as it was.
+        dlg = _open_move(page)
+        assert dlg.locator("select option").all_inner_texts() == ["tv"]
+        assert dlg.locator("#dxe-move-lines").inner_text().startswith("Stops on hall; runs on tv.")
+        assert "bind 2 dashboards to tv" in dlg.inner_text()
+        dlg.locator("[data-cancel]").click()
+        dlg.wait_for(state="detached")
+        assert _fk(page) == "move"
+        assert _loc(page).startswith("On hall") and page.locator(state).inner_text() == (
+            "All changes saved"
+        )
+        _open_move(page)
+        page.keyboard.press("Escape")
+        page.locator("dialog.dxe-move-dialog").wait_for(state="detached")
+        assert _loc(page).startswith("On hall")
+        # Confirm asks to bind the dashboards, then only stages it.
+        dlg = _open_move(page)
+        dlg.locator("[data-ok]").click()
+        page.locator("dialog.bind-dialog:not(.dxe-move-dialog) button.primary").click()
+        page.locator("#dxe-loc .is-pending").wait_for()
+        assert _loc(page).startswith("Moving to tv")
+        assert page.locator(state).inner_text() == "Unsaved changes"
+        assert store.get("morning").device_ids == ["hall"]
+        assert page.locator("#dxe-crumb-here").inner_text() == "tv"
+        # Discard resets the move, and the bind answer with it.
+        page.locator("[data-discard]").click()
+        assert _loc(page).startswith("On hall")
+        assert page.locator(state).inner_text() == "All changes saved"
+        assert page.locator("[data-move-undo]").count() == 0
+        # Undo drops it too.
+        dlg = _open_move(page)
+        dlg.locator("[data-ok]").click()
+        page.locator("dialog.bind-dialog:not(.dxe-move-dialog) button.primary").click()
+        page.locator("[data-move-undo]").click()
+        assert _loc(page).startswith("On hall")
+        assert page.locator(state).inner_text() == "All changes saved"
+        # Discard asks again: nothing was remembered. Then Save moves it.
+        dlg = _open_move(page)
+        dlg.locator("[data-ok]").click()
+        page.locator("dialog.bind-dialog:not(.dxe-move-dialog)").wait_for(state="visible")
+        page.locator("dialog.bind-dialog:not(.dxe-move-dialog) button.primary").click()
+        _save(page)
+        assert store.get("morning").device_ids == ["tv"]
+        assert app.config["PAGE_STORE"].get("weather").device_ids == ["tv"]
+        assert _loc(page).startswith("On tv")
+        assert errors == []
+        browser.close()
+
+
+def test_move_cancelled_at_the_bind_prompt_stays_put(real: tuple[str, Flask]) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, _app = real
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/morning/edit")
+        dlg = _open_move(page)
+        dlg.locator("[data-ok]").click()
+        page.locator("dialog.bind-dialog:not(.dxe-move-dialog) button.ghost").click()
+        page.locator("dialog.bind-dialog:not(.dxe-move-dialog)").wait_for(state="detached")
+        assert _loc(page).startswith("On hall")
+        assert page.locator("#dxe-save-state").inner_text() == "All changes saved"
+        assert errors == []
+        browser.close()
+
+
+def test_move_says_only_the_first_display_moves_on_a_shared_lineup(
+    real: tuple[str, Flask],
+) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    app.config["PAGE_STORE"].save(Page(id="both", name="Both", device_ids=["hall", "tv"]))
+    app.config["DECK_STORE"].upsert(
+        Deck(
+            id="shared", name="Shared", device_ids=["hall", "tv"], pages=[DeckPage(page_id="both")]
+        )
+    )
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/shared/edit")
+        assert _loc(page).startswith("On hall + tv")
+        dlg = _open_move(page)
+        assert "Only hall moves; tv stays." in dlg.locator("#dxe-move-lines").inner_text()
+        assert errors == []
+        browser.close()
+
+
+def test_move_is_readable_in_a_phone_width_dark_page_and_labelled(real: tuple[str, Flask]) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, _app = real
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/morning/edit", 420)
+        page.evaluate("() => document.documentElement.setAttribute('data-theme', 'dark')")
+        assert page.evaluate("() => document.documentElement.scrollWidth <= innerWidth")
+        page.screenshot(path="/tmp/lu-move/header-420.png")
+        dlg = _open_move(page)
+        assert dlg.get_attribute("aria-labelledby") == "dxe-move-title"
+        assert dlg.locator("label[for=dxe-move-to]").inner_text() == "Move to"
+        # Focus starts in the dialog, on the display choice, and Escape gives it back.
+        assert page.evaluate("() => document.activeElement.id") == "dxe-move-to"
+        page.screenshot(path="/tmp/lu-move/dialog-420.png")
+        page.keyboard.press("Escape")
+        dlg.wait_for(state="detached")
+        assert _fk(page) == "move"
+        assert errors == []
+        browser.close()
+
+
+# -- the "On screen now" thumbnail takes the display's shape ----------------------------
+
+
+def _frame(app: Flask) -> None:
+    c = app.test_client()
+    code = app.config["PAIRING_STORE"].issue(note="t").code
+    resp = c.post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+        data=json.dumps({"device_id": "frame", "kind": "visionect"}),
+    )
+    assert resp.status_code == 201
+    app.config["PAGE_STORE"].save(Page(id="fp", name="Frame page", device_ids=["frame"]))
+    app.config["DECK_STORE"].upsert(
+        Deck(id="fd", name="Frame lineup", device_ids=["frame"], pages=[DeckPage(page_id="fp")])
+    )
+
+
+_BOXES = """(sel) => [...document.querySelectorAll(sel)].map((t) => {
+    const r = t.getBoundingClientRect();
+    return [r.width, r.height, t.style.getPropertyValue('--arw') / t.style.getPropertyValue('--arh')];
+})"""
+
+
+@pytest.mark.parametrize("width", [1280, 420])
+def test_the_header_thumbnail_is_the_displays_exact_shape(
+    real: tuple[str, Flask], width: int
+) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    _frame(app)
+    with sync_playwright() as p:
+        for path, portrait in (("/decks/fd/edit", True), ("/decks/art/edit", False)):
+            browser, page, errors = _open(p, base, path, width)
+            ((w, h, ratio),) = page.evaluate(_BOXES, "#dxe-now .lu-thumb")
+            assert abs(w / h - ratio) < 0.02
+            assert (h > w) is portrait
+            assert h <= 200
+            if portrait and width == 1280:
+                page.screenshot(path="/tmp/lu-move/header-portrait.png")
+            assert errors == []
+            browser.close()
+
+
+def test_the_new_lineup_display_cards_keep_each_displays_shape(real: tuple[str, Flask]) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    _frame(app)
+    with sync_playwright() as p:
+        for width in (1280, 420):
+            browser, page, _errors = _open(p, base, "/decks/new", width)
+            boxes = page.evaluate(_BOXES, ".dxe-dcard-th .lu-thumb")
+            assert len(boxes) == 3
+            for w, h, ratio in boxes:
+                assert abs(w / h - ratio) < 0.02
+            assert any(h > w for w, h, _r in boxes)
+            browser.close()
+
+
+# -- the header's day bar: this lineup's block drags and resizes into When it runs -----
+
+
+def _window_lineup(app: Flask) -> None:
+    app.config["DECK_STORE"].upsert(
+        Deck(
+            id="mid", name="Midday", device_ids=["tv"], advance="timer", advance_trigger="cycle",
+            advance_anchor="09:00", advance_end_at="12:00",
+            pages=[DeckPage(page_id="clock"), DeckPage(page_id="climate")],
+        )
+    )  # fmt: skip
+
+
+def _times(page: Any) -> tuple[str, str]:
+    return (
+        page.locator('[data-time="start"]').input_value(),
+        page.locator('[data-time="end"]').input_value(),
+    )
+
+
+def test_dragging_this_lineups_block_stages_the_time_and_nothing_else(
+    real: tuple[str, Flask],
+) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    _window_lineup(app)
+    store = app.config["DECK_STORE"]
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/mid/edit")
+        seen: list[str] = []
+        page.on("request", lambda r: r.method == "POST" and seen.append(r.url))
+        blk = page.locator(".dxe-daybar .lu-blk[data-edit]")
+        # Only this lineup's block is draggable; the day's other blocks are inert.
+        assert blk.count() == 1 and blk.get_attribute("data-lineup") == "mid"
+        assert page.locator(".dxe-daybar .lu-blk:not([data-edit])").count() >= 1
+        assert page.locator(".dxe-daybar .lu-blk:not([data-edit])[tabindex]").count() == 0
+        assert blk.get_attribute("role") == "button"
+        assert "Shift+arrows to resize the end" in blk.get_attribute("aria-label")
+        assert _times(page) == ("09:00", "12:00")
+        box = blk.bounding_box()
+        track = page.locator(".dxe-daybar .lu-trk").bounding_box()
+        x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+        hour = track["width"] / 24
+        page.mouse.move(x, y)
+        page.mouse.down()
+        page.mouse.move(x + hour * 1.1, y, steps=5)
+        assert page.locator(".lu-drag-tip").inner_text().startswith("10\u202fAM")
+        page.mouse.up()
+        # The fields follow, the footer says unsaved, nothing was saved.
+        assert _times(page) == ("10:00", "13:00")
+        assert page.locator("#dxe-save-state").inner_text() == "Unsaved changes"
+        assert store.get("mid").advance_anchor == "09:00"
+        assert not [u for u in seen if "/window" in u or "/edits" in u]
+        # A handle resizes the end alone.
+        box = page.locator(".dxe-daybar .lu-blk[data-edit]").bounding_box()
+        page.mouse.move(box["x"] + box["width"] - 3, box["y"] + box["height"] / 2)
+        page.mouse.down()
+        page.mouse.move(box["x"] + box["width"] - 3 + hour * 0.5, box["y"] + 5, steps=5)
+        page.mouse.up()
+        assert _times(page) == ("10:00", "13:30")
+        # Discard puts the bar and the fields back.
+        page.locator("[data-discard]").click()
+        assert _times(page) == ("09:00", "12:00")
+        assert page.locator("#dxe-save-state").inner_text() == "All changes saved"
+        # Save applies a drag.
+        box = page.locator(".dxe-daybar .lu-blk[data-edit]").bounding_box()
+        x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+        page.mouse.move(x, y)
+        page.mouse.down()
+        page.mouse.move(x + hour * 2.1, y, steps=5)
+        page.mouse.up()
+        _save(page)
+        d = store.get("mid")
+        assert (d.advance_anchor, d.advance_end_at) == ("11:00", "14:00")
+        assert not [u for u in seen if "/window" in u or "/edits" in u]
+        assert errors == []
+        browser.close()
+
+
+def test_the_block_takes_the_lineups_keys_and_stops_at_the_next_lineup(
+    real: tuple[str, Flask],
+) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    _window_lineup(app)
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/mid/edit")
+        page.locator(".dxe-daybar .lu-blk[data-edit]").focus()
+        page.keyboard.press("ArrowRight")
+        assert _times(page) == ("09:15", "12:15")
+        assert _fk(page) == "bar-mine"
+        page.keyboard.press("Shift+ArrowRight")
+        assert _times(page) == ("09:15", "12:30")
+        page.keyboard.press("Alt+Shift+ArrowLeft")
+        assert _times(page) == ("09:00", "12:30")
+        assert page.locator("#dxe-save-state").inner_text() == "Unsaved changes"
+        # Enter goes to the start field.
+        page.keyboard.press("Enter")
+        assert _fk(page) == "start"
+        # The 06:00 push on the same display is a wall: the start stops after it.
+        page.locator(".dxe-daybar .lu-blk[data-edit]").focus()
+        for _ in range(20):
+            page.keyboard.press("Alt+Shift+ArrowLeft")
+        assert _times(page)[0] == "06:15"
+        assert errors == []
+        browser.close()
+
+
+def test_a_pushes_block_only_moves_and_the_bar_is_read_only_when_narrow(
+    real: tuple[str, Flask],
+) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, _app = real
+    with sync_playwright() as p:
+        browser, page, _errors = _open(p, base, "/decks/art/edit")
+        blk = page.locator(".dxe-daybar .lu-blk[data-edit]")
+        assert blk.count() == 1
+        assert "resize" not in blk.get_attribute("aria-label")
+        assert page.locator(".dxe-daybar .lu-h").count() == 0
+        blk.focus()
+        page.keyboard.press("ArrowRight")
+        assert page.locator('[data-time="start"]').input_value() == "06:15"
+        page.keyboard.press("Shift+ArrowRight")  # no end to resize
+        assert page.locator('[data-time="start"]').input_value() == "06:30"
+        browser.close()
+        browser, page, _errors = _open(p, base, "/decks/art/edit", 420)
+        assert page.locator(".dxe-daybar .lu-blk[data-edit]").count() == 0
         browser.close()
