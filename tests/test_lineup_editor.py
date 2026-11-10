@@ -447,7 +447,12 @@ def test_create_warns_about_quiet_hours(app: Flask) -> None:
     _register(app, "hall")
     app.config["SETTINGS_STORE"].patch_section(
         "app",
-        {"quiet_hours_enabled": True, "quiet_hours_start": "23:00", "quiet_hours_end": "07:00"},
+        {
+            "locale": "en-US",  # 12-hour times, whatever the host's locale is
+            "quiet_hours_enabled": True,
+            "quiet_hours_start": "23:00",
+            "quiet_hours_end": "07:00",
+        },
     )
     got = _create(app, when="at", start="06:00", device_ids="hall", page_ids=["a"])
     assert got["ok"] and got["warnings"] == [
@@ -544,6 +549,41 @@ def test_an_interval_given_a_second_dashboard_becomes_a_rotation(app: Flask) -> 
         "07:00",
         None,
     )
+
+
+def test_a_rotation_cut_to_one_dashboard_keeps_its_cadence(app: Flask) -> None:
+    """The remaining dashboard's dwell becomes the interval, not the 30 minute default."""
+    _deck(
+        app, advance="timer", advance_trigger="cycle", advance_anchor="06:00",
+        advance_end_at="18:00", advance_interval_minutes=30,
+        pages=[DeckPage(page_id="a", dwell_minutes=5), DeckPage(page_id="b")],
+    )  # fmt: skip
+    # The editor posts the lineup default and the dashboard's own dwell.
+    assert _save(app, pages="a", advance_interval_minutes="30", **{"dwell[a]": "5"}).get_json()[
+        "ok"
+    ]
+    d = _stored(app)
+    assert (d.advance_trigger, d.advance_interval_minutes) == ("interval", 5)
+    assert [p.dwell_minutes for p in d.pages] == [None]  # no dormant dwell left behind
+    # A form without those fields (an older client) still keeps it.
+    _deck(
+        app, advance="timer", advance_trigger="cycle", advance_anchor="06:00",
+        advance_end_at="18:00", advance_interval_minutes=30,
+        pages=[DeckPage(page_id="a", dwell_minutes=5), DeckPage(page_id="b")],
+    )  # fmt: skip
+    assert _save(app, pages="a").get_json()["ok"]
+    assert _stored(app).advance_interval_minutes == 5
+
+
+def test_an_interval_drops_a_dwell_it_never_reads(app: Flask) -> None:
+    _deck(
+        app, advance="timer", advance_trigger="interval", advance_window_start="06:00",
+        advance_window_end="18:00", advance_interval_minutes=30,
+        pages=[DeckPage(page_id="a", dwell_minutes=5)],
+    )  # fmt: skip
+    assert _save(app, pages="a", advance_interval_minutes="30").get_json()["ok"]
+    d = _stored(app)
+    assert (d.advance_interval_minutes, d.pages[0].dwell_minutes) == (30, None)
 
 
 def test_an_interval_past_midnight_cannot_take_a_second_dashboard(app: Flask) -> None:

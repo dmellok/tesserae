@@ -134,6 +134,7 @@
   const ui = {
     open: new Set(),
     editing: new Set(),
+    rawOpen: new Set(), // step ids whose conditions' raw JSON is open
     grid: {}, // page id -> {q, offset, data, busy, open}
     strip: {}, // page id -> {data} (the first few items)
     draws: {}, // page id -> [{key, state, thumb, note}]
@@ -169,7 +170,8 @@
     if (st.when.mode === "at") return "daily";
     return st.steps.length === 1 ? "interval" : "cycle";
   }
-  const dwellOf = (s) => (s.dwell ? s.dwell : st.interval);
+  // An interval has one cadence, "Sent again every"; a dashboard's own dwell only counts in a cycle.
+  const dwellOf = (s) => (s.dwell && kind() !== "interval" ? s.dwell : st.interval);
   const loopMinutes = () => st.steps.reduce((t, s) => t + dwellOf(s), 0);
   const window_ = () => {
     const s = T(st.when.start);
@@ -381,40 +383,47 @@
     }
     const id = S.deckId || "__new__";
     let shown = d;
-    if (kind() !== "manual" && st.steps.length && Number.isFinite(T(st.when.start))) {
+    if (dirty() || S.isNew) {
       const copy = JSON.parse(JSON.stringify(d));
-      const w = window_();
-      const k = kind();
-      const mine = {
-        id,
-        name: st.name || "This lineup",
-        kind: k,
-        enabled: true,
-        days: st.when.days.slice(),
-        window: {
-          start_min: w.s,
-          end_min: k === "daily" ? w.s : w.e,
-          is_point: k === "daily",
-          start: st.when.start,
-          end: k === "daily" ? null : st.when.end,
-          label: "",
-        },
-        steps: st.steps.map((s) => ({
-          dashboard_id: s.id,
-          name: pageOf(s.id).name,
-          dwell_minutes: dwellOf(s),
-        })),
-        step_minutes: st.interval,
-      };
-      copy.lineups = copy.lineups.filter((x) => x.id !== id).concat([mine]);
-      if (!st.enabled) copy.lineups = copy.lineups.filter((x) => x.id !== id);
-      const pend = {};
-      pend[id] = {
-        start_min: mine.window.start_min,
-        end_min: mine.window.end_min,
-        days: mine.days,
-      };
-      shown = dirty() || S.isNew ? R.withPending(copy, pend, S.now.weekday, S.now.minute) : d;
+      copy.lineups = copy.lineups.filter((x) => x.id !== id);
+      const timed =
+        kind() !== "manual" && st.enabled && st.steps.length && Number.isFinite(T(st.when.start));
+      if (!timed) {
+        // Off, by hand or empty: nothing of this lineup runs, so none of its blocks show.
+        shown = R.rebuildWeek(copy, d, S.now.weekday, S.now.minute);
+      } else {
+        const w = window_();
+        const k = kind();
+        const mine = {
+          id,
+          name: st.name || "This lineup",
+          kind: k,
+          enabled: true,
+          days: st.when.days.slice(),
+          window: {
+            start_min: w.s,
+            end_min: k === "daily" ? w.s : w.e,
+            is_point: k === "daily",
+            start: st.when.start,
+            end: k === "daily" ? null : st.when.end,
+            label: "",
+          },
+          steps: st.steps.map((s) => ({
+            dashboard_id: s.id,
+            name: pageOf(s.id).name,
+            dwell_minutes: dwellOf(s),
+          })),
+          step_minutes: st.interval,
+        };
+        copy.lineups.push(mine);
+        const pend = {};
+        pend[id] = {
+          start_min: mine.window.start_min,
+          end_min: mine.window.end_min,
+          days: mine.days,
+        };
+        shown = R.withPending(copy, pend, S.now.weekday, S.now.minute);
+      }
     }
     const today = S.now.weekday;
     let day = today;
@@ -600,7 +609,7 @@
     if (notSent) tags += `<span class="dxe-tag mute">Not sent by a push</span>`;
     if (stranded)
       tags += `<span class="dxe-tag warn" title="Bound to another display; saving asks to bind it here">Not on this display</span>`;
-    if (s.dwell && s.dwell !== st.interval && (k === "cycle" || k === "interval"))
+    if (s.dwell && s.dwell !== st.interval && k === "cycle")
       tags += `<span class="dxe-tag time" title="Shows ${esc(mins(s.dwell))}, not the lineup's ${esc(mins(st.interval))}">${ico("clock")}${esc(mins(s.dwell))}</span>`;
     if (home && (takesInput() || k === "manual") && n > 1)
       tags += `<span class="dxe-tag home" title="Home dashboard">★ home</span>`;
@@ -748,7 +757,7 @@
   /* --- per-dashboard settings, one summary line and an Edit */
   function settingsHtml(s, p, i) {
     const k = kind();
-    const window = k === "cycle" || k === "interval";
+    const window = k === "cycle";
     const bits = [];
     if (window && s.dwell && s.dwell !== st.interval) bits.push(`shows ${mins(s.dwell)}`);
     bits.push(s.refresh ? `updates every ${mins(s.refresh)}` : "updates when sent");
@@ -1101,10 +1110,27 @@
         sel = null;
       }
     }
-    return fk ? { fk, sel } : null;
+    if (fk) return { fk, sel };
+    // A control the condition picker made (it has no data-fk): its place in its picker.
+    const box = a && a.closest ? a.closest("[data-condition-picker]") : null;
+    const ta = box ? box.querySelector("[data-cond]") : null;
+    if (!ta) return null;
+    const idx = [...box.querySelectorAll("input, select, textarea, button, summary")].indexOf(a);
+    return idx < 0 ? null : { pk: ta.dataset.cond, idx };
   }
-  function refocus(mark) {
+  // `later`: the pickers have been built (they start a moment after a draw).
+  function refocus(mark, later) {
     if (!mark) return;
+    if (mark.pk) {
+      if (!later) return;
+      const ta = root.querySelector(`[data-cond="${CSS.escape(mark.pk)}"]`);
+      const box = ta ? ta.closest("[data-condition-picker]") : null;
+      const back = box
+        ? [...box.querySelectorAll("input, select, textarea, button, summary")][mark.idx]
+        : null;
+      if (back && !back.disabled && document.activeElement !== back) back.focus();
+      return;
+    }
     const a = document.activeElement;
     if (a && a.dataset && a.dataset.fk === mark.fk && root.contains(a)) return;
     const back = root.querySelector(`[data-fk="${CSS.escape(mark.fk)}"]`);
@@ -1119,8 +1145,18 @@
     }
   }
 
+  // Which conditions pickers have "Edit raw JSON" open: a redraw builds the
+  // pickers anew, closed.
+  function noteRawOpen() {
+    root.querySelectorAll("[data-cond]").forEach((ta) => {
+      const det = ta.closest("details");
+      if (det) ui.rawOpen[det.open ? "add" : "delete"](ta.dataset.cond);
+    });
+  }
+
   function draw() {
     const mark = focusMark();
+    noteRawOpen();
     const sections = $("dxe-sections");
     if (S.isNew) sections.innerHTML = newFlowHtml();
     else
@@ -1131,6 +1167,16 @@
     drawHeader();
     drawFooter();
     refocus(mark);
+    // The pickers start in a microtask queued by the redraw above; this runs after it.
+    queueMicrotask(() => {
+      ui.rawOpen.forEach((id) => {
+        const ta = root.querySelector(`[data-cond="${CSS.escape(id)}"]`);
+        const det = ta ? ta.closest("details") : null;
+        if (det) det.open = true;
+        else if (!ta) ui.rawOpen.delete(id);
+      });
+      refocus(mark, true);
+    });
     ui.justDay = null;
     // A drag cut short by a redraw (an item list landing) never ends.
     dragId = null;
@@ -1185,7 +1231,14 @@
   /* ------------------------------------------------------------ edits */
   function change(fn, opts) {
     if (ui.saving) return; // see drawFooter
+    const was = kind();
     fn();
+    // A cycle cut down to one dashboard is an interval: that dashboard's dwell
+    // is its cadence now (the server does the same on save).
+    if (was === "cycle" && kind() === "interval" && st.steps[0].dwell) {
+      st.interval = st.steps[0].dwell;
+      st.steps[0].dwell = null;
+    }
     ui.msg = "";
     ui.msgKind = "";
     if (!opts || opts.draw !== false) draw();

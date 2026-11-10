@@ -163,6 +163,104 @@ def test_header_shows_this_lineups_slice_of_the_day(real: tuple[str, Flask]) -> 
         browser.close()
 
 
+def test_the_day_bar_drops_a_lineup_switched_off_or_set_to_by_hand(
+    real: tuple[str, Flask],
+) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, _app = real
+    mine = ".dxe-daybar .lu-trk .lu-blk.is-mine"
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/morning/edit")
+        assert page.locator(mine).count() >= 1
+        page.locator("#dxe-enabled").click()
+        assert page.locator(mine).count() == 0
+        page.locator("#dxe-enabled").click()
+        assert page.locator(mine).count() >= 1
+        page.locator('[data-when="manual"]').click()
+        assert page.locator(mine).count() == 0
+        page.locator('[data-when="between"]').click()
+        assert page.locator(mine).count() >= 1
+        _settle(page)
+        assert errors == []
+        browser.close()
+
+
+def test_a_redraw_from_an_item_list_keeps_the_raw_conditions_open(
+    real: tuple[str, Flask],
+) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    decks = app.config["DECK_STORE"]
+    art = decks.get("art")
+    sun = {"source_kind": "sun", "operator": "is_day", "value": {}}
+    decks.upsert(
+        art.model_copy(
+            update={
+                "pages": [
+                    DeckPage.model_validate({"page_id": "photos", "conditions": [sun]}),
+                    *art.pages[1:],
+                ]
+            }
+        )
+    )
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/art/edit")
+        held: list[Any] = []
+        page.route("**/decks/dashboard-items?**", lambda route: held.append(route))
+        page.locator('[data-expand="photos"]').click()
+        page.locator('[data-edit="photos"]').click()
+        picker = page.locator('[data-step="photos"] [data-condition-picker]')
+        picker.locator("summary").click()
+        raw = picker.locator("textarea")
+        raw.focus()
+        assert raw.is_visible() and _fk(page) == "cond-photos"
+        assert held, "the item list should still be on its way"
+        held[0].continue_()  # its response redraws the editor
+        page.wait_for_function("() => document.querySelector('[data-step=photos] img')")
+        page.wait_for_timeout(100)  # the pickers start just after the redraw
+        assert page.locator('[data-cond="photos"]').is_visible()
+        assert _fk(page) == "cond-photos"
+        _settle(page)
+        assert errors == []
+        browser.close()
+
+
+def test_a_rotation_cut_to_one_dashboard_carries_its_cadence(real: tuple[str, Flask]) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    decks = app.config["DECK_STORE"]
+    morning = decks.get("morning")
+    decks.upsert(
+        morning.model_copy(
+            update={
+                "pages": [
+                    morning.pages[0].model_copy(update={"dwell_minutes": 5}),
+                    morning.pages[1],
+                ]
+            }
+        )
+    )
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/morning/edit")
+        page.locator('[data-expand="weather"]').click()
+        page.locator('[data-edit="weather"]').click()
+        assert page.locator('[data-dwell="weather"]').count() == 1  # a cycle: its own time
+        page.locator('[data-expand="agenda"]').click()
+        page.locator('[data-remove="agenda"]').click()
+        # Now an interval: its one cadence is what the dashboard showed for.
+        assert "Sent again every 5 min" in page.locator("#dxe-sections").inner_text()
+        assert page.locator("[data-dwell]").count() == 0
+        _save(page)
+        d = decks.get("morning")
+        assert (d.advance_trigger, d.advance_interval_minutes) == ("interval", 5)
+        assert [x.dwell_minutes for x in d.pages] == [None]
+        assert errors == []
+        browser.close()
+
+
 def test_when_an_end_time_turns_a_push_into_a_rotation(real: tuple[str, Flask]) -> None:
     from playwright.sync_api import sync_playwright
 
@@ -442,7 +540,12 @@ def test_quiet_hours_say_what_really_happens(real: tuple[str, Flask]) -> None:
     base, app = real
     app.config["SETTINGS_STORE"].patch_section(
         "app",
-        {"quiet_hours_enabled": True, "quiet_hours_start": "23:00", "quiet_hours_end": "08:08"},
+        {
+            "locale": "en-US",  # 12-hour times, whatever the host's locale is
+            "quiet_hours_enabled": True,
+            "quiet_hours_start": "23:00",
+            "quiet_hours_end": "08:08",
+        },
     )
     with sync_playwright() as p:
         browser, page, errors = _open(p, base, "/decks/art/edit")

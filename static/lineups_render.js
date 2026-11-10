@@ -949,6 +949,15 @@
       const sel = l.days.map((on, i) => (on ? i : -1)).filter((i) => i >= 0);
       l.days_text = sel.length === 7 ? "every day" : sel.map((i) => DAYS[i]).join(", ");
     });
+    return rebuildWeek(copy, d, nowWeekday, nowMin);
+  }
+
+  /**
+   * ``copy``'s week and day bars recomputed from its lineups (``d`` is the
+   * display it was copied from, for what is live now). Unlike withPending, it
+   * also shows a lineup that was taken out or switched off as gone.
+   */
+  function rebuildWeek(copy, d, nowWeekday, nowMin) {
     const liveSeg = (
       d.day.is_today ? d.day : d.week.find((x) => x.is_today) || d.day
     ).segments.find((s) => s.live && s.kind !== "hold");
@@ -985,6 +994,7 @@
     peek,
     timeline,
     withPending,
+    rebuildWeek,
     overlapsPause,
   };
 })();

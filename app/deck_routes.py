@@ -3273,6 +3273,11 @@ def _editor_state(deck: Deck | None) -> dict[str, Any]:
         }
         for p in (deck.pages if deck is not None else [])
     ]
+    interval = deck.advance_interval_minutes if deck is not None else 30
+    if deck is not None and deck.advance_trigger == "cycle" and len(deck.pages) == 1:
+        # Saving reshapes this into an interval at the dashboard's own dwell.
+        interval = deck.pages[0].effective_dwell_minutes(interval)
+        steps[0]["dwell"] = None
     return {
         "deckId": deck.id if deck is not None else "",
         "isNew": deck is None,
@@ -3281,7 +3286,7 @@ def _editor_state(deck: Deck | None) -> dict[str, Any]:
         "enabled": deck.enabled if deck is not None else True,
         "when": _when_of(deck),
         "advance": deck.advance if deck is not None else "timer",
-        "interval": deck.advance_interval_minutes if deck is not None else 30,
+        "interval": interval,
         # The stored home, not the resolved one: with none set, home is
         # whichever dashboard is first, and a save must not pin it there.
         "home": (deck.home_page_id or "") if deck is not None else "",
@@ -3407,12 +3412,23 @@ def _reshape_window(deck: Deck) -> Deck:
             changes["legacy_kind"] = None  # see _edited_deck: the scheduler skips those
         return _merged_deck(deck, **changes)
     if deck.advance_trigger == "cycle" and len(deck.pages) == 1:
+        # The one dashboard's dwell was the cycle's cadence; an interval reads
+        # advance_interval_minutes and ignores a per-dashboard dwell.
         return _merged_deck(
             deck,
             advance_trigger="interval",
+            advance_interval_minutes=deck.pages[0].effective_dwell_minutes(
+                deck.advance_interval_minutes
+            ),
+            pages=[deck.pages[0].model_copy(update={"dwell_minutes": None})],
             advance_window_start=deck.advance_anchor,
             advance_window_end=deck.advance_end_at,
             advance_end_at=None,
+        )
+    if deck.advance_trigger == "interval" and any(p.dwell_minutes is not None for p in deck.pages):
+        # A dwell an interval never reads: clear it so nothing shows a cadence it lacks.
+        return _merged_deck(
+            deck, pages=[p.model_copy(update={"dwell_minutes": None}) for p in deck.pages]
         )
     return deck
 
