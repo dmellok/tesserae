@@ -152,7 +152,7 @@ def test_a_pinned_widget_still_lists_its_items_and_says_which(
         from app.lineup_editor import dashboard_summary
 
         summary = dashboard_summary(app.config["PAGE_STORE"].get("news"))
-    assert summary["subtitle"].endswith("2 papers, pinned: The New York Times")
+    assert summary["subtitle"].endswith("2 papers, chosen: The New York Times")
 
 
 def test_saving_a_pin_writes_the_widget_option_and_unpins(

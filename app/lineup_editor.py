@@ -96,7 +96,7 @@ def dashboard_summary(page: Any) -> dict[str, Any]:
     if items["mode"] == "pick":
         fact = _count(int(items["count"]), str(items["noun"]))
         if items.get("pinned"):
-            fact += f", pinned: {items['pinned_label'] or items['pinned']}"
+            fact += f", chosen: {items['pinned_label'] or items['pinned']}"
         elif lister == "picture_gallery":
             mode = next(
                 (str(pl.options.get("mode") or "random") for pid, pl in widgets if pid == lister),

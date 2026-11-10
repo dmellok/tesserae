@@ -978,11 +978,11 @@
       ? `<img src="${esc(it.thumb_url)}" alt="" loading="lazy" decoding="async">`
       : `<span class="dxe-it-word">${esc(label)}</span>`;
     const tag = mark
-      ? `<span class="dxe-tag ${mark === "Pinned" ? "now" : "mute"}">${esc(mark)}</span>`
+      ? `<span class="dxe-tag ${mark === "Chosen" ? "now" : "mute"}">${esc(mark)}</span>`
       : "";
     const inner = `<span class="dxe-it-pic">${pic}</span><span class="dxe-it-l">${esc(`#${it.index + 1} ${it.thumb_url ? label : ""}`.trim())}</span>${tag}`;
     return pinMode
-      ? `<button type="button" class="dxe-it${mark ? " is-marked" : ""}" data-pin-item="${esc(p.id)}" data-key="${esc(it.key)}" data-fk="pin-${esc(p.id)}-${esc(it.key)}" aria-pressed="${mark === "Pinned"}" title="Pin ${esc(label)}">${inner}</button>`
+      ? `<button type="button" class="dxe-it${mark ? " is-marked" : ""}" data-pin-item="${esc(p.id)}" data-key="${esc(it.key)}" data-fk="pin-${esc(p.id)}-${esc(it.key)}" aria-pressed="${mark === "Chosen"}" title="Show ${esc(label)}">${inner}</button>`
       : `<span class="dxe-it${mark ? " is-marked" : ""}" title="${esc(label)}">${inner}</span>`;
   }
 
@@ -994,13 +994,13 @@
       const pinMode = !!it.pinnable && !!pinned;
       const head =
         `<div class="dxe-kids-head"><span class="dxe-mono">${esc(plural(it.count, it.noun || "items"))}</span>` +
-        `<span class="dxe-soft">${pinned ? `Pinned: the others are skipped.` : it.order === "random" ? `A random one each visit.` : `One per visit, in turn.`}</span>` +
+        `<span class="dxe-soft">${pinned ? `Showing the chosen item; the others are skipped.` : it.order === "random" ? `A random one each visit.` : `One per visit, in turn.`}</span>` +
         (it.pinnable
-          ? `<span class="lu-seg dxe-seg sm" role="group" aria-label="${esc(p.name)}: one per visit or pinned"><button type="button" data-pin-mode="${esc(p.id)}" data-mode="walk" data-fk="pinmode-${esc(p.id)}-walk" aria-pressed="${!pinned}">One per visit</button><button type="button" data-pin-mode="${esc(p.id)}" data-mode="pin" data-fk="pinmode-${esc(p.id)}-pin" aria-pressed="${!!pinned}">Pinned</button></span>`
+          ? `<span class="lu-seg dxe-seg sm" role="group" aria-label="${esc(p.name)}: rotate items or show chosen"><button type="button" data-pin-mode="${esc(p.id)}" data-mode="walk" data-fk="pinmode-${esc(p.id)}-walk" aria-pressed="${!pinned}">Rotate items</button><button type="button" data-pin-mode="${esc(p.id)}" data-mode="pin" data-fk="pinmode-${esc(p.id)}-pin" aria-pressed="${!!pinned}">Show chosen</button></span>`
           : "") +
         // A pin is the dashboard's own setting, so it moves every lineup that shows it.
         (it.pinnable && p.shared
-          ? `<small class="dxe-soft dxe-shared">Pins for every lineup using it.</small>`
+          ? `<small class="dxe-soft dxe-shared">Applies to this dashboard in every lineup.</small>`
           : "") +
         `</div>`;
       const strip = ui.strip[p.id];
@@ -1011,7 +1011,7 @@
         const gridOpen = !!(ui.grid[p.id] && ui.grid[p.id].open);
         tiles = strip.data.items
           .slice(0, gridOpen ? 0 : STRIP)
-          .map((x) => itemTile(p, x, pinned && x.key === pinned ? "Pinned" : "", pinMode))
+          .map((x) => itemTile(p, x, pinned && x.key === pinned ? "Chosen" : "", pinMode))
           .join("");
         const more = it.count - Math.min(STRIP, strip.data.items.length);
         const g = ui.grid[p.id];
@@ -1089,7 +1089,7 @@
       : "";
     const body = !data
       ? `<p class="dxe-soft dxe-loading">Loading…</p>`
-      : `<div class="dxe-grid-items${g.busy ? " is-busy" : ""}"${g.busy ? ' aria-busy="true"' : ""}>${data.items.map((x) => itemTile(p, x, pinned && x.key === pinned ? "Pinned" : "", pinMode)).join("")}</div>`;
+      : `<div class="dxe-grid-items${g.busy ? " is-busy" : ""}"${g.busy ? ' aria-busy="true"' : ""}>${data.items.map((x) => itemTile(p, x, pinned && x.key === pinned ? "Chosen" : "", pinMode)).join("")}</div>`;
     return (
       `<div class="dxe-grid" data-grid-for="${esc(p.id)}">` +
       `<div class="dxe-grid-tb"><label class="lu-tb-search dxe-search">${ico("search")}<input type="search" data-fk="q-${esc(p.id)}" data-grid-q="${esc(p.id)}" value="${esc(g.q)}" placeholder="Search ${esc(plural(it.count, it.noun || "items"))}" aria-label="Search ${esc(p.name)}" autocomplete="off" spellcheck="false"></label>` +
@@ -1219,7 +1219,7 @@
     );
   }
 
-  /* ------------------------------------------------------------ 3 Pace */
+  /* ------------------------------------------------------------ 3 Timing */
   function paceLead() {
     const k = kind();
     if (k === "manual") return "Taps flip; there's no timer.";
@@ -1522,7 +1522,7 @@
       sections.innerHTML =
         `<section class="dxe-sec" aria-labelledby="dxe-h-when">${secHead(1, "When it runs", whenLead(), "dxe-h-when")}${whenCard()}</section>` +
         `<section class="dxe-sec" aria-labelledby="dxe-h-dash">${secHead(2, "Dashboards", stepsLead(), "dxe-h-dash")}${stepsCard()}</section>` +
-        `<section class="dxe-sec dxe-sec-pace" aria-labelledby="dxe-h-pace">${secHead(3, "Pace", paceLead(), "dxe-h-pace")}${paceHtml()}</section>`;
+        `<section class="dxe-sec dxe-sec-pace" aria-labelledby="dxe-h-timing">${secHead(3, "Timing", paceLead(), "dxe-h-timing")}${paceHtml()}</section>`;
     drawHeader();
     drawFooter();
     refocus(mark);
@@ -2381,14 +2381,16 @@
         change(() => (s.pin = pinnedKey(s, p) || (first ? first.key : "")));
       }
       live(
-        d.mode === "walk" ? `${p.name}: one per visit.` : `${p.name}: pinned, pick one to keep.`
+        d.mode === "walk"
+          ? `${p.name}: rotating items.`
+          : `${p.name}: showing the chosen item, pick one.`
       );
       return;
     }
     if (d.pinItem) {
       const s = stepOf(d.pinItem);
       if (s) change(() => (s.pin = d.key));
-      live(`Pinned ${d.key}.`);
+      live(`Showing ${d.key}.`);
       return;
     }
     if (d.draw) return drawItem(d.draw, true);

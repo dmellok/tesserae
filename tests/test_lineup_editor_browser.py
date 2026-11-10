@@ -1,7 +1,7 @@
 """The lineup editor in a live Chromium, against the real routes: the header's
 slice of the day, 1 When it runs (an end time turns a push into a rotation),
 2 Dashboards (Alt+Arrow reorder, a gallery's items and their searchable grid,
-add and remove, Discard), 3 Pace (options only where the display has them;
+add and remove, Discard), 3 Timing (options only where the display has them;
 Smart sync switches off), the new-lineup flow, and a phone-width page."""
 
 from __future__ import annotations
@@ -1455,6 +1455,48 @@ def test_pace_names_the_dashboards_with_their_own_time_and_links_to_them(
         line.locator('[data-overridden="agenda"]').click()
         assert page.locator('[data-step="agenda"].is-open').count() == 1
         assert page.locator('[data-step="agenda"].is-flash').count() == 1
+        _settle(page)
+        assert errors == []
+        browser.close()
+
+
+def test_the_item_control_says_rotate_items_and_show_chosen(real: tuple[str, Flask]) -> None:
+    from types import SimpleNamespace
+
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    papers = [{"key": k, "label": k.upper()} for k in ("nyt", "wsj", "ft")]
+    reg = app.config["PLUGIN_REGISTRY"]
+    real_get = reg.get
+    fake = SimpleNamespace(
+        manifest={"lineups": {"pin_option": "paper", "noun": "papers"}},
+        server_module=SimpleNamespace(lineup_items=lambda options: papers),
+    )
+    reg.get = lambda pid: fake if pid == "papers" else real_get(pid)
+    app.config["PAGE_STORE"].save(
+        Page(
+            id="news",
+            name="News",
+            device_ids=["tv"],
+            cells=[Cell(id="n", plugin="papers", x=0, y=0, w=10, h=10, options={"paper": "nyt"})],
+        )
+    )
+    app.config["DECK_STORE"].upsert(
+        Deck(id="readers", name="Readers", device_ids=["tv"], pages=[DeckPage(page_id="news")])
+    )
+    app.config["DECK_STORE"].upsert(
+        Deck(id="more", name="More", device_ids=["tv"], pages=[DeckPage(page_id="news")])
+    )  # a dashboard in two lineups says its choice applies to both
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/readers/edit")
+        page.locator('[data-expand="news"]').click()
+        seg = page.locator("[data-pin-mode]")
+        assert [b.inner_text() for b in seg.all()] == ["Rotate items", "Show chosen"]
+        assert (
+            "Applies to this dashboard in every lineup." in page.locator("#dxe-detail").inner_text()
+        )
+        assert page.locator(".dxe-it .dxe-tag").first.inner_text().lower() == "chosen"
         _settle(page)
         assert errors == []
         browser.close()
