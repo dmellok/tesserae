@@ -196,6 +196,8 @@ def test_switching_display_asks_and_cancel_reverts(real: tuple[str, Flask]) -> N
         assert loc.inner_text().startswith("On hallway")
 
         def move() -> Any:
+            # Move to another display… lives in the ⋯ menu by the On switch.
+            page.locator("[data-loc-more]").click()
             page.locator("[data-move]").click()
             mv = page.locator("dialog.dxe-move-dialog")
             mv.wait_for(state="visible")

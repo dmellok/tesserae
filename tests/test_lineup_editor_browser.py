@@ -910,8 +910,13 @@ def test_a_drawing_dashboards_arrows_draw_another_and_go_back(
         src = "() => document.querySelector('[data-step=album] .lu-thumb img')?.getAttribute('src')"
         page.wait_for_function(f"({src})() === '/_img/d1.png'")
         assert drawn[0].startswith("draw:")
-        # Its details list what was drawn; Draw another there draws one more.
+        # Its details list what was drawn; Draw another there, in one action
+        # row with Push now (× apart), draws one more.
         tile.locator(".dxe-sel").click()
+        acts = page.locator(".dxe-detail-head .dxe-detail-acts")
+        assert acts.locator('[data-draw="album"]').count() == 1
+        assert acts.locator('[data-push="album"]').count() == 1
+        assert acts.locator(".dxe-close").count() == 0
         page.locator('[data-draw="album"]').click()
         page.wait_for_function(f"({src})() === '/_img/d2.png'")
         assert page.locator('[data-panel="album"] .dxe-strip .dxe-it').count() == 3
@@ -1829,6 +1834,44 @@ def test_edited_timing_drops_next_until_it_is_saved(real: tuple[str, Flask]) -> 
         assert page.locator(".dxe-daybar .lu-nflag").count() == 0
         page.locator("[data-discard]").click()
         assert page.locator(".dxe-tiles .lu-pill.p-next").count() == 1
+        _settle(page)
+        assert errors == []
+        browser.close()
+
+
+def test_the_open_tile_is_framed_round_its_stack_in_the_accent(real: tuple[str, Flask]) -> None:
+    """The open dashboard's frame goes round the tile and its stacked back
+    cards (never through them), in the accent, light and dark."""
+    from playwright.sync_api import sync_playwright
+
+    base, _app = real
+    js = """() => {
+        const step = document.querySelector('[data-step="photos"]');
+        const sel = step.querySelector('.dxe-sel').getBoundingClientRect();
+        const pic = step.querySelector('.lu-thumb').getBoundingClientRect();
+        const cs = getComputedStyle(step.querySelector('.dxe-sel'));
+        const acc = getComputedStyle(document.getElementById('deck-editor'))
+            .getPropertyValue('--lu-acc').trim();
+        const probe = document.createElement('i');
+        probe.style.color = acc;
+        document.body.append(probe);
+        const accRgb = getComputedStyle(probe).color;
+        probe.remove();
+        return {
+            above: pic.top - sel.top, right: sel.right - pic.right,
+            style: cs.outlineStyle, color: cs.outlineColor, acc: accRgb,
+        };
+    }"""
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/art/edit")
+        page.locator('[data-step="photos"] .dxe-sel').click()
+        for theme in ("light", "dark"):
+            if theme == "dark":
+                page.evaluate("document.documentElement.setAttribute('data-theme', 'dark')")
+            box = page.evaluate(js)
+            assert box["style"] == "solid" and box["color"] == box["acc"], box
+            # The frame's box takes in the back cards, up and to the right.
+            assert box["above"] >= 11 and box["right"] >= 11, box
         _settle(page)
         assert errors == []
         browser.close()

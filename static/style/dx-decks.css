@@ -144,16 +144,23 @@
  * Scoped under .lu.dxe: the day bar, day tiles, thumbnails, segmented controls
  * and buttons are the Lineups page's own (dx-lineups.css); this adds the page
  * column, the three numbered sections, the dashboard rows and the save bar.
- * Type steps: title 26, section 18, body 14, label 13, help 12.5, mono 11. */
+ * Type steps (base.css --t-size-*): title 26, section xl 18, body base 14,
+ * label md 13, help sm 12, mono xs 11. Spacing is the --t-space-* scale:
+ * --dxe-pad inside a card, --dxe-sec between sections, --dxe-stack the
+ * offset of a stacked tile's back cards. */
 main.page.dxe-page {
   padding-bottom: 0;
 }
 .lu.dxe {
   container: dxe / inline-size;
-  --dxe-gap: 20px;
+  --dxe-pad: var(--t-space-5);
+  --dxe-sec: var(--t-space-8);
+  --dxe-stack: 12px;
+  /* the label column of a card's fields, so every card's controls line up */
+  --dxe-label-w: 170px;
   max-width: 1000px;
   margin: 0 auto;
-  padding-bottom: 24px;
+  padding-bottom: var(--t-space-6);
 }
 .lu.dxe .dxe-soft {
   color: var(--t-fg-soft);
@@ -173,6 +180,7 @@ main.page.dxe-page {
 /* -- top: breadcrumb and the on switch */
 .lu.dxe .dxe-top {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -191,9 +199,6 @@ main.page.dxe-page {
 }
 .lu.dxe .dxe-crumb a:hover {
   color: var(--t-fg);
-}
-.lu.dxe .dxe-top {
-  flex-wrap: wrap;
 }
 .lu.dxe .dxe-top-ctl {
   display: flex;
@@ -221,8 +226,11 @@ main.page.dxe-page {
 .lu.dxe .dxe-loc-txt.is-pending b {
   color: var(--lu-warn-text);
 }
-.lu.dxe .dxe-push-now {
+/* Every secondary action on the page (Push now, Draw another, Add) is the
+   Lineups outline button at one height. */
+.lu.dxe .dxe-act {
   height: 32px;
+  padding: 0 var(--t-space-3);
   color: var(--t-fg);
 }
 .lu.dxe .dxe-link:focus-visible,
@@ -268,22 +276,23 @@ main.page.dxe-page {
 .lu.dxe .dxe-hero {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 16px 28px;
-  margin: 14px 0 0;
+  gap: var(--t-space-4) var(--t-space-6);
+  margin: var(--t-space-3) 0 0;
 }
-.lu.dxe .dxe-now {
-  margin: 0;
-  width: 220px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-/* The box is the display's exact shape inside a 220 x 200 bound: portrait
-   panels get taller than wide, never a wide box with bars. */
+/* As wide as the picture: a portrait panel's narrow picture leaves no hole
+   before the title. */
 .lu.dxe .dxe-now {
   --now-w: 220px;
   --now-h: 200px;
+  margin: 0;
+  width: max-content;
+  max-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-2);
 }
+/* The box is the display's exact shape inside a 220 x 200 bound: portrait
+   panels get taller than wide, never a wide box with bars. */
 .lu.dxe .dxe-now .lu-thumb {
   align-self: flex-start;
   width: min(var(--now-w), calc(var(--now-h) * var(--arw) / var(--arh)));
@@ -296,7 +305,7 @@ main.page.dxe-page {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  font-size: 12.5px;
+  font-size: var(--t-size-sm);
   color: var(--t-fg-soft);
 }
 .lu.dxe .dxe-now figcaption b {
@@ -356,8 +365,8 @@ main.page.dxe-page {
 .lu.dxe .dxe-live-line {
   display: flex;
   align-items: center;
-  gap: 9px;
-  font-size: 15px;
+  gap: var(--t-space-2);
+  font-size: var(--t-size-base);
 }
 .lu.dxe .dxe-live-line b {
   font-weight: 600;
@@ -377,16 +386,16 @@ main.page.dxe-page {
   color: var(--t-fg-soft);
 }
 .lu.dxe .dxe-next-line {
-  margin: 3px 0 0 17px;
-  font-size: 13px;
+  margin: 2px 0 0 calc(8px + var(--t-space-2));
+  font-size: var(--t-size-md);
   color: var(--t-fg-soft);
 }
 .lu.dxe .dxe-daybar {
   grid-column: 1 / -1;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-top: 6px;
+  gap: var(--t-space-1);
+  margin-top: var(--t-space-2);
 }
 .lu.dxe .dxe-daybar[hidden] {
   display: none;
@@ -489,10 +498,10 @@ main.page.dxe-page {
   flex-direction: column;
 }
 .lu.dxe .dxe-sec {
-  margin-top: 40px;
+  margin-top: var(--dxe-sec);
 }
 .lu.dxe .dxe-sec-head {
-  margin-bottom: 14px;
+  margin-bottom: var(--t-space-3);
 }
 .lu.dxe .dxe-h2 {
   display: flex;
@@ -521,12 +530,12 @@ main.page.dxe-page {
   height: 12px;
 }
 .lu.dxe .dxe-lead {
-  margin: 4px 0 0 34px;
-  font-size: 14px;
+  margin: var(--t-space-1) 0 0 34px;
+  font-size: var(--t-size-base);
   color: var(--t-fg-soft);
 }
 .lu.dxe .dxe-sec-head.is-wait {
-  margin-top: 28px;
+  margin-top: var(--t-space-7);
   opacity: 0.55;
 }
 .lu.dxe .dxe-sec-head.is-wait .dxe-n {
@@ -536,21 +545,21 @@ main.page.dxe-page {
   background: var(--t-surface);
   border: 1px solid var(--t-border);
   border-radius: var(--lu-r-card);
-  padding: 0 20px;
+  padding: 0 var(--dxe-pad);
 }
 .lu.dxe .dxe-field {
   display: grid;
-  grid-template-columns: 170px minmax(0, 1fr);
+  grid-template-columns: var(--dxe-label-w) minmax(0, 1fr);
   align-items: start;
-  gap: 8px 16px;
-  padding: 16px 0;
+  gap: var(--t-space-2) var(--t-space-4);
+  padding: var(--t-space-4) 0;
 }
 .lu.dxe .dxe-field + .dxe-field {
   border-top: 1px solid var(--t-border);
 }
 .lu.dxe .dxe-label {
-  padding-top: 8px;
-  font-size: 13px;
+  padding-top: var(--t-space-2);
+  font-size: var(--t-size-md);
   color: var(--t-fg-soft);
 }
 .lu.dxe .dxe-ctl {
@@ -599,7 +608,7 @@ main.page.dxe-page {
   display: inline;
   color: var(--lu-acc-text);
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--t-size-md);
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: pointer;
@@ -616,6 +625,10 @@ main.page.dxe-page {
   opacity: 1;
   color: var(--t-fg-soft);
 }
+.lu.dxe .dxe-select.is-unused {
+  color: var(--t-muted);
+  border-color: var(--t-border);
+}
 .lu.dxe .lu-btn-primary:disabled {
   opacity: 0.45;
   cursor: not-allowed;
@@ -630,7 +643,7 @@ main.page.dxe-page {
   width: 48px;
   height: 34px;
   border-radius: var(--lu-r);
-  font: 600 12.5px var(--t-font);
+  font: 600 var(--t-size-sm) var(--t-font);
   border: 1px solid var(--t-border-strong);
   background: var(--t-surface);
   color: var(--t-fg-soft);
@@ -674,7 +687,7 @@ main.page.dxe-page {
   height: 30px;
 }
 .lu.dxe .dxe-seg.sm button {
-  font-size: 12.5px;
+  font-size: var(--t-size-sm);
   padding: 0 9px;
 }
 .lu.dxe .lu-win-end {
@@ -708,13 +721,21 @@ main.page.dxe-page {
   align-items: center;
   gap: 4px 10px;
   margin: 0;
-  font-size: 13px;
+  font-size: var(--t-size-md);
 }
 .lu.dxe .dxe-warn {
-  padding: 8px 12px;
+  padding: var(--t-space-2) var(--t-space-3);
   border-radius: var(--lu-r);
   background: color-mix(in oklab, var(--t-warn) 13%, var(--t-surface));
   color: var(--t-fg);
+}
+/* The words stay beside their icon; a fix-it link wraps under them. */
+.lu.dxe :is(.dxe-warn, .dxe-note) > span {
+  flex: 1 1 0;
+  min-width: 14em;
+}
+.lu.dxe :is(.dxe-warn, .dxe-note) > .lu-ico {
+  flex: none;
 }
 .lu.dxe .dxe-warn > .lu-ico,
 .lu.dxe .dxe-note > .lu-ico {
@@ -743,15 +764,25 @@ main.page.dxe-page {
   --dxe-tw: min(112px, calc(84px * var(--dxe-arw, 16) / var(--dxe-arh, 10)));
   padding: 0;
 }
+/* The stacked back cards rise --dxe-stack above a tile: the top padding
+   counts them, so the card's edge is as far from them as from the sides.
+   A live lineup's NOW / NEXT slot already gives that room. */
 .lu.dxe .dxe-tiles-scroll {
-  padding: 22px 20px 14px;
+  padding: calc(var(--dxe-pad) + var(--dxe-stack)) var(--dxe-pad) var(--dxe-pad);
+}
+.lu.dxe .dxe-tiles-scroll:has(.lu-strip.has-now) {
+  padding-top: var(--dxe-pad);
+}
+.lu.dxe .dxe-hint {
+  margin: var(--t-space-4) 0 0;
+  font-size: var(--t-size-sm);
 }
 .lu.dxe .dxe-tiles {
   --tile-h: var(--dxe-tile-h);
   --fig-min: 96px;
   flex-wrap: wrap;
   width: auto;
-  row-gap: 26px;
+  row-gap: var(--t-space-6);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -769,10 +800,10 @@ main.page.dxe-page {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
-  font-size: 13.5px;
+  font-size: var(--t-size-md);
 }
 .lu.dxe .dxe-tiles .lu-step-meta {
-  font-size: 11.5px;
+  font-size: var(--t-size-xs);
 }
 /* Every tile reads at full strength here: the editor is about all of them. */
 .lu.dxe .lu-strip.has-now .lu-step:not(.is-now):not(:hover):not(:focus-within),
@@ -800,19 +831,29 @@ main.page.dxe-page {
   outline: 2px solid var(--t-fg);
   outline-offset: 4px;
 }
-.lu.dxe .dxe-tiles .lu-step.is-open .lu-thumb {
-  outline: 3px solid var(--t-fg);
-  outline-offset: 3px;
+/* The open dashboard: an accent frame round the whole tile, its stack
+   included (the tile's own button grows over the back cards), so it never
+   cuts through them; the accent is the primary buttons', in both themes. */
+.lu.dxe .dxe-tiles .lu-tile.stacked .dxe-sel {
+  inset: calc(-1 * var(--dxe-stack)) calc(-1 * var(--dxe-stack)) 0 0;
+}
+.lu.dxe .dxe-tiles .lu-step.is-open .dxe-sel {
+  outline: 2px solid var(--lu-acc);
+  outline-offset: 4px;
+}
+.lu.dxe .dxe-tiles .lu-step.is-open .dxe-sel:focus-visible {
+  outline-width: 3px;
 }
 .lu.dxe .dxe-tiles .lu-step.is-open .lu-step-name {
   text-decoration: underline;
+  text-decoration-color: var(--lu-acc);
   text-decoration-thickness: 2px;
   text-underline-offset: 3px;
 }
 /* Many items: two card edges behind the picture, clear in light and dark. */
 /* Every tile keeps room for the stack, so tiles line up across the lines. */
 .lu.dxe .dxe-tiles .lu-tile {
-  margin: 0 12px 0 0;
+  margin: 0 var(--dxe-stack) 0 0;
 }
 .lu.dxe .dxe-tiles .lu-tile.stacked::before,
 .lu.dxe .dxe-tiles .lu-tile.stacked::after {
@@ -821,11 +862,11 @@ main.page.dxe-page {
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.18);
 }
 .lu.dxe .dxe-tiles .lu-tile.stacked::before {
-  transform: translate(12px, -12px);
+  transform: translate(var(--dxe-stack), calc(-1 * var(--dxe-stack)));
   background: var(--lu-stack-far);
 }
 .lu.dxe .dxe-tiles .lu-tile.stacked::after {
-  transform: translate(6px, -6px);
+  transform: translate(calc(var(--dxe-stack) / 2), calc(var(--dxe-stack) / -2));
   background: var(--lu-stack-near);
 }
 .lu.dxe .dxe-tiles .lu-count {
@@ -874,9 +915,10 @@ main.page.dxe-page {
   padding-left: 0;
 }
 /* + Add dashboard: a tile at the end, the same size as the others, a step's
-   arrow-width away from the last one. */
-.lu.dxe .dxe-add-step {
-  margin-left: 34px;
+   arrow-width away from the last one; the space is the last tile's, so a
+   wrapped Add starts its line in line with the tiles above. */
+.lu.dxe .dxe-tiles .lu-step:nth-last-child(2):not(.dxe-add-step) {
+  margin-right: 34px;
 }
 .lu.dxe .dxe-add-tile {
   display: flex;
@@ -914,15 +956,15 @@ main.page.dxe-page {
 .lu.dxe .dxe-detail {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 18px 20px 20px;
+  gap: var(--t-space-4);
+  padding: var(--dxe-pad);
   border-top: 1px solid var(--t-border);
   background: color-mix(in oklab, var(--t-fg) 3%, var(--t-surface));
 }
 .lu.dxe .dxe-detail-head {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--t-space-3);
 }
 .lu.dxe .dxe-plug {
   display: grid;
@@ -944,7 +986,7 @@ main.page.dxe-page {
   min-width: 0;
 }
 .lu.dxe .dxe-detail-t b {
-  font-size: 15px;
+  font-size: var(--t-size-lg);
   font-weight: 600;
 }
 .lu.dxe .dxe-detail-t b,
@@ -954,17 +996,23 @@ main.page.dxe-page {
   white-space: nowrap;
 }
 .lu.dxe .dxe-detail-t span {
-  font-size: 13px;
+  font-size: var(--t-size-md);
 }
+/* Its actions in one row, then × apart from them. */
 .lu.dxe .dxe-detail-acts {
   display: flex;
   flex: none;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: center;
-  gap: 6px;
+  gap: var(--t-space-2);
 }
-.lu.dxe .dxe-push {
-  border: 1px solid var(--t-border-strong);
-  color: var(--t-fg);
+.lu.dxe .dxe-detail-head .dxe-close {
+  flex: none;
+  margin-left: var(--t-space-1);
+}
+.lu.dxe .dxe-detail-acts:empty {
+  display: none;
 }
 
 /* The add picker's cards keep a small thumbnail box of the display's shape. */
@@ -1028,7 +1076,7 @@ main.page.dxe-page {
 }
 .lu.dxe .dxe-step-sub,
 .lu.dxe .dxe-where {
-  font-size: 12.5px;
+  font-size: var(--t-size-sm);
   color: var(--t-fg-soft);
 }
 .lu.dxe .dxe-tag {
@@ -1085,19 +1133,19 @@ main.page.dxe-page {
 
 /* children: what a dashboard shows one of */
 .lu.dxe .dxe-kids {
+  --dxe-iw: clamp(56px, calc(84px * var(--dxe-arw, 16) / var(--dxe-arh, 10)), 120px);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--t-space-3);
 }
 .lu.dxe .dxe-kids-head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px 12px;
-  font-size: 13px;
+  gap: var(--t-space-1) var(--t-space-3);
+  font-size: var(--t-size-md);
 }
-.lu.dxe .dxe-kids-head .lu-seg,
-.lu.dxe .dxe-kids-head .dxe-draw {
+.lu.dxe .dxe-kids-head .lu-seg {
   margin-left: auto;
 }
 .lu.dxe .dxe-kids-head .dxe-shared {
@@ -1106,10 +1154,6 @@ main.page.dxe-page {
 }
 .lu.dxe .dxe-grid-items.is-busy {
   opacity: 0.55;
-}
-.lu.dxe .dxe-draw {
-  border: 1px solid var(--t-border-strong);
-  color: var(--t-fg);
 }
 .lu.dxe .dxe-strip,
 .lu.dxe .dxe-grid-items {
@@ -1126,9 +1170,6 @@ main.page.dxe-page {
    on .dxe-kids): tall on a portrait frame, wide on a landscape one. A picture
    fills it the way the frame shows it: cropped to cover, or whole where the
    widget letterboxes (.is-fit). */
-.lu.dxe .dxe-kids {
-  --dxe-iw: clamp(56px, calc(84px * var(--dxe-arw, 16) / var(--dxe-arh, 10)), 120px);
-}
 .lu.dxe .dxe-it {
   display: flex;
   flex: none;
@@ -1323,15 +1364,16 @@ main.page.dxe-page {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px 12px;
-  padding-top: 10px;
-  border-top: 1px dashed var(--t-border);
-  font-size: 13px;
+  gap: var(--t-space-1) var(--t-space-3);
+  padding-top: var(--t-space-3);
+  border-top: 1px solid var(--t-border);
+  font-size: var(--t-size-md);
 }
+/* Edit, Home and Remove together, at the end of the line. */
 .lu.dxe .dxe-sum-r {
   margin-left: auto;
   display: inline-flex;
-  gap: 16px;
+  gap: var(--t-space-4);
 }
 .lu.dxe .dxe-edit {
   display: grid;
@@ -1350,7 +1392,7 @@ main.page.dxe-page {
   color: var(--t-fg);
 }
 .lu.dxe .dxe-mini small {
-  font-size: 12px;
+  font-size: var(--t-size-sm);
 }
 .lu.dxe .dxe-mini.row {
   flex-direction: row;
@@ -1386,10 +1428,6 @@ main.page.dxe-page {
   color: var(--t-fg);
   font-weight: 500;
 }
-.lu.dxe .dxe-hint {
-  margin-left: auto;
-  font-size: 12.5px;
-}
 .lu.dxe .dxe-picker {
   --dxe-tw: min(80px, calc(60px * var(--dxe-arw, 16) / var(--dxe-arh, 10)));
   padding: 14px 16px 16px;
@@ -1417,10 +1455,6 @@ main.page.dxe-page {
   border-radius: var(--lu-r);
   background: var(--t-surface);
 }
-.lu.dxe .dxe-add-btn {
-  border: 1px solid var(--t-border-strong);
-  color: var(--t-fg);
-}
 .lu.dxe .dxe-pick-more {
   margin: 0;
   font-size: 13px;
@@ -1432,45 +1466,38 @@ main.page.dxe-page {
 .lu.dxe .dxe-empty {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--t-space-2);
   margin: 0;
-  padding: 16px;
+  padding: var(--t-space-4);
   border: 1px dashed var(--t-border-strong);
   border-radius: var(--lu-r);
-  font-size: 13.5px;
+  font-size: var(--t-size-md);
   color: var(--t-fg-soft);
 }
 .lu.dxe .dxe-steps-card > .dxe-empty {
-  margin: 12px 16px 4px;
+  margin: var(--dxe-pad) var(--dxe-pad) 0;
 }
 
-/* 3 Timing: no card, a quiet list */
-.lu.dxe .dxe-pace {
-  margin-left: 34px;
+/* 3 Timing: a card of fields like When it runs; the display's options fold
+   away as its last row. */
+.lu.dxe .dxe-pace > :is(.dxe-opts-none, .dxe-pace-note) {
+  padding: var(--t-space-4) 0;
 }
-.lu.dxe .dxe-pace > .dxe-field {
-  border-top: 0;
-  padding: 10px 0;
-}
-.lu.dxe .dxe-pace > .dxe-field .dxe-ctl {
-  font-size: 13.5px;
-}
-.lu.dxe .dxe-pace .dxe-opts-none {
-  padding: 14px 0;
-  border-top: 1px solid var(--t-border);
-}
-.lu.dxe .dxe-fold {
+.lu.dxe .dxe-pace > * + :is(.dxe-fold, .dxe-opts-none, .dxe-pace-note) {
   border-top: 1px solid var(--t-border);
 }
 .lu.dxe .dxe-fold > summary {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 12px;
-  padding: 14px 0;
-  font-size: 14px;
+  gap: var(--t-space-1) var(--t-space-3);
+  padding: var(--t-space-4) 0;
+  font-size: var(--t-size-md);
   cursor: pointer;
   list-style: none;
+}
+.lu.dxe .dxe-fold > summary b {
+  font-weight: 600;
 }
 .lu.dxe .dxe-fold > summary::-webkit-details-marker {
   display: none;
@@ -1488,19 +1515,10 @@ main.page.dxe-page {
   transform: none;
 }
 .lu.dxe .dxe-fold-body {
-  padding: 0 0 18px 26px;
+  padding: 0 0 var(--t-space-4) calc(var(--dxe-label-w) + var(--t-space-4));
   display: flex;
   flex-direction: column;
-  gap: 14px;
-}
-.lu.dxe .dxe-fold-body.dxe-adv {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 16px 24px;
-}
-.lu.dxe .dxe-ovs {
-  grid-column: 1 / -1;
-  max-width: 480px;
+  gap: var(--t-space-4);
 }
 .lu.dxe .dxe-opt {
   display: flex;
@@ -1510,11 +1528,11 @@ main.page.dxe-page {
 }
 .lu.dxe .dxe-opt b {
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--t-size-base);
 }
 .lu.dxe .dxe-opt p {
   margin: 2px 0 0;
-  font-size: 12.5px;
+  font-size: var(--t-size-sm);
   display: flex;
   align-items: center;
   gap: 4px;
@@ -1532,8 +1550,8 @@ main.page.dxe-page {
 .lu.dxe .dxe-lead-s {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 13px;
+  gap: var(--t-space-2);
+  font-size: var(--t-size-md);
 }
 .lu.dxe .dxe-lead-s .dxe-num {
   width: 72px;
@@ -1544,9 +1562,9 @@ main.page.dxe-page {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px 12px;
-  margin-top: 24px;
-  font-size: 14.5px;
+  gap: var(--t-space-1) var(--t-space-3);
+  margin-top: var(--t-space-6);
+  font-size: var(--t-size-base);
 }
 .lu.dxe .dxe-done b {
   font-weight: 600;
@@ -1560,12 +1578,12 @@ main.page.dxe-page {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  padding: 12px;
+  padding: var(--t-space-3);
   border: 1px solid var(--t-border);
   border-radius: var(--lu-r-card);
   background: var(--t-surface);
   text-align: left;
-  font-size: 12.5px;
+  font-size: var(--t-size-sm);
   cursor: pointer;
 }
 .lu.dxe .dxe-dcard:hover {
@@ -1581,6 +1599,8 @@ main.page.dxe-page {
   font-weight: 600;
 }
 .lu.dxe .dxe-dcard-th {
+  container-type: inline-size;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1588,16 +1608,12 @@ main.page.dxe-page {
   border-radius: var(--lu-r);
   background: var(--t-surface-sunk);
 }
-.lu.dxe .dxe-dcard-th {
-  container-type: inline-size;
-  width: 100%;
-}
 .lu.dxe .dxe-dcard-th .lu-thumb {
   width: min(90cqw, calc(80px * var(--arw) / var(--arh)));
   height: auto;
 }
 .lu.dxe .dxe-next-step {
-  margin-top: 14px;
+  margin-top: var(--t-space-4);
 }
 
 /* the save bar */
@@ -1605,7 +1621,7 @@ main.page.dxe-page {
   position: sticky;
   bottom: 0;
   z-index: 5;
-  margin-top: 36px;
+  margin-top: var(--dxe-sec);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1648,14 +1664,13 @@ main.page.dxe-page {
     grid-template-columns: minmax(0, 1fr);
   }
   .lu.dxe .dxe-now {
+    --now-w: 120px;
+    --now-h: 120px;
     width: auto;
+    max-width: none;
     flex-direction: row;
     align-items: center;
     gap: 12px;
-  }
-  .lu.dxe .dxe-now {
-    --now-w: 120px;
-    --now-h: 120px;
   }
   .lu.dxe .dxe-now .lu-thumb {
     flex: none;
@@ -1663,8 +1678,29 @@ main.page.dxe-page {
   #deck-editor .dxe-h1 input.dxe-title {
     font-size: 22px;
   }
-  .lu.dxe .dxe-card {
-    padding: 0 14px;
+  .lu.dxe {
+    --dxe-pad: var(--t-space-3);
+  }
+  /* The controls under the crumb, in reading order, the On switch at the end. */
+  .lu.dxe .dxe-top-ctl {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+  .lu.dxe .dxe-on {
+    margin-left: auto;
+  }
+  .lu.dxe .dxe-fold-body {
+    padding-left: 0;
+  }
+  /* The dashboard's name keeps the line, with ×; its actions go under it. */
+  .lu.dxe .dxe-detail-head {
+    flex-wrap: wrap;
+  }
+  .lu.dxe .dxe-detail-acts {
+    order: 3;
+    flex: 1 1 100%;
+    justify-content: flex-start;
   }
   .lu.dxe .dxe-field {
     grid-template-columns: minmax(0, 1fr);
@@ -1676,8 +1712,7 @@ main.page.dxe-page {
   .lu.dxe .dxe-days .lu-dt {
     width: 40px;
   }
-  .lu.dxe .dxe-lead,
-  .lu.dxe .dxe-pace {
+  .lu.dxe .dxe-lead {
     margin-left: 0;
   }
   /* The tiles: one line that scrolls sideways, as on the Lineups page. */
@@ -1689,14 +1724,14 @@ main.page.dxe-page {
   .lu.dxe .dxe-tiles-scroll {
     overflow-x: auto;
     overscroll-behavior-x: contain;
-    padding: 20px 14px 12px;
+  }
+  .lu.dxe .dxe-hint {
+    position: sticky;
+    left: 0;
   }
   .lu.dxe .dxe-tiles {
     flex-wrap: nowrap;
     width: max-content;
-  }
-  .lu.dxe .dxe-detail {
-    padding: 16px 12px 18px;
   }
   .lu.dxe .dxe-picks {
     grid-template-columns: minmax(0, 1fr);
@@ -1706,9 +1741,6 @@ main.page.dxe-page {
   }
   .lu.dxe .dxe-more {
     height: 53px;
-  }
-  .lu.dxe .dxe-hint {
-    margin-left: 0;
   }
   .lu.dxe .dxe-actionbar-btns {
     width: 100%;
@@ -1846,8 +1878,8 @@ html .dxe-move-dialog .wizard-footer button.primary.dxe-caution:hover {
 .lu.dxe .dxe-loc .lu-more-menu button {
   white-space: nowrap;
 }
-.lu.dxe .dxe-overridden {
-  flex: 1 1 100%;
+.lu.dxe .dxe-overridden .dxe-link {
+  font-size: inherit;
 }
 .lu.dxe .dxe-step.is-flash {
   animation: dxe-flash 1.8s ease-out;

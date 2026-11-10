@@ -375,7 +375,7 @@
         const to = sel.value;
         const from = S.display;
         const rows = [];
-        if (to === from) rows.push(`Stays on ${nameOf(to)}; this drops the staged move.`);
+        if (to === from) rows.push(`Stays on ${nameOf(to)}; the move is dropped.`);
         else
           rows.push(
             from ? `Stops on ${nameOf(from)}; runs on ${nameOf(to)}.` : `Runs on ${nameOf(to)}.`
@@ -546,7 +546,7 @@
     box.innerHTML =
       text +
       undo +
-      `<button type="button" class="lu-btn-ghost lu-btn-line dxe-push-now" data-push-lineup data-fk="f-push"${canPushNow ? "" : " disabled"} title="Send ${esc(pageOf(home).name || "it")} now">${ico("send")}<span>Push now</span></button>` +
+      `<button type="button" class="lu-btn-ghost lu-btn-line dxe-act dxe-push-now" data-push-lineup data-fk="f-push"${canPushNow ? "" : " disabled"} title="Send ${esc(pageOf(home).name || "it")} now">${ico("send")}<span>Push now</span></button>` +
       `<details class="lu-more dxe-more-menu"${wasOpen ? " open" : ""}><summary title="More" aria-label="More actions" data-loc-more data-fk="loc-more">${ico("dots")}</summary><div class="lu-more-menu">` +
       `<button type="button" data-move data-fk="move" aria-haspopup="dialog"${can ? "" : " disabled"}>Move to another display…</button>` +
       `<hr class="lu-more-sep"><button type="button" class="danger" data-delete data-fk="f-delete">Delete lineup</button></div></details>`;
@@ -935,7 +935,10 @@
     const n = st.steps.length;
     if (!n) return "No dashboards yet.";
     const k = kind();
-    if (k === "manual") return "Taps and buttons step through them.";
+    if (k === "manual") {
+      const w = flipWord();
+      return `${w.charAt(0).toUpperCase()}${w.slice(1)} step through them.`;
+    }
     if (k === "daily") return n > 1 ? "Only the first dashboard is sent." : "Sent once, then held.";
     if (k === "interval") return `Sent again every ${mins(st.interval)}.`;
     const same = st.steps.every((s) => dwellOf(s) === st.interval);
@@ -1090,7 +1093,9 @@
         : "";
     const now = vms.some((x) => x.pill) ? " has-now" : "";
     return (
-      `<div class="dxe-tiles-scroll"><ol class="lu-strip dxe-tiles ${d.orientation}${now}" id="dxe-steps" aria-label="Dashboards in order">${tiles}${addTile}</ol></div>` +
+      `<div class="dxe-tiles-scroll"><ol class="lu-strip dxe-tiles ${d.orientation}${now}" id="dxe-steps" aria-label="Dashboards in order">${tiles}${addTile}</ol>` +
+      (n > 1 ? `<p class="dxe-soft dxe-hint">Drag or Alt+←→ to reorder.</p>` : "") +
+      `</div>` +
       detailHtml()
     );
   }
@@ -1108,15 +1113,26 @@
     const label = c && c.label ? `Push ${c.label}` : "Push now";
     const push = S.isNew
       ? ""
-      : `<button type="button" class="lu-btn-ghost sm dxe-push" data-push="${esc(id)}" data-fk="push-${esc(id)}"${canPush(id) && !ui.pushing && ready ? "" : " disabled"} title="${!canPush(id) ? "Save first to push it" : ready ? `Push ${esc(p.name)} to the display now` : "Wait for this picture to finish"}">${ico("send")}<span>${esc(label)}</span></button>`;
+      : `<button type="button" class="lu-btn-ghost lu-btn-line dxe-act dxe-push" data-push="${esc(id)}" data-fk="push-${esc(id)}"${canPush(id) && !ui.pushing && ready ? "" : " disabled"} title="${!canPush(id) ? "Save first to push it" : ready ? `Push ${esc(p.name)} to the display now` : "Wait for this picture to finish"}">${ico("send")}<span>${esc(label)}</span></button>`;
+    // Draw another sits with Push now: both act on this dashboard at once.
+    const it = p.items || {};
+    let drawBtn = "";
+    if (!S.isNew && it.mode === "draw") {
+      const c0 = ui.choice[id];
+      const hist = c0 && c0.mode === "draw" ? c0.hist : [];
+      const ok = canPick(id);
+      const busy = hist.length && hist[hist.length - 1].state === "loading";
+      drawBtn = `<button type="button" class="lu-btn-ghost lu-btn-line dxe-act dxe-draw" data-draw="${esc(id)}" data-fk="draw-${esc(id)}"${ok && !busy ? "" : ` disabled title="${ok ? "Drawing…" : "Save first to draw"}"`}>${ico("refresh")}<span>Draw another</span></button>`;
+    }
+    const sub = p.subtitle && p.subtitle !== p.name ? p.subtitle : "";
     const body = S.isNew
       ? `<div class="dxe-sum"><span class="dxe-sum-r"><button type="button" class="dxe-link quiet" data-remove="${esc(id)}" data-fk="rm-${esc(id)}" aria-label="Remove ${esc(p.name)}">Remove</button></span></div>`
       : `${childrenHtml(s, p)}${settingsHtml(s, p, i)}`;
     return (
       `<section class="dxe-detail" id="dxe-detail" data-panel="${esc(id)}" aria-label="${esc(p.name)}">` +
       `<div class="dxe-detail-head"><span class="dxe-plug" aria-hidden="true"><i class="ph ${esc(p.icon || "ph-squares-four")}"></i></span>` +
-      `<span class="dxe-detail-t"><b>${esc(p.name)}</b><span class="dxe-soft">${esc(p.subtitle || "")}</span></span>` +
-      `<span class="dxe-detail-acts">${push}<button type="button" class="lu-ibtn" data-expand="${esc(id)}" data-fk="close-${esc(id)}" aria-label="Close ${esc(p.name)} details" title="Close (Esc)">${ico("x")}</button></span></div>` +
+      `<span class="dxe-detail-t"><b>${esc(p.name)}</b>${sub ? `<span class="dxe-soft">${esc(sub)}</span>` : ""}</span>` +
+      `<span class="dxe-detail-acts">${drawBtn}${push}</span><button type="button" class="lu-ibtn dxe-close" data-expand="${esc(id)}" data-fk="close-${esc(id)}" aria-label="Close ${esc(p.name)} details" title="Close (Esc)">${ico("x")}</button></div>` +
       body +
       `</section>`
     );
@@ -1206,8 +1222,7 @@
         .join("");
       return (
         `<div class="dxe-kids"><div class="dxe-kids-head"><span class="dxe-mono">${esc(it.count ? plural(it.count, it.noun || "items") : "Draw")}</span>` +
-        `<span class="dxe-soft">${c && c.note ? esc(c.note) : "A new one each time it's sent."}</span>` +
-        `<button type="button" class="lu-btn-ghost sm dxe-draw" data-draw="${esc(p.id)}" data-fk="draw-${esc(p.id)}"${ok && !(hist.length && hist[hist.length - 1].state === "loading") ? "" : ` disabled title="${ok ? "Drawing…" : "Save first to draw"}"`}>${ico("refresh")}<span>Draw another</span></button></div>` +
+        `<span class="dxe-soft">${c && c.note ? esc(c.note) : "A new one each time it's sent."}</span></div>` +
         `<div class="dxe-strip">${last}${drawn}</div></div>`
       );
     }
@@ -1354,7 +1369,7 @@
             : "";
           return (
             `<li class="dxe-pick"><span class="dxe-pick-th">${stackedThumb(p)}</span><span class="dxe-step-text"><b>${esc(p.name)}</b><span class="dxe-step-sub">${esc(p.subtitle || "")}</span>${where}</span>` +
-            `<button type="button" class="lu-btn-ghost sm dxe-add-btn" data-add="${esc(p.id)}" data-fk="add-${esc(p.id)}"${elsewhere ? " data-elsewhere" : ""} aria-label="Add ${esc(p.name)}">${ico("plus")}<span>Add</span></button></li>`
+            `<button type="button" class="lu-btn-ghost lu-btn-line sm dxe-add-btn" data-add="${esc(p.id)}" data-fk="add-${esc(p.id)}"${elsewhere ? " data-elsewhere" : ""} aria-label="Add ${esc(p.name)}">${ico("plus")}<span>Add</span></button></li>`
           );
         })
         .join("");
@@ -1384,9 +1399,7 @@
       ? ""
       : `<p class="dxe-empty">${ico("layers")}<span>No dashboards yet.</span></p>`;
     const addRow = st.steps.length
-      ? st.steps.length > 1
-        ? `<div class="dxe-add-row"><span class="dxe-soft dxe-hint">Drag or Alt+←→ to reorder.</span></div>`
-        : ""
+      ? ""
       : `<div class="dxe-add-row"><button type="button" class="lu-btn-ghost dxe-add" data-picker data-fk="picker" aria-expanded="${ui.picker}" aria-controls="dxe-picker"${st.display ? "" : " disabled"}>${ico(ui.picker ? "x" : "plus")}<span>${ui.picker ? "Close" : "Add dashboard"}</span></button></div>`;
     return (
       `<div class="dxe-card dxe-steps-card"${shapeVars()}>${empty}${st.steps.length ? stripHtml() : ""}` +
@@ -1580,7 +1593,7 @@
       rows.push(
         `<p class="dxe-note dxe-pace-note">${ico("info")}<span><button type="button" class="dxe-link" data-end="add">Add end time</button> to show them in turn.</span></p>`
       );
-    return `<div class="dxe-pace">${rows.join("")}${optionsHtml()}</div>`;
+    return `<div class="dxe-card dxe-pace">${rows.join("")}${optionsHtml()}</div>`;
   }
 
   /* ------------------------------------------------------------ the new-lineup flow */
@@ -1653,7 +1666,7 @@
         : `<p class="dxe-empty">${ico("layers")}<span>No dashboards yet.</span></p>`;
       html +=
         `<section class="dxe-sec" aria-labelledby="dxe-h-dash">${secHead(3, "Dashboards", "Pick what it shows, in order.", "dxe-h-dash")}` +
-        `<div class="dxe-card dxe-steps-card"${shapeVars()}>${chosen}${st.steps.length > 1 ? `<div class="dxe-add-row"><span class="dxe-soft dxe-hint">Drag or Alt+←→ to reorder.</span></div>` : ""}</div>` +
+        `<div class="dxe-card dxe-steps-card"${shapeVars()}>${chosen}</div>` +
         pickerHtml() +
         `</section>`;
     } else html += waitingHead(3, "Dashboards", "Choose when it runs first.");
