@@ -16,10 +16,16 @@
   const h1 = document.querySelector("main.page h1");
   if (!slot || !title || !h1 || !("IntersectionObserver" in window)) return;
   const copy = h1.cloneNode(true);
-  copy.querySelectorAll("svg, i, .sr-only").forEach((n) => n.remove());
-  const words = copy.textContent.replace(/\s+/g, " ").trim();
+  copy.querySelectorAll("svg, i, .sr-only, .lu-sr-only").forEach((n) => n.remove());
+  // A title you can edit in place (the lineup editor's name) is an input in
+  // the h1: the bar shows its value, and follows it as it is typed.
+  const field = h1.querySelector("input");
+  const read = () =>
+    copy.textContent.replace(/\s+/g, " ").trim() || (field ? field.value.trim() : "");
+  const words = read();
   if (!words) return;
   title.textContent = words;
+  if (field) field.addEventListener("input", () => (title.textContent = read() || words));
   const bar = document.querySelector(".topbar");
   const barHeight = () => Math.round(bar ? bar.getBoundingClientRect().height : 56);
   let watcher = null;

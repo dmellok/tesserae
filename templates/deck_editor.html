@@ -29,6 +29,7 @@
       <label class="dxe-on">
         <span id="dxe-on-word">{{ 'On' if deck.enabled else 'Off' }}</span>
         <span class="switch dxe-switch">
+          <input type="hidden" name="enabled" value="0">
           <input type="checkbox" name="enabled" id="dxe-enabled" {% if deck.enabled %}checked{% endif %}
                  aria-label="Lineup on">
           <span class="switch-track"><span class="switch-thumb"></span></span>
@@ -41,8 +42,8 @@
       <figure class="dxe-now" id="dxe-now" hidden></figure>
       <div class="dxe-hero-main">
         <h1 class="dxe-h1">
-          <label class="lu-sr-only" for="dxe-title">Lineup name</label>
           <input type="text" name="name" id="dxe-title" class="dxe-title" maxlength="80"
+                 aria-label="Lineup name"
                  value="{{ deck.name if deck else '' }}" autocomplete="off" spellcheck="false"
                  placeholder="{{ 'Name it (or leave it for later)' if not deck else 'Lineup name' }}">
         </h1>

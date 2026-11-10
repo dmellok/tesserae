@@ -4232,7 +4232,10 @@ def test_a_displays_plus_starts_a_lineup_for_that_display(real: tuple[str, Flask
         with page.expect_navigation():
             page.locator('.lu-ds[data-display="hall"] .lu-ds-add').click()
         assert page.url.endswith("/decks/new?display=hall")
-        page.locator("[data-goto='3']").click()  # its display is chosen: When is open
+        # Its display is chosen: When is open. (10:00 keeps clear of Hall loop,
+        # 06:00-09:00: a new lineup that meets it is refused.)
+        page.locator('[data-time="start"]').fill("10:00")
+        page.locator("[data-goto='3']").click()
         page.locator('[data-add="free"]').click()
         with page.expect_navigation():
             page.locator("[data-create]").click()

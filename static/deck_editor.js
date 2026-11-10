@@ -49,6 +49,14 @@
   const pageOf = (id) =>
     S.pages[id] || { id, name: id, subtitle: "", items: { mode: "none" }, missing: true };
   const deviceOf = (id) => S.devices.find((d) => d.id === id) || null;
+  // A lineup bound to several displays: the editor edits the first and keeps
+  // the rest (they are posted back as they are).
+  const otherDisplays = () => (S.displays || []).slice(1).filter((d) => d && d !== st.display);
+  const displayNames = () =>
+    [st.display, ...otherDisplays()]
+      .filter(Boolean)
+      .map((id) => (deviceOf(id) || { name: id }).name)
+      .join(" + ");
   const viewOf = (id) => (id && S.views ? S.views[id] : null) || null;
   const capsOf = (id) => (deviceOf(id) || {}).caps || {};
   const live = (text) => {
@@ -64,6 +72,29 @@
     if (!on.length) return "no days";
     return on.map((i) => DAYS[i]).join(", ");
   };
+  // A failed request as one plain line: the server's own words when it gave
+  // some, else what went wrong in general terms.
+  const NET = "Can't reach Tesserae; changes kept, try again.";
+  function failure(r, data) {
+    if (data && data.error) return data.error;
+    if (r && r.status >= 500) return "Server error; try again.";
+    return r ? `Refused (error ${r.status}).` : NET;
+  }
+  async function request(url, init) {
+    let r;
+    try {
+      r = await fetch(url, Object.assign({ credentials: "same-origin" }, init));
+    } catch {
+      throw Object.assign(new Error(NET), { net: true });
+    }
+    const data = await r.json().catch(() => null);
+    if (!r.ok || !data || data.ok === false)
+      throw Object.assign(new Error(failure(r, data)), {
+        status: r.status,
+        reload: !!(data && data.reload),
+      });
+    return data;
+  }
   const nonce = () =>
     Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) =>
       b.toString(16).padStart(2, "0")
@@ -111,6 +142,8 @@
     changeDisplay: false,
     step: S.isNew ? (S.display ? 2 : 1) : 0, // the new flow's open step
     saving: false,
+    pushing: false,
+    reload: false,
     msg: "",
     msgKind: "",
     justDay: null,
@@ -118,18 +151,22 @@
     consentDisplay: S.display,
   };
   const snapshot = () => JSON.stringify(Object.assign({}, st, { whenChanged: false }));
+  const stepHadConditions = new Set(
+    S.steps.filter((s) => s.conditions && s.conditions.length).map((s) => s.id)
+  );
+  // Conditions are a legacy, per-dashboard rule: only a step that has some
+  // shows (and posts) its editor.
+  const hasConditions = (s) => stepHadConditions.has(s.id) || !!(s.conditions || "").trim();
   let saved = snapshot();
   const dirty = () => snapshot() !== saved;
 
   /* ------------------------------------------------------------ the lineup's shape */
   // What the lineup is as edited: "manual", "daily" (one send), "cycle" (a window taken
   // in turn) or "interval" (one dashboard repeated through a window); the same rule as
-  // the server's _apply_when.
+  // the server's _apply_when and _reshape_window, which apply it on every save.
   function kind() {
     if (st.when.mode === "manual") return "manual";
     if (st.when.mode === "at") return "daily";
-    if (!st.whenChanged && S.when.kind === "interval") return "interval";
-    if (!st.whenChanged && S.when.kind === "cycle") return "cycle";
     return st.steps.length === 1 ? "interval" : "cycle";
   }
   const dwellOf = (s) => (s.dwell ? s.dwell : st.interval);
@@ -147,6 +184,29 @@
     const p = pause();
     if (!p || !Number.isFinite(m)) return false;
     return R.overlapsPause(p, m, m);
+  }
+  // The whole of s..e (minutes, e up to 1440) inside quiet hours.
+  function allInPause(s, e) {
+    const p = pause();
+    if (!p || !Number.isFinite(s) || !Number.isFinite(e) || e <= s) return false;
+    const a = p.start_min;
+    const b = p.end_min;
+    return a < b ? s >= a && e <= b : e <= b || s >= a;
+  }
+  // The first quarter hour at or after quiet hours end (or `m` when it's out).
+  function slotAfterPause(m) {
+    let t = Math.ceil(m / 15) * 15;
+    for (let i = 0; i < 96 && inPause(t % DAY_MIN); i++) t += 15;
+    return t % DAY_MIN;
+  }
+  // A window's end that comes before its start: refused, except on a saved
+  // one-dashboard interval, which may run past midnight.
+  function endBeforeStart() {
+    if (st.when.mode !== "between") return false;
+    const w = window_();
+    if (!Number.isFinite(w.s) || !Number.isFinite(w.e)) return false;
+    if (w.e === w.s) return true;
+    return w.e < w.s && !(S.when.kind === "interval" && st.steps.length === 1);
   }
   const takesInput = () => !!capsOf(st.display).inputs;
   const sleeps = () => !!capsOf(st.display).sleeps;
@@ -223,7 +283,7 @@
   function drawHeader() {
     const here = $("dxe-crumb-here");
     const dev = deviceOf(st.display);
-    if (here && !S.isNew) here.textContent = dev ? dev.name : "No display";
+    if (here && !S.isNew) here.textContent = dev ? displayNames() : "No display";
     const d = viewOf(st.display);
     const model = $("dxe-model");
     if (model) {
@@ -264,9 +324,21 @@
 
   function statusLines(d) {
     const l = S.lineup;
-    if (!st.enabled)
-      return `<p class="dxe-live-line off"><i class="dxe-dot" aria-hidden="true"></i>Off. Nothing runs until it's on.</p>`;
+    const line = (text, cls) =>
+      `<p class="dxe-live-line${cls ? ` ${cls}` : ""}"><i class="dxe-dot" aria-hidden="true"></i>${text}</p>`;
+    if (!st.enabled) return line("Off, nothing runs.", "off");
     if (!l || !d) return "";
+    if (S.when.mode === "manual" && l.status !== "live")
+      return line("<b>By hand: taps and buttons flip it.</b>");
+    // A daily push in quiet hours is skipped, not held: the scheduler counts
+    // it as done for the day (as the When section says).
+    if (
+      S.when.kind === "daily" &&
+      l.status !== "live" &&
+      S.display === st.display &&
+      inPause(T(S.when.start))
+    )
+      return line(`<b>Skipped: ${esc(clockOf(S.when.start))} is in quiet hours.</b>`);
     if (l.status === "live") {
       const cur = l.steps.find((s) => s.current) || l.steps.find((s) => s.on_screen);
       const nx = l.steps.find((s) => s.next);
@@ -389,7 +461,7 @@
       const just = ui.justDay === i ? ` just-${on ? "on" : "off"}` : "";
       const edited = changed.includes(i) ? " is-edited" : "";
       const today = S.now && S.now.weekday === i ? " is-today" : "";
-      return `<button type="button" class="lu-dt${on ? " on" : ""}${today}${edited}${just}" data-day="${i}" aria-pressed="${on}" title="${DAY_NAMES[i]}: ${on ? "runs. Click to remove" : "off. Click to add"}">${n}</button>`;
+      return `<button type="button" class="lu-dt${on ? " on" : ""}${today}${edited}${just}" data-day="${i}" data-fk="day-${i}" aria-pressed="${on}" title="${DAY_NAMES[i]}: ${on ? "runs, click to remove" : "off, click to add"}">${n}</button>`;
     }).join("");
     return `<span class="lu-days dxe-days" role="group" aria-label="Days it runs">${tiles}</span>`;
   }
@@ -398,10 +470,10 @@
     const m = st.when.mode;
     const seg =
       `<div class="lu-seg dxe-seg" role="group" aria-label="When">` +
-      `<button type="button" data-when="at" aria-pressed="${m === "at"}">At a time</button>` +
-      `<button type="button" data-when="between" aria-pressed="${m === "between"}">Between times</button>` +
+      `<button type="button" data-when="at" data-fk="when-at" aria-pressed="${m === "at"}">At a time</button>` +
+      `<button type="button" data-when="between" data-fk="when-between" aria-pressed="${m === "between"}">Between times</button>` +
       (S.when.mode === "manual" || takesInput()
-        ? `<button type="button" data-when="manual" aria-pressed="${m === "manual"}">By hand</button>`
+        ? `<button type="button" data-when="manual" data-fk="when-manual" aria-pressed="${m === "manual"}">By hand</button>`
         : "") +
       `</div>`;
     if (m === "manual") return `<div class="dxe-time">${seg}</div>`;
@@ -409,7 +481,7 @@
     const fields =
       `<input type="time" step="900" class="dxe-in dxe-time-in" data-fk="start" data-time="start" value="${esc(st.when.start)}" aria-label="Start">` +
       (m === "between"
-        ? `<span class="dxe-to">to</span><input type="time" step="900" class="dxe-in dxe-time-in" data-fk="end" data-time="end" value="${esc(endVal)}" aria-label="End">` +
+        ? `<span class="dxe-to">to</span><input type="time" step="900" class="dxe-in dxe-time-in${endBeforeStart() ? " is-bad" : ""}" data-fk="end" data-time="end" value="${esc(endVal)}" aria-label="End"${endBeforeStart() ? ' aria-invalid="true" aria-describedby="dxe-end-err"' : ""}>` +
           `<button type="button" class="lu-win-end is-rm" data-end="rm" title="Remove end time" aria-label="Remove end time">${ico("x")}</button>`
         : `<button type="button" class="lu-win-end" data-end="add" title="Add end time" aria-label="Add end time">${ico("plus")}<span>End time</span></button>`);
     return `<div class="dxe-time">${seg}<span class="dxe-time-fields">${fields}</span></div>`;
@@ -419,6 +491,10 @@
     const out = [];
     if (st.when.mode === "manual") return "";
     const w = window_();
+    if (endBeforeStart())
+      out.push(
+        `<p class="dxe-warn is-err" id="dxe-end-err">${ico("info")}<span>End must be after start.</span></p>`
+      );
     if (st.when.mode === "at" && st.steps.length > 1)
       out.push(
         `<p class="dxe-warn">${ico("info")}<span>Only dashboard 1 is ever sent.</span><button type="button" class="dxe-link" data-end="add">Add end time</button></p>`
@@ -427,8 +503,10 @@
     if (p && st.when.mode === "at" && inPause(w.s)) {
       const after = R.hhmm(p.end_min + 2);
       out.push(
-        `<p class="dxe-warn">${ico("moon")}<span>${esc(clockOf(st.when.start))} is in quiet hours, so it's skipped.</span><button type="button" class="dxe-link" data-start="${esc(after)}">Start at ${esc(R.clock(p.end_min + 2))}</button></p>`
+        `<p class="dxe-warn">${ico("moon")}<span>${esc(clockOf(st.when.start))} is in quiet hours, so it's skipped.</span><button type="button" class="dxe-link" data-start="${esc(after)}" data-fk="start-fix">Start at ${esc(R.clock(p.end_min + 2))}</button></p>`
       );
+    } else if (p && st.when.mode === "between" && !endBeforeStart() && allInPause(w.s, w.e)) {
+      out.push(`<p class="dxe-warn">${ico("moon")}<span>All of this is in quiet hours.</span></p>`);
     } else if (p && st.when.mode === "between" && inPause(w.s)) {
       out.push(
         `<p class="dxe-note">${ico("moon")}<span>Quiet until ${esc(R.clock(p.end_min))}; it picks up then.</span></p>`
@@ -440,6 +518,7 @@
   function displayRow() {
     const dev = deviceOf(st.display);
     if (S.isNew) return "";
+    const more = otherDisplays().map((id) => (deviceOf(id) || { name: id }).name);
     const choose =
       ui.changeDisplay || !dev
         ? `<select class="dxe-in dxe-select" data-fk="display" data-display-select aria-label="Display">` +
@@ -451,14 +530,19 @@
             )
             .join("") +
           `</select>`
-        : `<span class="dxe-disp"><b>${esc(dev.name)}</b>${dev.model ? `<span class="dxe-soft">${esc(dev.model)}</span>` : ""}</span><button type="button" class="dxe-link" data-change-display>Change</button>`;
+        : `<span class="dxe-disp"><b>${esc(dev.name)}</b>${more.length ? `<b class="dxe-also">+ ${esc(more.join(" + "))}</b>` : dev.model ? `<span class="dxe-soft">${esc(dev.model)}</span>` : ""}</span><button type="button" class="dxe-link" data-change-display data-fk="change-display" aria-label="Change display${more.length ? ` (${esc(dev.name)})` : ""}">Change</button>`;
     return `<div class="dxe-field"><span class="dxe-label">Display</span><div class="dxe-ctl">${choose}</div></div>`;
   }
 
   function whenCard() {
+    // By hand has no time, so no days either.
+    const days =
+      st.when.mode === "manual"
+        ? ""
+        : `<div class="dxe-field"><span class="dxe-label" id="dxe-days-l">Days</span><div class="dxe-ctl">${dayTilesHtml()}</div></div>`;
     return (
       `<div class="dxe-card">` +
-      `<div class="dxe-field"><span class="dxe-label" id="dxe-days-l">Days</span><div class="dxe-ctl">${dayTilesHtml()}</div></div>` +
+      days +
       `<div class="dxe-field"><span class="dxe-label">Time</span><div class="dxe-ctl">${timeHtml()}${whenWarnings()}</div></div>` +
       displayRow() +
       `</div>`
@@ -524,16 +608,16 @@
     return (
       `<li class="dxe-step${open ? " is-open" : ""}${notSent ? " is-muted" : ""}${p.missing ? " is-missing" : ""}" data-step="${esc(s.id)}" draggable="true">` +
       `<div class="dxe-step-head">` +
-      `<button type="button" class="dxe-grip" data-grip aria-label="Move ${esc(p.name)}, ${i + 1} of ${n}. Alt+Up or Alt+Down" title="Drag, or Alt+↑↓">${gripIco}</button>` +
+      `<button type="button" class="dxe-grip" data-grip data-fk="grip-${esc(s.id)}" aria-label="Move ${esc(p.name)}, ${i + 1} of ${n}. Alt+Up or Alt+Down" title="Drag, or Alt+↑↓">${gripIco}</button>` +
       `<span class="dxe-pos" aria-hidden="true">${i + 1}/${n}</span>` +
       stackedThumb(p) +
       `<span class="dxe-step-text"><b class="dxe-step-name">${esc(p.name)}</b><span class="dxe-step-sub">${esc(p.subtitle || "")}</span></span>` +
       `<span class="dxe-step-tags">${tags}</span>` +
       (S.isNew
-        ? `<span class="dxe-step-acts"><button type="button" class="lu-ibtn" data-remove="${esc(s.id)}" title="Remove ${esc(p.name)}" aria-label="Remove ${esc(p.name)}">${ico("x")}</button></span></div>`
+        ? `<span class="dxe-step-acts"><button type="button" class="lu-ibtn" data-remove="${esc(s.id)}" data-fk="rm-${esc(s.id)}" title="Remove ${esc(p.name)}" aria-label="Remove ${esc(p.name)}">${ico("x")}</button></span></div>`
         : `<span class="dxe-step-acts">` +
-          `<button type="button" class="lu-ibtn" data-push="${esc(s.id)}"${pushOk ? "" : " disabled"} title="${pushOk ? `Push ${esc(p.name)} now` : "Save first to push it"}" aria-label="Push ${esc(p.name)} now">${ico("send")}</button>` +
-          `<button type="button" class="lu-ibtn dxe-exp" data-expand="${esc(s.id)}" aria-expanded="${open}" aria-controls="dxe-sp-${esc(s.id)}" aria-label="${open ? "Hide" : "Show"} ${esc(p.name)} details">${ico("caret")}</button>` +
+          `<button type="button" class="lu-ibtn" data-push="${esc(s.id)}" data-fk="push-${esc(s.id)}"${pushOk && !ui.pushing ? "" : " disabled"} title="${pushOk ? `Push ${esc(p.name)} now` : "Save first to push it"}" aria-label="Push ${esc(p.name)} now">${ico("send")}</button>` +
+          `<button type="button" class="lu-ibtn dxe-exp" data-expand="${esc(s.id)}" data-fk="exp-${esc(s.id)}" aria-expanded="${open}" aria-controls="dxe-sp-${esc(s.id)}" aria-label="${open ? "Hide" : "Show"} ${esc(p.name)} details">${ico("caret")}</button>` +
           `</span></div>`) +
       (open && !S.isNew
         ? `<div class="dxe-step-body" id="dxe-sp-${esc(s.id)}">${childrenHtml(s, p)}${settingsHtml(s, p, i)}</div>`
@@ -558,7 +642,7 @@
       : "";
     const inner = `<span class="dxe-it-pic">${pic}</span><span class="dxe-it-l">${esc(`#${it.index + 1} ${it.thumb_url ? label : ""}`.trim())}</span>${tag}`;
     return pinMode
-      ? `<button type="button" class="dxe-it${mark ? " is-marked" : ""}" data-pin-item="${esc(p.id)}" data-key="${esc(it.key)}" aria-pressed="${mark === "Pinned"}" title="Pin ${esc(label)}">${inner}</button>`
+      ? `<button type="button" class="dxe-it${mark ? " is-marked" : ""}" data-pin-item="${esc(p.id)}" data-key="${esc(it.key)}" data-fk="pin-${esc(p.id)}-${esc(it.key)}" aria-pressed="${mark === "Pinned"}" title="Pin ${esc(label)}">${inner}</button>`
       : `<span class="dxe-it${mark ? " is-marked" : ""}" title="${esc(label)}">${inner}</span>`;
   }
 
@@ -570,9 +654,13 @@
       const pinMode = !!it.pinnable && !!pinned;
       const head =
         `<div class="dxe-kids-head"><span class="dxe-mono">${esc(plural(it.count, it.noun || "items"))}</span>` +
-        `<span class="dxe-soft">${pinned ? `Pinned: the others are skipped.` : "One per visit, in turn."}</span>` +
+        `<span class="dxe-soft">${pinned ? `Pinned: the others are skipped.` : `One per visit, ${it.order === "random" ? "random" : "in turn"}.`}</span>` +
         (it.pinnable
-          ? `<span class="lu-seg dxe-seg sm" role="group" aria-label="${esc(p.name)}: one per visit or pinned"><button type="button" data-pin-mode="${esc(p.id)}" data-mode="walk" aria-pressed="${!pinned}">One per visit</button><button type="button" data-pin-mode="${esc(p.id)}" data-mode="pin" aria-pressed="${!!pinned}">Pinned</button></span>`
+          ? `<span class="lu-seg dxe-seg sm" role="group" aria-label="${esc(p.name)}: one per visit or pinned"><button type="button" data-pin-mode="${esc(p.id)}" data-mode="walk" data-fk="pinmode-${esc(p.id)}-walk" aria-pressed="${!pinned}">One per visit</button><button type="button" data-pin-mode="${esc(p.id)}" data-mode="pin" data-fk="pinmode-${esc(p.id)}-pin" aria-pressed="${!!pinned}">Pinned</button></span>`
+          : "") +
+        // A pin is the dashboard's own setting, so it moves every lineup that shows it.
+        (it.pinnable && p.shared
+          ? `<small class="dxe-soft dxe-shared">Pins for every lineup using it.</small>`
           : "") +
         `</div>`;
       const strip = ui.strip[p.id];
@@ -588,7 +676,7 @@
         const more = it.count - Math.min(STRIP, strip.data.items.length);
         const g = ui.grid[p.id];
         if (more > 0)
-          tiles += `<button type="button" class="dxe-more" data-grid="${esc(p.id)}" aria-expanded="${!!(g && g.open)}">${ico("layers")}<span><b>${g && g.open ? "Hide" : `+ ${more} more`}</b><small>${g && g.open ? "" : "Browse all"}</small></span></button>`;
+          tiles += `<button type="button" class="dxe-more" data-grid="${esc(p.id)}" data-fk="grid-${esc(p.id)}" aria-expanded="${!!(g && g.open)}">${ico("layers")}<span><b>${g && g.open ? "Hide" : `+ ${more} more`}</b><small>${g && g.open ? "" : "Browse all"}</small></span></button>`;
       }
       return `<div class="dxe-kids">${head}<div class="dxe-strip">${tiles}</div>${gridHtml(s, p)}</div>`;
     }
@@ -605,7 +693,7 @@
       return (
         `<div class="dxe-kids"><div class="dxe-kids-head"><span class="dxe-mono">${esc(it.count ? plural(it.count, it.noun || "items") : "Draw")}</span>` +
         `<span class="dxe-soft">A new one each render.</span>` +
-        `<button type="button" class="lu-btn-ghost sm dxe-draw" data-draw="${esc(p.id)}"${canDraw ? "" : ' disabled title="Save first to draw"'}>${ico("refresh")}<span>Draw another</span></button></div>` +
+        `<button type="button" class="lu-btn-ghost sm dxe-draw" data-draw="${esc(p.id)}" data-fk="draw-${esc(p.id)}"${canDraw ? "" : ' disabled title="Save first to draw"'}>${ico("refresh")}<span>Draw another</span></button></div>` +
         `<div class="dxe-strip">${drawn}${latest}</div></div>`
       );
     }
@@ -629,15 +717,15 @@
         else if (nums[nums.length - 1] !== "…") nums.push("…");
       pager =
         `<nav class="dxe-pager" aria-label="Pages">` +
-        `<button type="button" class="lu-ibtn sm" data-gpage="${cur - 1}"${cur <= 1 ? " disabled" : ""} aria-label="Previous page">${ico("chevl")}</button>` +
+        `<button type="button" class="lu-ibtn sm" data-gpage="${cur - 1}" data-fk="gprev-${esc(p.id)}"${cur <= 1 ? " disabled" : ""} aria-label="Previous page">${ico("chevl")}</button>` +
         nums
           .map((n) =>
             n === "…"
               ? `<span class="dxe-soft">…</span>`
-              : `<button type="button" class="dxe-pg" data-gpage="${n}"${n === cur ? ' aria-current="page"' : ""}>${n}</button>`
+              : `<button type="button" class="dxe-pg" data-gpage="${n}" data-fk="gpage-${esc(p.id)}-${n}"${n === cur ? ' aria-current="page"' : ""}>${n}</button>`
           )
           .join("") +
-        `<button type="button" class="lu-ibtn sm" data-gpage="${cur + 1}"${cur >= pages ? " disabled" : ""} aria-label="Next page">${ico("chev")}</button></nav>`;
+        `<button type="button" class="lu-ibtn sm" data-gpage="${cur + 1}" data-fk="gnext-${esc(p.id)}"${cur >= pages ? " disabled" : ""} aria-label="Next page">${ico("chev")}</button></nav>`;
     }
     const range = data
       ? data.matched
@@ -646,7 +734,7 @@
       : "";
     const body = !data
       ? `<p class="dxe-soft dxe-loading">Loading…</p>`
-      : `<div class="dxe-grid-items">${data.items.map((x) => itemTile(p, x, pinned && x.key === pinned ? "Pinned" : "", pinMode)).join("")}</div>`;
+      : `<div class="dxe-grid-items${g.busy ? " is-busy" : ""}"${g.busy ? ' aria-busy="true"' : ""}>${data.items.map((x) => itemTile(p, x, pinned && x.key === pinned ? "Pinned" : "", pinMode)).join("")}</div>`;
     return (
       `<div class="dxe-grid" data-grid-for="${esc(p.id)}">` +
       `<div class="dxe-grid-tb"><label class="lu-tb-search dxe-search">${ico("search")}<input type="search" data-fk="q-${esc(p.id)}" data-grid-q="${esc(p.id)}" value="${esc(g.q)}" placeholder="Search ${esc(plural(it.count, it.noun || "items"))}" aria-label="Search ${esc(p.name)}" autocomplete="off" spellcheck="false"></label>` +
@@ -670,13 +758,13 @@
     } catch {
       nCond = 1;
     }
-    bits.push(nCond ? plural(nCond, "conditions") : "no conditions");
+    if (nCond) bits.push(plural(nCond, "conditions"));
     const sum = bits.join(" · ");
     const editing = ui.editing.has(s.id);
     const home = st.home === s.id || (!st.home && i === 0);
     const homeBtn =
       (takesInput() || k === "manual") && st.steps.length > 1
-        ? `<button type="button" class="dxe-link quiet" data-home="${esc(s.id)}"${home ? " disabled" : ""}>${home ? "★ Home" : "Make home ★"}</button>`
+        ? `<button type="button" class="dxe-link quiet" data-home="${esc(s.id)}" data-fk="home-${esc(s.id)}"${home ? ' aria-disabled="true"' : ""} aria-label="${home ? `${esc(p.name)} is home` : `Make ${esc(p.name)} home`}">${home ? "★ Home" : "Make home ★"}</button>`
         : "";
     let edit = "";
     if (editing) {
@@ -702,13 +790,15 @@
             `<option value="${v}"${s.refresh === v ? " selected" : ""}>${v ? `every ${esc(mins(v))}` : "only when sent"}</option>`
         ).join("") +
         `</select><small class="dxe-soft">Changes this dashboard everywhere.</small></label>`;
-      const cond = `<div class="dxe-mini dxe-cond"><span>Conditions</span><div class="condition-picker" data-condition-picker><textarea rows="2" spellcheck="false" data-cond="${esc(s.id)}" placeholder="[]" aria-label="Conditions for ${esc(p.name)}">${esc(s.conditions)}</textarea></div><small class="dxe-soft">Skipped while they fail.</small></div>`;
+      const cond = hasConditions(s)
+        ? `<div class="dxe-mini dxe-cond"><span>Conditions</span><div class="condition-picker" data-condition-picker><textarea rows="2" spellcheck="false" data-cond="${esc(s.id)}" data-fk="cond-${esc(s.id)}" placeholder="[]" aria-label="Conditions for ${esc(p.name)}">${esc(s.conditions)}</textarea></div><small class="dxe-soft">Skipped while they fail.</small></div>`
+        : "";
       edit = `<div class="dxe-edit">${showFor}${upd}${cond}</div>`;
     }
     return (
       `<div class="dxe-sum"><span class="dxe-soft">${esc(sum.charAt(0).toUpperCase() + sum.slice(1))}</span>` +
-      `<button type="button" class="dxe-link" data-edit="${esc(s.id)}" aria-expanded="${editing}">${editing ? "Done" : "Edit"}</button>` +
-      `<span class="dxe-sum-r">${homeBtn}<button type="button" class="dxe-link quiet" data-remove="${esc(s.id)}">Remove</button></span></div>` +
+      `<button type="button" class="dxe-link" data-edit="${esc(s.id)}" data-fk="edit-${esc(s.id)}" aria-expanded="${editing}" aria-label="${editing ? "Done with" : "Edit"} ${esc(p.name)}">${editing ? "Done" : "Edit"}</button>` +
+      `<span class="dxe-sum-r">${homeBtn}<button type="button" class="dxe-link quiet" data-remove="${esc(s.id)}" data-fk="rm-${esc(s.id)}" aria-label="Remove ${esc(p.name)}">Remove</button></span></div>` +
       edit
     );
   }
@@ -732,7 +822,7 @@
             : "";
           return (
             `<li class="dxe-pick"><span class="dxe-pick-th">${stackedThumb(p)}</span><span class="dxe-step-text"><b>${esc(p.name)}</b><span class="dxe-step-sub">${esc(p.subtitle || "")}</span>${where}</span>` +
-            `<button type="button" class="lu-btn-ghost sm dxe-add-btn" data-add="${esc(p.id)}"${elsewhere ? " data-elsewhere" : ""} aria-label="Add ${esc(p.name)}">${ico("plus")}<span>Add</span></button></li>`
+            `<button type="button" class="lu-btn-ghost sm dxe-add-btn" data-add="${esc(p.id)}" data-fk="add-${esc(p.id)}"${elsewhere ? " data-elsewhere" : ""} aria-label="Add ${esc(p.name)}">${ico("plus")}<span>Add</span></button></li>`
           );
         })
         .join("");
@@ -745,7 +835,7 @@
         ? `<a href="${esc(S.urls.newDashboard)}">Make a new dashboard</a>`
         : "") +
       (other.length
-        ? `${S.urls.newDashboard ? " or " : ""}<button type="button" class="dxe-link" data-elsewhere-toggle aria-expanded="${ui.elsewhere}">${ui.elsewhere ? "hide" : "show"} dashboards from other displays (${other.length})</button>`
+        ? `${S.urls.newDashboard ? " or " : ""}<button type="button" class="dxe-link" data-elsewhere-toggle data-fk="elsewhere" aria-expanded="${ui.elsewhere}">${ui.elsewhere ? "hide" : "show"} dashboards from other displays (${other.length})</button>`
         : "") +
       `</p>`;
     return (
@@ -763,7 +853,7 @@
       ? ""
       : `<p class="dxe-empty">${ico("layers")}<span>No dashboards yet.</span></p>`;
     const addRow =
-      `<div class="dxe-add-row"><button type="button" class="lu-btn-ghost dxe-add" data-picker aria-expanded="${ui.picker}" aria-controls="dxe-picker"${st.display ? "" : " disabled"}>${ico(ui.picker ? "x" : "plus")}<span>${ui.picker ? "Close" : "Add dashboard"}</span></button>` +
+      `<div class="dxe-add-row"><button type="button" class="lu-btn-ghost dxe-add" data-picker data-fk="picker" aria-expanded="${ui.picker}" aria-controls="dxe-picker"${st.display ? "" : " disabled"}>${ico(ui.picker ? "x" : "plus")}<span>${ui.picker ? "Close" : "Add dashboard"}</span></button>` +
       (st.steps.length > 1
         ? `<span class="dxe-soft dxe-hint">Drag or Alt+↑↓ to reorder.</span>`
         : "") +
@@ -790,10 +880,12 @@
     const first = pages[0];
     const same = pages.every((r) => r === first);
     const n = pages.length;
+    // A push renders live; only a window's next dashboard is drawn ahead.
+    const ahead = kind() === "daily" ? "" : ", pre-rendered automatically";
     if (same && first)
-      return `${n === 1 ? "It updates" : `All ${n} update`} every ${mins(first)}, pre-rendered automatically.`;
-    if (same) return "Drawn when sent, pre-rendered automatically.";
-    return "Each on its own Updates (see its row), pre-rendered automatically.";
+      return `${n === 1 ? "It updates" : `All ${n} update`} every ${mins(first)}${ahead}.`;
+    if (same) return `Drawn when sent${ahead}.`;
+    return `Each on its own Updates (see its row)${ahead}.`;
   }
   function selectHtml(fk, attr, values, cur, label, fmt) {
     const opts = values.includes(cur) ? values : values.concat([cur]).sort((a, b) => a - b);
@@ -844,9 +936,20 @@
     );
   }
 
+  // Keep ready (a hidden re-render) only helps a display that flips by button
+  // or touch; a push renders live, and a by-hand lineup on a display with no
+  // input never flips (the settings audit).
+  const showKeepReady = () => takesInput() && kind() !== "daily";
+  // "First whose conditions pass" is a legacy mode: offered only where set.
+  const showMode = () => S.mode === "priority" && kind() === "cycle";
+  const showMinHold = () => kind() !== "manual";
   function advancedHtml() {
     const mode = st.mode === "priority" ? "first match" : "timed rotation";
     const keep = st.cadence ? `keep ready ${mins(st.cadence)}` : "keep ready off";
+    const sum = [`priority ${st.priority}`];
+    if (showMode()) sum.push(mode);
+    if (showMinHold()) sum.push(`min hold ${st.minHold} min`);
+    if (showKeepReady()) sum.push(keep);
     const overrides = st.steps
       .map((s) => {
         const p = pageOf(s.id);
@@ -860,14 +963,20 @@
       })
       .join("");
     return (
-      `<details class="dxe-fold" data-fold="advanced"${ui.advOpen ? " open" : ""}><summary>${ico("caret", "dxe-caret")}<b>Advanced</b><span class="dxe-soft">priority ${esc(st.priority)} · ${esc(mode)} · min hold ${esc(st.minHold)} min · ${esc(keep)}</span></summary>` +
+      `<details class="dxe-fold" data-fold="advanced"${ui.advOpen ? " open" : ""}><summary>${ico("caret", "dxe-caret")}<b>Advanced</b><span class="dxe-soft">${esc(sum.join(" · "))}</span></summary>` +
       `<div class="dxe-fold-body dxe-adv">` +
       `<label class="dxe-mini"><span>Priority</span><input type="number" class="dxe-in dxe-num" data-fk="prio" data-priority min="-1000" max="1000" value="${esc(st.priority)}"><small class="dxe-soft">Higher wins a tie.</small></label>` +
-      `<label class="dxe-mini"><span>Mode</span><select class="dxe-in dxe-select" data-fk="mode" data-mode-sel><option value="scheduled"${st.mode === "scheduled" ? " selected" : ""}>Timed rotation</option><option value="priority"${st.mode === "priority" ? " selected" : ""}>First whose conditions pass</option></select></label>` +
-      `<label class="dxe-mini"><span>Min hold</span><span class="dxe-unit"><input type="number" class="dxe-in dxe-num" data-fk="hold" data-hold min="0" max="120" value="${esc(st.minHold)}"><span>min</span></span><small class="dxe-soft">Shortest time on one.</small></label>` +
-      `<label class="dxe-mini"><span>Keep ready</span>${selectHtml("cadence", "data-cadence", KEEP_READY, st.cadence, "Keep ready every", (v) => (v ? `every ${mins(v)}` : "off"))}<small class="dxe-soft">Hidden re-render for flips.</small></label>` +
-      (st.steps.length
-        ? `<div class="dxe-mini dxe-ovs"><span>Keep ready, per dashboard</span>${overrides}</div>`
+      (showMode()
+        ? `<label class="dxe-mini"><span>Mode</span><select class="dxe-in dxe-select" data-fk="mode" data-mode-sel><option value="scheduled"${st.mode === "scheduled" ? " selected" : ""}>Timed rotation</option><option value="priority"${st.mode === "priority" ? " selected" : ""}>First whose conditions pass</option></select></label>`
+        : "") +
+      (showMinHold()
+        ? `<label class="dxe-mini"><span>Min hold</span><span class="dxe-unit"><input type="number" class="dxe-in dxe-num" data-fk="hold" data-hold min="0" max="120" value="${esc(st.minHold)}"><span>min</span></span><small class="dxe-soft">Shortest time on one.</small></label>`
+        : "") +
+      (showKeepReady()
+        ? `<label class="dxe-mini"><span>Keep ready</span>${selectHtml("cadence", "data-cadence", KEEP_READY, st.cadence, "Keep ready every", (v) => (v ? `every ${mins(v)}` : "off"))}<small class="dxe-soft">Hidden re-render for flips.</small></label>` +
+          (st.steps.length
+            ? `<div class="dxe-mini dxe-ovs"><span>Keep ready, per dashboard</span>${overrides}</div>`
+            : "")
         : "") +
       `</div></details>`
     );
@@ -875,10 +984,10 @@
 
   function paceHtml() {
     const k = kind();
-    let each;
+    let each = "";
     if (k === "daily")
       each = `<span class="dxe-soft">Only for a window.</span> <button type="button" class="dxe-link" data-end="add">Add an end time</button>`;
-    else if (k === "manual") each = `<span class="dxe-soft">No timer.</span>`;
+    else if (k === "manual") each = "";
     else
       each =
         selectHtml(
@@ -891,7 +1000,9 @@
         ) + (k === "cycle" ? `<span class="dxe-soft">A row with its own time says so.</span>` : "");
     return (
       `<div class="dxe-pace">` +
-      `<div class="dxe-field"><span class="dxe-label">${k === "interval" ? "Sent again every" : "Each dashboard shows for"}</span><div class="dxe-ctl">${each}</div></div>` +
+      (each
+        ? `<div class="dxe-field"><span class="dxe-label">${k === "interval" ? "Sent again every" : "Each dashboard shows for"}</span><div class="dxe-ctl">${each}</div></div>`
+        : "") +
       `<div class="dxe-field"><span class="dxe-label">Fresh pictures</span><div class="dxe-ctl"><span>${esc(freshLine())}</span></div></div>` +
       optionsHtml() +
       advancedHtml() +
@@ -900,8 +1011,11 @@
   }
 
   /* ------------------------------------------------------------ the new-lineup flow */
-  function doneLine(n, title, text, step) {
-    return `<div class="dxe-done"><span class="dxe-n is-done" aria-hidden="true">${ico("check")}</span><b>${esc(title)}</b><span class="dxe-soft">${esc(text)}</span><button type="button" class="dxe-link" data-goto="${step}" aria-label="Change ${esc(title.toLowerCase())}">Change</button><span class="lu-sr-only">Step ${n} done.</span></div>`;
+  function doneLine(n, title, text, step, locked) {
+    const change = locked
+      ? ""
+      : `<button type="button" class="dxe-link" data-goto="${step}" data-fk="goto-${step}" aria-label="Change ${esc(title.toLowerCase())}">Change</button>`;
+    return `<div class="dxe-done"><span class="dxe-n is-done" aria-hidden="true">${ico("check")}</span><b>${esc(title)}</b><span class="dxe-soft">${esc(text)}</span>${change}<span class="lu-sr-only">Step ${n} done.</span></div>`;
   }
   function waitingHead(n, title, why) {
     return `<div class="dxe-sec-head is-wait"><h2 class="dxe-h2"><span class="dxe-n" aria-hidden="true">${n}</span>${esc(title)}</h2><p class="dxe-lead">${esc(why)}</p></div>`;
@@ -925,7 +1039,7 @@
             v
           );
           return (
-            `<button type="button" class="dxe-dcard" role="radio" aria-checked="${d.id === st.display}" data-pick-display="${esc(d.id)}">` +
+            `<button type="button" class="dxe-dcard" role="radio" aria-checked="${d.id === st.display}" tabindex="${d.id === (st.display || S.devices[0].id) ? 0 : -1}" data-pick-display="${esc(d.id)}" data-fk="dcard-${esc(d.id)}">` +
             `<span class="dxe-dcard-th">${th}</span><b>${esc(d.name)}</b><span class="dxe-soft">${esc(d.model || "")}</span>` +
             `<span class="dxe-soft">${d.lineups ? esc(plural(d.lineups, "lineups")) : "No lineups yet"}</span></button>`
           );
@@ -940,11 +1054,16 @@
     const w = window_();
     return `${R.clockRange(w.s, w.e)}, ${daysText(st.when.days)}`;
   }
+  // Step 2 is done when it has a day, a start, and an end after the start.
+  const whenReady = () =>
+    st.when.mode === "manual" ||
+    (st.when.days.some(Boolean) && Number.isFinite(T(st.when.start)) && !endBeforeStart());
   function newFlowHtml() {
     const dev = deviceOf(st.display);
     let html = "";
     // 1 Display
-    if (ui.step > 1 && dev) html += doneLine(1, "Display", dev.name, 1);
+    // A lineup started from a display's + is for that display: no Change.
+    if (ui.step > 1 && dev) html += doneLine(1, "Display", dev.name, 1, S.displayLocked);
     else
       html += `<section class="dxe-sec">${secHead(1, "Display", "Pick the display it runs on.", "dxe-h-display")}${displayCards()}</section>`;
     // 2 When
@@ -952,7 +1071,7 @@
     else if (ui.step === 2)
       html +=
         `<section class="dxe-sec" aria-labelledby="dxe-h-when">${secHead(2, "When it runs", whenLead(), "dxe-h-when")}${whenCard()}` +
-        `<div class="dxe-next-step"><button type="button" class="lu-btn-primary" data-goto="3">Continue</button></div></section>`;
+        `<div class="dxe-next-step"><button type="button" class="lu-btn-primary" data-goto="3" data-fk="goto-3"${whenReady() ? "" : ' aria-disabled="true"'}>Continue</button></div></section>`;
     else html += waitingHead(2, "When it runs", "Pick a display first.");
     // 3 Dashboards
     if (ui.step === 3) {
@@ -969,15 +1088,39 @@
   }
 
   /* ------------------------------------------------------------ draw */
+  // A redraw replaces the controls: the focused one (by its data-fk) gets
+  // focus, and its caret, back.
+  function focusMark() {
+    const a = document.activeElement;
+    const fk = a && a.dataset ? a.dataset.fk : null;
+    let sel = null;
+    if (fk && "selectionStart" in a) {
+      try {
+        sel = [a.selectionStart, a.selectionEnd];
+      } catch {
+        sel = null;
+      }
+    }
+    return fk ? { fk, sel } : null;
+  }
+  function refocus(mark) {
+    if (!mark) return;
+    const a = document.activeElement;
+    if (a && a.dataset && a.dataset.fk === mark.fk && root.contains(a)) return;
+    const back = root.querySelector(`[data-fk="${CSS.escape(mark.fk)}"]`);
+    if (!back || back.disabled) return;
+    back.focus();
+    if (mark.sel && "setSelectionRange" in back) {
+      try {
+        back.setSelectionRange(mark.sel[0], mark.sel[1]);
+      } catch {
+        /* a time or number input has no selection */
+      }
+    }
+  }
+
   function draw() {
-    const fk =
-      document.activeElement && document.activeElement.dataset
-        ? document.activeElement.dataset.fk
-        : null;
-    const sel =
-      fk && "selectionStart" in document.activeElement
-        ? [document.activeElement.selectionStart, document.activeElement.selectionEnd]
-        : null;
+    const mark = focusMark();
     const sections = $("dxe-sections");
     if (S.isNew) sections.innerHTML = newFlowHtml();
     else
@@ -987,25 +1130,26 @@
         `<section class="dxe-sec dxe-sec-pace" aria-labelledby="dxe-h-pace">${secHead(3, "Pace", paceLead(), "dxe-h-pace")}${paceHtml()}</section>`;
     drawHeader();
     drawFooter();
-    if (fk) {
-      const back =
-        sections.querySelector(`[data-fk="${CSS.escape(fk)}"]`) ||
-        root.querySelector(`[data-fk="${CSS.escape(fk)}"]`);
-      if (back) {
-        back.focus();
-        if (sel && "setSelectionRange" in back) {
-          try {
-            back.setSelectionRange(sel[0], sel[1]);
-          } catch {
-            /* a time or number input has no selection */
-          }
-        }
-      }
-    }
+    refocus(mark);
     ui.justDay = null;
+    // A drag cut short by a redraw (an item list landing) never ends.
+    dragId = null;
   }
 
   function drawFooter() {
+    const mark = focusMark();
+    paintFooter();
+    refocus(mark);
+    // Nothing can be edited while a save is on its way: it would be marked
+    // saved and lost.
+    const sections = $("dxe-sections");
+    const hero = $("dxe-hero");
+    if (sections) sections.inert = ui.saving;
+    if (hero) hero.inert = ui.saving;
+    const on = $("dxe-enabled");
+    if (on) on.disabled = ui.saving;
+  }
+  function paintFooter() {
     const btns = $("dxe-actionbar-btns");
     const state = $("dxe-save-state");
     if (S.isNew) {
@@ -1019,8 +1163,8 @@
             ? `Step ${ui.step} of 3`
             : "Add a dashboard to create it.");
       btns.innerHTML =
-        `<a class="lu-btn-ghost lu-btn-line" href="${esc(S.urls.lineups)}">Cancel</a>` +
-        `<button type="button" class="lu-btn-primary" data-create${ready && !ui.saving ? "" : " disabled"}>${ui.saving ? "Creating…" : "Create lineup"}</button>`;
+        `<a class="lu-btn-ghost lu-btn-line" href="${esc(S.urls.lineups)}" data-fk="f-cancel">Cancel</a>` +
+        `<button type="button" class="lu-btn-primary" data-create data-fk="f-create"${ready && !ui.saving ? "" : " disabled"}>${ui.saving ? "Creating…" : "Create lineup"}</button>`;
       return;
     }
     const d = dirty();
@@ -1029,14 +1173,18 @@
     state.textContent = ui.msg || (d ? "Unsaved changes" : "All changes saved");
     const home = st.home || (st.steps[0] || {}).id || "";
     btns.innerHTML =
-      `<button type="button" class="lu-btn-ghost" data-push-lineup${S.display && home && isSavedStep(home) ? "" : " disabled"} title="Send ${esc(pageOf(home).name || "it")} now">${ico("send")}<span>Push now</span></button>` +
+      (ui.reload
+        ? `<button type="button" class="lu-btn-ghost lu-btn-line" data-reload data-fk="f-reload">Reload</button>`
+        : "") +
+      `<button type="button" class="lu-btn-ghost" data-push-lineup data-fk="f-push"${S.display && home && isSavedStep(home) && !ui.pushing ? "" : " disabled"} title="Send ${esc(pageOf(home).name || "it")} now">${ico("send")}<span>Push now</span></button>` +
       `<details class="lu-more dxe-more-menu"><summary title="More" aria-label="More actions">${ico("dots")}</summary><div class="lu-more-menu"><button type="button" class="danger" data-delete>Delete lineup</button></div></details>` +
-      `<button type="button" class="lu-btn-ghost lu-btn-line" data-discard${d ? "" : " disabled"}>Discard</button>` +
-      `<button type="button" class="lu-btn-primary" data-save${ui.saving ? " disabled" : ""}>${ui.saving ? "Saving…" : "Save lineup"}</button>`;
+      `<button type="button" class="lu-btn-ghost lu-btn-line" data-discard data-fk="f-discard"${d && !ui.saving ? "" : " disabled"}>Discard</button>` +
+      `<button type="button" class="lu-btn-primary" data-save data-fk="f-save"${ui.saving ? " disabled" : ""}>${ui.saving ? "Saving…" : "Save lineup"}</button>`;
   }
 
   /* ------------------------------------------------------------ edits */
   function change(fn, opts) {
+    if (ui.saving) return; // see drawFooter
     fn();
     ui.msg = "";
     ui.msgKind = "";
@@ -1048,13 +1196,24 @@
   }
   const stepOf = (id) => st.steps.find((s) => s.id === id);
 
+  // A new lineup's first time is out of the display's quiet hours, until the
+  // time is picked by hand.
+  function newStartAfterPause() {
+    if (!S.isNew || st.whenChanged || !inPause(T(st.when.start))) return;
+    st.when.start = R.hhmm(slotAfterPause(pause().end_min));
+  }
+
   function setWhen(mode) {
     change(() => {
       if (mode === "between" && st.when.mode !== "between") {
         const s = T(st.when.start);
-        const hi = Number.isFinite(s)
-          ? Math.min(DAY_MIN, s + Math.max(60, loopMinutes() || 60))
-          : 17 * 60;
+        const span = Math.max(60, loopMinutes() || 60);
+        let hi = Number.isFinite(s) ? Math.min(DAY_MIN, s + span) : 17 * 60;
+        // Not a window that is all quiet hours: end it a loop after they do.
+        if (Number.isFinite(s) && allInPause(s, hi)) {
+          const p = pause();
+          hi = Math.min(DAY_MIN, slotAfterPause(p.end_min) + span);
+        }
         st.when.end = hi >= DAY_MIN ? "24:00" : R.hhmm(hi);
         if (!st.when.start) st.when.start = "07:00";
       }
@@ -1086,6 +1245,11 @@
 
   async function addStep(id, elsewhere) {
     if (elsewhere && !(await confirmBind([id], st.display))) return;
+    const adds = [...root.querySelectorAll("[data-add]")];
+    const at = Math.max(
+      0,
+      adds.findIndex((b) => b.dataset.add === id)
+    );
     change(() => {
       st.steps.push({
         id,
@@ -1098,8 +1262,9 @@
       if (!st.home) st.home = "";
     });
     live(`Added ${pageOf(id).name}.`);
-    const btn = root.querySelector("[data-add]");
-    if (btn) btn.focus();
+    // The card it was on is gone: the next Add takes its place.
+    const left = [...root.querySelectorAll("[data-add]")];
+    (left[Math.min(at, left.length - 1)] || root.querySelector("[data-picker]"))?.focus();
   }
 
   function removeStep(id) {
@@ -1118,70 +1283,69 @@
   async function fetchItems(id, offset, limit, q) {
     const u = new URLSearchParams({ page_id: id, offset: String(offset), limit: String(limit) });
     if (q) u.set("q", q);
-    const r = await fetch(`${S.urls.items}?${u}`, {
-      credentials: "same-origin",
-      headers: { Accept: "application/json" },
-    });
-    const data = await r.json().catch(() => null);
-    if (!r.ok || !data || data.ok === false)
-      throw new Error((data && data.error) || `The server said ${r.status}.`);
-    return data;
+    return request(`${S.urls.items}?${u}`, { headers: { Accept: "application/json" } });
   }
   async function loadStrip(id) {
     const p = pageOf(id);
-    if (!p.items || p.items.mode !== "pick" || ui.strip[id]) return;
+    // A failed load is tried again the next time the row opens.
+    if (!p.items || p.items.mode !== "pick" || (ui.strip[id] && !ui.strip[id].err)) return;
     ui.strip[id] = { busy: true };
     try {
       ui.strip[id] = { data: await fetchItems(id, 0, STRIP + 1, "") };
     } catch (err) {
-      ui.strip[id] = { err: err.message };
+      ui.strip[id] = { err: err.net ? "Can't reach Tesserae; open it again." : err.message };
     }
     draw();
   }
-  let gridTimer = null;
+  const gridTimers = {}; // page id -> its search's debounce
   async function loadGrid(id) {
     const g = ui.grid[id];
     if (!g) return;
     const want = `${g.offset}|${g.q}`;
     g.want = want;
+    g.busy = true;
     try {
       const data = await fetchItems(id, g.offset, GRID_PAGE, g.q);
       if (g.want !== want) return;
       g.data = data;
     } catch (err) {
+      if (g.want !== want) return; // a newer search is on its way
       g.data = { items: [], matched: 0 };
       ui.msg = err.message;
       ui.msgKind = "err";
     }
+    g.busy = false;
     draw();
   }
 
   /* --- push now, draw another */
-  async function postJSON(url, body) {
-    const r = await fetch(url, {
+  function postJSON(url, body) {
+    return request(url, {
       method: "POST",
-      credentials: "same-origin",
       headers: { Accept: "application/json", "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    const data = await r.json().catch(() => null);
-    if (!r.ok || !data || data.ok === false)
-      throw new Error((data && data.error) || `The server said ${r.status}.`);
-    return data;
   }
+  // One push at a time: a double click must not send twice to the display.
   async function pushNow(id) {
+    if (ui.pushing) return;
+    ui.pushing = true;
+    const mark = focusMark();
     ui.msg = `Pushing ${pageOf(id).name}…`;
     ui.msgKind = "";
-    drawFooter();
+    draw();
     try {
       const res = await postJSON(S.urls.pushStep, { page_id: id, display_id: st.display });
       ui.msg = res.message || "Pushed.";
       ui.msgKind = "ok";
     } catch (err) {
-      ui.msg = err.message;
+      ui.msg = err.net ? "Can't reach Tesserae; not pushed, try again." : err.message;
       ui.msgKind = "err";
+    } finally {
+      ui.pushing = false;
     }
-    drawFooter();
+    draw();
+    refocus(mark);
     live(ui.msg);
   }
   async function drawAnother(id) {
@@ -1225,43 +1389,50 @@
   }
 
   /* --- save, create, discard */
+  // What the editor shows, and nothing else: a field left out keeps its
+  // stored value (app.deck_routes.editor_save).
   function formData() {
     const fd = new FormData();
+    const k = kind();
+    const windowed = k === "cycle" || k === "interval";
     fd.append("deck_id", S.deckId);
+    fd.append("revision", S.revision || "");
     fd.append("respond", "json");
     fd.append("name", st.name.trim() || "Lineup");
-    if (st.enabled) fd.append("enabled", "on");
-    if (st.display) fd.append("device_ids", st.display);
+    fd.append("enabled", st.enabled ? "on" : "0");
+    [st.display, ...otherDisplays()].filter(Boolean).forEach((d) => fd.append("device_ids", d));
     fd.append("pages", st.steps.map((s) => s.id).join(","));
-    st.when.days.forEach((on, i) => on && fd.append("advance_days", String(i)));
+    if (k !== "manual") st.when.days.forEach((on, i) => on && fd.append("advance_days", String(i)));
     if (st.whenChanged) {
       fd.append("when_changed", "1");
       fd.append("when_mode", st.when.mode);
       fd.append("when_start", st.when.start || "");
       fd.append("when_end", st.when.mode === "between" ? st.when.end : "");
     }
-    const k = kind();
     if (takesInput() && k === "cycle") fd.append("taps_flip", st.taps ? "1" : "0");
-    fd.append("advance_interval_minutes", String(st.interval));
-    fd.append("home", st.home || "");
+    if (windowed) fd.append("advance_interval_minutes", String(st.interval));
+    // Home: only once picked (or its dashboard removed); unpicked, it stays
+    // whichever dashboard is first.
+    if (st.home !== (S.home || "")) fd.append("home", st.home || "");
     const showHome = takesInput() && (k === "manual" || (k === "cycle" && st.taps));
-    fd.append("timeout", String(showHome ? st.timeout : 0));
-    if (sleeps()) {
+    if (showHome) fd.append("timeout", String(st.timeout));
+    if (sleeps() && k !== "manual") {
       fd.append("advance_smart_sync", "0");
       if (st.smartSync) fd.append("advance_smart_sync", "on");
       fd.append("advance_smart_sync_lead_s", String(st.lead));
     }
     fd.append("advance_priority", String(st.priority));
-    fd.append("advance_mode", st.mode);
-    fd.append("advance_min_hold_minutes", String(st.minHold));
-    fd.append("refresh_interval_minutes", String(st.cadence));
+    if (showMode()) fd.append("advance_mode", st.mode);
+    if (showMinHold()) fd.append("advance_min_hold_minutes", String(st.minHold));
+    if (showKeepReady()) fd.append("refresh_interval_minutes", String(st.cadence));
     st.steps.forEach((s) => {
-      fd.append(`dwell[${s.id}]`, s.dwell ? String(s.dwell) : "");
-      fd.append(
-        `override[${s.id}]`,
-        s.override === null || s.override === undefined ? "" : String(s.override)
-      );
-      fd.append(`conditions[${s.id}]`, s.conditions || "");
+      if (windowed) fd.append(`dwell[${s.id}]`, s.dwell ? String(s.dwell) : "");
+      if (showKeepReady())
+        fd.append(
+          `override[${s.id}]`,
+          s.override === null || s.override === undefined ? "" : String(s.override)
+        );
+      if (hasConditions(s)) fd.append(`conditions[${s.id}]`, s.conditions || "");
       if (s.refresh !== (pageOf(s.id).refresh || 0))
         fd.append(`page_refresh[${s.id}]`, String(s.refresh));
       if (s.pin !== undefined) fd.append(`pin[${s.id}]`, s.pin);
@@ -1291,32 +1462,39 @@
       ))
     )
       return;
+    if (endBeforeStart()) {
+      ui.msg = "End must be after start.";
+      ui.msgKind = "err";
+      drawFooter();
+      return;
+    }
+    // What is sent is what counts as saved; nothing can change meanwhile.
+    const body = formData();
+    const sent = snapshot();
     ui.saving = true;
     ui.msg = "";
+    ui.reload = false;
     drawFooter();
     try {
-      const r = await fetch(S.urls.save, {
+      const data = await request(S.urls.save, {
         method: "POST",
-        body: formData(),
-        credentials: "same-origin",
+        body,
         headers: { Accept: "application/json" },
       });
-      const data = await r.json().catch(() => null);
-      if (!r.ok || !data || data.ok === false)
-        throw new Error((data && data.error) || `The server said ${r.status}.`);
-      saved = snapshot();
+      saved = sent;
       window.location.assign(data.url);
     } catch (err) {
       ui.saving = false;
-      ui.msg = err.message;
+      ui.reload = !!err.reload;
+      ui.msg = err.net || err.reload ? err.message : `Not saved: ${err.message}`;
       ui.msgKind = "err";
       drawFooter();
-      live(`Not saved: ${err.message}`);
+      live(ui.msg);
     }
   }
 
   async function create() {
-    if (ui.saving || !st.display || !st.steps.length) return;
+    if (ui.saving || !st.display || !st.steps.length || !whenReady()) return;
     if (
       !(await confirmBind(
         st.steps.map((s) => s.id),
@@ -1338,19 +1516,16 @@
     st.steps.forEach((s) => fd.append("page_ids", s.id));
     fd.append("interval_minutes", String(st.interval));
     consentFields(fd);
+    const sent = snapshot();
     ui.saving = true;
     drawFooter();
     try {
-      const r = await fetch(S.urls.create, {
+      const data = await request(S.urls.create, {
         method: "POST",
         body: fd,
-        credentials: "same-origin",
         headers: { Accept: "application/json" },
       });
-      const data = await r.json().catch(() => null);
-      if (!r.ok || !data || data.ok === false)
-        throw new Error((data && data.error) || `The server said ${r.status}.`);
-      saved = snapshot();
+      saved = sent;
       window.location.assign(data.editor_url);
     } catch (err) {
       ui.saving = false;
@@ -1369,6 +1544,11 @@
     if (title) title.value = st.name;
     const on = $("dxe-enabled");
     if (on) on.checked = st.enabled;
+    const word = $("dxe-on-word");
+    if (word) word.textContent = st.enabled ? "On" : "Off";
+    ui.msg = "";
+    ui.msgKind = "";
+    ui.reload = false;
     draw();
     live("Changes discarded.");
   }
@@ -1402,7 +1582,12 @@
       root.querySelector('[data-time="start"]')?.focus();
       return;
     }
-    if (d.start) return change(() => ((st.when.start = d.start), (st.whenChanged = true)));
+    if (d.start) {
+      change(() => ((st.when.start = d.start), (st.whenChanged = true)));
+      // The fix goes with the warning: the time it set takes the focus.
+      root.querySelector('[data-time="start"]')?.focus();
+      return;
+    }
     if (d.changeDisplay !== undefined) {
       ui.changeDisplay = true;
       draw();
@@ -1418,7 +1603,10 @@
         ))
       )
         return;
-      change(() => (st.display = id));
+      change(() => {
+        st.display = id;
+        newStartAfterPause();
+      });
       ui.step = Math.max(ui.step, 2);
       draw();
       root.querySelector("#dxe-h-when")?.scrollIntoView({ block: "nearest" });
@@ -1427,7 +1615,12 @@
     }
     if (d.goto) {
       const n = Number(d.goto);
-      if (n === 3 && !(st.when.days.some(Boolean) && Number.isFinite(T(st.when.start)))) return;
+      if (n === 3 && !whenReady()) {
+        ui.msg = endBeforeStart() ? "End must be after start." : "Pick a day and a time.";
+        ui.msgKind = "err";
+        drawFooter();
+        return;
+      }
       ui.step = n;
       draw();
       (
@@ -1456,6 +1649,7 @@
     if (d.add) return addStep(d.add, d.elsewhere !== undefined);
     if (d.remove) return removeStep(d.remove);
     if (d.home) {
+      if (t.getAttribute("aria-disabled") === "true") return; // already home
       change(() => (st.home = d.home));
       live(`${pageOf(d.home).name} is home.`);
       return;
@@ -1493,7 +1687,9 @@
       const g = host && ui.grid[host.dataset.gridFor];
       if (!g) return;
       g.offset = Math.max(0, (Number(d.gpage) - 1) * GRID_PAGE);
-      g.data = null;
+      // The page it was on stays (dimmed) until the new one lands, so the
+      // pager, and the focus on it, stay too.
+      g.busy = true;
       draw();
       loadGrid(host.dataset.gridFor);
       return;
@@ -1509,7 +1705,7 @@
         change(() => (s.pin = pinnedKey(s, p) || (first ? first.key : "")));
       }
       live(
-        d.mode === "walk" ? `${p.name}: one per visit.` : `${p.name}: pinned. Pick the one to keep.`
+        d.mode === "walk" ? `${p.name}: one per visit.` : `${p.name}: pinned, pick one to keep.`
       );
       return;
     }
@@ -1522,6 +1718,7 @@
     if (d.draw) return drawAnother(d.draw);
     if (d.push) return pushNow(d.push);
     if (d.pushLineup !== undefined) return pushNow(st.home || st.steps[0].id);
+    if (d.reload !== undefined) return window.location.reload();
     if (d.save !== undefined) return save();
     if (d.create !== undefined) return create();
     if (d.discard !== undefined) return discard();
@@ -1539,7 +1736,9 @@
       if (!t.value) return;
       change(
         () => {
-          const v = t.value === "23:59" && d.time === "end" ? "24:00" : t.value;
+          // 11:59 PM (how midnight shows) and 12:00 AM both end the day.
+          const v =
+            d.time === "end" && (t.value === "23:59" || t.value === "00:00") ? "24:00" : t.value;
           st.when[d.time] = v;
           st.whenChanged = true;
         },
@@ -1554,8 +1753,8 @@
       if (!g) return;
       g.q = t.value;
       g.offset = 0;
-      window.clearTimeout(gridTimer);
-      gridTimer = window.setTimeout(() => loadGrid(d.gridQ), 220);
+      window.clearTimeout(gridTimers[d.gridQ]);
+      gridTimers[d.gridQ] = window.setTimeout(() => loadGrid(d.gridQ), 220);
       return;
     }
     if (d.cond) {
@@ -1640,6 +1839,17 @@
       move(row.dataset.step, e.key === "ArrowUp" ? -1 : 1);
       return;
     }
+    // The display cards are a radio group: arrows move between them.
+    const card = e.target.closest && e.target.closest("[data-pick-display]");
+    if (card && ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) {
+      e.preventDefault();
+      const cards = [...root.querySelectorAll("[data-pick-display]")];
+      const step = e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 1;
+      const next = cards[(cards.indexOf(card) + step + cards.length) % cards.length];
+      cards.forEach((c) => (c.tabIndex = c === next ? 0 : -1));
+      next.focus();
+      return;
+    }
     if (e.key === "Enter" && e.target.matches("input:not([type=checkbox])")) e.preventDefault();
   });
   form.addEventListener("submit", (e) => {
@@ -1660,22 +1870,27 @@
   });
   root.addEventListener("dragover", (e) => {
     if (!dragId) return;
-    const over = e.target.closest && e.target.closest("[data-step]");
     const list = $("dxe-steps");
-    if (!over || !list) return;
-    e.preventDefault();
+    if (!list || !list.contains(e.target)) return;
+    e.preventDefault(); // anywhere on the list is a drop
+    const over = e.target.closest && e.target.closest("[data-step]");
+    if (!over) return;
     const dragged = list.querySelector(`[data-step="${CSS.escape(dragId)}"]`);
     if (!dragged || over === dragged) return;
     const r = over.getBoundingClientRect();
     const after = e.clientY > r.top + r.height / 2;
     list.insertBefore(dragged, after ? over.nextSibling : over);
   });
-  root.addEventListener("dragend", () => {
+  root.addEventListener("drop", (e) => {
+    if (dragId) e.preventDefault(); // the order is read on dragend
+  });
+  root.addEventListener("dragend", (e) => {
     if (!dragId) return;
     const list = $("dxe-steps");
     const id = dragId;
     dragId = null;
-    if (!list) return draw();
+    // Esc, or a drop outside the list, cancels: the rows go back.
+    if (!list || !e.dataTransfer || e.dataTransfer.dropEffect === "none") return draw();
     const order = [...list.querySelectorAll("[data-step]")].map((n) => n.dataset.step);
     change(() => (st.steps = order.map((x) => stepOf(x)).filter(Boolean)));
     live(`Moved ${pageOf(id).name} to ${order.indexOf(id) + 1} of ${order.length}.`);
@@ -1707,5 +1922,9 @@
   );
 
   if (S.isNew && S.displayLocked) ui.step = 2;
+  if (S.isNew) {
+    newStartAfterPause();
+    saved = snapshot();
+  }
   draw();
 })();

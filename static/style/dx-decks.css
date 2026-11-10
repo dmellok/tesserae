@@ -625,6 +625,15 @@ main.page.dxe-page {
 .lu.dxe .dxe-note {
   color: var(--t-fg-soft);
 }
+.lu.dxe .dxe-warn.is-err {
+  background: color-mix(in oklab, var(--t-danger) 12%, var(--t-surface));
+}
+.lu.dxe .dxe-warn.is-err > .lu-ico {
+  color: var(--t-danger);
+}
+.lu.dxe .dxe-time-in.is-bad {
+  border-color: var(--t-danger);
+}
 .lu.dxe .dxe-disp {
   display: inline-flex;
   flex-wrap: wrap;
@@ -820,6 +829,13 @@ main.page.dxe-page {
 .lu.dxe .dxe-kids-head .lu-seg,
 .lu.dxe .dxe-kids-head .dxe-draw {
   margin-left: auto;
+}
+.lu.dxe .dxe-kids-head .dxe-shared {
+  flex: 1 1 100%;
+  text-align: right;
+}
+.lu.dxe .dxe-grid-items.is-busy {
+  opacity: 0.55;
 }
 .lu.dxe .dxe-draw {
   border: 1px solid var(--t-border-strong);

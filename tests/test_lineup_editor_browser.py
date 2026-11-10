@@ -293,7 +293,8 @@ def test_new_lineup_steps_and_creates(real: tuple[str, Flask]) -> None:
         assert page.locator(".dxe-done").first.inner_text().startswith("")
         assert "Display" in page.locator(".dxe-done").first.inner_text()
         page.locator('[data-when="between"]').click()
-        page.locator('[data-time="start"]').fill("06:00")
+        # (Art pushes at 06:00 on the TV: a window from 07:00 stays clear of it.)
+        page.locator('[data-time="start"]').fill("07:00")
         page.locator('[data-time="end"]').fill("16:30")
         page.locator('[data-time="end"]').dispatch_event("change")
         page.locator("[data-goto='3']").click()
@@ -314,7 +315,7 @@ def test_new_lineup_steps_and_creates(real: tuple[str, Flask]) -> None:
         assert (d.name, d.device_ids, d.page_ids) == ("Day art", ["tv"], ["photos", "clock"])
         assert (d.advance_trigger, d.advance_anchor, d.advance_end_at) == (
             "cycle",
-            "06:00",
+            "07:00",
             "16:30",
         )
         assert errors == []
@@ -345,6 +346,225 @@ def test_a_phone_width_page_never_scrolls_sideways(real: tuple[str, Flask], path
                 .map((e) => e.outerHTML.slice(0, 80))"""
         )
         assert unlabelled == []
+        _settle(page)
+        assert errors == []
+        browser.close()
+
+
+# -- review fixes ------------------------------------------------------------------
+
+
+def _fk(page: Any) -> str | None:
+    return page.evaluate("() => document.activeElement?.dataset?.fk || null")
+
+
+def test_a_lineup_on_two_displays_keeps_both_and_a_stale_save_is_refused(
+    real: tuple[str, Flask],
+) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    app.config["PAGE_STORE"].save(Page(id="both", name="Both", device_ids=["hall", "tv"]))
+    store = app.config["DECK_STORE"]
+    store.upsert(
+        Deck(
+            id="shared", name="Shared", device_ids=["hall", "tv"], pages=[DeckPage(page_id="both")]
+        )
+    )
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/shared/edit")
+        assert page.locator("#dxe-crumb-here").inner_text() == "hall + tv"
+        assert "+ tv" in page.locator(".dxe-disp").inner_text()
+        _save(page)  # no edits
+        assert store.get("shared").device_ids == ["hall", "tv"]
+        # Renamed elsewhere (another tab) after this page loaded: refused.
+        store.upsert(store.get("shared").model_copy(update={"name": "Theirs"}))
+        page.locator("#dxe-title").fill("Mine")
+        page.locator("[data-save]").click()
+        state = page.locator("#dxe-save-state")
+        page.wait_for_function(
+            "() => document.querySelector('#dxe-save-state').textContent.startsWith('Changed')"
+        )
+        assert state.inner_text() == "Changed elsewhere; reload to see it."
+        assert page.locator("[data-reload]").is_visible()
+        assert store.get("shared").name == "Theirs"
+        # Deleted elsewhere: refused, not made again.
+        store.delete("shared")
+        page.locator("[data-save]").click()
+        page.wait_for_function(
+            "() => document.querySelector('#dxe-save-state').textContent.includes('deleted')"
+        )
+        assert store.get("shared") is None
+        _settle(page)
+        assert errors == []
+        browser.close()
+
+
+def test_keyboard_focus_stays_put_through_a_redraw(real: tuple[str, Flask]) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/morning/edit")
+        page.locator('[data-when="at"]').focus()
+        page.keyboard.press("Enter")
+        assert _fk(page) == "when-at"
+        page.locator('[data-when="between"]').focus()
+        page.keyboard.press("Enter")
+        assert _fk(page) == "when-between"
+        page.locator('[data-expand="agenda"]').click()
+        page.locator('[data-home="agenda"]').focus()
+        page.keyboard.press("Enter")
+        assert _fk(page) == "home-agenda"
+        assert page.locator('[data-home="agenda"]').inner_text() == "★ Home"
+        # 12:00 AM as an end is midnight, not a window that ends before it starts.
+        page.locator('[data-time="end"]').fill("00:00")
+        page.locator('[data-time="end"]').dispatch_event("change")
+        assert page.locator("#dxe-end-err").count() == 0
+        # Discard puts the On word back with the switch.
+        page.locator("#dxe-enabled").click()
+        assert page.locator("#dxe-on-word").inner_text() == "Off"
+        page.locator("[data-discard]").click()
+        assert page.locator("#dxe-on-word").inner_text() == "On"
+        page.locator('[data-when="between"]').click()  # discard put it back to between
+        page.locator('[data-time="end"]').fill("00:00")
+        page.locator('[data-time="end"]').dispatch_event("change")
+        _save(page)
+        d = app.config["DECK_STORE"].get("morning")
+        assert (d.advance_trigger, d.advance_anchor, d.advance_end_at) == ("cycle", "00:00", None)
+        assert errors == []
+        browser.close()
+
+
+def test_quiet_hours_say_what_really_happens(real: tuple[str, Flask]) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    app.config["SETTINGS_STORE"].patch_section(
+        "app",
+        {"quiet_hours_enabled": True, "quiet_hours_start": "23:00", "quiet_hours_end": "08:08"},
+    )
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/art/edit")
+        # A daily push in quiet hours is skipped, and the header says so.
+        assert page.locator(".dxe-live-line").inner_text() == "Skipped: 6 AM is in quiet hours."
+        # + End time doesn't make a window that is all quiet hours.
+        page.locator('.dxe-time [data-end="add"]').click()
+        assert page.locator('[data-time="end"]').input_value() == "09:45"
+        page.locator('[data-time="end"]').fill("07:00")
+        page.locator('[data-time="end"]').dispatch_event("change")
+        assert "All of this is in quiet hours." in page.locator(".dxe-warn").inner_text()
+        _settle(page)
+        # A new lineup starts after quiet hours; an end before the start is said
+        # at once, and Continue waits for it.
+        page.goto(base + "/decks/new?display=hall", wait_until="load")
+        assert page.locator('[data-time="start"]').input_value() == "08:15"
+        page.locator('[data-when="between"]').click()
+        page.locator('[data-time="end"]').fill("08:00")
+        page.locator('[data-time="end"]').dispatch_event("change")
+        assert page.locator("#dxe-end-err").inner_text() == "End must be after start."
+        page.locator("[data-goto='3']").click(force=True)  # aria-disabled: still focusable
+        assert page.locator(".dxe-done").count() == 1
+        assert page.locator("#dxe-save-state").inner_text() == "End must be after start."
+        # Started from a display's +: its display can't be changed.
+        assert page.locator(".dxe-done [data-goto='1']").count() == 0
+        _settle(page)
+        assert errors == []
+        browser.close()
+
+
+def test_a_save_in_flight_a_cancelled_drag_and_a_double_push(real: tuple[str, Flask]) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/art/edit")
+        # Esc (dropEffect none) puts the rows back; a real drop keeps the move.
+        drag = """(effect) => {
+            const rows = [...document.querySelectorAll('[data-step]')];
+            const dt = new DataTransfer();
+            rows[0].dispatchEvent(new DragEvent('dragstart', {bubbles: true, dataTransfer: dt}));
+            const r = rows[2].getBoundingClientRect();
+            rows[2].dispatchEvent(new DragEvent('dragover',
+                {bubbles: true, cancelable: true, dataTransfer: dt, clientY: r.bottom - 1}));
+            dt.dropEffect = effect;
+            rows[0].dispatchEvent(new DragEvent('dragend', {bubbles: true, dataTransfer: dt}));
+        }"""
+        page.evaluate(drag, "none")
+        assert _steps(page) == ["photos", "clock", "climate"]
+        assert page.locator("#dxe-save-state").inner_text() == "All changes saved"
+        climate = page.locator('[data-step="climate"]')
+        box = climate.bounding_box()
+        assert box is not None
+        page.locator('[data-step="photos"] [data-grip]').drag_to(
+            climate, target_position={"x": 20, "y": box["height"] - 3}
+        )
+        assert _steps(page) == ["clock", "climate", "photos"]
+        assert page.locator("#dxe-save-state").inner_text() == "Unsaved changes"
+        page.locator("[data-discard]").click()
+        # Push now: one request however fast it is clicked.
+        pushes: list[Any] = []
+        page.route("**/push-step", lambda route: pushes.append(route))
+        page.locator('[data-push="photos"]').click()
+        page.locator('[data-push="photos"]').click(force=True)
+        page.wait_for_timeout(200)
+        assert len(pushes) == 1
+        assert page.locator('[data-push="photos"]').is_disabled()
+        pushes[0].fulfill(json={"ok": True, "message": "Sent."})
+        page.wait_for_function("() => !document.querySelector('[data-push=\"photos\"]').disabled")
+        # Nothing can be edited while a save is on its way.
+        held: list[Any] = []
+        page.route("**/decks/editor-save", lambda route: held.append(route))
+        page.locator("#dxe-title").fill("Before")
+        page.locator("[data-save]").click()
+        page.wait_for_function("() => document.getElementById('dxe-sections').inert")
+        assert page.evaluate("() => document.getElementById('dxe-hero').inert")
+        assert page.locator("[data-discard]").is_disabled()
+        with page.expect_navigation():
+            held[0].continue_()
+        _settle(page)
+        assert app.config["DECK_STORE"].get("art").name == "Before"
+        assert errors == []
+        browser.close()
+
+
+def test_the_audit_hides_what_does_nothing(real: tuple[str, Flask]) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    app.config["DECK_STORE"].upsert(
+        Deck(id="hand", name="Hand", device_ids=["hall"], pages=[DeckPage(page_id="weather")])
+    )
+    with sync_playwright() as p:
+        # A daily push on a TV: no Keep ready, no pre-render claim, no Mode.
+        browser, page, errors = _open(p, base, "/decks/art/edit")
+        adv = page.locator('[data-fold="advanced"]')
+        adv.locator("summary").click()
+        assert "Keep ready" not in adv.inner_text() and "Mode" not in adv.inner_text()
+        assert "pre-rendered" not in page.locator(".dxe-pace").inner_text()
+        page.locator('[data-expand="clock"]').click()
+        page.locator('[data-edit="clock"]').click()
+        assert page.locator('[data-cond="clock"]').count() == 0  # no conditions, no editor
+        _settle(page)
+        # By hand: no days, no timer row, and the header says how it flips.
+        page.goto(base + "/decks/hand/edit", wait_until="load")
+        assert page.locator(".dxe-days").count() == 0
+        assert "shows for" not in page.locator(".dxe-pace").inner_text()
+        assert page.locator(".dxe-live-line").inner_text() == "By hand: taps and buttons flip it."
+        _settle(page)
+        assert errors == []
+        browser.close()
+
+
+def test_the_phone_bar_shows_the_lineups_name(real: tuple[str, Flask]) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, _app = real
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/art/edit", width=420)
+        assert page.locator("[data-page-bar-title]").text_content() == "Art"
+        page.locator("#dxe-title").fill("Art day")
+        assert page.locator("[data-page-bar-title]").text_content() == "Art day"
         _settle(page)
         assert errors == []
         browser.close()
