@@ -1619,22 +1619,32 @@ def test_the_item_stack_follows_the_dark_theme(real: tuple[str, Flask]) -> None:
     app.config["DECK_STORE"].upsert(
         Deck(id="d", name="D", device_ids=["tv"], pages=[DeckPage(page_id="np")])
     )
-    # The cards' computed colours are oklab(L a b); L is the lightness.
+    # The cards' computed colours are oklab(L a b / alpha); L is the lightness.
     js = """() => {
         const t = document.querySelector('[data-step="np"] .lu-tile');
-        const light = (pseudo) =>
-            Number(getComputedStyle(t, pseudo).backgroundColor.match(/[\\d.]+/)[0]);
-        return [light('::before'), light('::after')];
+        const v = (el, pseudo) =>
+            getComputedStyle(el, pseudo).backgroundColor.match(/[\\d.]+/g).map(Number);
+        const probe = document.body.appendChild(document.createElement('i'));
+        probe.style.backgroundColor = 'color-mix(in oklab, var(--t-bg) 100%, var(--t-bg))';
+        const page = v(probe)[0];
+        probe.remove();
+        return { page, far: v(t, '::before'), near: v(t, '::after'),
+                 op: [getComputedStyle(t, '::before').opacity, getComputedStyle(t, '::after').opacity] };
     }"""
     with sync_playwright() as p:
         browser, page, errors = _open(p, base, "/decks/d/edit")
         _settle(page)
         light = page.evaluate(js)
-        assert min(light) > 0.7  # paper sheets in the light theme
+        assert min(light["far"][0], light["near"][0]) > 0.7  # paper sheets in the light theme
         page.evaluate("document.documentElement.setAttribute('data-theme', 'dark')")
         dark = page.evaluate(js)
-        # Dark: the back cards are darker than cream paper, not lighter than the page's text.
-        assert max(dark) < 0.35, dark
+        # Dark: filled, opaque cards a step lighter than the page, the nearer one lighter still.
+        assert dark["op"] == ["1", "1"], dark
+        for card in (dark["far"], dark["near"]):
+            assert len(card) < 4 or card[3] == 1, dark  # not transparent
+            assert card[0] - dark["page"] > 0.05, dark  # distinct from the page
+            assert card[0] < 0.5, dark  # still dark, not cream
+        assert dark["near"][0] > dark["far"][0], dark
         assert errors == []
         browser.close()
 

@@ -68,10 +68,11 @@ main.page.lu-page {
   --lu-blk-bg: color-mix(in oklab, var(--t-fg) 6%, var(--t-border-strong));
   --lu-on-warn: var(--t-bg);
   --lu-pz-edge: color-mix(in oklab, var(--t-warn) 25%, var(--t-bg));
-  /* Dark: cards darker than the page's surface, with a lighter edge. */
-  --lu-stack-far: color-mix(in oklab, var(--t-bg) 70%, var(--t-surface));
-  --lu-stack-near: color-mix(in oklab, var(--t-bg) 35%, var(--t-surface));
-  --lu-stack-edge: color-mix(in oklab, var(--t-fg) 38%, transparent);
+  /* Dark: filled cards a step lighter than the page, each nearer one lighter
+     again, with a soft edge. */
+  --lu-stack-far: color-mix(in oklab, var(--t-surface-soft) 55%, var(--t-border-strong));
+  --lu-stack-near: color-mix(in oklab, var(--t-surface-soft) 20%, var(--t-border-strong));
+  --lu-stack-edge: color-mix(in oklab, var(--t-fg) 22%, transparent);
   --lu-count-bg: color-mix(in oklab, var(--t-fg) 18%, var(--t-surface));
   --lu-count-fg: var(--t-fg);
 }
@@ -2585,6 +2586,13 @@ main.page.lu-page {
 .lu .lu-tile.stacked::after {
   transform: translate(4px, -4px);
   opacity: 0.8;
+}
+:root[data-theme="dark"] .lu .lu-tile.stacked::before,
+:root[data-theme="dark"] .lu .lu-tile.stacked::after {
+  opacity: 1;
+}
+:root[data-theme="dark"] .lu .lu-tile.stacked::before {
+  background: var(--lu-stack-far);
 }
 .lu .lu-tile.stacked .lu-thumb {
   z-index: 1;
