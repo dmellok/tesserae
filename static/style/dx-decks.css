@@ -410,6 +410,17 @@ main.page.dxe-page {
 .lu.dxe .dxe-daybar .lu-blk[data-edit] {
   cursor: grab;
 }
+.lu.dxe .dxe-daybar .lu-blk.is-link {
+  cursor: pointer;
+}
+.lu.dxe .dxe-daybar .lu-blk.is-link:hover {
+  background: color-mix(in oklab, var(--t-fg) 14%, var(--lu-blk-bg));
+}
+.lu.dxe .dxe-daybar .lu-blk.is-link:focus-visible {
+  outline: 2px solid var(--t-fg);
+  outline-offset: 2px;
+  z-index: 4;
+}
 .lu.dxe .dxe-daybar .lu-blk.is-drag {
   cursor: grabbing;
 }

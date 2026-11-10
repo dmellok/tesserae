@@ -1171,7 +1171,10 @@ def test_dragging_this_lineups_block_stages_the_time_and_nothing_else(
         # Only this lineup's block is draggable; the day's other blocks are inert.
         assert blk.count() == 1 and blk.get_attribute("data-lineup") == "mid"
         assert page.locator(".dxe-daybar .lu-blk:not([data-edit])").count() >= 1
-        assert page.locator(".dxe-daybar .lu-blk:not([data-edit])[tabindex]").count() == 0
+        assert (
+            page.locator(".dxe-daybar .lu-blk:not([data-edit]):not(.is-link)[tabindex]").count()
+            == 0
+        )
         assert blk.get_attribute("role") == "button"
         assert "Shift+arrows to resize the end" in blk.get_attribute("aria-label")
         assert _times(page) == ("09:00", "12:00")
@@ -1265,4 +1268,54 @@ def test_a_pushes_block_only_moves_and_the_bar_is_read_only_when_narrow(
         browser.close()
         browser, page, _errors = _open(p, base, "/decks/art/edit", 420)
         assert page.locator(".dxe-daybar .lu-blk[data-edit]").count() == 0
+        browser.close()
+
+
+def test_another_lineups_block_opens_its_editor_and_guards_unsaved_edits(
+    real: tuple[str, Flask],
+) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    _window_lineup(app)
+    app.config["DECK_STORE"].upsert(
+        Deck(
+            id="eve", name="Evening", device_ids=["tv"], advance="timer", advance_trigger="cycle",
+            advance_anchor="18:00", advance_end_at="21:00",
+            pages=[DeckPage(page_id="clock"), DeckPage(page_id="climate")],
+        )
+    )  # fmt: skip
+    other = '.dxe-daybar .lu-blk.is-link[data-lineup="eve"]'
+    with sync_playwright() as p:
+        browser, page, _errors = _open(p, base, "/decks/mid/edit")
+        link = page.locator(other)
+        assert link.get_attribute("role") == "link"
+        assert link.get_attribute("title") == "Edit Evening"
+        assert "Edit Evening" in link.get_attribute("aria-label")
+        # This lineup's own block and holds never navigate.
+        assert page.locator(".dxe-daybar .lu-blk[data-edit]").get_attribute("role") == "button"
+        assert page.locator(".dxe-daybar .lu-blk.hold.is-link").count() == 0
+        page.locator(".dxe-daybar .lu-blk[data-edit]").click()
+        assert page.url.endswith("/decks/mid/edit")
+        # A click opens the other lineup's editor.
+        link.click()
+        page.wait_for_url("**/decks/eve/edit")
+        _settle(page)
+        # Keyboard: focus and Enter.
+        page.goto(base + "/decks/mid/edit")
+        _settle(page)
+        page.locator(other).focus()
+        page.keyboard.press("Enter")
+        page.wait_for_url("**/decks/eve/edit")
+        # With unsaved edits the leave-page prompt appears; dismissing stays.
+        page.goto(base + "/decks/mid/edit")
+        _settle(page)
+        page.locator("#dxe-enabled").click()
+        assert page.locator("#dxe-save-state").inner_text() == "Unsaved changes"
+        dialogs: list[str] = []
+        page.on("dialog", lambda d: (dialogs.append(d.type), d.dismiss()))
+        page.locator(other).evaluate("(n) => n.click()")
+        page.wait_for_timeout(300)
+        assert dialogs == ["beforeunload"]
+        assert page.url.endswith("/decks/mid/edit")
         browser.close()

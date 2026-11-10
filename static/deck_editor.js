@@ -576,10 +576,27 @@
     bar.innerHTML =
       `<p class="dxe-bar-day">${esc(label)}</p>` +
       `<div class="lu-today-bar">${R.dayTrack(shown, dd, editable, true, "dxe-trk")}${R.dayScale(dd)}</div>`;
+    const editUrlOf = (b) => {
+      const l = shown.lineups.find((x) => x.id === b.dataset.lineup);
+      if (l && l.name) b.dataset.name = l.name;
+      return (l && l.actions && l.actions.edit_url) || "";
+    };
     bar.querySelectorAll(".lu-blk").forEach((b) => {
       if (b.dataset.lineup === id) b.classList.add("is-mine");
-      if (!b.hasAttribute("data-edit")) b.removeAttribute("tabindex");
-      else {
+      if (!b.hasAttribute("data-edit")) {
+        b.removeAttribute("tabindex");
+        // Another lineup's block opens its own editor; holds stay inert.
+        const url = b.classList.contains("hold") || b.dataset.lineup === id ? "" : editUrlOf(b);
+        if (url) {
+          const name = b.dataset.name || "this lineup";
+          b.classList.add("is-link");
+          b.dataset.href = url;
+          b.tabIndex = 0;
+          b.setAttribute("role", "link");
+          b.setAttribute("aria-label", `Edit ${name}. ${b.getAttribute("title") || ""}`.trim());
+          b.setAttribute("title", `Edit ${name}`);
+        }
+      } else {
         b.setAttribute("data-fk", "bar-mine");
         b.setAttribute(
           "aria-label",
@@ -2492,6 +2509,21 @@
     if (!blk || (e.key !== "Enter" && e.key !== " ")) return;
     e.preventDefault();
     root.querySelector('[data-time="start"]')?.focus();
+  });
+
+  // Another lineup's block on the day bar: a plain navigation, so the
+  // beforeunload guard below asks first when there are unsaved edits.
+  const openBlock = (e) => {
+    const blk = e.target.closest && e.target.closest(".dxe-daybar .lu-blk.is-link[data-href]");
+    if (!blk) return false;
+    window.location.href = blk.dataset.href;
+    return true;
+  };
+  root.addEventListener("click", (e) => {
+    if (!e.defaultPrevented && e.button === 0) openBlock(e);
+  });
+  root.addEventListener("keydown", (e) => {
+    if ((e.key === "Enter" || e.key === " ") && openBlock(e)) e.preventDefault();
   });
 
   window.addEventListener("beforeunload", (e) => {
