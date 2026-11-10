@@ -221,24 +221,24 @@ main.page.dxe-page {
 .lu.dxe .dxe-loc-txt.is-pending b {
   color: var(--lu-warn-text);
 }
-.lu.dxe .dxe-move {
+.lu.dxe .dxe-push-now {
   height: 32px;
-  background: transparent;
-  border-color: color-mix(in oklab, var(--t-warn) 55%, var(--t-border-strong));
-  color: var(--lu-warn-text);
+  color: var(--t-fg);
 }
-.lu.dxe .dxe-move:hover {
-  background: color-mix(in oklab, var(--t-warn) 12%, transparent);
-  color: var(--lu-warn-text);
-}
-.lu.dxe .dxe-move:focus-visible,
-.lu.dxe .dxe-link:focus-visible {
+.lu.dxe .dxe-link:focus-visible,
+.lu.dxe .dxe-loc .lu-more summary:focus-visible {
   outline: 2px solid var(--lu-acc);
   outline-offset: 2px;
 }
-.lu.dxe .dxe-move:disabled {
+.lu.dxe .dxe-loc .lu-more-menu button:disabled {
   opacity: 0.5;
   cursor: default;
+}
+.lu.dxe .lu-more-sep {
+  width: 100%;
+  margin: 5px 0;
+  border: 0;
+  border-top: 1px solid var(--t-border);
 }
 .lu.dxe .dxe-switch {
   position: relative;
@@ -1622,10 +1622,6 @@ main.page.dxe-page {
 .lu.dxe .dxe-actionbar-btns .lu-btn-ghost {
   color: var(--t-fg);
 }
-.lu.dxe .dxe-more-menu .lu-more-menu {
-  bottom: calc(100% + 6px);
-  top: auto;
-}
 
 /* narrow: one column */
 @container dxe (max-width: 640px) {
@@ -1824,4 +1820,10 @@ html .dxe-move-dialog .wizard-footer button.primary.dxe-caution:hover {
 }
 .lu.dxe .dxe-wk .lu-trk.flagged {
   margin: 0;
+}
+.lu.dxe .dxe-loc .lu-more-menu {
+  min-width: 210px;
+}
+.lu.dxe .dxe-loc .lu-more-menu button {
+  white-space: nowrap;
 }

@@ -252,7 +252,7 @@
   function askMove() {
     return new Promise((resolve) => {
       if (typeof HTMLDialogElement === "undefined") return resolve(null);
-      const opener = document.activeElement;
+      const opener = root.querySelector("[data-loc-more]") || document.activeElement;
       const choices = S.devices.filter((d) => d.id !== st.display);
       const dlg = document.createElement("dialog");
       dlg.className = "wizard-dialog bind-dialog dxe-move-dialog";
@@ -332,7 +332,7 @@
     if (to === S.display) dropMoveConsent();
     change(() => (st.display = to));
     live(to === S.display ? "Move dropped." : `Moving to ${nameOf(to)}. Save to apply.`);
-    root.querySelector("[data-move]")?.focus();
+    root.querySelector("[data-loc-more]")?.focus();
   }
   function consentFields(fd) {
     st.steps.forEach((s) => {
@@ -438,10 +438,16 @@
       ? `<button type="button" class="dxe-link quiet" data-move-undo data-fk="move-undo">Undo</button>`
       : "";
     const can = S.devices.length > 1 && !ui.saving;
+    const wasOpen = !!box.querySelector("details.lu-more[open]");
+    const home = st.home || (st.steps[0] || {}).id || "";
+    const canPushNow = !S.isNew && S.display && home && isSavedStep(home) && !ui.pushing;
     box.innerHTML =
       text +
       undo +
-      `<button type="button" class="lu-btn-ghost lu-btn-line dxe-move" data-move data-fk="move" aria-haspopup="dialog" aria-label="Move lineup to another display"${can ? "" : " disabled"}>Move…</button>`;
+      `<button type="button" class="lu-btn-ghost lu-btn-line dxe-push-now" data-push-lineup data-fk="f-push"${canPushNow ? "" : " disabled"} title="Send ${esc(pageOf(home).name || "it")} now">${ico("send")}<span>Push now</span></button>` +
+      `<details class="lu-more dxe-more-menu"${wasOpen ? " open" : ""}><summary title="More" aria-label="More actions" data-loc-more data-fk="loc-more">${ico("dots")}</summary><div class="lu-more-menu">` +
+      `<button type="button" data-move data-fk="move" aria-haspopup="dialog"${can ? "" : " disabled"}>Move to another display…</button>` +
+      `<hr class="lu-more-sep"><button type="button" class="danger" data-delete data-fk="f-delete">Delete lineup</button></div></details>`;
   }
 
   function statusLines(d) {
@@ -1523,6 +1529,7 @@
   function drawFooter() {
     const mark = focusMark();
     paintFooter();
+    if (!S.isNew) drawLoc(); // Push now sits up there and follows the save state
     refocus(mark);
     // Nothing can be edited while a save is on its way: it would be marked
     // saved and lost.
@@ -1559,13 +1566,10 @@
     state.className =
       "dxe-actionbar-status" + (ui.msgKind ? ` is-${ui.msgKind}` : d ? " is-dirty" : "");
     state.textContent = ui.msg || (d ? "Unsaved changes" : "All changes saved");
-    const home = st.home || (st.steps[0] || {}).id || "";
     btns.innerHTML =
       (ui.reload
         ? `<button type="button" class="lu-btn-ghost lu-btn-line" data-reload data-fk="f-reload">Reload</button>`
         : "") +
-      `<button type="button" class="lu-btn-ghost" data-push-lineup data-fk="f-push"${S.display && home && isSavedStep(home) && !ui.pushing ? "" : " disabled"} title="Send ${esc(pageOf(home).name || "it")} now">${ico("send")}<span>Push now</span></button>` +
-      `<details class="lu-more dxe-more-menu"><summary title="More" aria-label="More actions">${ico("dots")}</summary><div class="lu-more-menu"><button type="button" class="danger" data-delete>Delete lineup</button></div></details>` +
       `<button type="button" class="lu-btn-ghost lu-btn-line" data-discard data-fk="f-discard"${d && !ui.saving ? "" : " disabled"}>Discard</button>` +
       `<button type="button" class="lu-btn-primary" data-save data-fk="f-save"${ui.saving ? " disabled" : ""}>${ui.saving ? "Saving…" : "Save lineup"}</button>`;
   }
@@ -2228,7 +2232,7 @@
       dropMoveConsent();
       change(() => (st.display = S.display));
       live(`Move to ${was} undone.`);
-      root.querySelector("[data-move]")?.focus();
+      root.querySelector("[data-loc-more]")?.focus();
       return;
     }
     if (d.pickDisplay) {
@@ -2549,6 +2553,32 @@
 
   // Another lineup's block on the day bar: a plain navigation, so the
   // beforeunload guard below asks first when there are unsaved edits.
+  // The header's ⋯ menu closes after a choice, on Escape and on an outside click.
+  const closeMenus = (keep) =>
+    root.querySelectorAll(".dxe-top-ctl details.lu-more[open]").forEach((m) => {
+      if (m !== keep) m.open = false;
+    });
+  root.addEventListener("click", (e) => {
+    const t = e.target.closest ? e.target : null;
+    const item = t && t.closest(".dxe-top-ctl .lu-more-menu button");
+    if (item) item.closest("details").open = false;
+    else closeMenus(t && t.closest("details.lu-more"));
+  });
+  document.addEventListener("click", (e) => {
+    if (!root.contains(e.target)) closeMenus(null);
+  });
+  document.addEventListener(
+    "keydown",
+    (e) => {
+      const m = root.querySelector(".dxe-top-ctl details.lu-more[open]");
+      if (e.key !== "Escape" || !m || document.querySelector("dialog:modal")) return;
+      m.open = false;
+      m.querySelector("summary").focus();
+      e.preventDefault();
+      e.stopPropagation();
+    },
+    true
+  );
   const SCROLL_KEY = "tesserae.lineupEditor.scroll";
   root.addEventListener("click", (e) => {
     if (!e.target.closest || !e.target.closest("[data-week-toggle]")) return;

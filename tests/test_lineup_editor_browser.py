@@ -929,13 +929,18 @@ def _loc(page: Any) -> str:
 
 
 def _open_move(page: Any) -> Any:
+    # The menu eases shut after a choice; open it again once it has closed.
+    page.wait_for_function("() => !document.querySelector('.dxe-top-ctl details.lu-more').open")
+    page.locator("[data-loc-more]").click()
     page.locator("[data-move]").click()
     dlg = page.locator("dialog.dxe-move-dialog")
     dlg.wait_for(state="visible")
     return dlg
 
 
-def test_the_display_row_is_gone_and_move_sits_by_the_on_switch(real: tuple[str, Flask]) -> None:
+def test_the_header_holds_push_now_and_a_menu_with_move_and_delete(
+    real: tuple[str, Flask],
+) -> None:
     from playwright.sync_api import sync_playwright
 
     base, _app = real
@@ -944,13 +949,39 @@ def test_the_display_row_is_gone_and_move_sits_by_the_on_switch(real: tuple[str,
         assert page.locator("[data-display-select], [data-change-display]").count() == 0
         assert "Display" not in page.locator(".dxe-sections").inner_text()
         assert _loc(page).startswith("On hall")
+        # Push now and the menu are gone from the footer.
+        assert (
+            page.locator(".dxe-actionbar [data-push-lineup], .dxe-actionbar summary").count() == 0
+        )
+        assert [b.inner_text() for b in page.locator(".dxe-actionbar-btns button").all()] == [
+            "Discard",
+            "Save lineup",
+        ]
+        push = page.locator("[data-push-lineup]")
+        assert push.inner_text() == "Push now"
         move = page.locator("[data-move]")
-        assert move.inner_text() == "Move…"
-        assert move.get_attribute("aria-label") == "Move lineup to another display"
-        # Beside the On switch, top right.
-        a, b = move.bounding_box(), page.locator("#dxe-enabled").locator("xpath=..").bounding_box()
+        menu = page.locator(".dxe-top-ctl details.lu-more")
+        assert menu.evaluate("n => n.open") is False
+        # Beside the On switch, top right, and the menu opens from the keyboard.
+        a, b = push.bounding_box(), page.locator("#dxe-enabled").locator("xpath=..").bounding_box()
         assert abs((a["y"] + a["height"] / 2) - (b["y"] + b["height"] / 2)) < 20
         assert a["x"] < b["x"] and a["x"] > 600
+        page.locator("[data-loc-more]").focus()
+        page.keyboard.press("Enter")
+        assert menu.evaluate("n => n.open") is True
+        assert move.inner_text() == "Move to another display…"
+        assert page.locator(".dxe-top-ctl .lu-more-menu .danger").inner_text() == "Delete lineup"
+        assert page.locator(".dxe-top-ctl .lu-more-sep").count() == 1
+        page.wait_for_timeout(300)
+        page.keyboard.press("Escape")
+        page.wait_for_function("() => !document.querySelector('.dxe-top-ctl details.lu-more').open")
+        assert _fk(page) == "loc-more"
+        page.locator("[data-loc-more]").click()
+        page.wait_for_timeout(300)
+        page.screenshot(
+            path="/tmp/lu-shots/header-menu.png",
+            clip={"x": 0, "y": 0, "width": 1280, "height": 360},
+        )
         _settle(page)
         assert errors == []
         browser.close()
@@ -973,7 +1004,7 @@ def test_move_stages_shows_pending_saves_and_cancel_and_discard_reset(
         assert "bind 2 dashboards to tv" in dlg.inner_text()
         dlg.locator("[data-cancel]").click()
         dlg.wait_for(state="detached")
-        assert _fk(page) == "move"
+        assert _fk(page) == "loc-more"
         assert _loc(page).startswith("On hall") and page.locator(state).inner_text() == (
             "All changes saved"
         )
@@ -1069,7 +1100,7 @@ def test_move_is_readable_in_a_phone_width_dark_page_and_labelled(real: tuple[st
         page.screenshot(path="/tmp/lu-move/dialog-420.png")
         page.keyboard.press("Escape")
         dlg.wait_for(state="detached")
-        assert _fk(page) == "move"
+        assert _fk(page) == "loc-more"
         assert errors == []
         browser.close()
 
