@@ -2,6 +2,7 @@
 {% extends "_base.html" %}
 {% from "_components.html" import text_input, slider, switch, select_field, color_input, button, auto_field, card_head, textarea_field, options_more_open, options_more_close %}
 {% from "_schedule_form.html" import schedule_form, schedule_form_scripts %}
+{% from "_query_preview.html" import query_preview_button %}
 {% block title %}{{ page.name }}, Dashboard editor, Tesserae{% endblock %}
 
 {% block head_extra %}
@@ -220,6 +221,7 @@
                       visible=option_visible(opt, cell.options, cell_opts)) }}
       {% endfor %}
       {% if opt_sections.advanced %}{{ options_more_close() }}{% endif %}
+      {{ query_preview_button(plugin, cell.w, cell.h) }}
     </fieldset>
     {% endif %}
 

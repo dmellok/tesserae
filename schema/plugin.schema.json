@@ -68,6 +68,10 @@
         }
       }
     },
+    "query_preview": {
+      "type": "boolean",
+      "description": "Show Preview query in the editors. server.py exports query_preview(options, settings, *, ctx), returning {images: [{url, thumbnail?, permalink?, matches: [str]}], total?, error?, warning?}. Previews are never settled; at most 20 results are shown."
+    },
     "cell_options": {
       "type": "array",
       "items": {

@@ -1,0 +1,6 @@
+{% macro query_preview_button(plugin, width, height) %}
+{% if plugin and plugin.manifest.get('query_preview') %}
+<button type="button" class="btn" data-query-preview="{{ url_for('plugins.query_preview', plugin_id=plugin.id) }}"
+        data-cell-w="{{ width }}" data-cell-h="{{ height }}">Preview query</button>
+{% endif %}
+{% endmacro %}
