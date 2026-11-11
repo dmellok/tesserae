@@ -6,6 +6,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.510.1], 2026-11-11
+
+### Fixed
+
+- Home Assistant Ingress over plain HTTP: forms work again. Since the cross-site request checks arrived, every form in the admin UI (starting with the first onboarding step) was refused with "Forbidden: cross-origin admin request blocked (CSRF)" and `Origin: null`. Home Assistant sets `Referrer-Policy: no-referrer` on everything it serves, which makes a browser send `Origin: null` with a form, and over HTTP there is nothing else to tell the request is same-origin. Pages now ask for a `same-origin` referrer policy themselves, so their own forms carry their real origin; nothing is sent to other sites and no check is relaxed. The 403 message also names a proxy-set referrer policy as a cause. Reload any open Tesserae tab after updating. Diagnosed and fixed by @G2Dolphin. (#497)
+
 ## [0.510.0], 2026-11-10
 
 ### Added
