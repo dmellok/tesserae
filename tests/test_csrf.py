@@ -505,6 +505,20 @@ def test_a_stripped_origin_points_at_software_on_the_computer(app, origin) -> No
     assert "X-Forwarded-Host" not in body
 
 
+def test_admin_pages_ask_for_a_same_origin_referrer_policy(gated_app) -> None:
+    # Home Assistant Ingress forces ``Referrer-Policy: no-referrer``, which
+    # makes a plain form POST carry ``Origin: null`` and, over HTTP (no
+    # Sec-Fetch-Site), get refused above. The page's own meta tag overrides
+    # the header so same-origin forms send their real Origin. (#497)
+    page = gated_app.test_client().get("/setup").get_data(as_text=True)
+    assert '<meta name="referrer" content="same-origin">' in page
+
+
+def test_a_stripped_origin_also_names_a_proxy_referrer_policy(app) -> None:
+    body = _blocked_body(app, {"Origin": "null"})
+    assert "Referrer-Policy: no-referrer" in body
+
+
 def test_a_cross_site_fetch_metadata_rejection_says_so(app) -> None:
     body = _blocked_body(app, {"Sec-Fetch-Site": "cross-site"})
     assert "Browser sent: Sec-Fetch-Site: cross-site" in body

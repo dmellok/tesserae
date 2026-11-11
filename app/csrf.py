@@ -71,7 +71,9 @@ _FIX_OPAQUE = (
     "something on this computer stripping it: a privacy or ad-blocking extension, "
     'antivirus or "web protection" software, a VPN or work security client, or a browser '
     "setting that removes referrers. Allow Tesserae's address in that tool, or try a private "
-    "window with extensions off to confirm. Serving Tesserae over HTTPS also avoids it."
+    "window with extensions off to confirm. A reverse proxy that adds "
+    '"Referrer-Policy: no-referrer" over plain HTTP does the same thing; reload the page '
+    "first, in case it was loaded before an update. Serving Tesserae over HTTPS also avoids it."
 )
 _FIX_CROSS_SITE = (
     "Your browser reported that this request was started by a page on another site. If you "

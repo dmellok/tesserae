@@ -11,6 +11,13 @@
 <html lang="en"{% if _paper %} data-ui="paper"{% endif %}{{ server_mark.html_attr(_si) }}>
 <head>
   <meta charset="utf-8">
+  {# Home Assistant stamps ``Referrer-Policy: no-referrer`` on every Ingress
+     response, and under that policy a browser sends ``Origin: null`` with a
+     plain form POST. Over HTTP there is no Sec-Fetch-Site to fall back on,
+     so app/csrf.py refused every form. ``same-origin`` gives our own forms
+     their real Origin and still sends nothing to other sites. A meta tag,
+     because HA overwrites the response header. (#497) #}
+  <meta name="referrer" content="same-origin">
   {# Viewport meta. With the mobile-zoom lock on (default), pin
      initial-scale + maximum-scale + user-scalable=no so the admin UI
      can't be pinch-zoomed and iOS Safari can't auto-zoom on input
