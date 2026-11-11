@@ -133,7 +133,7 @@ def _item_ctx(page: Any, placement: Any, plugin_id: str, device_id: str | None) 
         device = devices.get(target) if devices is not None and target else None
         panel = device_panel(device) if device is not None else None
         if panel is None:
-            panel = resolve_panel_for_page(page, devices, settings)
+            panel = resolve_panel_for_page(page, devices, settings)  # type: ignore[arg-type]
     except Exception:
         panel = None
     panel_w = int(getattr(panel, "w", 0) or 0)

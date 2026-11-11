@@ -1392,6 +1392,62 @@ def window_overlaps_pause(pause: PauseInput | None, lineup: LineupInput) -> bool
     return False
 
 
+def _short_range(start: int, end: int) -> str:
+    """``6–8 AM`` / ``11 AM–1 PM`` / ``06:00–08:00``: the clock range, with
+    the first AM/PM left off when both ends share it."""
+    a, b = clock(start), clock(end, end=True)
+    if a[-2:] in ("AM", "PM") and a[-2:] == b[-2:]:
+        a = a[:-2].rstrip("  ")
+    return f"{a}–{b}"
+
+
+def pause_note(pause: PauseInput | None, lineup: LineupInput, where: str) -> str | None:
+    """One line saying what quiet hours do to this lineup, or ``None`` when
+    they leave it alone. ``where`` names them (``Office Frame TV's quiet
+    hours``). Judged per run day with the pause's weekday and all-day masks;
+    a day that loses only part of the window wins over one that loses all of it."""
+    if pause is None or not window_overlaps_pause(pause, lineup):
+        return None
+    spans = day_spans(lineup)
+    if not spans:
+        return None
+    if lineup.kind == "interval":
+        # The window's last minute counts (18:00 runs), but it reads as 18:00, not 18:01.
+        spans = [(s, e - 1 if e < DAY_MIN else e) for s, e in spans]
+        spans = [(s, e) for s, e in spans if e > s] or day_spans(lineup)
+    if lineup.kind == "daily":
+        s = spans[0][0]
+        return f"Skipped: {clock(s)} is in {where}."
+    first, last = spans[0][0], spans[-1][1]
+    partial: str | None = None
+    whole = False
+    for day in sorted(set(lineup.days)):
+        parts = _pause_display_parts(pause, day)
+        hits = [
+            (max(ps, ws), min(pe, we))
+            for ws, we in spans
+            for ps, pe in parts
+            if ws < pe and ps < we
+        ]
+        if not hits:
+            continue
+        covered = sum(b - a for a, b in hits)
+        if covered >= sum(we - ws for ws, we in spans):
+            whole = True
+            continue
+        a, b = min(hits)
+        if a <= first:
+            partial = f"Starts at {clock(b)}: {_short_range(a, b)} is in {where}."
+        elif b >= last:
+            partial = f"Stops at {clock(a)}: {_short_range(a, b)} is in {where}."
+        else:
+            partial = f"Pauses {_short_range(a, b)} for {where}."
+        break
+    if partial:
+        return partial
+    return f"Sends nothing: all of it is in {where}." if whole else None
+
+
 # ---------------------------------------------------------------------------
 # Clash detection (inline edits)
 # ---------------------------------------------------------------------------

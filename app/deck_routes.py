@@ -61,12 +61,11 @@ from app.lineups_view import (
     UpcomingInput,
     build_view,
     clash_keys,
-    clock_range,
     parse_hhmm,
+    pause_note,
     resolve_day,
     using_time_cycle,
     window_label,
-    window_overlaps_pause,
 )
 from app.next_update import DeviceTiming, reach_for_device, tracks_held_frame
 from app.state.deck_model import Deck, DeckPage
@@ -1961,15 +1960,15 @@ def _edited_deck(
         elif kind == "cycle":
             s = _clean_time(start if start is not _UNSET else deck.advance_anchor, "Start", deck.id)
             raw_end = end if end is not _UNSET else deck.advance_end_at
-            e = None if raw_end in (None, "") else _clean_time(raw_end, "End", deck.id)
+            cycle_end = None if raw_end in (None, "") else _clean_time(raw_end, "End", deck.id)
             s_min = parse_hhmm(s) or 0
-            e_min = 1440 if e is None else (parse_hhmm(e) or 0)
+            e_min = 1440 if cycle_end is None else (parse_hhmm(cycle_end) or 0)
             if s == "24:00":
                 raise _EditError("Start must be before 24:00.", 400, deck.id)
             if e_min <= s_min:
                 raise _EditError("End must be after start.", 400, deck.id)
             changes["advance_anchor"] = s
-            changes["advance_end_at"] = None if e in (None, "24:00") else e
+            changes["advance_end_at"] = None if cycle_end in (None, "24:00") else cycle_end
         else:  # interval: a window that may wrap past midnight
             raw_start = start if start is not _UNSET else deck.advance_window_start
             raw_end = end if end is not _UNSET else deck.advance_window_end
@@ -2051,8 +2050,30 @@ def _check_batch(
         raise _EditError(msg, 409, deck_id)
 
 
-def _pause_warnings(deck: Deck, page_devices: dict[str, list[str]]) -> list[str]:
-    """One warning per display whose quiet hours a lineup's run falls in."""
+def _timing_key(deck: Deck, page_devices: dict[str, list[str]]) -> tuple[Any, ...]:
+    """What decides when and where a lineup runs: its trigger and times, its
+    days and its displays."""
+    return (
+        deck.advance,
+        deck.advance_trigger,
+        deck.advance_fires_at,
+        deck.advance_anchor,
+        deck.advance_end_at,
+        deck.advance_window_start,
+        deck.advance_window_end,
+        tuple(sorted(deck.advance_days_of_week)),
+        tuple(sorted(_deck_displays(deck, page_devices))),
+    )
+
+
+def _pause_warnings(
+    deck: Deck, page_devices: dict[str, list[str]], before: Deck | None = None
+) -> list[str]:
+    """One line per display whose quiet hours cut into a lineup's run. With
+    ``before`` (the saved lineup), only when this save changed its times, days
+    or display, so an unrelated save stays quiet."""
+    if before is not None and _timing_key(before, page_devices) == _timing_key(deck, page_devices):
+        return []
     targets = set(_deck_displays(deck, page_devices))
     candidate = _lineup_input(deck, with_urls=False)
     warnings: list[str] = []
@@ -2060,17 +2081,9 @@ def _pause_warnings(deck: Deck, page_devices: dict[str, list[str]]) -> list[str]
     for device in devices_reg.all() if devices_reg is not None else []:
         if device.id not in targets:
             continue
-        pause = _pause_input(device)
-        if pause is not None and window_overlaps_pause(pause, candidate):
-            label = clock_range(pause.start_min, pause.end_min)
-            where = f"{device.display_name}'s Quiet hours ({label})"
-            # A daily push in quiet hours is skipped, not held (the scheduler
-            # counts it as done); a window just sends nothing until they end.
-            warnings.append(
-                f"{deck.name} {window_label(candidate)} is in {where}, so it's skipped."
-                if candidate.kind == "daily"
-                else f"{deck.name} sends nothing in {where}."
-            )
+        note = pause_note(_pause_input(device), candidate, f"{device.display_name}'s quiet hours")
+        if note:
+            warnings.append(note)
     return warnings
 
 
@@ -2240,7 +2253,7 @@ def _apply_edits(edits: list[Any], day: Any, *, require_on: bool = False) -> Res
         with using_time_cycle(cycle):
             _check_batch(decks, after, order, page_devices)
             for deck_id in order:
-                warnings.extend(_pause_warnings(after[deck_id], page_devices))
+                warnings.extend(_pause_warnings(after[deck_id], page_devices, decks[deck_id]))
         changed = [after[i] for i in order if after[i] != decks[i]]
         return changed, (changed, [after[i] for i in order], warnings)
 
@@ -3794,7 +3807,7 @@ def editor_save() -> Response:
         before = dict(decks)
         with using_time_cycle(cycle):
             _check_batch(before, {**before, deck.id: deck}, [deck.id], page_devices)
-            found = _pause_warnings(deck, page_devices) if deck.advance != "manual" else []
+            found = _pause_warnings(deck, page_devices, current) if deck.advance != "manual" else []
         return [deck], found
 
     try:

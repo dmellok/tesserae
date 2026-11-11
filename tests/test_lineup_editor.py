@@ -360,7 +360,7 @@ def test_a_window_in_quiet_hours_saves_with_a_warning(app: Flask) -> None:
     )
     got = _when(app, "at", "06:00", device_ids="hall")
     assert got["ok"] and got["url"] == "/decks/lu/edit"
-    assert got["warnings"] and "Quiet hours" in got["warnings"][0]
+    assert got["warnings"] and "quiet hours" in got["warnings"][0]
 
 
 def test_updates_edits_the_dashboards_own_refresh(app: Flask) -> None:
@@ -455,9 +455,7 @@ def test_create_warns_about_quiet_hours(app: Flask) -> None:
         },
     )
     got = _create(app, when="at", start="06:00", device_ids="hall", page_ids=["a"])
-    assert got["ok"] and got["warnings"] == [
-        "New at 6\u202fAM is in hall's Quiet hours (11\u202fPM–7\u202fAM), so it's skipped."
-    ]
+    assert got["ok"] and got["warnings"] == ["Skipped: 6\u202fAM is in hall's quiet hours."]
 
 
 # -- review fixes: the save keeps what it doesn't show ----------------------------
@@ -1064,3 +1062,85 @@ def test_widget_thumbs_follow_the_ingress_prefix(
         f"{ingress}/plugins/picture_immich/image/l/b?thumb=1",
         "https://civitai.example/x.jpg",
     ]
+
+
+def _quiet(app: Flask, start: str = "01:00", end: str = "08:00", **extra: Any) -> None:
+    app.config["SETTINGS_STORE"].patch_section(
+        "app",
+        {
+            "locale": "en-US",
+            "quiet_hours_enabled": True,
+            "quiet_hours_start": start,
+            "quiet_hours_end": end,
+            **extra,
+        },
+    )
+
+
+def _cycle(app: Flask, **fields: Any) -> None:
+    _deck(
+        app,
+        pages=[DeckPage(page_id="a"), DeckPage(page_id="b")],
+        device_ids=["hall"],
+        advance="timer",
+        advance_trigger="cycle",
+        advance_anchor="06:00",
+        advance_end_at="18:30",
+        advance_days_of_week=[0, 1, 2, 3, 4],
+        **fields,
+    )
+
+
+def test_save_warns_in_words_about_what_quiet_hours_do(app: Flask) -> None:
+    _register(app, "hall")
+    _quiet(app)
+    _cycle(app)
+    nb = "\u202f"
+    got = _when(app, "between", "06:00", "17:00", device_ids="hall")
+    assert got["warnings"] == [f"Starts at 8{nb}AM: 6–8{nb}AM is in hall's quiet hours."]
+    got = _when(app, "between", "02:00", "05:00", device_ids="hall")
+    assert got["warnings"] == ["Sends nothing: all of it is in hall's quiet hours."]
+    _quiet(app, "17:00", "19:00")
+    got = _when(app, "between", "06:00", "18:00", device_ids="hall")
+    assert got["warnings"] == [f"Stops at 5{nb}PM: 5–6{nb}PM is in hall's quiet hours."]
+    _quiet(app, "12:00", "13:00")
+    got = _when(app, "between", "06:00", "18:15", device_ids="hall")
+    assert got["warnings"] == [f"Pauses 12–1{nb}PM for hall's quiet hours."]
+
+
+def test_save_warning_follows_the_clock_style_and_day_masks(app: Flask) -> None:
+    _register(app, "hall")
+    _quiet(app, locale="de-DE")
+    _cycle(app)
+    got = _when(app, "between", "06:00", "17:00", device_ids="hall")
+    assert got["warnings"] == ["Starts at 08:00: 06:00–08:00 is in hall's quiet hours."]
+    # Quiet hours that only apply on the weekend leave a Mon-Fri lineup alone.
+    _quiet(app, quiet_hours_days=[5, 6])
+    got = _when(app, "between", "06:00", "17:00", device_ids="hall")
+    assert got["warnings"] == []
+
+
+def test_a_save_that_leaves_times_days_and_display_alone_does_not_warn(app: Flask) -> None:
+    _register(app, "hall")
+    _quiet(app)
+    _cycle(app)
+    # Saving an unrelated field (the name) on a lineup already in quiet hours.
+    got = _save(app, name="Renamed", device_ids="hall", pages="a,b").get_json()
+    assert got["ok"] and got["warnings"] == []
+    # Changing the days is a timing change: the warning comes back.
+    got = _save(
+        app, name="Renamed", device_ids="hall", pages="a,b", when_changed="1", when_mode="between",
+        when_start="06:00", when_end="18:30", advance_days=["0", "1"],
+    ).get_json()  # fmt: skip
+    assert got["ok"] and len(got["warnings"]) == 1
+
+
+def test_inline_edit_warns_only_when_the_edit_changed_the_times(app: Flask) -> None:
+    _register(app, "hall")
+    _quiet(app)
+    _cycle(app)
+    client = app.test_client()
+    same = client.post("/decks/lu/window", json={"start": "06:00", "end": "18:30"}).get_json()
+    assert same["warnings"] == []
+    moved = client.post("/decks/lu/window", json={"start": "05:00"}).get_json()
+    assert len(moved["warnings"]) == 1 and moved["warnings"][0].startswith("Starts at ")

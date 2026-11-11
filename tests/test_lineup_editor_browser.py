@@ -561,7 +561,7 @@ def test_quiet_hours_say_what_really_happens(real: tuple[str, Flask]) -> None:
         assert page.locator('[data-time="end"]').input_value() == "09:45"
         page.locator('[data-time="end"]').fill("07:00")
         page.locator('[data-time="end"]').dispatch_event("change")
-        assert "All of this is in quiet hours." in page.locator(".dxe-warn").inner_text()
+        assert "Sends nothing: all of it is in " in page.locator(".dxe-warn").inner_text()
         _settle(page)
         # A new lineup starts after quiet hours; an end before the start is said
         # at once, and Continue waits for it.
@@ -1943,7 +1943,7 @@ def test_quiet_hours_count_only_on_their_days(real: tuple[str, Flask]) -> None:
         for d in others:
             page.locator(f'.dxe-days [data-day="{d}"]').click()
         warn = page.locator(".dxe-warn", has_text="quiet").inner_text().replace("\u202f", " ")
-        assert "6 AM is in quiet hours on " in warn and "so it's skipped then" in warn
+        assert "Skipped: 6 AM is in " in warn and "quiet hours on " in warn
         assert "Start at 8:15 AM" in warn
         _settle(page)
         assert errors == []

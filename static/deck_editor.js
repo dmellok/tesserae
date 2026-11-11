@@ -224,6 +224,41 @@
   // "Sat, Sun" when only some of the run days are named.
   const someDays = (days) =>
     days.length === runDays().length ? "" : daysText(DAYS.map((_, i) => days.includes(i)));
+  // "6–8 AM": the clock range, the first AM/PM left off when both share it.
+  function shortRange(a, b) {
+    const x = R.clock(a);
+    const y = R.clock(b, true);
+    const m = x.match(/\s?[AP]M$/);
+    return m && y.endsWith(m[0].trim())
+      ? `${x.slice(0, -m[0].length)}\u2013${y}`
+      : `${x}\u2013${y}`;
+  }
+  const pauseWhere = () => {
+    const dev = deviceOf(st.display);
+    return `${dev ? `${dev.name}'s` : "the display's"} quiet hours`;
+  };
+  // What quiet hours do to the window s..e, in words (mirrors
+  // lineups_view.pause_note): { text, none } or null when they don't touch it.
+  function windowPauseNote(s, e) {
+    if (!pause() || !Number.isFinite(s) || !Number.isFinite(e) || e <= s) return null;
+    const where = pauseWhere();
+    let whole = false;
+    for (const d of runDays()) {
+      const hits = pauseParts(d)
+        .map(([a, b]) => [Math.max(a, s), Math.min(b, e)])
+        .filter(([a, b]) => a < b);
+      if (!hits.length) continue;
+      const [a, b] = hits.sort((x, y) => x[0] - y[0])[0];
+      if (hits.reduce((n, [x, y]) => n + y - x, 0) >= e - s) {
+        whole = true;
+        continue;
+      }
+      if (a <= s) return { text: `Starts at ${R.clock(b)}: ${shortRange(a, b)} is in ${where}.` };
+      if (b >= e) return { text: `Stops at ${R.clock(a)}: ${shortRange(a, b)} is in ${where}.` };
+      return { text: `Pauses ${shortRange(a, b)} for ${where}.` };
+    }
+    return whole ? { text: `Sends nothing: all of it is in ${where}.`, none: true } : null;
+  }
   // The first quarter hour after quiet hours end: the scheduler counts the
   // end minute as quiet, so a push exactly at the end is still held.
   function slotAfterPause(m) {
@@ -573,7 +608,7 @@
       S.display === st.display &&
       inPause(T(S.when.start))
     )
-      return line(`<b>Skipped: ${esc(clockOf(S.when.start))} is in quiet hours.</b>`);
+      return line(`<b>Skipped: ${esc(clockOf(S.when.start))} is in ${esc(pauseWhere())}.</b>`);
     if (l.status === "live") {
       const cur = l.steps.find((s) => s.current) || l.steps.find((s) => s.on_screen);
       const nx = l.steps.find((s) => s.next);
@@ -880,14 +915,14 @@
     if (p && st.when.mode === "at" && quiet.length) {
       const after = slotAfterPause(p.end_min);
       out.push(
-        `<p class="dxe-warn">${ico("moon")}<span>${esc(clockOf(st.when.start))} is in quiet hours${on ? ` on ${esc(on)}` : ""}, so it's skipped${on ? " then" : ""}.</span><button type="button" class="dxe-link" data-start="${esc(R.hhmm(after))}" data-fk="start-fix">Start at ${esc(R.clock(after))}</button></p>`
+        `<p class="dxe-warn">${ico("moon")}<span>Skipped: ${esc(clockOf(st.when.start))} is in ${esc(pauseWhere())}${on ? ` on ${esc(on)}` : ""}.</span><button type="button" class="dxe-link" data-start="${esc(R.hhmm(after))}" data-fk="start-fix">Start at ${esc(R.clock(after))}</button></p>`
       );
-    } else if (p && st.when.mode === "between" && !endBeforeStart() && allInPause(w.s, w.e)) {
-      out.push(`<p class="dxe-warn">${ico("moon")}<span>All of this is in quiet hours.</span></p>`);
-    } else if (p && st.when.mode === "between" && quiet.length) {
-      out.push(
-        `<p class="dxe-note">${ico("moon")}<span>Quiet until ${esc(R.clock(p.end_min))}${on ? ` on ${esc(on)}` : ""}; it picks up then.</span></p>`
-      );
+    } else if (p && st.when.mode === "between" && !endBeforeStart()) {
+      const note = windowPauseNote(w.s, w.e);
+      if (note)
+        out.push(
+          `<p class="${note.none ? "dxe-warn" : "dxe-note"}">${ico("moon")}<span>${esc(note.text)}</span></p>`
+        );
     }
     return out.join("");
   }
