@@ -22,6 +22,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 ### Fixed
 
 - Fraimic: a scheduled wake with nothing new to send put the frame back to sleep within a few seconds of waking, which can stop it setting its next alarm (seen on firmware 0.2.31 with wakes minutes apart: the frame then slept until tapped). It is now left up for 40 seconds first.
+- Lineups: a + beside each display's chevron starts a new lineup for that display.
+- Lineups: a day tile you click shows a check (runs) or an x (off) for a moment, and a small one until the change is saved.
+- Lineups: click a lineup's name to rename it in place; Enter or clicking away saves, Escape cancels.
+- Lineups: a daily push can take an end time ("06:00-18:00"); with several dashboards it then steps through them in that window. Remove the end to go back to a single push.
+- Lineups: drag a lineup's dashboards left or right to reorder them, or press Alt+Left / Alt+Right on one; it saves on drop.
+
+### Fixed
+
+- Lineups: a greyed row says why in a small tag (Not today, Done for today, Off, Not playing), so grey pictures aren't mistaken for black and white.
+- Lineups: a long day tag such as "Mon Tue Wed Sat Sun" no longer runs under the lineup's title.
+- Lineups: the time editor shows AM or PM in full.
+- Lineups: a display's day bar stays when you fold it; only its lineup rows fold.
+- Lineups: the day picker's calendar icon sits level with the middle of the day bar, at any width.
+- Lineups: reordering a live rotation sends the dashboard now in its slot.
 
 ## [0.510.1], 2026-11-11
 
