@@ -511,10 +511,15 @@
         emitOrderChange(row);
       }
 
-      function updateCount() {
-        if (!countEl) return;
-        const n = opts.filter((o) => o.querySelector("input").checked).length;
-        countEl.textContent = n ? `${n} selected` : "";
+      function updateSelection() {
+        let count = 0;
+        opts.forEach((row) => {
+          const checked = inputFor(row).checked;
+          // Chromium can leave :has(input:checked) stale when moveBefore moves the row.
+          row.classList.toggle("is-selected", checked);
+          if (checked) count += 1;
+        });
+        if (countEl) countEl.textContent = count ? `${count} selected` : "";
       }
       function applyFilter() {
         const q = (filter ? filter.value : "").trim().toLowerCase();
@@ -604,10 +609,11 @@
       }
 
       ms.addEventListener("change", (ev) => {
-        if (ev.target.matches?.('input[type="checkbox"]')) partitionSelection();
-        updateCount();
+        if (!ev.target.matches?.('input[type="checkbox"]')) return;
+        partitionSelection();
+        updateSelection();
       });
-      updateCount();
+      updateSelection();
     });
   }
 
