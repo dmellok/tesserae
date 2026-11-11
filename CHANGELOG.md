@@ -6,6 +6,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+- Fix contextual help buttons in the canvas editor.
+
 ## [0.510.1], 2026-11-11
 
 ### Fixed
