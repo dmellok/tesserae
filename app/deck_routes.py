@@ -1924,12 +1924,12 @@ def _edited_deck(
             if raw_end in (None, ""):
                 changes["advance_fires_at"] = s
             else:
-                e = _clean_time(raw_end, "End", deck.id)
-                if (parse_hhmm(e) or 0) <= (parse_hhmm(s) or 0):
+                end_s = _clean_time(raw_end, "End", deck.id)
+                if (parse_hhmm(end_s) or 0) <= (parse_hhmm(s) or 0):
                     raise _EditError("End must be after start.", 400, deck.id)
                 # A window to midnight is stored as no end (see the interval
                 # and cycle branches).
-                stop = None if e == "24:00" else e
+                stop = None if end_s == "24:00" else end_s
                 if len(deck.pages) > 1:
                     changes.update(
                         advance_trigger="cycle",
