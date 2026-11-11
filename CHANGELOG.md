@@ -22,6 +22,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 ### Fixed
 
 - Fraimic: a scheduled wake with nothing new to send put the frame back to sleep within a few seconds of waking, which can stop it setting its next alarm (seen on firmware 0.2.31 with wakes minutes apart: the frame then slept until tapped). It is now left up for 40 seconds first.
+- Blank pictures on a frame: a render whose images fail to load is retried once, and a scheduled, lineup or refresh send that still has broken images keeps the previous frame. A manual send goes out with a warning in History.
 
 ## [0.510.1], 2026-11-11
 

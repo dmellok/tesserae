@@ -268,6 +268,9 @@
         {% if ev.extra and ev.extra.get('waited_s') %}
         <p class="dx-hist-waited"><i class="ph ph-hourglass" aria-hidden="true"></i> waited {{ ev.extra.waited_s|round|int }} s for {{ ev.extra.waited_for or 'the' }} picture{{ '' if ev.extra.waited_for == 1 else 's' }} to finish before sending</p>
         {% endif %}
+        {% if ev.extra and ev.extra.get('image_warning') %}
+        <p class="dx-hist-waited"><i class="ph ph-warning" aria-hidden="true"></i> {{ ev.extra.image_warning }}</p>
+        {% endif %}
         {% if ev.followups %}
         {# The page sent again once a widget's pending work landed: small
            dots on the same rail, then when the finished page got there. #}

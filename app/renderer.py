@@ -30,10 +30,10 @@ import os
 import queue
 import threading
 import time
-from collections.abc import Mapping
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Final, Literal, cast
+from typing import Any, Final, Literal, TypeVar, cast
 from urllib.parse import urlsplit, urlunsplit
 
 from playwright.sync_api import Browser, Playwright, sync_playwright
@@ -41,6 +41,8 @@ from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 logger = logging.getLogger(__name__)
+
+_R = TypeVar("_R")
 
 DEFAULT_PANEL_W: Final[int] = 1600
 DEFAULT_PANEL_H: Final[int] = 1200
@@ -172,6 +174,15 @@ class RenderRequest:
     # under no obvious cause, most commonly a brief loopback contention
     # or a background-thread GC pause that ate the navigation window.
     max_attempts: int = 3
+    # Extra full renders allowed when a composer page finished with images that
+    # failed to load (separate from ``max_attempts``, which only counts
+    # timeouts). A CDN that errors a request for no lasting reason (Google's
+    # lh3 does, from a headless client) usually serves the same URL a moment
+    # later on a fresh connection, so one more pass after a short backoff turns
+    # most blank frames into good ones. 0 disables. Composer renders only: an
+    # arbitrary webpage almost always has a dead tracker pixel somewhere.
+    image_retries: int = 1
+    image_retry_backoff_s: float = 1.5
     # IANA zone name (e.g. ``"Europe/London"``) forwarded to Chromium so
     # widgets' client-side ``new Date()`` matches the app's configured
     # timezone, NOT the Docker container's ``TZ`` env var (which defaults
@@ -315,6 +326,126 @@ class CaptureRequest:
     script: str
 
 
+@dataclass(frozen=True)
+class ImageFailure:
+    """One image the page asked for and never got, with what the network said.
+
+    ``url`` has no query string (see ``_IMAGE_WAIT_JS``). ``status`` is the HTTP
+    status when a response arrived (a 429 / 403 from the CDN), ``error`` the
+    Chromium failure text when none did (``net::ERR_HTTP2_PROTOCOL_ERROR``,
+    ``net::ERR_BLOCKED_BY_ORB``, ...). Both None means the request itself left
+    no trace on the page (a cached failure, or the src was never fetched)."""
+
+    url: str
+    host: str = ""
+    status: int | None = None
+    status_text: str = ""
+    error: str | None = None
+
+    def describe(self) -> str:
+        bits = [f"host {self.host}" if self.host else "host ?"]
+        if self.status is not None:
+            bits.append(f"HTTP {self.status} {self.status_text}".strip())
+        if self.error:
+            bits.append(self.error)
+        if self.status is None and not self.error:
+            bits.append("no network error seen")
+        return f"{self.url} ({', '.join(bits)})"
+
+
+class RenderedPng(bytes):
+    """A screenshot's bytes, plus the images that failed to load in it.
+
+    Behaves as plain ``bytes`` everywhere; the publish path reads
+    ``failed_images`` to decide whether an automated send should go out."""
+
+    failed_images: tuple[ImageFailure, ...] = ()
+
+    def __new__(cls, data: bytes, failed_images: tuple[ImageFailure, ...] = ()) -> RenderedPng:
+        obj = super().__new__(cls, data)
+        obj.failed_images = failed_images
+        return obj
+
+
+def failed_images_of(png: object) -> tuple[ImageFailure, ...]:
+    """The failed images a render carries (empty for plain bytes)."""
+    found = getattr(png, "failed_images", ())
+    return tuple(found) if isinstance(found, tuple) else ()
+
+
+def _query_free(url: str) -> str:
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return url
+    return f"{parts.scheme}://{parts.netloc}{parts.path}"
+
+
+def _watch_image_requests(page: Any) -> dict[str, dict[str, Any]]:
+    """Record, per query-free URL, how each image request ended, so a failed
+    ``<img>`` can be reported with the response status or Chromium failure
+    text instead of just its address. Never raises into the page."""
+    seen: dict[str, dict[str, Any]] = {}
+
+    def _on_response(resp: Any) -> None:
+        try:
+            if resp.request.resource_type != "image":
+                return
+            entry = seen.setdefault(_query_free(resp.url), {})
+            # A later 200 for the same URL must not hide an earlier error.
+            if entry.get("status") is None or resp.status >= 400:
+                entry["status"] = resp.status
+                entry["status_text"] = str(getattr(resp, "status_text", "") or "")
+        except Exception:
+            logger.debug("image response watch failed", exc_info=True)
+
+    def _on_requestfailed(req: Any) -> None:
+        try:
+            if req.resource_type != "image":
+                return
+            seen.setdefault(_query_free(req.url), {})["error"] = str(req.failure or "failed")[:200]
+        except Exception:
+            logger.debug("image requestfailed watch failed", exc_info=True)
+
+    page.on("response", _on_response)
+    page.on("requestfailed", _on_requestfailed)
+    return seen
+
+
+def _image_failures(
+    images: Any, net: Mapping[str, Mapping[str, Any]] | None
+) -> tuple[ImageFailure, ...]:
+    """The failed images in an image-wait status object, joined with the
+    network record ``_watch_image_requests`` kept."""
+    if not isinstance(images, dict):
+        return ()
+    failed = images.get("failed")
+    urls = images.get("failed_urls")
+    if not isinstance(failed, int) or failed <= 0:
+        return ()
+    if not isinstance(urls, list) or not urls:
+        urls = ["?"]
+    out: list[ImageFailure] = []
+    for raw in urls:
+        url = str(raw)
+        info = (net or {}).get(url, {})
+        try:
+            host = urlsplit(url).hostname or ""
+        except ValueError:
+            host = ""
+        status = info.get("status")
+        out.append(
+            ImageFailure(
+                url=url,
+                host=host,
+                status=status if isinstance(status, int) else None,
+                status_text=str(info.get("status_text") or ""),
+                error=info.get("error"),
+            )
+        )
+    return tuple(out)
+
+
 _IMAGE_WAIT_JS: Final[str] = """async () => {
     // Walk every <img> across the page AND every shadow root (each
     // widget lives in its own shadow tree), then resolve once they've
@@ -448,40 +579,91 @@ _FONT_WAIT_JS: Final[str] = """async () => {
 }"""
 
 
-def _screenshot_one(browser: Browser, request: RenderRequest) -> bytes:
-    """Retry shell around ``_screenshot_attempt``.
+# Sleep between a render that finished with failed images and its retry.
+# Module-level so tests can replace it.
+_image_retry_sleep = time.sleep
 
-    Each attempt opens a fresh ``new_context`` + ``new_page``, so a
-    half-loaded page from the previous timeout doesn't carry into the
-    retry. Only Playwright ``TimeoutError`` triggers a retry (the
-    typical mode: ``Page.goto: Timeout 15000ms exceeded``). Other
-    Playwright errors (invalid URL, browser-side crash, etc.) surface
-    immediately, retrying them just wastes the deadline."""
+
+def _run_attempts(
+    request: RenderRequest,
+    run: Callable[[int], _R],
+    png_of: Callable[[_R], object],
+    what: str,
+) -> _R:
+    """Run ``run(attempt)`` with the renderer's two kinds of retry.
+
+    * Playwright ``TimeoutError`` (the typical mode: ``Page.goto: Timeout
+      15000ms exceeded``): another attempt, up to ``max_attempts`` in total.
+      Each attempt opens a fresh ``new_context`` + ``new_page``, so a
+      half-loaded page from the previous timeout doesn't carry into the retry.
+      Other Playwright errors (invalid URL, browser-side crash, etc.) surface
+      immediately, retrying them just wastes the deadline.
+    * A finished composer render with images that failed to load: up to
+      ``image_retries`` more renders after ``image_retry_backoff_s``. If they
+      still fail, the last render is returned (carrying ``failed_images``) and
+      the caller decides whether to publish it."""
     last_err: PlaywrightTimeoutError | None = None
-    for attempt in range(1, request.max_attempts + 1):
+    timeouts = 0
+    image_retries_left = max(0, request.image_retries) if request.is_composer else 0
+    attempt = 0
+    while True:
+        attempt += 1
         try:
-            return _screenshot_attempt(browser, request, attempt)
+            result = run(attempt)
         except PlaywrightTimeoutError as err:
             last_err = err
-            if attempt >= request.max_attempts:
+            timeouts += 1
+            if timeouts >= request.max_attempts:
                 logger.error(
-                    "render failed after %d attempts: %s (url=%s)",
+                    "%s failed after %d attempts: %s (url=%s)",
+                    what,
                     attempt,
                     err,
                     request.url,
                 )
                 raise
             logger.warning(
-                "render attempt %d/%d hit a timeout (will retry): %s (url=%s)",
-                attempt,
+                "%s attempt %d/%d hit a timeout (will retry): %s (url=%s)",
+                what,
+                timeouts,
                 request.max_attempts,
                 err,
                 request.url,
             )
-    # Unreachable, the loop either returns on success or raises on the
-    # last attempt. The assert keeps mypy honest about the bound.
-    assert last_err is not None
-    raise last_err
+            continue
+        failures = failed_images_of(png_of(result))
+        if failures and image_retries_left > 0:
+            image_retries_left -= 1
+            logger.warning(
+                "%s: %d image(s) failed to load; rendering again in %.1f s (url=%s)",
+                what,
+                len(failures),
+                request.image_retry_backoff_s,
+                request.url,
+            )
+            _image_retry_sleep(request.image_retry_backoff_s)
+            continue
+        if failures:
+            logger.warning(
+                "%s: images still failing after %d render(s) (url=%s)",
+                what,
+                attempt,
+                request.url,
+            )
+        return result
+    # Unreachable: the loop returns on success or raises on the last timeout.
+    assert last_err is not None  # pragma: no cover
+    raise last_err  # pragma: no cover
+
+
+def _screenshot_one(browser: Browser, request: RenderRequest) -> bytes:
+    """Retry shell around ``_screenshot_attempt`` (see ``_run_attempts``)."""
+    return _run_attempts(
+        request,
+        lambda attempt: _screenshot_attempt(browser, request, attempt),
+        lambda png: png,
+        "render",
+    )
 
 
 def _install_request_policy(page: Any, request: RenderRequest) -> None:
@@ -558,8 +740,11 @@ def _install_request_policy(page: Any, request: RenderRequest) -> None:
     page.route("**/*", _route)
 
 
-def _log_failed_images(settle: Any) -> None:
-    """Say so when a render finished with images that never loaded.
+def _log_failed_images(
+    settle: Any, net: Mapping[str, Mapping[str, Any]] | None = None
+) -> tuple[ImageFailure, ...]:
+    """Say so when a render finished with images that never loaded, and return
+    them (with the response status / failure text from ``net``).
 
     The wait resolves on ``error`` as well as ``load``, which is correct (a
     dead CDN must not hold a render) but meant a page full of broken-image
@@ -569,7 +754,7 @@ def _log_failed_images(settle: Any) -> None:
     token never lands in a log.
     """
     if not isinstance(settle, dict):
-        return
+        return ()
     bad = settle.get("undecodable")
     if isinstance(bad, int) and bad > 0:
         logger.warning(
@@ -585,16 +770,16 @@ def _log_failed_images(settle: Any) -> None:
         )
     failed = settle.get("failed")
     if not isinstance(failed, int) or failed <= 0:
-        return
-    urls = settle.get("failed_urls")
-    listed = ", ".join(str(u) for u in urls) if isinstance(urls, list) and urls else "?"
+        return ()
+    failures = _image_failures(settle, net)
+    listed = ", ".join(f.describe() for f in failures) or "?"
     logger.warning(
-        "render: %d of %s image(s) failed to load: %s. The frame was still "
-        "captured, so the panel will show a broken image where these were.",
+        "render: %d of %s image(s) failed to load: %s",
         failed,
         settle.get("total", "?"),
         listed,
     )
+    return failures
 
 
 def _context_extras(request: RenderRequest) -> dict[str, Any]:
@@ -650,7 +835,12 @@ def _new_composer_page(browser: Browser, request: RenderRequest) -> tuple[Any, A
     return context, page
 
 
-def _navigate_and_settle(page: Any, request: RenderRequest, attempt: int) -> dict[str, Any]:
+def _navigate_and_settle(
+    page: Any,
+    request: RenderRequest,
+    attempt: int,
+    net: Mapping[str, Mapping[str, Any]] | None = None,
+) -> dict[str, Any]:
     """Navigate to the request URL and wait until the composed page is ready to
     read (compose-done signal, images, fonts). Shared by the screenshot and the
     inspect paths so both see the same fully-hydrated DOM.
@@ -691,7 +881,9 @@ def _navigate_and_settle(page: Any, request: RenderRequest, attempt: int) -> dic
     settle["compose_ms"] = int((t1 - t_goto) * 1000)
     try:
         settle["images"] = page.evaluate(_IMAGE_WAIT_JS)
-        _log_failed_images(settle["images"])
+        failures = _log_failed_images(settle["images"], net)
+        if failures and isinstance(settle["images"], dict):
+            settle["images"]["failed_detail"] = [asdict(f) for f in failures]
     except PlaywrightError as err:
         logger.warning("image wait skipped: %s", err)
         settle["images"] = {"error": str(err).splitlines()[0][:200]}
@@ -768,6 +960,7 @@ def _screenshot_attempt(browser: Browser, request: RenderRequest, attempt: int) 
         _prime_context(context, request)
         page = context.new_page()
         _install_request_policy(page, request)
+        image_net = _watch_image_requests(page)
         page.set_default_timeout(request.timeout_ms)
         # ``set_default_timeout`` covers actions (evaluate, click, …) but
         # NOT navigation, ``goto`` uses Playwright's 30s default unless
@@ -841,8 +1034,9 @@ def _screenshot_attempt(browser: Browser, request: RenderRequest, attempt: int) 
         # , slow remote images (HA cameras, Spotify art, Unsplash
         # CDN) keep downloading after that, and the screenshot would
         # otherwise capture a half-loaded / broken-image frame.
+        failures: tuple[ImageFailure, ...] = ()
         try:
-            _log_failed_images(page.evaluate(_IMAGE_WAIT_JS))
+            failures = _log_failed_images(page.evaluate(_IMAGE_WAIT_JS), image_net)
         except PlaywrightError as err:
             logger.warning("image wait skipped: %s", err)
         t_img = time.monotonic()
@@ -877,7 +1071,7 @@ def _screenshot_attempt(browser: Browser, request: RenderRequest, attempt: int) 
             t3 - t2,
             request.url,
         )
-        return png
+        return RenderedPng(png, failures)
     finally:
         # Closing the context tears down the page, cookies, localStorage,
         # font cache, so the next render starts clean even though the
@@ -1022,7 +1216,11 @@ def _capture_attempt(browser: Browser, request: CaptureRequest, attempt: int) ->
     extraction can never sink a push."""
     context, page = _new_composer_page(browser, request.render)
     try:
-        _navigate_and_settle(page, request.render, attempt)
+        image_net = _watch_image_requests(page)
+        settle = _navigate_and_settle(page, request.render, attempt, image_net)
+        images = settle.get("images")
+        detail = images.get("failed_detail") if isinstance(images, dict) else None
+        failures = tuple(ImageFailure(**d) for d in detail) if isinstance(detail, list) else ()
         png: bytes = page.screenshot(
             full_page=False,
             type="png",
@@ -1034,7 +1232,7 @@ def _capture_attempt(browser: Browser, request: CaptureRequest, attempt: int) ->
             result = page.evaluate(request.script)
         except PlaywrightError as err:
             logger.warning("capture script skipped: %s", err)
-        return png, result
+        return RenderedPng(png, failures), result
     finally:
         try:
             context.close()
@@ -1043,18 +1241,13 @@ def _capture_attempt(browser: Browser, request: CaptureRequest, attempt: int) ->
 
 
 def _capture_one(browser: Browser, request: CaptureRequest) -> tuple[bytes, Any]:
-    """Retry shell around ``_capture_attempt`` (mirrors ``_screenshot_one``)."""
-    last_err: PlaywrightTimeoutError | None = None
-    for attempt in range(1, request.render.max_attempts + 1):
-        try:
-            return _capture_attempt(browser, request, attempt)
-        except PlaywrightTimeoutError as err:
-            last_err = err
-            if attempt >= request.render.max_attempts:
-                raise
-            logger.warning("capture attempt %d hit a timeout (will retry): %s", attempt, err)
-    assert last_err is not None
-    raise last_err
+    """Retry shell around ``_capture_attempt`` (see ``_run_attempts``)."""
+    return _run_attempts(
+        request.render,
+        lambda attempt: _capture_attempt(browser, request, attempt),
+        lambda out: out[0],
+        "capture",
+    )
 
 
 def capture_composed(

@@ -77,8 +77,10 @@ from app.quiet_hours import device_is_quiet
 from app.renderer import (
     BrowserPool,
     CaptureRequest,
+    ImageFailure,
     RenderRequest,
     capture_composed,
+    failed_images_of,
     origin_of,
     render_to_png,
     to_loopback_url,
@@ -282,6 +284,32 @@ PushStatus = Literal[
 # (lineup navigation) must only do so for these.
 DELIVERED_STATUSES: frozenset[str] = frozenset({"sent", "no_change"})
 
+# Push sources that are the app's own timer / refresh machinery rather than a
+# person asking. A frame with broken pictures is held back for these (the panel
+# keeps its previous picture); a manual send still goes out, with a warning.
+# Anything pushed with ``respect_quiet_hours=True`` counts as automated too.
+_AUTOMATED_SOURCES: frozenset[str] = frozenset(
+    {
+        "scheduler",
+        "scheduler_fallback",
+        "schedule",
+        "rotation",
+        "page_refresh",
+        "widget_schedule",
+        "widget_change",
+        "data_change",
+        "follow-up",
+        "reconcile",
+        "deck_warm",
+        "album_warm",
+    }
+)
+# Consecutive automated renders of one page that may be held back for broken
+# pictures. After that the frame is published as it always was, so a page whose
+# picture is dead for good (or a lineup step that never gets a clean render)
+# still moves on instead of stalling; the next clean render resets the count.
+_BROKEN_IMAGE_MAX_HOLDS: int = 3
+
 # Max bytes we'll pull from a remote image URL (Send-page Image URL tab).
 # Larger downloads are rejected before going through Pillow.
 _MAX_REMOTE_IMAGE_BYTES: int = 16 * 1024 * 1024
@@ -450,6 +478,17 @@ class PushResult:
     renderers: list[RendererResult] = field(default_factory=list)
     event_id: int | None = None
     event_ids: tuple[int, ...] = ()
+    # A frame went out although something in it is known to be wrong (pictures
+    # that failed to load). Set only on a delivered push; callers that report
+    # to a person (webhook JSON, History) show it.
+    warning: str | None = None
+
+
+def _broken_images_warning(broken: tuple[ImageFailure, ...]) -> str:
+    """One line for a frame that went out with pictures missing."""
+    first = broken[0].describe()
+    more = f" (+{len(broken) - 1} more)" if len(broken) > 1 else ""
+    return f"{len(broken)} picture(s) failed to load and are blank in this frame: {first}{more}"
 
 
 def _marks_rendering(
@@ -624,6 +663,9 @@ class PushManager:
         # content token; entries are consume-once and short-TTL so a
         # scheduled push minutes later can never serve stale widget data.
         self._precompose_lock = threading.Lock()
+        # page_id -> consecutive automated renders held back for broken
+        # pictures (see ``_BROKEN_IMAGE_MAX_HOLDS``).
+        self._broken_image_holds: dict[str, int] = {}
         self._precompose: OrderedDict[
             str, tuple[float, bytes, list[dict[str, Any]], list[dict[str, Any]]]
         ] = OrderedDict()
@@ -1866,6 +1908,9 @@ class PushManager:
                 ),
                 pool=self._browser_pool_fn(),
             )
+            if failed_images_of(composition_png):
+                # A broken frame must not stand in for the real push's render.
+                return False
             raw_regions, raw_slots = split_capture_result(raw_result)
             self._store_precomposed(
                 key,
@@ -2814,6 +2859,28 @@ class PushManager:
                             )
                         )
                         continue
+                broken = failed_images_of(composition_png)
+                image_warning: str | None = None
+                if broken:
+                    held = self._hold_for_broken_images(
+                        page_id,
+                        broken,
+                        automated=source in _AUTOMATED_SOURCES
+                        or (respect_quiet_hours and not force_publish),
+                    )
+                    if held is not None:
+                        group_results.append(
+                            self._log_failure(
+                                source=source,
+                                target=page_id,
+                                error=held,
+                                duration_s=time.monotonic() - started,
+                            )
+                        )
+                        continue
+                    image_warning = _broken_images_warning(broken)
+                else:
+                    self._broken_image_holds.pop(page_id, None)
                 result = self._fan_out(
                     composition_png,
                     panel.model_dump(),
@@ -2822,6 +2889,7 @@ class PushManager:
                     started=started,
                     device_filters=device_filter,
                     force_publish=force_publish,
+                    image_warning=image_warning,
                     dither_regions=dither_regions,
                     touch_regions=touch_regions,
                     overlay_slots=overlay_slots,
@@ -2850,6 +2918,13 @@ class PushManager:
             status = "no_change"
         else:
             status = "sent"
+        # One group, one reason: say it. A page with several panel groups keeps
+        # the generic line (each group logged its own row).
+        failed_error = (
+            failed[0].error
+            if len(group_results) == 1 and failed and failed[0].error
+            else "one or more panels failed to render/publish"
+        )
         digest = next((r.composition_digest for r in group_results if r.composition_digest), "")
         event_ids = tuple(
             dict.fromkeys(
@@ -2873,9 +2948,10 @@ class PushManager:
             # there was nothing to publish. Attaching the render/publish error
             # to it made callers that branch on the error string report an
             # unchanged panel as a failed one.
-            error=("one or more panels failed to render/publish" if status == "failed" else None),
+            error=failed_error if status == "failed" else None,
             event_id=event_ids[0] if len(event_ids) == 1 else None,
             event_ids=event_ids,
+            warning=next((r.warning for r in group_results if r.warning), None),
         )
 
     def _push_bytes_locked(
@@ -2942,6 +3018,7 @@ class PushManager:
         stamp_into: dict[str, dict[str, Any]] | None = None,
         page_id: str | None = None,
         waited: tuple[float, int] = (0.0, 0),
+        image_warning: str | None = None,
     ) -> PushResult:
         """Common fanout: thumbnail + per-renderer transform / publish / log.
 
@@ -3270,6 +3347,8 @@ class PushManager:
             # The send waited for the page's widgets to finish painting first.
             event_extra["waited_s"] = waited[0]
             event_extra["waited_for"] = waited[1]
+        if image_warning:
+            event_extra["image_warning"] = image_warning
         # A successful warm (deck / album background refresh) rendered into
         # the side cache and never repainted a panel, so it must not be
         # logged with the same status as a push a display actually showed.
@@ -3318,6 +3397,45 @@ class PushManager:
             renderers=results,
             event_id=event_id,
             event_ids=(event_id,),
+            warning=image_warning if status == "sent" else None,
+        )
+
+    def _hold_for_broken_images(
+        self, page_id: str, broken: tuple[ImageFailure, ...], *, automated: bool
+    ) -> str | None:
+        """Decide what a render with failed pictures does. Returns the error
+        text when the frame must not be published (an automated send, within
+        the hold budget), else None (publish, with a warning)."""
+        what = "; ".join(f.describe() for f in broken[:3])
+        if not automated:
+            logger.warning(
+                "page %s: publishing a manual send although images failed to load (%s)",
+                page_id,
+                what,
+            )
+            return None
+        held = self._broken_image_holds.get(page_id, 0)
+        if held >= _BROKEN_IMAGE_MAX_HOLDS:
+            logger.warning(
+                "page %s: images still failing after %d held renders, publishing the frame "
+                "anyway (%s)",
+                page_id,
+                held,
+                what,
+            )
+            return None
+        self._broken_image_holds[page_id] = held + 1
+        logger.warning(
+            "page %s: not publishing, images failed to load after a retry; the display keeps "
+            "its previous picture (%d of %d holds): %s",
+            page_id,
+            held + 1,
+            _BROKEN_IMAGE_MAX_HOLDS,
+            what,
+        )
+        return (
+            f"{len(broken)} picture(s) failed to load, so the new frame was not sent "
+            f"and the display keeps its previous picture ({what})"
         )
 
     def _overlay_low_battery_if_needed(self, composition_png: bytes, device_id: str) -> bytes:
