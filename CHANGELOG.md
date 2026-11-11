@@ -22,6 +22,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 ### Fixed
 
 - Fraimic: a scheduled wake with nothing new to send put the frame back to sleep within a few seconds of waking, which can stop it setting its next alarm (seen on firmware 0.2.31 with wakes minutes apart: the frame then slept until tapped). It is now left up for 40 seconds first.
+- Lineup editor: rebuilt as When it runs, Dashboards and Timing, under what is on screen and the display's day bar.
+- Lineup editor: each dashboard says what it is ("Gallery · 412 photos") and opens to its items in a searchable grid, its first eight in the display's own shape.
+- Lineup editor: only the options that apply are shown; Priority when lineups overlap, Min hold when something can cut a dashboard short.
+- Lineup editor: Push now and a ... menu (Move to another display, Delete) sit top right by the On switch; a move applies on Save.
+- Lineup editor: drag or arrow-key this lineup's block on the day bar to set its time, click another lineup's block to open it, and Show all puts every day's bar in the header.
+- Lineup editor: a gear by a dashboard's name opens it in the dashboard editor; its arrows pick the item Push now sends, and the item control reads Rotate items or Show chosen.
+- Lineups: New lineup, and the + beside each display, open a three-step new-lineup page.
+- Lineups: album widgets that draw a random photo show as a stack badged "random" (or x N), with a Recent photos strip in the editor.
+- Widgets: item hooks can return a preview `thumb` per item and take a `ctx` (cell size, display); see the widget guide.
 - Lineups: a + beside each display's chevron starts a new lineup for that display.
 - Lineups: a day tile you click shows a check (runs) or an x (off) for a moment, and a small one until the change is saved.
 - Lineups: click a lineup's name to rename it in place; Enter or clicking away saves, Escape cancels.
@@ -30,6 +39,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- Lineups: the quiet-hours warning says what happens and only shows when a save changes the times, days or display.
+- Lineups: widget preview images (e.g. Immich) load under Home Assistant ingress instead of showing "?".
+- Lineups and the lineup editor: a short block on the day bar is a sliver of its own, 1px from its neighbours, never under them.
+- Lineup editor: a daily or interval lineup edits its own time, a window with several dashboards takes them in turn, and cut to one it keeps its pace.
+- Lineup editor: Smart sync can be switched off again, and a daily or interval lineup set to also take taps now runs.
+- Lineup editor: saving keeps a lineup's other displays and the settings it doesn't show, and a save from a stale tab is refused instead of undoing newer edits.
+- Lineup editor: Timing follows each dashboard's own time and quiet hours count only on their days.
 - Lineups: a greyed row says why in a small tag (Not today, Done for today, Off, Not playing), so grey pictures aren't mistaken for black and white.
 - Lineups: a long day tag such as "Mon Tue Wed Sat Sun" no longer runs under the lineup's title.
 - Lineups: the time editor shows AM or PM in full.
