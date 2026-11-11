@@ -1210,6 +1210,12 @@ def real(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[str,
         renderers_dir=REPO_ROOT / "renderers",
     )
     app.config["TESTING"] = True
+    # The scheduler runs on the real clock, not the midday pinned above. On a
+    # weekday between 06:00-09:00 or 17:00-20:00 it found the lineups below
+    # running and pushed a real frame to the panel mid-test, which put an
+    # eager header thumbnail (and a Queued tag) on a page these tests expect
+    # to be untouched. They check the page and its endpoints, so stop it.
+    app.config["SCHEDULER"].stop()
     store = app.config["SETTINGS_STORE"]
     store.patch_section("app", {"onboarded": True, "locale": "en-GB"})  # 24-hour labels
     store.patch_section("auth", {"disabled": True})
