@@ -555,7 +555,7 @@ def test_quiet_hours_say_what_really_happens(real: tuple[str, Flask]) -> None:
     with sync_playwright() as p:
         browser, page, errors = _open(p, base, "/decks/art/edit")
         # A daily push in quiet hours is skipped, and the header says so.
-        assert page.locator(".dxe-live-line").inner_text() == "Skipped: 6 AM is in quiet hours."
+        assert page.locator(".dxe-live-line").inner_text() == "Skipped: 6 AM is in tv's quiet hours."
         # + End time doesn't make a window that is all quiet hours.
         page.locator('.dxe-time [data-end="add"]').click()
         assert page.locator('[data-time="end"]').input_value() == "09:45"
