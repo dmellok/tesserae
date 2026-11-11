@@ -624,7 +624,9 @@ def _coalesce(candidates: list[_Candidate], tick_seconds: int) -> list[_Candidat
     E-ink holds the most recent frame, and the tick fires its whole due list
     in ascending ``(priority, kind, id)`` order, so the winner is the maximum
     of that key. Reporting the losers would describe the scheduler's
-    internals rather than the display's behaviour.
+    internals rather than the display's behaviour. One record fires at most
+    once per tick, so a record's own later candidate (the boundary just after
+    the window it is catching up) starts a new bucket instead of being lost.
     """
     if not candidates:
         return []
@@ -633,7 +635,10 @@ def _coalesce(candidates: list[_Candidate], tick_seconds: int) -> list[_Candidat
     out: list[_Candidate] = []
     bucket: list[_Candidate] = [ordered[0]]
     for candidate in ordered[1:]:
-        if candidate.at - bucket[0].at < window:
+        if candidate.at - bucket[0].at < window and all(
+            (candidate.rank, candidate.record_id) != (member.rank, member.record_id)
+            for member in bucket
+        ):
             bucket.append(candidate)
             continue
         out.append(max(bucket, key=lambda c: (c.priority, c.rank, c.record_id)))

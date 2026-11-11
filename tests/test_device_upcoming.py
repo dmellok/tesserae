@@ -498,6 +498,27 @@ def test_two_records_due_together_report_the_one_that_wins_the_panel() -> None:
     ]
 
 
+def test_one_record_is_never_coalesced_into_itself() -> None:
+    """A record fires at most once per tick. The window running now (not yet
+    fired) and the boundary 20 seconds after it are two ticks, not one: the
+    boundary must not vanish into the catch-up."""
+    now = datetime(2026, 8, 17, 11, 29, 40, tzinfo=UTC)
+    events = project_upcoming(
+        _inputs(
+            now=now,
+            through=now + timedelta(hours=2),
+            cycles=[CycleRecord(rotation=_cycle(), last_step=None)],
+            current_page_id="weather",
+        ),
+        limit=3,
+    )
+    assert [(e.scheduled_at.isoformat(), e.dashboard_id) for e in events] == [
+        ("2026-08-17T11:29:40+00:00", "todo"),
+        ("2026-08-17T11:30:00+00:00", "weather"),
+        ("2026-08-17T12:00:00+00:00", "todo"),
+    ]
+
+
 def test_a_lower_priority_record_does_not_win_a_shared_tick() -> None:
     schedule = Schedule(
         id="morning",
