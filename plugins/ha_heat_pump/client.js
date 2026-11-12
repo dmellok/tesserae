@@ -116,6 +116,7 @@ export default function render(shadow, ctx) {
   const showHeating = options.show_heating !== false && options.show_heating !== "false";
   const showHotWater = options.show_hot_water !== false && options.show_hot_water !== "false";
   const showYesterday = options.show_yesterday !== false && options.show_yesterday !== "false";
+  const showOverallSpf = options.show_overall_spf !== false && options.show_overall_spf !== "false";
   const showTemperatureGauge = options.show_temperature_gauge === true
     || options.show_temperature_gauge === "true";
   const includeHeating = fragment === "heating" || (showHeating && fragment === "full");
@@ -324,10 +325,10 @@ export default function render(shadow, ctx) {
         <span class="hp-hero-label">${escapeHtml(t("compressor", "Compressor"))}</span>
         <strong class="status-state hp-state">${escapeHtml(statusText)}</strong>
       </div>
-      <div class="hp-hero-spf">
+      ${showOverallSpf ? `<div class="hp-hero-spf">
         <span class="hp-hero-label">${escapeHtml(t("overall_spf", "Overall SPF"))}</span>
         <strong class="hp-hero-spf-value">${formatReading(overallSpf, "", t)}</strong>
-      </div>
+      </div>` : ""}
     </div>`;
   const powerMarkup = `
     <div class="hp-current-power">

@@ -303,6 +303,8 @@ def test_manifest_and_locales_include_widget_defaults_and_common_modes() -> None
 
     assert options["show_yesterday"]["default"] is True
     assert options["show_temperature_gauge"]["default"] is False
+    assert options["show_overall_spf"]["default"] is True
+    assert options["show_overall_spf"]["advanced"] is True
     for translations in (english, german):
         assert translations["not_available"]
         for mode in ("heat_pump", "performance", "electric", "high_demand"):

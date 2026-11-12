@@ -739,7 +739,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   suggesting a re-run of install.sh. The helper script sets it.
 - A Home Assistant heat-pump widget with configurable entity selectors,
   responsive compressor and temperature panels, optional temperature gauges,
-  current power and daily energy fragments, and yesterday-value controls.
+  current power and daily energy fragments, yesterday-value controls, and an
+  optional overall SPF display.
 
 ## [0.480.1], 2026-10-26
 

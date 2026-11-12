@@ -127,6 +127,13 @@
       "advanced": true
     },
     {
+      "name": "show_overall_spf",
+      "type": "boolean",
+      "label": "Show overall SPF",
+      "default": true,
+      "advanced": true
+    },
+    {
       "name": "label",
       "type": "string",
       "label": "Title",
