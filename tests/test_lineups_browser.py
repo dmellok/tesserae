@@ -3573,7 +3573,14 @@ def test_a_redraw_while_the_lightbox_is_open_changes_nothing_and_updates_it(live
         page.keyboard.press("ArrowRight")
         assert page.locator("[data-lb-pos]").inner_text().startswith("2 of 13")
         page.keyboard.press("Escape")
-        assert page.locator(f"{ART} [data-zoom]").evaluate("e => e === document.activeElement")
+        # The ArrowRight's own draw can finish after the close and redraw the strip once
+        # more (focus goes back to the new icon in the same task). Look the icon up inside
+        # the page: Locator.evaluate finds the node and then reads it in two round trips,
+        # and a redraw between them leaves it comparing the old, detached icon.
+        assert page.evaluate(
+            "(sel) => document.querySelector(sel) === document.activeElement",
+            f"{ART} [data-zoom]",
+        )
         assert page.locator(f"{ART} .lu-it-pos").inner_text() == "2/13"
         assert page.evaluate("() => document.body.style.overflow") != "hidden"
         assert page._lu_errors == []
