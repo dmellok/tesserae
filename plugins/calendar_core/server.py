@@ -54,6 +54,7 @@ from flask import (
 from werkzeug.wrappers import Response
 
 from app.plugin_http import decode_content_encoding
+from app.tz_resolve import app_timezone
 
 _log = logging.getLogger(__name__)
 
@@ -446,11 +447,12 @@ def _expand_events_full(blob: bytes, start: datetime, end: datetime) -> list[dic
                 s_iso = sdt.isoformat()
                 e_iso = edt.isoformat() if edt else s_iso
             else:
-                # Normalise to UTC ISO so the client can localize.
+                # Normalise to UTC ISO so the client can localize. Floating
+                # times (no TZID, no Z) are local time (RFC 5545 3.3.5).
                 if sdt.tzinfo is None:
-                    sdt = sdt.replace(tzinfo=UTC)
+                    sdt = sdt.replace(tzinfo=app_timezone())
                 if edt and getattr(edt, "tzinfo", None) is None:
-                    edt = edt.replace(tzinfo=UTC)
+                    edt = edt.replace(tzinfo=app_timezone())
                 s_iso = sdt.astimezone(UTC).isoformat()
                 e_iso = edt.astimezone(UTC).isoformat() if edt else s_iso
             out.append(
@@ -750,7 +752,7 @@ def _normalise_vtodo(comp: Any) -> dict[str, Any] | None:
         if ddt is not None:
             if hasattr(ddt, "hour"):
                 if ddt.tzinfo is None:
-                    ddt = ddt.replace(tzinfo=UTC)
+                    ddt = ddt.replace(tzinfo=app_timezone())
                 due_iso = ddt.astimezone(UTC).isoformat()
             else:
                 due_iso = ddt.isoformat()

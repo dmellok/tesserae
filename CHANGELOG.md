@@ -34,6 +34,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- Calendar: events with a floating time (no `TZID` and no `Z`, e.g. `DTSTART:20261116T090000`) show at their local time. They were read as UTC, so a 9:00 event showed at 04:00 in New York. To-do due times get the same fix.
 - Blank pictures on a frame: a render whose images fail to load is retried once, and a scheduled, lineup or refresh send that still has broken images keeps the previous frame. A manual send goes out with a warning in History.
 - Device page: dashboard schedules have their own list instead of sitting in the Lineups list.
 - Lineups: a greyed row says why in a small tag (Not today, Done for today, Off, Not playing), so grey pictures aren't mistaken for black and white.
