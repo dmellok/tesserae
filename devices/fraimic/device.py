@@ -15,10 +15,16 @@ import json
 import re
 from typing import Any
 
-# Fraimic's wake-schedule limits (REST API guide, "Wake Schedule").
-INTERVALS = (60, 90, 120, 180, 240, 360, 480, 720, 1440)
-MAX_TIMES = 4
-WAKE_MODES = ("interval", "times", "manual")
+# The frame's own schedule takes an interval of 60 minutes or more, or up to
+# four times a day (REST API guide, "Wake Schedule"). Shorter intervals and
+# longer lists are done by rewriting the schedule at every wake
+# (``app.fraimic_wakes``).
+INTERVALS = (5, 10, 15, 20, 30, 60, 90, 120, 180, 240, 360, 480, 720, 1440)
+CEILINGS = (60, 120, 180, 240, 360, 480, 720, 1440)
+MAX_TIMES = 48
+WAKE_MODES = ("interval", "times", "changes", "manual")
+TAP_ACTIONS = ("none", "next")
+REDRAWS = ("off", "daily", "weekly")
 
 _TIME = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 _HOSTNAME = re.compile(
@@ -28,8 +34,8 @@ _HOSTNAME = re.compile(
 
 def parse_times(raw: Any) -> list[str] | None:
     """``"06:00, 18:00"`` -> ``["06:00", "18:00"]`` (sorted, de-duplicated);
-    None when any entry isn't a 24-hour ``HH:MM`` or there are none or
-    more than four."""
+    None when any entry isn't a 24-hour ``HH:MM``, or there are none or
+    more than ``MAX_TIMES``."""
     if not isinstance(raw, str):
         return None
     parts = [p.strip() for p in re.split(r"[,\s]+", raw) if p.strip()]
@@ -77,10 +83,19 @@ def parse_status(payload: bytes) -> dict[str, Any]:
         out["ip"] = wifi["ip"][:64]
     if isinstance(decoded.get("firmware_version"), str):
         out["fw_version"] = decoded["firmware_version"][:32]
+    if isinstance(battery.get("sleep_delta_mv"), int):
+        # Voltage change over the last deep sleep: what a wake cycle costs.
+        out["sleep_delta_mv"] = battery["sleep_delta_mv"]
     settings = decoded.get("settings") if isinstance(decoded.get("settings"), dict) else {}
     if isinstance(settings.get("keep_awake"), bool):
-        out["stays_awake"] = settings["keep_awake"]
-    for key in ("next_wake", "last_upload", "awake", "schedule"):
+        # On charge the frame doesn't sleep either, so new frames reach it
+        # at once and there is no wake to predict.
+        out["stays_awake"] = settings["keep_awake"] or battery.get("charging") is True
+    display = decoded.get("display") if isinstance(decoded.get("display"), dict) else {}
+    for key in ("last_refresh", "next_refresh"):
+        if isinstance(display.get(key), str):
+            out[f"frame_{key}"] = display[key][:40]
+    for key in ("next_wake", "last_upload", "awake", "schedule", "missed_wakes"):
         if key in decoded:
             out[key] = decoded[key]
     return out
@@ -102,8 +117,22 @@ def validate_config(payload: dict[str, Any]) -> tuple[bool, str | None]:
         except (TypeError, ValueError):
             return False, "Wake every must be a whole number of minutes"
         if minutes not in INTERVALS:
-            return False, "Wake every must be one of 60, 90, 120, 180, 240, 360, 480, 720 or 1440"
+            return False, "Wake every must be one of " + ", ".join(map(str, INTERVALS)) + " minutes"
+    ceiling = payload.get("wake_ceiling_minutes")
+    if ceiling not in (None, ""):
+        try:
+            if int(ceiling) not in CEILINGS:
+                raise ValueError
+        except (TypeError, ValueError):
+            return False, "And at least every must be one of " + ", ".join(map(str, CEILINGS))
+    anchor = payload.get("wake_anchor")
+    if anchor not in (None, "") and not (isinstance(anchor, str) and _TIME.match(anchor.strip())):
+        return False, "Counted from must be a 24-hour time such as 00:00"
     times = payload.get("wake_times")
     if (mode == "times" or times not in (None, "")) and parse_times(times) is None:
-        return False, "Wake times must be one to four 24-hour times such as 06:00, 18:00"
+        return False, "Wake times must be 24-hour times such as 06:00, 18:00"
+    if payload.get("tap_action") not in (None, "", *TAP_ACTIONS):
+        return False, "On a tap must be none or next"
+    if payload.get("redraw") not in (None, "", *REDRAWS):
+        return False, "Redraw must be off, daily or weekly"
     return True, None
