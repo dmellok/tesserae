@@ -2,8 +2,8 @@
   "tesserae_compat": "1.x",
   "name": "Fraimic Canvas",
   "icon": "frame-corners",
-  "version": "0.1.0",
-  "description": "Fraimic colour e-paper canvas (31.5\" Large Canvas or 13.3\"), driven over its local REST API with no app, cloud or firmware change. On battery the frame sleeps and can't be reached, so Tesserae sets the frame's own wake schedule and, at each wake, uploads the latest frame as the .bin the frame paints and puts it back to sleep. While it is charging or set to stay awake, new frames go straight away. Enter the frame's IP address (give it a fixed lease in your router) and tap the frame once so Tesserae can set its schedule.",
+  "version": "0.2.0",
+  "description": "Fraimic colour e-paper canvas (31.5\" Large Canvas or 13.3\"), driven over its local REST API with no app, cloud or firmware change. On battery the frame sleeps and can't be reached, so Tesserae sets the frame's wake schedule and, at each wake, uploads the latest frame as the .bin the frame paints and puts it back to sleep. Wakes can be as close as five minutes apart, at any number of set times, or aimed at the next scheduled change; they skip quiet hours, and smart sync renders just before each one. While it is charging or set to stay awake, new frames go straight away. Enter the frame's IP address (give it a fixed lease in your router) and tap the frame once so Tesserae can set its schedule.",
   "renderers": [
     "fraimic_bin"
   ],
@@ -34,24 +34,48 @@
       "choices": [
         {
           "value": "interval",
-          "label": "Every few hours"
+          "label": "On a regular interval"
         },
         {
           "value": "times",
           "label": "At set times each day"
         },
         {
+          "value": "changes",
+          "label": "When the picture is due to change"
+        },
+        {
           "value": "manual",
           "label": "Leave the frame's own schedule"
         }
       ],
-      "help": "When the frame wakes to take a new picture. Tesserae writes this to the frame the next time it is awake (tap it once after saving). Leave the frame's own schedule if you set it yourself, for example from Home Assistant; Tesserae then only uses the wakes the frame reports."
+      "help": "When the frame wakes to take a new picture. Tesserae writes this to the frame the next time it is awake (tap it once after saving). An hourly or slower interval and up to four set times use the frame's own schedule. Anything else, and any schedule that has to skip quiet hours, is kept going by Tesserae: at each wake it tells the frame when to wake next, so the server has to be running for the wakes to carry on as set. Leave the frame's own schedule if you set it yourself, for example from Home Assistant; Tesserae then only uses the wakes the frame reports."
     },
     "wake_interval_minutes": {
       "type": "select",
       "label": "Wake every",
       "default": "60",
       "choices": [
+        {
+          "value": "5",
+          "label": "Every 5 minutes"
+        },
+        {
+          "value": "10",
+          "label": "Every 10 minutes"
+        },
+        {
+          "value": "15",
+          "label": "Every 15 minutes"
+        },
+        {
+          "value": "20",
+          "label": "Every 20 minutes"
+        },
+        {
+          "value": "30",
+          "label": "Every 30 minutes"
+        },
         {
           "value": "60",
           "label": "Every hour"
@@ -89,7 +113,17 @@
           "label": "Once a day"
         }
       ],
-      "help": "Counted from midnight, so every 6 hours is midnight, 6 AM, noon and 6 PM. Every wake costs some battery: hourly drains it noticeably faster than a few wakes a day. The frame can't wake more often than hourly.",
+      "help": "Every wake costs some battery, and every new picture is a full redraw of the panel: hourly drains it noticeably faster than a few wakes a day, and wakes minutes apart are for a frame near a charger. A dashboard that declares its own wake interval overrides this, down to every 15 minutes.",
+      "show_if": {
+        "wake_mode": "interval"
+      }
+    },
+    "wake_anchor": {
+      "type": "string",
+      "label": "Counted from",
+      "default": "00:00",
+      "placeholder": "00:00",
+      "help": "The time of day the interval is counted from, in the app's timezone. Every 6 hours from 00:00 is midnight, 6 AM, noon and 6 PM; from 01:30 it is 1:30, 7:30 and so on. Use the same value as your other displays' wake alignment to have them change together.",
       "show_if": {
         "wake_mode": "interval"
       }
@@ -98,17 +132,102 @@
       "type": "string",
       "label": "Wake times",
       "default": "06:00",
-      "placeholder": "06:00, 18:00",
-      "help": "Up to four 24-hour times in the frame's local time, separated by commas.",
+      "placeholder": "06:00, 07:30, 18:00",
+      "help": "24-hour times in the app's timezone, separated by commas. As many as you like: more often in the morning, less in the afternoon, nothing overnight.",
       "show_if": {
         "wake_mode": "times"
       }
+    },
+    "wake_ceiling_minutes": {
+      "type": "select",
+      "label": "And at least every",
+      "default": "360",
+      "choices": [
+        {
+          "value": "60",
+          "label": "Every hour"
+        },
+        {
+          "value": "120",
+          "label": "Every 2 hours"
+        },
+        {
+          "value": "180",
+          "label": "Every 3 hours"
+        },
+        {
+          "value": "240",
+          "label": "Every 4 hours"
+        },
+        {
+          "value": "360",
+          "label": "Every 6 hours"
+        },
+        {
+          "value": "480",
+          "label": "Every 8 hours"
+        },
+        {
+          "value": "720",
+          "label": "Every 12 hours"
+        },
+        {
+          "value": "1440",
+          "label": "Once a day"
+        }
+      ],
+      "help": "The frame wakes when a lineup step, schedule or page refresh is due to change its picture, and otherwise this often, so a change made by hand still arrives and the battery level stays current.",
+      "show_if": {
+        "wake_mode": "changes"
+      }
+    },
+    "low_battery_stretch": {
+      "type": "boolean",
+      "label": "Wake less often on a low battery",
+      "default": true,
+      "help": "Below 20% the gaps between interval wakes double, and below 10% they are four times as long, until the frame is charged. Set times are kept as they are."
     },
     "sleep_after_upload": {
       "type": "boolean",
       "label": "Sleep straight after a new picture",
       "default": true,
-      "help": "After a scheduled wake, put the frame back to sleep once its new picture is uploaded instead of waiting out its two-minute window. It finishes drawing first. A frame you tapped awake is left alone."
+      "help": "After a scheduled wake, put the frame back to sleep once it has its picture and its next wake, instead of waiting out its two-minute window. It finishes drawing first, and is never put down in its first 40 seconds awake. A frame you tapped awake is left alone."
+    },
+    "tap_action": {
+      "type": "select",
+      "label": "On a tap",
+      "default": "none",
+      "choices": [
+        {
+          "value": "none",
+          "label": "Just take the latest picture"
+        },
+        {
+          "value": "next",
+          "label": "Show the next page"
+        }
+      ],
+      "help": "A tap wakes the frame. It can also act as a Next button: the display moves to the next page of its lineup or rotation, as Next does in Home Assistant."
+    },
+    "redraw": {
+      "type": "select",
+      "label": "Redraw a picture that hasn't changed",
+      "default": "off",
+      "choices": [
+        {
+          "value": "off",
+          "label": "Never"
+        },
+        {
+          "value": "daily",
+          "label": "After a day"
+        },
+        {
+          "value": "weekly",
+          "label": "After a week"
+        }
+      ],
+      "help": "Draw the same picture again once it has been on the glass this long, at a scheduled wake with nothing new, to clear any ghosting. The redraw takes about a minute."
     }
   }
 }
