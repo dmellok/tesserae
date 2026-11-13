@@ -185,10 +185,12 @@ def test_day_bar_is_prerendered(page: str) -> None:
     assert 'aria-label="Wed: Breakfast 06:30, Dinner (Mon–Wed) 17:00, Night 22:00"' in b
     # The live window wears the accent class; holds are rods; a push is a sliver.
     assert re.search(
-        r'class="lu-blk live" style="left:70\.8333%;width:12\.5%" data-lineup="dinner"', b
+        r'class="lu-blk live" style="left:70\.8333%;width:12\.5%;--w:12\.5" data-lineup="dinner"',
+        b,
     )
     assert b.count('class="lu-blk hold"') == 4  # night, breakfast, dinner, night
-    assert re.search(r'class="lu-blk push" [^>]*data-lineup="night"', b)
+    # A push is thin: it draws above a block that starts where it does.
+    assert re.search(r'class="lu-blk push is-thin" [^>]*data-lineup="night"', b)
     # Every non-hold block is a drag/keyboard target with resize handles.
     assert b.count('data-edit tabindex="0"') == 3
     assert b.count('<i class="lu-h" data-h="l"') == 2  # the push has no handles
@@ -451,7 +453,9 @@ def test_page_shell_and_progressive_enhancement(page: str) -> None:
     assert "lineup_fold.js" not in page
     assert "/static/style/dx-lineups.css" in page
     assert 'data-view-url="/decks/view.json"' in page and 'data-edits-url="/decks/edits"' in page
-    # The wizard and the schedule forms are still on the page.
+    # New lineup opens the lineup editor's new-lineup flow; the setup wizard
+    # and the schedule forms are still on the page.
+    assert '<a class="lu-btn-primary" href="/decks/new">' in page
     assert "data-open-timed-wizard" in page and 'id="timed-wizard"' in page
     assert 'id="schedule-form-card"' in page
 
@@ -538,7 +542,7 @@ def test_old_lineups_page_code_is_gone() -> None:
     assert not (REPO_ROOT / "static" / "lineup_fold.js").exists()
     old = (REPO_ROOT / "static" / "style" / "dx-decks.css").read_text()
     assert ".dk-row" not in old and ".dk-group" not in old
-    assert ".dxe-thumb" in old  # the lineup editor keeps its styles
+    assert ".lu.dxe" in old  # the lineup editor keeps its styles
     # Thumbnails are the one frame in the display's shape (base.css): the picture
     # covers it, so the lineups sheet sets no object-fit on a thumbnail's picture.
     assert not re.search(r"\.lu \.lu-thumb img \{[^}]*object-fit", CSS)
@@ -864,13 +868,14 @@ def test_lightbox_script_loads_before_the_page_script_and_the_tabbar_stays_below
 
 def test_draw_arrows_say_picture_not_item_and_wait_for_something_drawn(app: Flask) -> None:
     """A widget that cannot name its items but differs per render: Next draws,
-    Previous waits for a picture, and no count is ever drawn (the total is unknown)."""
+    Previous waits for a picture; it stacks like a collection with a "random" badge
+    (the total is unknown), never a ×N count."""
     vm = sample_view_model().to_dict()
     step = vm["displays"][0]["lineups"][0]["steps"][2]  # a plain one-item dashboard
     step["draw_items"] = True
     row = _row(_render(app, vm), "dinner")
     seg = row.split('data-step="2"')[1].split('data-step="3"')[0]
-    assert 'class="lu-tile has-items"' in seg and "stacked" not in seg
+    assert 'class="lu-tile stacked has-items"' in seg
     assert re.search(
         r'<span class="lu-items" role="group" aria-label="Draw another Family picture">'
         r'<button type="button" class="lu-it" data-item="dinner:2:-1" aria-label="Previous picture" '
@@ -878,7 +883,8 @@ def test_draw_arrows_say_picture_not_item_and_wait_for_something_drawn(app: Flas
         seg,
     )
     assert 'data-item="dinner:2:1" aria-label="Draw the next picture"' in seg
-    assert '<span class="lu-it-pos" aria-hidden="true"></span>' in seg and "lu-count" not in seg
+    assert '<span class="lu-it-pos" aria-hidden="true"></span>' in seg
+    assert re.search(r'<span class="lu-count is-draw"[^>]*>random</span>', seg) and "×" not in seg
     # Named items keep their wording; a step that is neither gets no arrows.
     assert "Choose which Art item to push" in row and "Previous item" in row
     assert row.count("lu-items") == 2

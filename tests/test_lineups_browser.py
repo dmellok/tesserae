@@ -1483,22 +1483,17 @@ def test_editor_shows_deleted_step_and_remove_persists(real: tuple[str, Flask]) 
         errors: list[str] = []
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.goto(base + "/decks/gone/edit", wait_until="load")
-        cards = page.locator("#dxe-rail .dxe-pcard")
-        assert cards.count() == 2
-        first = cards.nth(0)
+        rows = page.locator("[data-step]")
+        assert rows.count() == 2
+        first = rows.nth(0)
         assert "is-missing" in first.get_attribute("class")
         assert "Missing dashboard (deleted)" in first.inner_text()
-        assert "f68e0c3b23bd" in first.locator(".dxe-missing-id").inner_text()
-        assert page.locator("#dxe-pages-field").input_value() == "f68e0c3b23bd,news"
         # Unchanged, it is kept; Remove drops just that step and survives a save.
-        first.locator(".dxe-remove-missing").click()
-        assert page.locator("#dxe-rail .dxe-pcard").count() == 1
-        assert page.locator("#dxe-pages-field").input_value() == "news"
-        assert page.locator("#dxe-avail .dxe-chip", has_text="Missing").count() == 0
-        page.locator("#deck-form").evaluate("f => f.requestSubmit()")
-        # ``/decks/gone/edit`` already matches ``.*/decks.*``: wait until the save
-        # redirected away from the editor, or the store is read before the POST lands.
-        page.wait_for_url(lambda url: "/edit" not in url)
+        first.locator("[data-expand]").click()
+        page.locator("[data-panel] [data-remove]").click()
+        assert [r.get_attribute("data-step") for r in rows.all()] == ["news"]
+        with page.expect_navigation():
+            page.locator("[data-save]").click()
         assert [p_.page_id for p_ in app.config["DECK_STORE"].get("gone").pages] == ["news"]
         assert errors == []
         browser.close()
@@ -3869,10 +3864,11 @@ def test_draw_next_end_to_end_with_a_real_chromium_render(
         tile.hover()
         prev_btn = tile.locator('[data-item="drawdeck:0:-1"]')
         next_btn = tile.locator('[data-item="drawdeck:0:1"]')
-        # Draw mode: arrows exist, no count anywhere, "previous" waits for something drawn.
+        # Draw mode: arrows exist, a stack badged "random", "previous" waits for something drawn.
         assert next_btn.get_attribute("aria-label") == "Draw the next picture"
         assert prev_btn.is_disabled() and tile.locator(".lu-it-pos").inner_text() == ""
-        assert step.locator(".lu-count").count() == 0
+        assert step.locator(".lu-count").inner_text() == "random"
+        assert "stacked" in tile.get_attribute("class")
 
         def shown() -> str:
             return str(tile.locator("img").get_attribute("src"))
@@ -3977,8 +3973,9 @@ def test_draw_arrows_draw_again_go_back_without_drawing_and_show_no_count(live: 
         )
         assert prev_btn.get_attribute("aria-label") == "Previous picture" and prev_btn.is_disabled()
         assert next_btn.get_attribute("aria-label") == "Draw the next picture"
-        assert tile.locator(".lu-count, .lu-it-pos:not(:empty)").count() == 0  # no unknown total
-        assert "stacked" not in tile.get_attribute("class")
+        assert tile.locator(".lu-it-pos:not(:empty)").count() == 0  # no unknown total
+        assert tile.locator(".lu-count").inner_text() == "random"  # a collection, not a count
+        assert "stacked" in tile.get_attribute("class")
         # Next draws one: the dashboard rendered once more under a new key, not an item name.
         api.item_pending = 1
         next_btn.click()
@@ -4180,9 +4177,9 @@ def test_grey_rows_carry_a_tag_saying_why(live: str, redraw: bool) -> None:
 
 
 def test_a_displays_plus_starts_a_lineup_for_that_display(real: tuple[str, Flask]) -> None:
-    """Each display header has a "+" beside its fold chevron that opens the setup wizard
-    (the page's one creation path) with that display chosen, and the lineup it creates
-    lands on that display. The "+" survives the page's redraws."""
+    """Each display header has a "+" beside its fold chevron that opens the new-lineup
+    flow with that display chosen, and the lineup it creates lands on that display.
+    The "+" survives the page's redraws."""
     from playwright.sync_api import sync_playwright
 
     from app.state.deck_model import Deck, DeckPage
@@ -4233,28 +4230,17 @@ def test_a_displays_plus_starts_a_lineup_for_that_display(real: tuple[str, Flask
             page.evaluate("() => window.TesseraeLineups.refresh()")
         check_buttons()
 
-        # The button never folds its display.
-        page.locator('.lu-ds-add[data-wizard-display="hall"]').click()
-        wiz = page.locator("#timed-wizard")
-        assert wiz.evaluate("e => e.open")
-        assert (
-            page.locator(".lu-ds-hdr [data-collapse]").first.get_attribute("aria-expanded")
-            == "true"
-        )
-        assert wiz.locator("[data-wizard-device]").input_value() == "hall"
-        assert "New lineup for" in wiz.locator("#timed-wizard-title").inner_text()
-        # A single-dashboard mode would otherwise follow the dashboard's own display.
-        wiz.locator('[data-wizard-mode="interval"]').click()
-        wiz.locator("[data-wizard-forward]").click()
-        wiz.locator("[data-wizard-dash]").select_option("news")  # bound to "panel"
-        assert wiz.locator("[data-wizard-device]").input_value() == "hall"
-        wiz.locator("[data-wizard-dash]").select_option("free")
-        assert wiz.locator("[data-wizard-device]").input_value() == "hall"
-        wiz.locator("[data-wizard-forward]").click()
-        wiz.locator("[data-wizard-forward]").click()  # create
-        page.wait_for_function(
-            "() => document.querySelector('#timed-wizard [data-wizard-view=created]:not([hidden])')"
-        )
+        # The button opens the new-lineup flow on that display.
+        with page.expect_navigation():
+            page.locator('.lu-ds[data-display="hall"] .lu-ds-add').click()
+        assert page.url.endswith("/decks/new?display=hall")
+        # Its display is chosen: When is open. (10:00 keeps clear of Hall loop,
+        # 06:00-09:00: a new lineup that meets it is refused.)
+        page.locator('[data-time="start"]').fill("10:00")
+        page.locator("[data-goto='3']").click()
+        page.locator('[data-add="free"]').click()
+        with page.expect_navigation():
+            page.locator("[data-create]").click()
         made = [d for d in app.config["DECK_STORE"].all() if d.id not in before]
         assert len(made) == 1 and made[0].device_ids == ["hall"], made
         assert errors == []
@@ -5051,4 +5037,28 @@ def test_real_routes_an_end_on_a_push_of_four_dashboards_makes_a_rotation(
         assert deck.advance_trigger == "daily" and deck.advance_fires_at == "06:00"
         assert deck.page_ids == list(pages)
         assert errors == []
+        browser.close()
+
+
+def test_pills_are_never_covered_by_a_stack(live: str) -> None:
+    from playwright.sync_api import sync_playwright
+
+    check = """() => {
+        const bad = [];
+        for (const pill of document.querySelectorAll(".lu-step .lu-pill")) {
+          pill.scrollIntoView({ block: "center", inline: "center" });
+          const r = pill.getBoundingClientRect();
+          for (const [x, y] of [[r.left + 1, r.top + 1], [r.right - 1, r.top + 1],
+                                [r.left + 1, r.bottom - 1], [r.right - 1, r.bottom - 1]]) {
+            const hit = document.elementFromPoint(x, y);
+            if (!hit || !(hit === pill || pill.contains(hit))) bad.push(String(hit && hit.className));
+          }
+        }
+        return bad;
+    }"""
+    with sync_playwright() as p:
+        browser, page, _api = _open(p, live, pics=True)
+        assert page.locator(".lu-step .lu-pill").count() > 0
+        assert page.locator(".lu-tile.stacked").count() > 0
+        assert page.evaluate(check) == []
         browser.close()

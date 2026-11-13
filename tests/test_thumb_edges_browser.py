@@ -116,7 +116,7 @@ SURFACES: dict[str, dict[str, Any]] = {
     },
     "lineup-editor-cards": {
         "path": "/decks/night/edit",
-        "frame": ".dxe-thumb",
+        "frame": ".lu.dxe .lu-thumb",
     },
     "history": {
         "path": "/history",

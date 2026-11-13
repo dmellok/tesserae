@@ -38,6 +38,8 @@ main.page.lu-page {
   --lu-r-pill: 10px;
   --lu-r-xs: 4px;
   --lu-wb-gap: 6px; /* between the thumbs in an open timeline block */
+  --lu-blk-min: 4px; /* the narrowest a day bar block draws */
+  --lu-blk-pad: 7px; /* a day bar block's label inset */
   --lu-live-wash: color-mix(in oklab, var(--lu-acc) 6%, var(--t-surface));
   --lu-sched-bg: var(--t-surface-sunk);
   --lu-blk-bg: color-mix(in oklab, var(--t-border-strong) 60%, var(--t-border));
@@ -49,6 +51,12 @@ main.page.lu-page {
   --lu-warn-text: color-mix(in oklab, var(--t-warn) 80%, var(--t-fg));
   --lu-shadow-pop: var(--t-shadow-md);
   --lu-paper: var(--thumb-paper); /* an e-paper sheet behind a thumbnail */
+  /* The cards behind a multi-item tile, and its ×N badge. */
+  --lu-stack-far: color-mix(in oklab, var(--lu-paper) 78%, var(--t-fg));
+  --lu-stack-near: color-mix(in oklab, var(--lu-paper) 90%, var(--t-fg));
+  --lu-stack-edge: color-mix(in oklab, var(--t-fg) 42%, transparent);
+  --lu-count-bg: var(--t-fg);
+  --lu-count-fg: var(--t-bg);
   font-size: 14px;
   line-height: 1.45;
   color: var(--t-fg);
@@ -60,6 +68,13 @@ main.page.lu-page {
   --lu-blk-bg: color-mix(in oklab, var(--t-fg) 6%, var(--t-border-strong));
   --lu-on-warn: var(--t-bg);
   --lu-pz-edge: color-mix(in oklab, var(--t-warn) 25%, var(--t-bg));
+  /* Dark: filled cards a step lighter than the page, each nearer one lighter
+     again, with a soft edge. */
+  --lu-stack-far: color-mix(in oklab, var(--t-surface-soft) 55%, var(--t-border-strong));
+  --lu-stack-near: color-mix(in oklab, var(--t-surface-soft) 20%, var(--t-border-strong));
+  --lu-stack-edge: color-mix(in oklab, var(--t-fg) 22%, transparent);
+  --lu-count-bg: color-mix(in oklab, var(--t-fg) 18%, var(--t-surface));
+  --lu-count-fg: var(--t-fg);
 }
 :root[data-ui="paper"] .lu {
   --lu-r: 2px;
@@ -216,6 +231,7 @@ main.page.lu-page {
   text-decoration: underline;
 }
 .lu .lu-btn-primary {
+  text-decoration: none;
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -350,6 +366,12 @@ main.page.lu-page {
   color: var(--lu-acc-text);
   background: color-mix(in oklab, var(--t-fg) 6%, transparent);
 }
+/* A ghost button with an outline: a second action beside a primary one. */
+.lu .lu-btn-ghost.lu-btn-line {
+  border: 1px solid var(--t-border-strong);
+  color: var(--t-fg);
+  text-decoration: none;
+}
 .lu .lu-tb-count {
   margin-left: auto;
   font: 12px var(--t-font-mono);
@@ -432,6 +454,7 @@ main.page.lu-page {
   width: var(--lu-fold-w);
   height: var(--lu-fold-w);
   color: var(--t-muted);
+  text-decoration: none;
 }
 .lu .lu-ds-hdr .lu-now-thumb {
   grid-area: thumb;
@@ -903,7 +926,10 @@ main.page.lu-page {
   bottom: 2px;
   display: flex;
   align-items: center;
-  padding: 0 7px;
+  /* No padding: a block is exactly its slot, however short (the label keeps
+     its own margin). A padded block grew past a short slot and slid under
+     the next one. */
+  padding: 0;
   overflow: hidden;
   border-radius: 6px;
   font: 600 11px/1 var(--t-font);
@@ -912,10 +938,15 @@ main.page.lu-page {
   background: var(--lu-blk-bg);
   color: var(--lu-blk-fg);
   box-shadow: inset 0 0 0 1px var(--lu-blk-edge);
-  /* A hairline of track between neighbouring blocks, so they never touch:
-     half a pixel of transparent border each side, with the fill kept inside. */
-  border-inline: 0.5px solid transparent;
+  /* One pixel of track after every block, at any width and pixel density:
+     a transparent end edge with the fill kept inside it. */
+  border-inline-end: 1px solid transparent;
   background-clip: padding-box;
+  /* A short slot still reads as a sliver: it grows to the minimum to the
+     left (--w is its width in % of the day), so its end, and the gap to
+     the next block, stay where they are. */
+  min-width: var(--lu-blk-min);
+  margin-left: min(0px, calc(var(--w, 100) * 1% - var(--lu-blk-min)));
   transition:
     filter 150ms ease-out,
     box-shadow 150ms ease-out;
@@ -942,8 +973,15 @@ main.page.lu-page {
   background: color-mix(in oklab, var(--lu-acc) 30%, transparent);
 }
 .lu .lu-blk.push {
-  min-width: 5px;
-  padding: 0;
+  min-width: max(5px, var(--lu-blk-min));
+}
+/* A short block or a push rides above its neighbours, never under them; one
+   that starts where another ends grows right, off that block's end. */
+.lu .lu-blk.is-thin {
+  z-index: 3;
+}
+.lu .lu-blk.grow-r {
+  margin-left: 0;
 }
 .lu .lu-blk:not(.hold):hover,
 .lu .lu-blk.is-linked {
@@ -968,7 +1006,8 @@ main.page.lu-page {
   pointer-events: none;
   display: block;
   min-width: 0;
-  max-width: 100%;
+  max-width: calc(100% - 2 * var(--lu-blk-pad));
+  margin-inline: var(--lu-blk-pad);
   overflow: hidden;
   text-overflow: ellipsis;
   font: 600 12px/1.2 var(--t-font);
@@ -2415,6 +2454,9 @@ main.page.lu-page {
   align-items: flex-start;
 }
 .lu .lu-slot {
+  /* NOW / NEXT sit above the stack cards and the selection outline, never under them. */
+  position: relative;
+  z-index: 3;
   height: 20px;
   display: flex;
   align-items: center;
@@ -2527,7 +2569,7 @@ main.page.lu-page {
   inset: 0;
   border-radius: var(--lu-r-xs);
   border: 1px solid var(--t-border-strong);
-  background: color-mix(in oklab, var(--lu-paper) 80%, var(--t-surface));
+  background: var(--lu-stack-near);
 }
 .lu .lu-tile.stacked::before {
   transform: translate(8px, -8px);
@@ -2536,6 +2578,13 @@ main.page.lu-page {
 .lu .lu-tile.stacked::after {
   transform: translate(4px, -4px);
   opacity: 0.8;
+}
+:root[data-theme="dark"] .lu .lu-tile.stacked::before,
+:root[data-theme="dark"] .lu .lu-tile.stacked::after {
+  opacity: 1;
+}
+:root[data-theme="dark"] .lu .lu-tile.stacked::before {
+  background: var(--lu-stack-far);
 }
 .lu .lu-tile.stacked .lu-thumb {
   z-index: 1;
@@ -2549,8 +2598,9 @@ main.page.lu-page {
   min-width: 28px;
   padding: 0 6px;
   border-radius: var(--lu-r-pill);
-  background: var(--t-fg);
-  color: var(--t-bg);
+  background: var(--lu-count-bg);
+  color: var(--lu-count-fg);
+  box-shadow: inset 0 0 0 1px var(--lu-stack-edge);
   font: 700 11px/20px var(--t-font-mono);
   text-align: center;
   cursor: pointer;
@@ -2559,6 +2609,10 @@ main.page.lu-page {
 .lu .lu-count[aria-expanded="true"] {
   background: var(--lu-acc);
   color: var(--lu-acc-fg);
+}
+
+.lu .lu-count.is-draw {
+  cursor: default;
 }
 
 /* Hover / focus: push this dashboard now. */
@@ -3392,6 +3446,7 @@ main.page.lu-page {
   }
   /* ×N: a 44px target in the tile's top-right corner, the badge inside it. */
   .lu .lu-count {
+    box-shadow: none;
     right: -8px;
     bottom: auto;
     top: -10px;
@@ -3403,8 +3458,9 @@ main.page.lu-page {
     display: flex;
     align-items: flex-start;
     justify-content: flex-end;
-    background: linear-gradient(var(--t-fg), var(--t-fg)) no-repeat right top / 32px 20px;
-    color: var(--t-bg);
+    background: linear-gradient(var(--lu-count-bg), var(--lu-count-bg)) no-repeat right top / 32px
+      20px;
+    color: var(--lu-count-fg);
     line-height: 20px;
   }
   :root:not([data-ui="paper"]) .lu .lu-count {
@@ -3619,7 +3675,7 @@ main.page.lu-page {
 }
 
 .lu .lu-today .lu-blk {
-  padding-inline: 4px;
+  --lu-blk-pad: 4px;
 }
 .lu .lu-today .lu-blk-l {
   font-size: 11px;

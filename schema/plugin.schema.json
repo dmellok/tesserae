@@ -237,7 +237,14 @@
       "additionalProperties": false,
       "properties": {
         "pin_option": { "type": "string", "minLength": 1 },
-        "draw": { "type": "boolean" }
+        "draw": { "type": "boolean" },
+        "noun": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32,
+          "pattern": "^[A-Za-z][A-Za-z '-]*$",
+          "description": "What the lineup editor calls the items, plural (\"papers\": \"6 papers\" instead of \"6 items\")."
+        }
       }
     },
     "updates": {

@@ -1164,9 +1164,6 @@
 :root[data-ui="paper"] .multiselect-opt.is-dragging {
   box-shadow: inset 0 0 0 1px var(--t-accent);
 }
-:root[data-ui="paper"] .dxe-pcard.is-selected::after {
-  border-width: 1px;
-}
 :root[data-ui="paper"] .dx-thumb {
   --thumb-edge-w: 1px;
 }

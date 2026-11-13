@@ -17,7 +17,7 @@ import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta, tzinfo
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any, cast
 
 from flask import (
     Blueprint,
@@ -62,18 +62,20 @@ from app.lineups_view import (
     UpcomingInput,
     build_view,
     clash_keys,
-    clock_range,
     parse_hhmm,
+    pause_note,
     resolve_day,
     using_time_cycle,
     window_label,
-    window_overlaps_pause,
 )
 from app.next_update import DeviceTiming, reach_for_device, tracks_held_frame
 from app.state.deck_model import Deck, DeckPage
 from app.state.deck_store import DeckStore
 from app.state.page_store import PageStore
+from app.step_items import step_draw_count as _step_draw_count
 from app.step_items import step_draws as _step_draws
+from app.step_items import step_empty as _step_empty
+from app.step_items import step_fit as _step_fit
 from app.step_items import step_items as _step_items
 
 bp = Blueprint("decks", __name__, url_prefix="/decks")
@@ -1528,6 +1530,7 @@ def _build_lineups_view(
         count, items = _step_items(page) if page is not None else (1, ())
         w, h = shapes.get(pid, (0, 0))
         bound_ids = tuple(page.device_ids) if page is not None else ()
+        draws = _step_draws(page) if page is not None else False
         dashboards[pid] = DashboardInfo(
             id=pid,
             name=page.name if page is not None else pid,
@@ -1540,7 +1543,10 @@ def _build_lineups_view(
             height=h,
             item_count=count,
             items=items,
-            draw=_step_draws(page) if page is not None else False,
+            draw=draws,
+            draw_count=_step_draw_count(page) if draws and page is not None else 0,
+            item_fit=_step_fit(page) if page is not None else False,
+            empty_list=_step_empty(page) if page is not None else False,
         )
 
     by_display: dict[str, list[LineupInput]] = {d.id: [] for d in devices}
@@ -2003,15 +2009,15 @@ def _edited_deck(
         elif kind == "cycle":
             s = _clean_time(start if start is not _UNSET else deck.advance_anchor, "Start", deck.id)
             raw_end = end if end is not _UNSET else deck.advance_end_at
-            e = None if raw_end in (None, "") else _clean_time(raw_end, "End", deck.id)
+            cycle_end = None if raw_end in (None, "") else _clean_time(raw_end, "End", deck.id)
             s_min = parse_hhmm(s) or 0
-            e_min = 1440 if e is None else (parse_hhmm(e) or 0)
+            e_min = 1440 if cycle_end is None else (parse_hhmm(cycle_end) or 0)
             if s == "24:00":
                 raise _EditError("Start must be before 24:00.", 400, deck.id)
             if e_min <= s_min:
                 raise _EditError("End must be after start.", 400, deck.id)
             changes["advance_anchor"] = s
-            changes["advance_end_at"] = None if e in (None, "24:00") else e
+            changes["advance_end_at"] = None if cycle_end in (None, "24:00") else cycle_end
         else:  # interval: a window that may wrap past midnight
             raw_start = start if start is not _UNSET else deck.advance_window_start
             raw_end = end if end is not _UNSET else deck.advance_window_end
@@ -2085,13 +2091,38 @@ def _check_batch(
             continue
         a, b, day = mine[0]
         clash = Clash(final[b if a == deck_id else a], day)
-        added = set(after[deck_id].advance_days_of_week) - set(before[deck_id].advance_days_of_week)
+        prior = before.get(deck_id)  # None for a lineup being created
+        added = set(after[deck_id].advance_days_of_week) - (
+            set(prior.advance_days_of_week) if prior is not None else set(range(7))
+        )
         msg = clash.message_for_day() if day in added else clash.message_for_window()
         raise _EditError(msg, 409, deck_id)
 
 
-def _pause_warnings(deck: Deck, page_devices: dict[str, list[str]]) -> list[str]:
-    """One warning per display whose quiet hours a lineup's run falls in."""
+def _timing_key(deck: Deck, page_devices: dict[str, list[str]]) -> tuple[Any, ...]:
+    """What decides when and where a lineup runs: its trigger and times, its
+    days and its displays."""
+    return (
+        deck.advance,
+        deck.advance_trigger,
+        deck.advance_fires_at,
+        deck.advance_anchor,
+        deck.advance_end_at,
+        deck.advance_window_start,
+        deck.advance_window_end,
+        tuple(sorted(deck.advance_days_of_week)),
+        tuple(sorted(_deck_displays(deck, page_devices))),
+    )
+
+
+def _pause_warnings(
+    deck: Deck, page_devices: dict[str, list[str]], before: Deck | None = None
+) -> list[str]:
+    """One line per display whose quiet hours cut into a lineup's run. With
+    ``before`` (the saved lineup), only when this save changed its times, days
+    or display, so an unrelated save stays quiet."""
+    if before is not None and _timing_key(before, page_devices) == _timing_key(deck, page_devices):
+        return []
     targets = set(_deck_displays(deck, page_devices))
     candidate = _lineup_input(deck, with_urls=False)
     warnings: list[str] = []
@@ -2099,13 +2130,9 @@ def _pause_warnings(deck: Deck, page_devices: dict[str, list[str]]) -> list[str]
     for device in devices_reg.all() if devices_reg is not None else []:
         if device.id not in targets:
             continue
-        pause = _pause_input(device)
-        if pause is not None and window_overlaps_pause(pause, candidate):
-            label = clock_range(pause.start_min, pause.end_min)
-            warnings.append(
-                f"Part of {deck.name} ({window_label(candidate)}) falls in "
-                f"{device.display_name}'s Quiet hours ({label}); nothing is pushed then."
-            )
+        note = pause_note(_pause_input(device), candidate, f"{device.display_name}'s quiet hours")
+        if note:
+            warnings.append(note)
     return warnings
 
 
@@ -2166,6 +2193,9 @@ def _check_weekday(value: Any, what: str, deck_id: str | None) -> int:
 
 #: The longest lineup name the inline rename takes.
 _NAME_MAX = 80
+
+#: The weekday digits a form may post (``str.isdigit`` would pass "²").
+_WEEKDAY_DIGITS = frozenset("0123456")
 
 _EDIT_FIELDS = frozenset({"id", "start", "end", "days", "toggle_day", "on", "push"})
 
@@ -2272,7 +2302,7 @@ def _apply_edits(edits: list[Any], day: Any, *, require_on: bool = False) -> Res
         with using_time_cycle(cycle):
             _check_batch(decks, after, order, page_devices)
             for deck_id in order:
-                warnings.extend(_pause_warnings(after[deck_id], page_devices))
+                warnings.extend(_pause_warnings(after[deck_id], page_devices, decks[deck_id]))
         changed = [after[i] for i in order if after[i] != decks[i]]
         return changed, (changed, [after[i] for i in order], warnings)
 
@@ -2555,7 +2585,7 @@ def step_item(deck_id: str) -> Response:
         return fail("This lineup doesn't play on that display.", 400)
     from app.step_items import find_item
 
-    item = find_item(page, request.args.get("item") or "")
+    item = find_item(page, request.args.get("item") or "", display_id)
     if item is None:
         return fail("That item isn't in this dashboard.", 404)
     render = _item_render(page, display_id, item)
@@ -2676,7 +2706,9 @@ def push_step(deck_id: str) -> Response:
     if item_key:
         from app.step_items import find_item
 
-        chosen = find_item(page, item_key) if page is not None else None
+        chosen = (
+            find_item(page, item_key, targets[0] if targets else None) if page is not None else None
+        )
         if page is None or chosen is None:
             return fail(_EditError("That item isn't in this dashboard any more.", 409, deck_id))
         for did in targets:
@@ -2900,6 +2932,12 @@ def create_lineup() -> Response:
         interval = int(form.get("interval_minutes") or 30)
     except (TypeError, ValueError):
         interval = 30
+    # The new-lineup page says when it runs as the editor does (``when``:
+    # "at" / "between", ``start``, ``end``, ``days``) and leaves the shape to
+    # the dashboards: one send, or a window taken in turn or repeated.
+    when = (form.get("when") or "").strip()
+    if when:
+        intent = "cycle"
     try:
         deck = build_lineup(
             intent=intent,
@@ -2912,6 +2950,20 @@ def create_lineup() -> Response:
             fires_at=(form.get("fires_at") or "").strip() or None,
             anchor=(form.get("anchor") or "00:00").strip() or "00:00",
         )
+        if when:
+            start = (form.get("start") or "").strip()
+            deck = _apply_when(deck, "at", start, "", None)
+            if when == "between":
+                deck = _apply_when(deck, when, start, (form.get("end") or "").strip(), None)
+            elif when != "at":
+                raise ValueError("when must be 'at' or 'between'")
+            days = sorted({int(d) for d in form.getlist("days") if d in _WEEKDAY_DIGITS})
+            if "days" in form and not days:
+                raise ValueError("pick at least one day")
+            if days:
+                deck = _merged_deck(deck, advance_days_of_week=days)
+    except _EditError as exc:
+        return _json_error(str(exc))
     except (ValidationError, ValueError) as exc:
         msg = _first_error(exc) if isinstance(exc, ValidationError) else str(exc)
         return _json_error(f"Invalid lineup: {msg}")
@@ -2919,9 +2971,28 @@ def create_lineup() -> Response:
     stranded = guard_change(deck.device_ids, deck.page_ids, consent)
     if stranded:
         return refusal(deck.device_ids, stranded)
+    page_devices = {p.id: list(p.device_ids) for p in _pages().list()}
+    cycle = _time_cycle()
+
+    def plan(decks: dict[str, Deck]) -> tuple[list[Deck], list[str]]:
+        # The new-lineup page has the editor's rule: a window that meets
+        # another lineup on the display is refused. Quiet hours warn.
+        if deck.id in decks:
+            raise _EditError("A lineup with that id was just made; try again.", 409, deck.id)
+        with using_time_cycle(cycle):
+            if when:
+                _check_batch(decks, {**decks, deck.id: deck}, [deck.id], page_devices)
+            found = _pause_warnings(deck, page_devices) if deck.advance != "manual" else []
+        return [deck], found
+
+    try:
+        warnings = _store().transaction(plan)
+    except _EditError as exc:
+        return _edit_error_json(exc)
     apply_consent(deck.device_ids, deck.page_ids, consent)
-    _store().upsert(deck)
     _invalidate(deck)
+    for warning in warnings:
+        flash(warning, "warn")
     # A dashboard picked here that isn't on any display yet binds to this
     # Lineup's display, so a freshly-created Lineup can actually render every
     # step. Same rule the deck editor's save has always applied.
@@ -2937,6 +3008,7 @@ def create_lineup() -> Response:
             "id": deck.id,
             "url": url_for("decks.index", hl=deck.id) + f"#udeck-{deck.id}",
             "editor_url": url_for("decks.editor", deck_id=deck.id),
+            "warnings": warnings,
         }
     )
 
@@ -2952,6 +3024,15 @@ def _merged_deck(existing: Deck, **changes: Any) -> Deck:
     data = existing.model_dump()
     data.update(changes)
     return Deck.model_validate(data)
+
+
+def _deck_revision(deck: Deck) -> str:
+    """Opaque revision of a stored lineup, so the editor can tell a save
+    from a stale tab (another tab, the Lineups page) apart."""
+    import hashlib
+
+    encoded = json.dumps(deck.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode()).hexdigest()[:20]
 
 
 def _apply_page_refresh(page: DeckPage, raw: str | None) -> DeckPage:
@@ -3088,152 +3169,313 @@ def edit_graph(deck_id: str) -> Response:
 @bp.get("/new")
 @bp.get("/<deck_id>/edit")
 def editor(deck_id: str | None = None) -> str | Response:
-    """The deck editor ("dense rail + inspector" redesign): pick pages
-    and their flip order; navigation derives automatically. GET /new
-    renders a blank deck; GET /<id>/edit loads an existing one."""
+    """The lineup editor. GET /<id>/edit edits a lineup: when it runs, its
+    dashboards in order, its pace. GET /new is the new-lineup flow (display,
+    when, dashboards), which creates through ``create_lineup``; ``?display=``
+    starts it on a display."""
     deck = None
     if deck_id is not None:
         deck = _store().get(deck_id)
         if deck is None:
             flash(f"No deck with id {deck_id!r}.", "error")
             return redirect(url_for("decks.index"))
+    return render_template("deck_editor.html", deck=deck, editor_state=_editor_state(deck))
 
-    # The page library offers working dashboards only. Members are kept
-    # regardless so an existing lineup always renders its own pages.
-    current_members = set(deck.page_ids) if deck is not None else set()
-    pages = [p for p in _pages().list() if not p.archived or p.id in current_members]
+
+def _when_of(deck: Deck | None) -> dict[str, Any]:
+    """The editor's time control for ``deck``: ``mode`` "at" (one send),
+    "between" (a window) or "manual" (no time), with HH:MM ``start``/``end``
+    (``end`` "24:00" for until midnight) and the weekdays."""
+    if deck is None:
+        return {"mode": "at", "start": "07:00", "end": "", "days": list(range(7)), "kind": "new"}
+    kind = _lineup_kind(deck)
+    days = sorted(deck.advance_days_of_week)
+    if kind == "manual":
+        return {"mode": "manual", "start": "", "end": "", "days": days, "kind": kind}
+    if kind == "daily":
+        start = deck.advance_fires_at or "07:00"
+        return {"mode": "at", "start": start, "end": "", "days": days, "kind": kind}
+    if kind == "cycle":
+        start, end = deck.advance_anchor, deck.advance_end_at or "24:00"
+    else:
+        start = deck.advance_window_start or "00:00"
+        end = deck.advance_window_end or "24:00"
+    return {"mode": "between", "start": start, "end": end, "days": days, "kind": kind}
+
+
+def _recent_sent(page_id: str, limit: int = 8) -> list[dict[str, Any]]:
+    """The pictures this dashboard last sent, newest first (``[{thumb, at}]``):
+    a draw widget's recent photos, from the push log. Only frames still on disk."""
+    from app.lineup_thumbs import sent_thumb_url
+
+    events = current_app.config.get("EVENT_LOG")
+    if events is None:
+        return []
+    try:
+        rows = events.list(type="push", target=page_id, statuses=("sent", "ok"), limit=40)
+    except Exception:
+        return []
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for row in rows:
+        digest = row.extra.get("composition_digest") or row.digest
+        if not isinstance(digest, str) or digest in seen:
+            continue
+        thumb = sent_thumb_url(digest)
+        if not thumb:
+            continue
+        seen.add(digest)
+        out.append({"thumb": thumb, "at": float(row.timestamp)})
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _editor_page(
+    page: Any, dims: tuple[int, int], token: str, device_id: str | None = None
+) -> dict[str, Any]:
+    from app.lineup_editor import dashboard_summary
+
+    try:
+        summary = dashboard_summary(page, device_id)
+    except Exception:
+        current_app.logger.exception("lineup editor: summary of %s failed", page.id)
+        summary = {"subtitle": "", "items": {"mode": "none", "count": 1}, "fresh": ""}
+    return {
+        "id": page.id,
+        "name": page.name,
+        "w": dims[0],
+        "h": dims[1],
+        "thumb": url_for("composer.compose_preview", page_id=page.id) + f"?v={token}&refresh=300",
+        "devices": list(page.device_ids),
+        "subtitle": summary.get("subtitle", ""),
+        "icon": summary.get("icon", ""),
+        "items": summary.get("items", {}),
+        "recent": (
+            _recent_sent(page.id)
+            if (summary.get("items") or {}).get("mode") == "draw"
+            or (summary.get("items") or {}).get("empty")
+            else []
+        ),
+        "fresh": summary.get("fresh", ""),
+        "refresh": int(page.refresh_minutes or 0),
+        "missing": False,
+    }
+
+
+def _editor_state(deck: Deck | None) -> dict[str, Any]:
+    """Everything the editor draws, as one JSON island."""
     from app.composer import page_preview_token, preview_dims
+    from app.lineup_editor import display_caps, display_model
 
+    members = set(deck.page_ids) if deck is not None else set()
+    pages = [p for p in _pages().list() if not p.archived or p.id in members]
     devices_reg = current_app.config.get("DEVICE_REGISTRY")
     settings = current_app.config.get("SETTINGS_STORE")
-    page_meta = []
+    all_decks = _store().all()
+    # How many other lineups show each dashboard: a pin or Updates changes
+    # it for them too.
+    shared: dict[str, int] = {}
+    for other in all_decks:
+        if deck is not None and other.id == deck.id:
+            continue
+        for pid in set(other.page_ids):
+            shared[pid] = shared.get(pid, 0) + 1
+    page_meta: dict[str, dict[str, Any]] = {}
     for p in pages:
         try:
             dims = preview_dims(p, devices_reg, settings)
             token = page_preview_token(p, dims)
         except Exception:
-            dims = (0, 0)
-            token = ""
-        page_meta.append(
+            dims, token = (0, 0), ""
+        page_meta[p.id] = {
+            **_editor_page(
+                p, dims, token, deck.device_ids[0] if deck and deck.device_ids else None
+            ),
+            "shared": shared.get(p.id, 0),
+        }
+    # A step whose dashboard was deleted still belongs to the lineup: list it,
+    # flagged, so it can be seen and removed rather than kept on every save.
+    for dp in deck.pages if deck is not None else []:
+        if dp.page_id not in page_meta:
+            page_meta[dp.page_id] = {
+                "id": dp.page_id,
+                "name": "Missing dashboard (deleted)",
+                "w": 0,
+                "h": 0,
+                "thumb": "",
+                "devices": [],
+                "subtitle": "Deleted. Remove it from the lineup.",
+                "items": {"mode": "none", "count": 1},
+                "fresh": "",
+                "refresh": 0,
+                "missing": True,
+                "shared": 0,
+            }
+
+    try:
+        vm: dict[str, Any] | None = build_lineups_view().to_dict()
+    except Exception:
+        current_app.logger.exception("lineup editor: the lineups view failed to build")
+        vm = None
+    views = {d["id"]: d for d in (vm or {}).get("displays", [])}
+    lineup = None
+    if deck is not None:
+        for d in views.values():
+            lineup = next((x for x in d["lineups"] if x["id"] == deck.id), None)
+            if lineup is not None:
+                break
+        if lineup is None:
+            lineup = next((x for x in (vm or {}).get("unassigned", []) if x["id"] == deck.id), None)
+
+    devices: list[dict[str, Any]] = []
+    counts: dict[str, int] = {}
+    for other in all_decks:
+        for did in other.device_ids:
+            counts[did] = counts.get(did, 0) + 1
+    for d in devices_reg.all() if devices_reg is not None else []:
+        if d.kind_of is None:
+            continue
+        view = views.get(d.id)
+        dw, dh, _spec = _device_size(d)
+        shown = (view or {}).get("on_screen") or (view or {}).get("frame") or {}
+        devices.append(
             {
-                "w": dims[0],
-                "h": dims[1],
-                "id": p.id,
-                "name": p.name,
-                "thumb": url_for("composer.compose_preview", page_id=p.id)
-                + f"?v={token}&refresh=300",
-                # Device bindings, so the editor can filter the page library to the
-                # dashboards assigned to the chosen display. Empty = unassigned.
-                "devices": list(p.device_ids),
-                "kind": p.layout_kind,
+                "id": d.id,
+                "name": d.display_name,
+                "model": display_model(d, view),
+                "w": dw,
+                "h": dh,
+                "caps": display_caps(d),
+                "thumb": shown.get("thumb_url") or "",
+                "lineups": counts.get(d.id, 0),
+                "view": view is not None,
             }
         )
-
-    # Steps whose dashboard was deleted still belong to the lineup. List them,
-    # flagged, in their own position so they can be seen and removed; hiding
-    # them would silently keep the step on every save.
-    library = {p.id for p in pages}
-    for dp in deck.pages if deck is not None else []:
-        if dp.page_id not in library and not any(m["id"] == dp.page_id for m in page_meta):
-            page_meta.append(
+    # A binding to a display that has since been deleted keeps an entry, or a
+    # plain save would silently unbind the lineup.
+    known = {d["id"] for d in devices}
+    for did in deck.device_ids if deck is not None else []:
+        if did not in known:
+            devices.append(
                 {
+                    "id": did,
+                    "name": f"{did} (unavailable)",
+                    "model": "",
                     "w": 0,
                     "h": 0,
-                    "id": dp.page_id,
-                    "name": "Missing dashboard (deleted)",
+                    "caps": {"inputs": False, "sleeps": False, "buttons": False, "touch": False},
                     "thumb": "",
-                    "devices": [],
-                    "kind": "",
-                    "missing": True,
+                    "lineups": counts.get(did, 0),
+                    "view": False,
                 }
             )
 
-    device_meta = []
-    touch_bound = False
-    if devices_reg is not None:
-        for d in devices_reg.all():
-            if d.kind_of is None:
-                continue
-            dw, dh, _spec = _device_size(d)
-            device_meta.append({"id": d.id, "name": d.display_name, "w": dw, "h": dh})
-            if deck is not None and d.id in deck.device_ids and d.manifest.get("touch") is True:
-                touch_bound = True
-    # A binding to a display that has since been deleted still needs an
-    # option, or the select falls back to "Choose a display" and a plain
-    # save would silently unbind the deck. It stays selected (and labelled)
-    # until the user picks a live display.
-    if deck is not None:
-        known = {d["id"] for d in device_meta}
-        device_meta.extend(
-            {"id": did, "name": f"{did} (unavailable)"}
-            for did in deck.device_ids
-            if did not in known
-        )
-
-    from app.deck_suggest import suggest_decks
-
-    suggestions = []
-    for sd in suggest_decks(pages, [d for d in _store().all() if deck is None or d.id != deck.id]):
-        suggestions.append({"name": sd.name, "page_ids": [pg.page_id for pg in sd.pages]})
-
-    # "New timer cycle" entry point preselects timer advance (#167).
-    advance_default = "timer" if request.args.get("mode") == "timer" else "manual"
-    member_ids = [p.page_id for p in deck.pages] if deck else []
-    override_map = (
+    wanted = request.args.get("display") or ""
+    display = (
+        deck.device_ids[0]
+        if deck is not None and deck.device_ids
+        else (wanted if deck is None and wanted in known else "")
+    )
+    steps = [
         {
-            p.page_id: p.refresh_interval_minutes
-            for p in deck.pages
-            if p.refresh_interval_minutes is not None
+            "id": p.page_id,
+            "dwell": p.dwell_minutes,
+            "override": p.refresh_interval_minutes,
+            "conditions": [c.model_dump(mode="json", exclude_none=True) for c in p.conditions],
         }
-        if deck
-        else {}
-    )
-    dwell_map = (
-        {p.page_id: p.dwell_minutes for p in deck.pages if p.dwell_minutes is not None}
-        if deck
-        else {}
-    )
-    editor_state = {
-        "deckId": deck.id if deck else "",
+        for p in (deck.pages if deck is not None else [])
+    ]
+    interval = deck.advance_interval_minutes if deck is not None else 30
+    if deck is not None and deck.advance_trigger == "cycle" and len(deck.pages) == 1:
+        # Saving reshapes this into an interval at the dashboard's own dwell.
+        interval = deck.pages[0].effective_dwell_minutes(interval)
+        steps[0]["dwell"] = None
+    return {
+        "deckId": deck.id if deck is not None else "",
+        "isNew": deck is None,
+        "revision": _deck_revision(deck) if deck is not None else "",
+        "name": deck.name if deck is not None else "",
+        "enabled": deck.enabled if deck is not None else True,
+        "when": _when_of(deck),
+        "advance": deck.advance if deck is not None else "timer",
+        "interval": interval,
+        # The stored home, not the resolved one: with none set, home is
+        # whichever dashboard is first, and a save must not pin it there.
+        "home": (deck.home_page_id or "") if deck is not None else "",
+        "timeout": deck.home_timeout_minutes if deck is not None else 0,
+        "smartSync": bool(deck.advance_smart_sync) if deck is not None else False,
+        "lead": deck.advance_smart_sync_lead_s if deck is not None else 10,
+        "priority": deck.advance_priority if deck is not None else 0,
+        "mode": deck.advance_mode if deck is not None else "scheduled",
+        "minHold": deck.advance_min_hold_minutes if deck is not None else 5,
+        "cadence": deck.refresh_interval_minutes if deck is not None else 15,
+        "steps": steps,
         "pages": page_meta,
-        "order": member_ids,
-        "home": (deck.resolved_home_page_id if deck and deck.pages else ""),
-        "timeout": deck.home_timeout_minutes if deck else 0,
-        "overrides": override_map,
-        "cadence": deck.refresh_interval_minutes if deck else 15,
-        "touchBound": touch_bound,
-        "suggestions": suggestions,
-        # Device-first flow: the primary display drives the page-library filter.
-        # Pre-select the deck's first bound device when editing; empty for a new deck.
-        "devices": device_meta,
-        "primaryDevice": (deck.device_ids[0] if deck and deck.device_ids else ""),
-        # Timer advance (Phase 1 of the rotations merge).
-        "advance": deck.advance if deck else advance_default,
-        "advanceInterval": deck.advance_interval_minutes if deck else 30,
-        "advanceAnchor": deck.advance_anchor if deck else "00:00",
-        "dwells": dwell_map,
-        "returnHome": deck.home_timeout_minutes if deck else 0,
-        # Dashboards bound to no display: the "Available pages" chips. Adding one
-        # binds it to the deck's display on save.
-        "unassigned": [
-            {"id": p.id, "name": p.name}
-            for p in pages
-            if not p.device_ids and p.id not in member_ids
-        ],
+        "devices": devices,
+        "display": display,
+        # Every display it is bound to; the editor edits the first and keeps
+        # the rest.
+        "displays": list(deck.device_ids) if deck is not None else ([display] if display else []),
+        "displayLocked": bool(deck is None and wanted and wanted in known),
+        "views": views,
+        "now": (vm or {}).get("now"),
+        "timeCycle": (vm or {}).get("time_cycle") or _time_cycle(),
+        "lineup": lineup,
+        # Every lineup's priority: the editor names the ones that overlap.
+        "priorities": {d.id: d.advance_priority for d in all_decks},
+        "urls": {
+            "save": url_for("decks.editor_save"),
+            "create": url_for("decks.create_lineup"),
+            "items": url_for("decks.dashboard_items"),
+            "lineups": url_for("decks.index"),
+            "view": url_for("decks.view_json"),
+            "newDashboard": url_for("pages.index"),
+            "editPage": url_for("pages.edit", page_id="__ID__"),
+            "pushStep": url_for("decks.push_step", deck_id=deck.id) if deck is not None else "",
+            "stepItem": url_for("decks.step_item", deck_id=deck.id) if deck is not None else "",
+            "delete": url_for("decks.delete", deck_id=deck.id) if deck is not None else "",
+            "editor": url_for("decks.editor", deck_id=deck.id) if deck is not None else "",
+        },
     }
-    return render_template(
-        "deck_editor.html",
-        deck=deck,
-        page_meta=page_meta,
-        device_meta=device_meta,
-        member_ids=member_ids,
-        home_id=editor_state["home"],
-        override_map=override_map,
-        dwell_map=dwell_map,
-        editor_state=editor_state,
-        advance_default=advance_default,
-        page_names={m["id"]: m["name"] for m in page_meta},
+
+
+@bp.get("/dashboard-items")
+def dashboard_items() -> Response:
+    """A page of one dashboard's items for the lineup editor's grid: query
+    ``page_id``, optional ``offset``, ``limit`` (at most
+    ``app.step_items.MAX_PAGE_ITEMS``) and ``q`` (a text filter on the
+    name); ``display_id`` (optional) names the display whose cell size a
+    widget's item hook sees. Replies ``app.step_items.ItemPage.to_dict()``. Unlike the
+    Lineups view (which lists the first ``MAX_STEP_ITEMS``) it reaches every
+    item, and it lists a pinned widget's items too."""
+    from app.step_items import MAX_PAGE_ITEMS, list_items
+
+    page = _pages().get(request.args.get("page_id") or "")
+    if page is None:
+        return _json_error("No such dashboard.")
+
+    def whole(name: str, default: int) -> int:
+        raw = request.args.get(name, "")
+        # isdigit() passes "²", which int() refuses: parse instead.
+        try:
+            return max(0, int(raw)) if raw.isascii() else default
+        except ValueError:
+            return default
+
+    # Only a display that exists: the id reaches the widget's item hook.
+    display = (request.args.get("display_id") or "").strip()[:100] or None
+    registry = current_app.config.get("DEVICE_REGISTRY")
+    if display is not None and (registry is None or registry.get(display) is None):
+        display = None
+    found = list_items(
+        page,
+        device_id=display,
+        offset=whole("offset", 0),
+        limit=whole("limit", MAX_PAGE_ITEMS),
+        query=(request.args.get("q") or "")[:100],
     )
+    return jsonify({"ok": True, **found.to_dict()})
 
 
 def _ordered_ids_from_form(form: Any) -> list[str]:
@@ -3259,71 +3501,212 @@ def _ordered_ids_from_form(form: Any) -> list[str]:
     return sorted(dict.fromkeys(members), key=order_key)
 
 
+_TIMER_DAILY = {
+    "advance_trigger": "daily",
+    "advance_window_start": None,
+    "advance_window_end": None,
+    "advance_end_at": None,
+}
+
+
+def _reshape_window(deck: Deck) -> Deck:
+    """A window lineup in the shape its dashboards need, whatever it was
+    saved as: several take turns (a cycle, from the window's start to its
+    end), one is sent again and again (an interval). An interval only ever
+    sends its first dashboard, so one given more dashboards would never show
+    them. A cycle can't run past midnight, so an interval window that wraps
+    can't take a second dashboard (``_EditError``)."""
+    if deck.advance == "manual":
+        return deck
+    if deck.advance_trigger == "interval" and len(deck.pages) > 1:
+        s, e = deck.advance_window_start, deck.advance_window_end
+        if s and e and (parse_hhmm(e) or 0) <= (parse_hhmm(s) or 0):
+            raise _EditError(
+                "Several dashboards can't run past midnight; end it by 24:00.", 400, deck.id
+            )
+        changes: dict[str, Any] = {
+            "advance_trigger": "cycle",
+            "advance_anchor": s or "00:00",
+            "advance_end_at": e,
+            "advance_window_start": None,
+            "advance_window_end": None,
+            "advance_fires_at": None,
+        }
+        if deck.legacy_kind == "schedule":
+            changes["legacy_kind"] = None  # see _edited_deck: the scheduler skips those
+        return _merged_deck(deck, **changes)
+    if deck.advance_trigger == "cycle" and len(deck.pages) == 1:
+        # The one dashboard's dwell was the cycle's cadence; an interval reads
+        # advance_interval_minutes and ignores a per-dashboard dwell.
+        return _merged_deck(
+            deck,
+            advance_trigger="interval",
+            advance_interval_minutes=deck.pages[0].effective_dwell_minutes(
+                deck.advance_interval_minutes
+            ),
+            pages=[deck.pages[0].model_copy(update={"dwell_minutes": None})],
+            advance_window_start=deck.advance_anchor,
+            advance_window_end=deck.advance_end_at,
+            advance_end_at=None,
+        )
+    if deck.advance_trigger == "interval" and any(p.dwell_minutes is not None for p in deck.pages):
+        # A dwell an interval never reads: clear it so nothing shows a cadence it lacks.
+        return _merged_deck(
+            deck, pages=[p.model_copy(update={"dwell_minutes": None}) for p in deck.pages]
+        )
+    return deck
+
+
+def _with_taps(deck: Deck, taps: bool | None) -> Deck:
+    """``deck`` with "taps also flip" as the editor says: ``taps`` for a
+    rotation (None keeps what it is); a daily or interval lineup always runs
+    on its timer, since "both" never fires there."""
+    if deck.advance == "manual":
+        return deck
+    if deck.advance_trigger != "cycle":
+        advance: str = "timer"
+    elif taps is None:
+        advance = deck.advance
+    else:
+        advance = "both" if taps else "timer"
+    return deck if deck.advance == advance else _merged_deck(deck, advance=advance)
+
+
+def _apply_when(deck: Deck, mode: str, start: str, end: str, taps: bool | None) -> Deck:
+    """``deck`` set to run as the editor's time control says, with the
+    Lineups page's semantics (``_edited_deck``): "at" is one send a day
+    (a daily push, which only ever sends dashboard 1); "between" is a
+    window, which several dashboards take in turn (a rotation) and one
+    dashboard repeats in (an interval); "manual" has no time. ``taps`` is
+    "taps also flip" for a rotation (None keeps what it is). A daily or
+    interval lineup always runs on its timer: "both" never fires there.
+    Raises ``_EditError`` for a time it can't take."""
+    if mode == "manual":
+        return _merged_deck(deck, advance="manual")
+    if mode not in ("at", "between"):
+        raise _EditError("Pick At a time or Between times.", 400, deck.id)
+    s = _clean_time(start, "Start", deck.id)
+    if s == "24:00":
+        raise _EditError("Start must be before 24:00.", 400, deck.id)
+    base = deck
+    kind = _lineup_kind(deck)
+    if kind == "manual" or (mode == "at" and kind != "daily"):
+        base = _merged_deck(deck, advance="timer", advance_fires_at=s, **_TIMER_DAILY)
+        kind = "daily"
+    if mode == "at":
+        out = _edited_deck(base, start=s)
+    else:
+        if not end:
+            raise _EditError("Add an end time, or pick At a time.", 400, deck.id)
+        out = _edited_deck(base, start=s, end=_clean_time(end, "End", deck.id))
+    if out.advance == "manual":
+        out = _merged_deck(out, advance="timer")
+    return _with_taps(_reshape_window(out), taps)
+
+
+def _form_int(form: Any, field: str, lo: int, hi: int, default: int) -> int:
+    """``form[field]`` clamped to lo..hi; ``default`` when absent or not a number."""
+    raw = form.get(field)
+    if raw is None or raw == "":
+        return default
+    try:
+        return max(lo, min(hi, int(raw)))
+    except ValueError:
+        return default
+
+
 @bp.post("/editor-save")
 def editor_save() -> Response:
-    """Persist the editor form. Links re-derive from the pages'
-    authored tap/swipe actions for the chosen set (same as Sync from
-    links); the sync manifest's defaults cover everything the graph
-    doesn't say, so a bare page pick is fully navigable."""
-    form = request.form
-    deck_id = (form.get("deck_id") or "").strip()
-    name = (form.get("name") or "").strip() or "Deck"
-    ordered = _ordered_ids_from_form(form)
-    if not ordered:
-        flash("Pick at least one page for the deck.", "error")
-        return redirect(request.referrer or url_for("decks.index"))
+    """Save the lineup editor. Every field the form leaves out keeps the
+    stored value (the editor shows only what applies to the lineup and its
+    display), so a save never resets a setting it didn't show.
 
+    Time: ``when_mode`` (at / between / manual) with ``when_start`` and
+    ``when_end``, applied only with ``when_changed`` (``_apply_when``); a
+    window is a rotation with several dashboards and an interval with one,
+    on every save (``_reshape_window``). Steps: ``pages`` (ids in order)
+    with ``dwell[id]``, ``override[id]``, ``conditions[id]``;
+    ``page_refresh[id]`` sets the dashboard's own Updates and ``pin[id]``
+    pins (or with "" unpins) its widget. ``device_ids`` lists every display;
+    just the first of a lineup bound to several keeps the others.
+    ``revision`` (from the editor's state) refuses a save over a lineup
+    changed since it was loaded, and a save of a deleted lineup is refused,
+    not re-created (409). A window that would meet another lineup on the
+    display is refused, like the Lineups page's edits. ``respond=json``
+    answers ``{ok, url, warnings}`` or ``{ok: false, error}`` instead of
+    redirecting."""
+    form = request.form
+    wants_json = form.get("respond") == "json"
+
+    def refuse(msg: str, back: str, status: int = 400, **extra: Any) -> Response:
+        if wants_json:
+            resp = jsonify({"ok": False, "error": msg, **extra})
+            resp.status_code = status
+            return resp
+        flash(msg, "error")
+        return redirect(back)
+
+    deck_id = (form.get("deck_id") or "").strip()
+    ordered = _ordered_ids_from_form(form)
     existing = _store().get(deck_id) if deck_id else None
-    if deck_id and existing is None and not _ID_RE.match(deck_id):
-        flash(f"Bad id {deck_id!r}.", "error")
-        return redirect(url_for("decks.index"))
+    back = url_for("decks.editor", deck_id=deck_id) if existing else url_for("decks.index")
+    if deck_id and existing is None:
+        # New lineups are made through /decks/new/lineup; an id that isn't
+        # stored is one deleted since the page loaded (or never was).
+        if not _ID_RE.match(deck_id):
+            return refuse(f"Bad id {deck_id!r}.", url_for("decks.index"))
+        return refuse("This lineup was deleted.", url_for("decks.index"), 409)
+    revision = (form.get("revision") or "").strip()
+    if existing is not None and revision and revision != _deck_revision(existing):
+        return refuse("Changed elsewhere; reload to see it.", back, 409, reload=True)
+    if not ordered:
+        return refuse("Add at least one dashboard.", back)
+
+    def keep(field: str, default: Any) -> Any:
+        return getattr(existing, field) if existing is not None else default
+
+    name = " ".join((form.get("name") or "").split())[:_NAME_MAX] if "name" in form else ""
+    if not name:
+        name = keep("name", "Lineup")
     if not deck_id:
         deck_id = _unique_id(_slug_from(name))
 
-    from app.deck_suggest import graph_for_pages
-
     derived = {p.page_id: p for p in graph_for_pages(_pages().list(), ordered)}
-    old_refresh = (
-        {p.page_id: p.refresh_interval_minutes for p in existing.pages} if existing else {}
-    )
-    old_dwell = {p.page_id: p.dwell_minutes for p in existing.pages} if existing else {}
-    # Per-page conditions are authored in the editor's Page-conditions fold
-    # (#167 consolidation); an absent field preserves the stored value so
-    # older forms and partial submits never drop them.
-    old_conditions = {p.page_id: p.conditions for p in existing.pages} if existing else {}
+    old = {p.page_id: p for p in existing.pages} if existing else {}
 
     def _page_conditions(pid: str) -> list[Any]:
+        kept = list(old[pid].conditions) if pid in old else []
         raw = form.get(f"conditions[{pid}]")
         if raw is None:
-            return list(old_conditions.get(pid, []))
+            return kept
         text = raw.strip()
         if not text:
             return []
         try:
             parsed = json.loads(text)
         except json.JSONDecodeError:
-            return list(old_conditions.get(pid, []))
-        return parsed if isinstance(parsed, list) else list(old_conditions.get(pid, []))
+            return kept
+        return parsed if isinstance(parsed, list) else kept
 
     pages: list[DeckPage] = []
     for pid in ordered:
         base = derived.get(pid) or DeckPage(page_id=pid)
-        refresh = old_refresh.get(pid)
+        refresh = old[pid].refresh_interval_minutes if pid in old else None
         raw_override = form.get(f"override[{pid}]")
-        if raw_override is not None and raw_override != "":
+        if raw_override:
             with contextlib.suppress(ValueError):
                 refresh = max(0, min(1440, int(raw_override)))
         elif raw_override == "":
             refresh = None
-        dwell = old_dwell.get(pid)
+        dwell = old[pid].dwell_minutes if pid in old else None
         raw_dwell = form.get(f"dwell[{pid}]")
-        if raw_dwell is not None and raw_dwell != "":
+        if raw_dwell:
             with contextlib.suppress(ValueError):
                 dwell = max(1, min(10_080, int(raw_dwell)))
         elif raw_dwell == "":
             dwell = None
         # model_validate (not model_copy) so authored conditions are checked
-        # NOW and bad input flashes, instead of poisoning the stored record.
+        # now, and bad input is refused instead of poisoning the stored record.
         try:
             pages.append(
                 DeckPage.model_validate(
@@ -3336,131 +3719,242 @@ def editor_save() -> Response:
                 )
             )
         except ValidationError as exc:
-            flash(f"Invalid page {pid!r}: {_first_error(exc)}", "error")
-            return redirect(
-                url_for("decks.editor", deck_id=deck_id) if existing else url_for("decks.index")
-            )
+            return refuse(f"Invalid conditions on {pid!r}: {_first_error(exc)}", back)
 
-    home = (form.get("home") or "").strip() or None
+    # Home and entry: what the form says, else what is stored, and only while
+    # that dashboard is still in the lineup.
+    home: str | None = keep("home_page_id", None)
+    if "home" in form:
+        home = (form.get("home") or "").strip() or None
     if home is not None and home not in ordered:
         home = None
-    entry = (form.get("entry") or "").strip() or None
+    entry: str | None = keep("entry_page_id", None)
+    if "entry" in form:
+        entry = (form.get("entry") or "").strip() or None
     if entry is not None and entry not in ordered:
         entry = None
-    try:
-        timeout = max(0, min(120, int(form.get("timeout") or 0)))
-    except ValueError:
-        timeout = 0
-    try:
-        cadence = max(0, min(1440, int(form.get("refresh_interval_minutes") or 15)))
-    except ValueError:
-        cadence = 15
+    if "device_ids" in form:
+        device_ids = list(dict.fromkeys(d for d in form.getlist("device_ids") if d))
+        stored = list(keep("device_ids", []))
+        if len(device_ids) == 1 and stored[:1] == device_ids:
+            # An older client posts just the first display: keep the others.
+            device_ids = stored
+    else:
+        device_ids = list(keep("device_ids", []))
+    if "enabled" in form:
+        # The switch posts "on" after a hidden "0", so off still says so.
+        enabled = any(v in ("on", "true", "1") for v in form.getlist("enabled"))
+    else:
+        enabled = keep("enabled", False)
 
-    advance_raw = form.get("advance") or "manual"
+    advance_raw = form.get("advance") or keep("advance", "manual")
     if advance_raw not in ("manual", "timer", "both"):
         advance_raw = "manual"
-    advance = cast(Literal["manual", "timer", "both"], advance_raw)
-    try:
-        adv_interval = max(1, min(10_080, int(form.get("advance_interval_minutes") or 30)))
-    except ValueError:
-        adv_interval = 30
-    adv_anchor = (form.get("advance_anchor") or "00:00").strip() or "00:00"
-
-    # Advance parity fields (Tier A + B). A missing form field falls back to the
-    # existing deck's value (the Advanced fold may omit some) then the model
-    # default, so a plain save never clobbers a migrated rotation's config.
-    def _adv_int(field: str, lo: int, hi: int, default: int) -> int:
-        raw = form.get(field)
-        if raw is None:
-            return default
-        try:
-            return max(lo, min(hi, int(raw)))
-        except ValueError:
-            return default
-
-    adv_end_at = (form.get("advance_end_at") or "").strip() or None
     if "advance_days" in form:
-        adv_dow = sorted({int(d) for d in form.getlist("advance_days") if d.isdigit()})
-    elif existing is not None:
-        adv_dow = list(existing.advance_days_of_week)
+        adv_dow = sorted({int(d) for d in form.getlist("advance_days") if d in _WEEKDAY_DIGITS})
     else:
-        adv_dow = [0, 1, 2, 3, 4, 5, 6]
-    adv_priority = _adv_int(
-        "advance_priority", -1000, 1000, existing.advance_priority if existing else 0
-    )
+        adv_dow = list(keep("advance_days_of_week", [0, 1, 2, 3, 4, 5, 6]))
     if "advance_smart_sync" in form:
-        adv_smart = form.get("advance_smart_sync") in ("on", "true", "1")
+        # The box posts "on" after a hidden "0", so an unticked box still says off.
+        adv_smart = any(v in ("on", "true", "1") for v in form.getlist("advance_smart_sync"))
     else:
-        adv_smart = existing.advance_smart_sync if existing else False
-    adv_lead = _adv_int(
-        "advance_smart_sync_lead_s", 0, 600, existing.advance_smart_sync_lead_s if existing else 10
-    )
-    adv_mode_raw = form.get("advance_mode") or (existing.advance_mode if existing else "scheduled")
-    adv_mode = cast(
-        Literal["scheduled", "priority"],
-        adv_mode_raw if adv_mode_raw in ("scheduled", "priority") else "scheduled",
-    )
-    adv_min_hold = _adv_int(
-        "advance_min_hold_minutes", 0, 120, existing.advance_min_hold_minutes if existing else 5
-    )
-
+        adv_smart = keep("advance_smart_sync", False)
+    adv_mode_raw = form.get("advance_mode") or keep("advance_mode", "scheduled")
     fields: dict[str, Any] = {
         "id": deck_id,
         "name": name,
-        "enabled": form.get("enabled") in ("on", "true", "1"),
-        "device_ids": [d for d in form.getlist("device_ids") if d],
+        "enabled": enabled,
+        "device_ids": device_ids,
         "pages": pages,
         "entry_page_id": entry,
         "home_page_id": home,
-        "home_timeout_minutes": timeout,
-        "refresh_interval_minutes": cadence,
-        "advance": advance,
-        "advance_interval_minutes": adv_interval,
-        "advance_anchor": adv_anchor,
-        "advance_end_at": adv_end_at,
+        "refresh_interval_minutes": _form_int(
+            form, "refresh_interval_minutes", 0, 1440, keep("refresh_interval_minutes", 15)
+        ),
+        "advance": advance_raw,
+        "advance_interval_minutes": _form_int(
+            form, "advance_interval_minutes", 1, 10_080, keep("advance_interval_minutes", 30)
+        ),
         "advance_days_of_week": adv_dow,
-        "advance_priority": adv_priority,
+        "advance_priority": _form_int(
+            form, "advance_priority", -1000, 1000, keep("advance_priority", 0)
+        ),
         "advance_smart_sync": adv_smart,
-        "advance_smart_sync_lead_s": adv_lead,
-        "advance_mode": adv_mode,
-        "advance_min_hold_minutes": adv_min_hold,
+        "advance_smart_sync_lead_s": _form_int(
+            form, "advance_smart_sync_lead_s", 0, 600, keep("advance_smart_sync_lead_s", 10)
+        ),
+        "advance_mode": adv_mode_raw if adv_mode_raw in ("scheduled", "priority") else "scheduled",
+        "advance_min_hold_minutes": _form_int(
+            form, "advance_min_hold_minutes", 0, 120, keep("advance_min_hold_minutes", 5)
+        ),
     }
+    # The no-JS form (and older clients) post the trigger's own fields.
+    for raw_time in ("advance_anchor", "advance_end_at"):
+        if raw_time in form:
+            fields[raw_time] = (form.get(raw_time) or "").strip() or (
+                "00:00" if raw_time == "advance_anchor" else None
+            )
+    for trigger_time in ("advance_fires_at", "advance_window_start", "advance_window_end"):
+        if trigger_time in form:
+            fields[trigger_time] = (form.get(trigger_time) or "").strip() or None
     try:
-        # This form covers the cycle shape only, so an interval or daily deck
-        # opened here would lose its trigger, window and fallback if the model
-        # were rebuilt from these fields alone. Overlay when editing.
+        # Overlay when editing, so a field this form doesn't carry (the
+        # trigger, a fallback) keeps its stored value.
         deck = _merged_deck(existing, **fields) if existing else Deck(**fields)
-    except ValidationError as exc:
-        flash(f"Invalid deck: {_first_error(exc)}", "error")
-        return redirect(
-            url_for("decks.editor", deck_id=deck_id) if existing else url_for("decks.index")
+        taps_raw = form.get("taps_flip")
+        taps = None if taps_raw is None else taps_raw in ("on", "true", "1")
+        if form.get("when_changed") == "1":
+            deck = _apply_when(
+                deck,
+                form.get("when_mode") or "at",
+                (form.get("when_start") or "").strip(),
+                (form.get("when_end") or "").strip(),
+                taps,
+            )
+        else:
+            deck = _with_taps(_reshape_window(deck), taps)
+        # Return home: what the form says. Left out (the control is hidden),
+        # what is stored, except on a rotation, which reclaims its display at
+        # each step and which a return home would park in between.
+        rotates = deck.advance != "manual" and deck.advance_trigger == "cycle"
+        timeout = _form_int(
+            form, "timeout", 0, 120, 0 if rotates else keep("home_timeout_minutes", 0)
         )
-    # The editor prompts before it submits; a save that still carries steps
-    # bound to another display (no JS, a stale tab, a crafted POST) is refused
-    # rather than stored as a lineup that can never render.
+        if timeout != deck.home_timeout_minutes:
+            deck = _merged_deck(deck, home_timeout_minutes=timeout)
+    except _EditError as exc:
+        return refuse(str(exc), back, exc.status)
+    except ValidationError as exc:
+        return refuse(f"Invalid lineup: {_first_error(exc)}", back)
+
+    page_devices = {p.id: list(p.device_ids) for p in _pages().list()}
+    # The editor asks before it submits; a save that still carries steps
+    # bound to another display (a stale tab, a crafted POST) is refused rather
+    # than stored as a lineup that can never render.
     consent = Consent.from_form(form)
     stranded = guard_change(deck.device_ids, ordered, consent)
     if stranded:
+        if wants_json:
+            return refusal(deck.device_ids, stranded)
         flash(flash_text(deck.device_ids, stranded), "error")
-        return redirect(
-            url_for("decks.editor", deck_id=deck_id)
-            if existing
-            else (request.referrer or url_for("decks.editor"))
-        )
+        return redirect(back)
+    cycle = _time_cycle()
+    was = _deck_revision(existing) if existing is not None else None
+
+    def plan(decks: dict[str, Deck]) -> tuple[list[Deck], list[str]]:
+        # Read, check and write under the store's lock: the lineup must still
+        # be the one this save was built from, and the clash check reads the
+        # others as they are now.
+        current = decks.get(deck.id)
+        if was is not None:
+            if current is None:
+                raise _EditError("This lineup was deleted.", 409, deck.id)
+            if _deck_revision(current) != was:
+                raise _EditError("Changed elsewhere; reload to see it.", 409, deck.id)
+        elif current is not None:
+            raise _EditError("Changed elsewhere; reload to see it.", 409, deck.id)
+        before = dict(decks)
+        with using_time_cycle(cycle):
+            _check_batch(before, {**before, deck.id: deck}, [deck.id], page_devices)
+            found = _pause_warnings(deck, page_devices, current) if deck.advance != "manual" else []
+        return [deck], found
+
+    try:
+        warnings = _store().transaction(plan)
+    except _EditError as exc:
+        stale = exc.status == 409 and str(exc).startswith("Changed elsewhere")
+        return refuse(str(exc), back, exc.status, **({"reload": True} if stale else {}))
     apply_consent(deck.device_ids, ordered, consent)
-    _store().upsert(deck)
-    # An unassigned dashboard added to the deck binds to the deck's display, so
-    # the "only dashboards bound to this display" invariant holds next time.
-    display = deck.device_ids[0] if deck.device_ids else None
-    if display:
-        for pid in ordered:
-            page = _pages().get(pid)
-            if page is not None and not page.device_ids:
-                _pages().save(page.model_copy(update={"device_ids": [display]}))
+    warnings += _save_dashboard_edits(
+        form, ordered, deck.device_ids[0] if deck.device_ids else None
+    )
     _invalidate(deck)
-    flash(f"Deck {deck.name!r} saved.", "ok")
-    # Every editor exit lands back on Lineups, highlighting the saved row.
-    return redirect(url_for("decks.index", hl=deck.id) + f"#udeck-{deck.id}")
+    if existing is not None:
+        # A lineup moved to another display leaves the old one too: its
+        # warmed frames and its place in this lineup go with it.
+        left = [d for d in existing.device_ids if d not in deck.device_ids]
+        if left:
+            _invalidate(existing.model_copy(update={"device_ids": left}))
+    if (
+        existing is not None
+        and existing.page_ids != deck.page_ids
+        and deck.advance != "manual"
+        and deck.advance_trigger == "cycle"
+    ):
+        # A rotation mid-window keeps its step number, which now names another
+        # dashboard: let the next tick send it (as the Lineups page's reorder).
+        resync = getattr(current_app.config.get("SCHEDULER"), "resync_cycle", None)
+        if callable(resync):
+            resync(deck.id)
+    url = url_for("decks.editor", deck_id=deck.id)
+    flash(f"Saved {deck.name}.", "ok")
+    for warning in warnings:
+        flash(warning, "warn")
+    if wants_json:
+        return jsonify({"ok": True, "id": deck.id, "url": url, "warnings": warnings})
+    return redirect(url)
+
+
+def _save_dashboard_edits(form: Any, ordered: list[str], display: str | None) -> list[str]:
+    """The dashboard settings the editor shows in a step's row: its own
+    Updates (``page_refresh[id]``, minutes) and its widget's pin (``pin[id]``,
+    an item key or "" to unpin). An unassigned dashboard added to the lineup
+    binds to its display, so it can render there.
+
+    Runs after the lineup is stored, so it never fails the save: a pin the
+    widget can't list, or a dashboard that can't be written, comes back as a
+    warning. Each write is a compare-and-swap against the page as read, so a
+    dashboard edited elsewhere meanwhile keeps that edit."""
+    from app.state.page_store import Page, PageRevisionConflict, page_revision
+    from app.step_items import pin_page
+
+    store = _pages()
+    warnings: list[str] = []
+    for pid in ordered:
+        raw = (form.get(f"page_refresh[{pid}]") or "").strip()
+        minutes = max(0, min(1440, int(raw))) if raw.isascii() and raw.isdigit() else None
+        wants_pin = f"pin[{pid}]" in form
+        pin_key = form.get(f"pin[{pid}]")
+        name = pid
+        try:
+            for _attempt in range(3):
+                page = store.get(pid)
+                if page is None:
+                    break
+                name = page.name
+                updated = page
+                if minutes is not None and minutes != page.refresh_minutes:
+                    updated = updated.model_copy(update={"refresh_minutes": minutes})
+                pin_failed = False
+                if wants_pin:
+                    data = pin_page(updated, pin_key)
+                    if data is not None:
+                        updated = Page.model_validate(data)
+                    else:
+                        pin_failed = True
+                if display and not updated.device_ids:
+                    updated = updated.model_copy(update={"device_ids": [display]})
+                if pin_failed:
+                    warnings.append(f"Couldn't pin {name}; its list didn't load.")
+                if updated == page:
+                    break
+
+                def replace(_current: Page, edited: Page = updated) -> Page:
+                    return edited
+
+                try:
+                    store.update_if_revision(pid, page_revision(page), replace)
+                    break
+                except PageRevisionConflict:
+                    if pin_failed:
+                        warnings.pop()
+                    continue  # changed meanwhile: apply the edits to the new one
+            else:
+                warnings.append(f"Saved, but {name} changed meanwhile; check its settings.")
+        except Exception:
+            current_app.logger.exception("lineup editor: dashboard edits on %s failed", pid)
+            warnings.append(f"Saved, but {name}'s settings weren't applied.")
+    return warnings
 
 
 @bp.post("/bind-check")
@@ -3640,7 +4134,7 @@ def delete(deck_id: str) -> Response:
     if _store().delete(deck_id):
         if existing is not None:
             _invalidate(existing)
-        flash("Deck deleted.", "ok")
+        flash("Lineup deleted.", "ok")
     else:
         flash(f"No deck with id {deck_id!r}.", "error")
     return redirect(url_for("decks.index"))

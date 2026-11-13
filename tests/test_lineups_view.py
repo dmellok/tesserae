@@ -869,7 +869,7 @@ def test_pause_overlap_is_a_warning(client: Any, app: Flask) -> None:
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["pause_overlap"] is True
-    assert "Quiet hours (23:00–06:30)" in data["warnings"][0]
+    assert data["warnings"][0].startswith("Starts at 06:30: 05:00–06:30 is in ")
     assert _deck(app, "morning").advance_anchor == "05:00"
 
 
@@ -1293,6 +1293,48 @@ def test_pause_flag_needs_a_real_overlap() -> None:
     assert window_overlaps_pause(pause, replace(push, start="06:29"))
     kitchen = _lineup(_display(sample_view_model(), "kitchen"), "kitchen")
     assert kitchen.window is not None and not kitchen.window.overlaps_pause
+
+
+def test_pause_note_says_what_quiet_hours_do() -> None:
+    from app.lineups_view import pause_note, using_time_cycle
+
+    where = "TV's quiet hours"
+    pause = PauseInput(1 * 60, 8 * 60)
+    steps = (StepInput("x", 30),)
+    win = LineupInput("a", "A", "cycle", steps, start="06:00", end="18:30", days=(0, 1, 2, 3, 4))
+    with using_time_cycle("h12"):
+        nb = "\u202f"
+        assert (
+            pause_note(pause, win, where) == f"Starts at 8{nb}AM: 6–8{nb}AM is in TV's quiet hours."
+        )
+        inside = replace(win, start="02:00", end="05:00")
+        assert (
+            pause_note(pause, inside, where) == "Sends nothing: all of it is in TV's quiet hours."
+        )
+        tail = replace(win, start="00:00", end="03:00")
+        assert pause_note(pause, tail, where) == (
+            f"Stops at 1{nb}AM: 1–3{nb}AM is in TV's quiet hours."
+        )
+        stops = replace(win, start="20:00", end="23:00")
+        assert pause_note(PauseInput(22 * 60, 23 * 60 + 59), stops, where) == (
+            f"Stops at 10{nb}PM: 10–11{nb}PM is in TV's quiet hours."
+        )
+        mid = pause_note(PauseInput(12 * 60, 13 * 60), win, where)
+        assert mid == f"Pauses 12–1{nb}PM for TV's quiet hours."
+        push = LineupInput("p", "P", "daily", steps, start="06:00", days=(0,))
+        assert pause_note(pause, push, where) == f"Skipped: 6{nb}AM is in TV's quiet hours."
+        assert pause_note(pause, replace(push, start="09:00"), where) is None
+    with using_time_cycle("h23"):
+        assert (
+            pause_note(pause, win, where) == "Starts at 08:00: 06:00–08:00 is in TV's quiet hours."
+        )
+    # Weekday and all-day masks: a weekend-only pause leaves a weekday window alone,
+    # an all-day Monday swallows a Monday-only one.
+    with using_time_cycle("h23"):
+        assert pause_note(PauseInput(1 * 60, 8 * 60, days=(5, 6)), win, where) is None
+        monday = replace(win, days=(0,))
+        note = pause_note(PauseInput(0, 0, days=(), all_day=(0,)), monday, where)
+        assert note == "Sends nothing: all of it is in TV's quiet hours."
 
 
 # ---------------------------------------------------------------------------
@@ -3213,7 +3255,11 @@ def test_a_declared_widget_with_nothing_to_list_offers_no_arrows(
     def boom(options: dict[str, Any]) -> list[dict[str, str]]:
         raise RuntimeError("no list")
 
-    for lister in (lambda o: [], lambda o: [{"key": "only"}], boom):
+    for lister, empty in (
+        (lambda o: [], True),
+        (lambda o: [{"key": "only"}], False),
+        (boom, False),
+    ):
         _install_widgets(
             app,
             monkeypatch,
@@ -3223,7 +3269,9 @@ def test_a_declared_widget_with_nothing_to_list_offers_no_arrows(
             },
         )
         with app.test_request_context():
-            assert step_choices(_declared_page(app)) is None
+            found = step_choices(_declared_page(app))
+            # An empty list is flagged (no arrows, not a plain tile); the rest offer nothing.
+            assert (found is not None and found.mode == "empty") if empty else found is None
     # Declared, but the module has no lineup_items: nothing to offer either.
     _install_widgets(app, monkeypatch, papers={"manifest": {"lineups": {"pin_option": "paper"}}})
     with app.test_request_context():

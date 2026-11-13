@@ -70,6 +70,15 @@ def _clear_ephemeral_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def _fresh_item_hook_cache() -> None:
+    """Each test starts with no remembered ``lineup_items`` answers
+    (``app.step_items._HOOK_CACHE`` keeps them for a few seconds)."""
+    from app import step_items
+
+    step_items._HOOK_CACHE.clear()
+
+
+@pytest.fixture(autouse=True)
 def _no_visionect_listener(monkeypatch: pytest.MonkeyPatch) -> None:
     """Keep ``app.visionect.register`` from binding TCP 11113 for any test app
     that holds a Visionect device. Tests that need a listener start one

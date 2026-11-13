@@ -140,649 +140,1640 @@
   margin-bottom: var(--t-space-3);
 }
 
-/* ---- deck editor (design-handoff rebuild, mapped to app tokens) --------- */
-.dxe {
-  --dxe-ctl-h: 36px;
-  max-width: 1120px;
+/* ---- the lineup editor (templates/deck_editor.html, static/deck_editor.js) ----
+ * Scoped under .lu.dxe: the day bar, day tiles, thumbnails, segmented controls
+ * and buttons are the Lineups page's own (dx-lineups.css); this adds the page
+ * column, the three numbered sections, the dashboard rows and the save bar.
+ * Type steps (base.css --t-size-*): title 26, section xl 18, body base 14,
+ * label md 13, help sm 12, mono xs 11. Spacing is the --t-space-* scale:
+ * --dxe-pad inside a card, --dxe-sec between sections, --dxe-stack the
+ * offset of a stacked tile's back cards. */
+main.page.dxe-page {
+  padding-bottom: 0;
+}
+.lu.dxe {
+  container: dxe / inline-size;
+  --dxe-pad: var(--t-space-5);
+  --dxe-sec: var(--t-space-8);
+  --dxe-stack: 12px;
+  /* the label column of a card's fields, so every card's controls line up */
+  --dxe-label-w: 170px;
+  max-width: 1000px;
   margin: 0 auto;
-  padding-bottom: 96px;
+  padding-bottom: var(--t-space-6);
 }
-.dxe-mono-label {
-  font-family: var(--t-font-mono);
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--t-muted);
-}
-.dxe-help {
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--t-fg-soft);
-  margin: 0;
-}
-.dxe-h2 {
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  margin: 0;
-}
-
-/* header */
-.dxe-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding-bottom: 20px;
-  gap: 16px;
-}
-.dxe-head-left {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.dxe-crumb {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-family: var(--t-font-mono);
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--t-muted);
-}
-.dxe-crumb a {
-  color: var(--t-muted);
-  text-decoration: none;
-}
-.dxe-crumb a:hover {
+.lu.dxe .dxe-soft {
   color: var(--t-fg-soft);
 }
-.dxe-title-input {
-  border: none;
-  border-bottom: 1px dashed transparent;
-  background: transparent;
-  font-family: inherit;
-  font-size: 30px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--t-fg);
-  width: 380px;
-  max-width: 100%;
-  padding: 0 0 2px;
-}
-.dxe-title-input::placeholder {
-  color: var(--t-muted);
-}
-.dxe-title-input:hover {
-  border-bottom-color: var(--t-border-strong);
-}
-.dxe-title-input:focus {
-  outline: none;
-  border-bottom-color: var(--t-fg);
-}
-.dxe-head-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding-top: 20px;
-}
-.dxe-status-word {
-  font-family: var(--t-font-mono);
-  font-size: 11px;
+.lu.dxe .dxe-k,
+.lu.dxe .dxe-mono {
+  font: 600 11px var(--t-font-mono);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--t-muted);
 }
-.dxe .switch input {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-/* two-column body */
-.dxe-body {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 312px);
-  gap: 20px;
-  align-items: start;
-}
-@media (max-width: 1040px) {
-  .dxe-body {
-    grid-template-columns: 1fr;
-  }
-}
-.dxe-card {
-  background: var(--t-surface);
-  border: 1px solid var(--t-border);
-  border-radius: var(--t-radius-lg);
-  padding: 20px 22px 24px;
-}
-
-/* flip order card */
-.dxe-main-head {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  padding-bottom: 18px;
-}
-.dxe-meta {
-  font-size: 13px;
-  color: var(--t-muted);
-}
-.dxe-wraps {
-  margin-left: auto;
-  font-family: var(--t-font-mono);
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  color: var(--t-muted);
-}
-
-/* advance bar */
-.dxe-advance {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  background: var(--t-inset);
-  border: 1px solid var(--t-border);
-  border-radius: var(--t-radius-md);
-  padding: 12px 14px;
-  margin-bottom: 20px;
-}
-.dxe-seg-track {
-  display: inline-flex;
-  align-items: stretch;
-  height: var(--dxe-ctl-h, 36px);
-  box-sizing: border-box;
-  gap: 3px;
-  background: var(--t-border);
-  border-radius: 9px;
-  padding: 3px;
-}
-.dxe-seg {
-  position: relative;
-  display: inline-flex;
-}
-.dxe-seg input {
-  position: absolute;
-  opacity: 0;
-}
-.dxe-seg span {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 14px;
-  font-size: 13px;
-  font-weight: 500;
-  border-radius: 7px;
-  cursor: pointer;
-  color: var(--t-fg-soft);
-}
-.dxe-seg input:checked + span {
-  background: var(--t-surface);
-  color: var(--t-fg);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
-}
-.dxe-seg input:focus-visible + span {
-  outline: 2px solid var(--t-accent);
-  outline-offset: 1px;
-}
-.dxe-interval {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-.dxe-every {
-  font-size: 13px;
-  color: var(--t-fg-soft);
-}
-.dxe-adv-hint {
-  font-size: 13px;
-  color: var(--t-fg-soft);
-}
-.dxe-switch-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-/* Tuning card: timing + conditions folds below the page rail. */
-.dxe-main-col {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  min-width: 0;
-}
-.dxe-tuning {
-  background: var(--t-surface-sunk);
-  padding: 8px 22px;
-}
-.dxe-tuning-hint {
-  padding: 8px 0;
-}
-.dxe-fold {
-  font-size: 13px;
-}
-.dxe-fold + .dxe-fold {
-  border-top: 1px solid color-mix(in oklab, var(--t-border) 80%, transparent);
-}
-.dxe-fold > summary {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  padding: 12px 0;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--t-fg);
-  list-style: none;
-}
-.dxe-fold > summary::-webkit-details-marker {
-  display: none;
-}
-.dxe-fold > summary:hover {
-  color: var(--t-accent);
-}
-.dxe-fold-caret {
-  font-size: 12px;
-  color: var(--t-fg-soft);
-  transition: transform 0.15s;
-}
-.dxe-fold[open] > summary .dxe-fold-caret {
-  transform: rotate(90deg);
-}
-.dxe-fold-hint {
-  margin-left: auto;
-  font: 12px var(--t-font-mono);
-  font-weight: 400;
-  color: var(--t-muted);
-}
-.dxe-fold > .dxe-adv-grid,
-.dxe-fold > .dxe-advanced-body {
-  padding: 2px 0 14px;
-}
-@media (prefers-reduced-motion: reduce) {
-  .dxe-fold-caret {
-    transition: none;
-  }
-}
-.dxe-adv-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 14px;
-  padding: 12px 2px 4px;
-}
-.dxe-days {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-.dxe-day {
-  position: relative;
-  display: inline-flex;
-}
-.dxe-day input {
-  position: absolute;
-  opacity: 0;
-}
-.dxe-day span {
-  display: inline-flex;
-  align-items: center;
-  height: var(--dxe-ctl-h, 36px);
-  box-sizing: border-box;
-  padding: 0 11px;
-  font-size: 12px;
-  border: 1px solid var(--t-border-strong);
-  border-radius: var(--t-radius-sm);
-  cursor: pointer;
-  color: var(--t-fg-soft);
-}
-.dxe-day input:checked + span {
-  background: var(--t-fg);
-  color: var(--t-bg);
-  border-color: var(--t-fg);
-}
-.dxe-smart {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-/* page grid */
-.dxe-rail {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
-  gap: 12px;
-}
-.dxe-pcard {
-  position: relative;
-  background: var(--t-surface);
-  border: 1px solid var(--t-border);
-  border-radius: 12px;
-  padding: 9px;
-  cursor: grab;
-  transition:
-    box-shadow 140ms,
-    transform 140ms;
-}
-.dxe-pcard:hover {
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.09);
-  transform: translateY(-1px);
-}
-.dxe-pcard.is-selected::after {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  border: 2px solid var(--t-fg);
-  border-radius: 13px;
-  pointer-events: none;
-}
-.dxe-pcard.is-dragging {
-  opacity: 0.5;
-}
-.dxe-thumb {
-  height: 112px;
-  --thumb-radius: 7px;
-  --thumb-bg: var(--t-inset);
-  --thumb-slot-w: 100%;
-  --thumb-slot-h: 112px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-/* A page card keeps the dashboard's own shape: wide for landscape, tall for a
-   portrait panel. */
-.dxe-thumb[style*="--thumb-r"] {
-  margin-inline: auto;
-}
-.dxe-thumb.is-portrait {
-  --thumb-slot-h: 190px;
-}
-.dxe-thumb.is-ph {
-  font-family: var(--t-font-mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  color: var(--t-muted);
-  background-image:
-    linear-gradient(var(--t-border) 1px, transparent 1px),
-    linear-gradient(90deg, var(--t-border) 1px, transparent 1px);
-  background-size: 14px 14px;
-}
-.dxe-badge {
-  position: absolute;
-  top: 7px;
-  left: 7px;
-  width: 19px;
-  height: 19px;
-  border-radius: 50%;
-  background: var(--t-fg);
-  color: var(--t-bg);
-  font-size: 11px;
-  font-weight: 600;
-  display: grid;
-  place-items: center;
-}
-.dxe-grip {
-  position: absolute;
-  top: 6px;
-  right: 7px;
-  font-family: var(--t-font-mono);
-  font-size: 12px;
-  color: var(--t-muted);
-  cursor: grab;
-}
-.dxe-pcard.is-missing {
-  border: 1px dashed var(--t-warn);
-  background: color-mix(in oklab, var(--t-warn) 10%, var(--t-surface));
-}
-.dxe-pcard.is-missing .dxe-thumb {
+.lu.dxe .dxe-noscript {
+  padding: 16px 0;
   color: var(--t-warn);
-  font-weight: 700;
-}
-.dxe-pcard.is-missing .dxe-pcard-name {
-  white-space: normal;
-  color: var(--t-fg);
-}
-.dxe-missing-id {
-  display: block;
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--t-muted, var(--t-fg));
-  opacity: 0.7;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.dxe-remove-missing {
-  margin-left: auto;
-  padding: 3px 8px;
-}
-/* A step bound to another display: same dashed warning rim as a deleted one,
-   but the thumbnail stays (it is a real dashboard) and the tag says why. */
-.dxe-pcard.is-offdisplay {
-  border: 1px dashed var(--t-warn);
-  background: color-mix(in oklab, var(--t-warn) 8%, var(--t-surface));
-}
-.dxe-offdisplay {
-  flex-shrink: 0;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: color-mix(in oklab, var(--t-warn) 18%, var(--t-surface));
-  color: color-mix(in oklab, var(--t-warn) 75%, var(--t-fg));
-}
-.dxe-pcard-foot {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 3px 2px;
-}
-.dxe-pcard-name {
-  flex: 1;
-  font-size: 13px;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.dxe-star {
-  color: var(--t-fg);
-  font-size: 12px;
-}
-.dxe-add {
-  min-height: 156px;
-  border: 1px dashed var(--t-border-strong);
-  border-radius: 12px;
-  background: none;
-  color: var(--t-muted);
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  font-size: 13px;
-}
-.dxe-add:hover:not(:disabled) {
-  border-color: var(--t-fg);
-  color: var(--t-fg);
-  background: var(--t-inset);
-}
-.dxe-add:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.dxe-add-plus {
-  font-size: 19px;
 }
 
-/* selected-page panel */
-.dxe-panel {
-  margin-top: 18px;
-  border: 1px solid var(--t-border);
-  border-radius: 12px;
-  background: var(--t-inset);
-  overflow: hidden;
-}
-.dxe-panel-head {
+/* -- top: breadcrumb and the on switch */
+.lu.dxe .dxe-top {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
-  padding: 13px 16px;
-  border-bottom: 1px solid var(--t-border);
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 32px;
 }
-.dxe-panel-name {
-  font-size: 14px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.dxe-remove {
-  margin-left: auto;
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--t-danger);
-  background: transparent;
-  border: 1px solid transparent;
-  padding: 5px 10px;
-  border-radius: 7px;
-  cursor: pointer;
-}
-.dxe-remove:hover {
-  background: var(--t-danger-bg);
-  border-color: var(--t-pill-danger-border);
-}
-.dxe-fieldgrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
-  gap: 14px;
-  padding: 15px 16px 17px;
-}
-.dxe-field {
+.lu.dxe .dxe-crumb {
   display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-.dxe-fbtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: var(--dxe-ctl-h);
-  box-sizing: border-box;
-  background: var(--t-surface);
-  border: 1px solid var(--t-border-strong);
-  border-radius: var(--t-radius-sm);
-  padding: 0 11px;
+  gap: 8px;
   font-size: 13px;
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-crumb a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.lu.dxe .dxe-crumb a:hover {
   color: var(--t-fg);
-  cursor: pointer;
 }
-.dxe-fbtn:hover:not(:disabled) {
-  border-color: var(--t-fg);
+.lu.dxe .dxe-top-ctl {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px 18px;
+  margin-left: auto;
 }
-.dxe-fbtn:disabled {
-  opacity: 0.45;
+/* Where it runs, and the way to move it: set apart from the On switch
+   because moving is not a toggle. */
+.lu.dxe .dxe-loc {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 13px;
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-loc b {
+  color: var(--t-fg);
+  font-weight: 600;
+}
+.lu.dxe .dxe-loc-txt.is-pending,
+.lu.dxe .dxe-loc-txt.is-pending b {
+  color: var(--lu-warn-text);
+}
+/* Every secondary action on the page (Push now, Draw another, Add) is the
+   Lineups outline button at one height. */
+.lu.dxe .dxe-act {
+  height: 32px;
+  padding: 0 var(--t-space-3);
+  color: var(--t-fg);
+}
+.lu.dxe .dxe-link:focus-visible,
+.lu.dxe .dxe-loc .lu-more summary:focus-visible {
+  outline: 2px solid var(--lu-acc);
+  outline-offset: 2px;
+}
+.lu.dxe .dxe-loc .lu-more-menu button:disabled {
+  opacity: 0.5;
   cursor: default;
 }
-.dxe-home-btn {
-  justify-content: flex-start;
-  white-space: nowrap;
+.lu.dxe .lu-more-sep {
+  width: 100%;
+  margin: 5px 0;
+  border: 0;
+  border-top: 1px solid var(--t-border);
 }
-.dxe-pos-btns {
-  display: flex;
-  gap: 6px;
-}
-.dxe-pos-btns .dxe-fbtn {
-  flex: 1;
-}
-.dxe-dwell-box {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-.dxe-dwell-inp {
-  flex: 1;
-  min-width: 0;
-}
-.dxe-dwell-suf {
-  font-size: 12px;
-  color: var(--t-fg-soft);
+.lu.dxe .dxe-switch {
+  position: relative;
+  display: inline-flex;
   flex: none;
 }
-.dxe-slider-row {
+.lu.dxe .dxe-switch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  z-index: 1;
+  cursor: pointer;
+}
+.lu.dxe .dxe-on {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--t-fg-soft);
+  cursor: pointer;
+}
+
+/* -- hero: what is on screen, the name, live status, the day bar */
+.lu.dxe .dxe-hero {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--t-space-4) var(--t-space-6);
+  margin: var(--t-space-3) 0 0;
+}
+/* As wide as the picture: a portrait panel's narrow picture leaves no hole
+   before the title. */
+.lu.dxe .dxe-now {
+  --now-w: 220px;
+  --now-h: 200px;
+  margin: 0;
+  width: max-content;
+  max-width: 220px;
   display: flex;
+  flex-direction: column;
+  gap: var(--t-space-2);
+}
+/* The box is the display's exact shape inside a 220 x 200 bound: portrait
+   panels get taller than wide, never a wide box with bars. */
+.lu.dxe .dxe-now .lu-thumb {
+  align-self: flex-start;
+  width: min(var(--now-w), calc(var(--now-h) * var(--arw) / var(--arh)));
+  height: auto;
+}
+.lu.dxe .dxe-now figcaption {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: var(--t-size-sm);
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-now figcaption b {
+  color: var(--t-fg);
+  font-weight: 600;
+}
+.lu.dxe .dxe-now[hidden] + .dxe-hero-main {
+  grid-column: 1 / -1;
+}
+.lu.dxe .dxe-hero-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lu.dxe .dxe-h1 {
+  margin: 0;
+  font: inherit;
+}
+#deck-editor .dxe-h1 input.dxe-title {
+  width: 100%;
+  margin: 0 0 0 -8px;
+  padding: 2px 8px;
+  height: auto;
+  min-height: 0;
+  border: 1px solid transparent;
+  border-radius: var(--lu-r);
+  background: transparent;
+  font: 600 26px/1.25 var(--t-font);
+  letter-spacing: -0.01em;
+  color: var(--t-fg);
+  box-shadow: none;
+}
+#deck-editor .dxe-h1 input.dxe-title::placeholder {
+  color: var(--t-muted);
+  font-weight: 500;
+}
+#deck-editor .dxe-h1 input.dxe-title:hover {
+  border-color: var(--t-border);
+}
+#deck-editor .dxe-h1 input.dxe-title:focus {
+  outline: none;
+  border-color: var(--lu-acc);
+  background: var(--t-surface);
+}
+.lu.dxe .dxe-model {
+  margin: 0;
+  font-size: 13px;
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-status {
+  margin-top: 8px;
+}
+.lu.dxe .dxe-status p {
+  margin: 0;
+}
+.lu.dxe .dxe-live-line {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-2);
+  font-size: var(--t-size-base);
+}
+.lu.dxe .dxe-live-line b {
+  font-weight: 600;
+}
+.lu.dxe .dxe-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px var(--t-fg-soft);
+}
+.lu.dxe .dxe-live-line.is-live .dxe-dot {
+  background: var(--lu-acc);
+  box-shadow: none;
+}
+.lu.dxe .dxe-live-line.off {
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-next-line {
+  margin: 2px 0 0 calc(8px + var(--t-space-2));
+  font-size: var(--t-size-md);
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-daybar {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-1);
+  margin-top: var(--t-space-2);
+}
+.lu.dxe .dxe-daybar[hidden] {
+  display: none;
+}
+.lu.dxe .dxe-bar-day {
+  margin: 0;
+  font: 600 11px var(--t-font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--t-muted);
+}
+.lu.dxe .dxe-bar-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.lu.dxe .dxe-week-toggle {
+  font-size: 12px;
+}
+.lu.dxe .dxe-wk {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.lu.dxe .dxe-wk-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+.lu.dxe .dxe-wk-lab {
+  font: 600 11px var(--t-font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--t-muted);
+}
+.lu.dxe .dxe-wk-row.is-today .dxe-wk-lab {
+  color: var(--lu-acc-text);
+}
+.lu.dxe .dxe-wk-row .lu-trk {
+  height: 26px;
+}
+.lu.dxe .dxe-daybar .lu-today-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+/* This lineup in the accent; the display's other lineups stay neutral. */
+.lu.dxe .dxe-daybar .lu-blk:not(.hold) {
+  cursor: default;
+}
+.lu.dxe .dxe-daybar .lu-blk[data-edit] {
+  cursor: grab;
+}
+.lu.dxe .dxe-daybar .lu-blk.is-link {
+  cursor: pointer;
+}
+.lu.dxe .dxe-daybar .lu-blk.is-link:hover {
+  background: color-mix(in oklab, var(--t-fg) 14%, var(--lu-blk-bg));
+}
+.lu.dxe .dxe-daybar .lu-blk.is-link:focus-visible {
+  outline: 2px solid var(--t-fg);
+  outline-offset: 2px;
+  z-index: 4;
+}
+.lu.dxe .dxe-daybar .lu-blk.is-drag {
+  cursor: grabbing;
+}
+.lu.dxe .dxe-daybar .lu-blk.live:not(.is-mine):not(.hold) {
+  background: var(--lu-blk-bg);
+  color: var(--lu-blk-fg);
+}
+.lu.dxe .dxe-daybar .lu-blk.live:not(.is-mine) .lu-blk-l {
+  color: var(--lu-blk-fg);
+}
+.lu.dxe .dxe-daybar .lu-blk.is-mine:not(.hold) {
+  background: var(--lu-acc-soft);
+  color: var(--lu-acc-text);
+  box-shadow: inset 0 0 0 1.5px var(--lu-acc);
+}
+.lu.dxe .dxe-daybar .lu-blk.is-mine.live:not(.hold) {
+  background: var(--lu-acc);
+  color: var(--lu-acc-fg);
+}
+.lu.dxe .dxe-daybar .lu-blk.is-mine .lu-blk-l {
+  color: inherit;
+  font-weight: 600;
+}
+.lu.dxe .dxe-daybar .lu-blk.is-mine.push {
+  background: var(--lu-acc);
+}
+.lu.dxe .dxe-daybar .lu-blk-side.is-mine {
+  color: var(--lu-acc-text);
+  font-weight: 600;
+}
+
+/* -- sections */
+.lu.dxe .dxe-sections {
+  display: flex;
+  flex-direction: column;
+}
+.lu.dxe .dxe-sec {
+  margin-top: var(--dxe-sec);
+}
+.lu.dxe .dxe-sec-head {
+  margin-bottom: var(--t-space-3);
+}
+.lu.dxe .dxe-h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font: 600 18px/1.3 var(--t-font);
+  color: var(--t-fg);
+}
+.lu.dxe .dxe-n {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: 50%;
+  border: 1.5px solid var(--t-fg);
+  font: 600 12px var(--t-font-mono);
+}
+.lu.dxe .dxe-n.is-done {
+  background: var(--t-fg);
+  color: var(--t-surface);
+}
+.lu.dxe .dxe-n.is-done .lu-ico {
+  width: 12px;
+  height: 12px;
+}
+.lu.dxe .dxe-lead {
+  margin: var(--t-space-1) 0 0 34px;
+  font-size: var(--t-size-base);
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-sec-head.is-wait {
+  margin-top: var(--t-space-7);
+  opacity: 0.55;
+}
+.lu.dxe .dxe-sec-head.is-wait .dxe-n {
+  border-color: var(--t-muted);
+}
+.lu.dxe .dxe-card {
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  border-radius: var(--lu-r-card);
+  padding: 0 var(--dxe-pad);
+}
+.lu.dxe .dxe-field {
+  display: grid;
+  grid-template-columns: var(--dxe-label-w) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--t-space-2) var(--t-space-4);
+  padding: var(--t-space-4) 0;
+}
+.lu.dxe .dxe-field + .dxe-field {
+  border-top: 1px solid var(--t-border);
+}
+.lu.dxe .dxe-label {
+  padding-top: var(--t-space-2);
+  font-size: var(--t-size-md);
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-ctl {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-height: 36px;
+}
+
+/* controls */
+.lu.dxe .dxe-in {
+  height: 36px;
+  margin: 0;
+  padding: 0 10px;
+  border: 1px solid var(--t-border-strong);
+  border-radius: var(--lu-r);
+  background: var(--t-surface);
+  color: var(--t-fg);
+  font: 14px var(--t-font);
+  box-shadow: none;
+}
+.lu.dxe .dxe-in:hover {
+  border-color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-in:focus-visible {
+  outline: 2px solid var(--lu-acc);
+  outline-offset: 1px;
+}
+.lu.dxe .dxe-in:disabled {
+  opacity: 0.5;
+}
+.lu.dxe .dxe-select {
+  padding-right: 28px;
+  width: auto;
+  max-width: 100%;
+}
+.lu.dxe .dxe-num {
+  width: 84px;
+}
+.lu.dxe .dxe-time-in {
+  width: 132px;
+}
+.lu.dxe .dxe-link {
+  display: inline;
+  color: var(--lu-acc-text);
+  font-weight: 600;
+  font-size: var(--t-size-md);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.lu.dxe .dxe-link:hover {
+  color: var(--t-fg);
+}
+.lu.dxe .dxe-link.quiet {
+  color: var(--t-fg-soft);
+  font-weight: 500;
+}
+.lu.dxe .dxe-link:disabled {
+  text-decoration: none;
+  opacity: 1;
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-select.is-unused {
+  color: var(--t-muted);
+  border-color: var(--t-border);
+}
+.lu.dxe .lu-btn-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* 1 When: bigger day tiles (the Lineups ones, with their check and x marks) */
+.lu.dxe .dxe-days {
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.lu.dxe .dxe-days .lu-dt {
+  width: 48px;
+  height: 34px;
+  border-radius: var(--lu-r);
+  font: 600 var(--t-size-sm) var(--t-font);
+  border: 1px solid var(--t-border-strong);
+  background: var(--t-surface);
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-days .lu-dt.on {
+  background: var(--t-fg);
+  border-color: var(--t-fg);
+  color: var(--t-surface);
+}
+.lu.dxe .dxe-days .lu-dt.is-today {
+  box-shadow: inset 0 -3px 0 var(--lu-acc);
+}
+.lu.dxe .dxe-days .lu-dt::before,
+.lu.dxe .dxe-days .lu-dt::after {
+  top: -5px;
+  right: -5px;
+  width: 12px;
+  height: 12px;
+}
+.lu.dxe .dxe-days .lu-dt.just-on,
+.lu.dxe .dxe-days .lu-dt.just-off {
+  color: transparent;
+}
+.lu.dxe .dxe-time {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.lu.dxe .dxe-time-fields {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.lu.dxe .dxe-to {
+  font-size: 13px;
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-seg.sm {
+  height: 30px;
+}
+.lu.dxe .dxe-seg.sm button {
+  font-size: var(--t-size-sm);
+  padding: 0 9px;
+}
+.lu.dxe .lu-win-end {
+  font: 500 13px var(--t-font);
+  border: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: var(--lu-r);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--t-fg);
+  cursor: pointer;
+}
+.lu.dxe .lu-win-end:hover {
+  background: color-mix(in oklab, var(--t-fg) 6%, transparent);
+}
+.lu.dxe .lu-win-end.is-rm {
+  width: 36px;
+  justify-content: center;
+  padding: 0;
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-warn,
+.lu.dxe .dxe-note {
+  flex: 1 1 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 0;
+  font-size: var(--t-size-md);
+}
+.lu.dxe .dxe-warn {
+  padding: var(--t-space-2) var(--t-space-3);
+  border-radius: var(--lu-r);
+  background: color-mix(in oklab, var(--t-warn) 13%, var(--t-surface));
+  color: var(--t-fg);
+}
+/* The words stay beside their icon; a fix-it link wraps under them. */
+.lu.dxe :is(.dxe-warn, .dxe-note) > span {
+  flex: 1 1 0;
+  min-width: 14em;
+}
+.lu.dxe :is(.dxe-warn, .dxe-note) > .lu-ico {
+  flex: none;
+}
+.lu.dxe .dxe-warn > .lu-ico,
+.lu.dxe .dxe-note > .lu-ico {
+  width: 14px;
+  height: 14px;
+  color: var(--lu-warn-text);
+}
+.lu.dxe .dxe-note {
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-warn.is-err {
+  background: color-mix(in oklab, var(--t-danger) 12%, var(--t-surface));
+}
+.lu.dxe .dxe-warn.is-err > .lu-ico {
+  color: var(--t-danger);
+}
+.lu.dxe .dxe-time-in.is-bad {
+  border-color: var(--t-danger);
+}
+/* 2 Dashboards: the Lineups page's own step tiles (lineups_render.js stepHtml,
+ * dx-lineups.css), bigger and wrapping; a tile opens its details under the strip.
+ * --dxe-arw/--dxe-arh are the display's shape (deck_editor.js shapeVars). */
+.lu.dxe .dxe-steps-card {
+  --dxe-tile-h: 200px;
+  /* a drawn picture in the details: the display's shape, small */
+  --dxe-tw: min(112px, calc(84px * var(--dxe-arw, 16) / var(--dxe-arh, 10)));
+  padding: 0;
+}
+/* The stacked back cards rise --dxe-stack above a tile: the top padding
+   counts them, so the card's edge is as far from them as from the sides.
+   A live lineup's NOW / NEXT slot already gives that room. */
+.lu.dxe .dxe-tiles-scroll {
+  padding: calc(var(--dxe-pad) + var(--dxe-stack)) var(--dxe-pad) var(--dxe-pad);
+}
+.lu.dxe .dxe-tiles-scroll:has(.lu-strip.has-now) {
+  padding-top: var(--dxe-pad);
+}
+.lu.dxe .dxe-hint {
+  margin: var(--t-space-4) 0 0;
+  font-size: var(--t-size-sm);
+}
+.lu.dxe .dxe-tiles {
+  --tile-h: var(--dxe-tile-h);
+  --fig-min: 96px;
+  flex-wrap: wrap;
+  width: auto;
+  row-gap: var(--t-space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lu.dxe .dxe-tiles .lu-step figure {
+  gap: 10px;
+}
+.lu.dxe .dxe-tiles .lu-step figcaption {
+  gap: 3px;
+  cursor: pointer;
+  max-width: max(132px, calc(var(--th) * var(--dxe-arw, 16) / var(--dxe-arh, 10)));
+}
+.lu.dxe .dxe-tiles .lu-step-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: var(--t-size-md);
+}
+.lu.dxe .dxe-tiles .lu-step-meta {
+  font-size: var(--t-size-xs);
+}
+/* Every tile reads at full strength here: the editor is about all of them. */
+.lu.dxe .lu-strip.has-now .lu-step:not(.is-now):not(:hover):not(:focus-within),
+.lu.dxe .lu-strip.has-now .lu-step:is(.is-next, .is-waiting):not(:hover) {
+  opacity: 1;
+}
+.lu.dxe .dxe-tiles .lu-step.is-muted:not(:hover):not(:focus-within) {
+  opacity: 0.55;
+}
+.lu.dxe .dxe-tiles .lu-step.is-dragging {
+  opacity: 0.35;
+}
+/* The whole tile is its button; the zoom, the arrows and the count sit above it. */
+.lu.dxe .dxe-sel {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  padding: 0;
+  border: 0;
+  border-radius: var(--lu-r-xs);
+  background: transparent;
+  cursor: pointer;
+}
+.lu.dxe .dxe-sel:focus-visible {
+  outline: 2px solid var(--t-fg);
+  outline-offset: 4px;
+}
+/* The open dashboard: an accent frame round the whole tile, its stack
+   included (the tile's own button grows over the back cards), so it never
+   cuts through them; the accent is the primary buttons', in both themes. */
+/* The pill's row clears the accent frame (the stack's rise, the 4px offset, the
+   2px line) so the frame never runs through NOW / NEXT. */
+.lu.dxe .dxe-tiles .lu-slot {
+  height: calc(20px + var(--dxe-stack) + 8px);
+  align-items: flex-start;
+}
+.lu.dxe .dxe-tiles .lu-tile.stacked .dxe-sel {
+  inset: calc(-1 * var(--dxe-stack)) calc(-1 * var(--dxe-stack)) 0 0;
+}
+.lu.dxe .dxe-tiles .lu-step.is-open .dxe-sel {
+  outline: 2px solid var(--lu-acc);
+  outline-offset: 4px;
+}
+.lu.dxe .dxe-tiles .lu-step.is-open .dxe-sel:focus-visible {
+  outline-width: 3px;
+}
+.lu.dxe .dxe-tiles .lu-step.is-open .lu-step-name {
+  text-decoration: underline;
+  text-decoration-color: var(--lu-acc);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+/* Many items: two card edges behind the picture, clear in light and dark. */
+/* Every tile keeps room for the stack, so tiles line up across the lines. */
+.lu.dxe .dxe-tiles .lu-tile {
+  margin: 0 var(--dxe-stack) 0 0;
+}
+.lu.dxe .dxe-tiles .lu-tile.stacked::before,
+.lu.dxe .dxe-tiles .lu-tile.stacked::after {
+  opacity: 1;
+  border: 1px solid var(--lu-stack-edge);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.18);
+}
+.lu.dxe .dxe-tiles .lu-tile.stacked::before {
+  transform: translate(var(--dxe-stack), calc(-1 * var(--dxe-stack)));
+  background: var(--lu-stack-far);
+}
+.lu.dxe .dxe-tiles .lu-tile.stacked::after {
+  transform: translate(calc(var(--dxe-stack) / 2), calc(var(--dxe-stack) / -2));
+  background: var(--lu-stack-near);
+}
+.lu.dxe .dxe-tiles .lu-count {
+  right: -10px;
+  bottom: -9px;
+  height: 24px;
+  min-width: 36px;
+  padding: 0 8px;
+  font: 700 12px/24px var(--t-font-mono);
+  box-shadow: 0 0 0 2px var(--t-surface);
+}
+/* The item arrows, as on the Lineups page: on hover or focus, always on touch,
+   over a shade at the foot of the picture only. */
+.lu.dxe .dxe-tiles .lu-scrim {
+  background: linear-gradient(to top, rgb(21 20 18 / 0.62), transparent 48%);
+}
+.lu.dxe .dxe-tiles .lu-tile:not(.has-items) .lu-scrim {
+  display: none;
+}
+.lu.dxe .dxe-tiles .lu-items {
+  bottom: 8px;
+  gap: 4px;
+}
+.lu.dxe .dxe-tiles .lu-it {
+  width: 30px;
+  height: 30px;
+  font-size: 15px;
+  background: rgb(21 20 18 / 0.55);
+}
+.lu.dxe .dxe-tiles .lu-it-pos {
+  font-size: 11px;
+}
+@media (hover: none) {
+  .lu.dxe .dxe-tiles .lu-tile.has-items .lu-scrim,
+  .lu.dxe .dxe-tiles .lu-tile.has-items .lu-items {
+    opacity: 1;
+  }
+}
+.lu.dxe .dxe-step-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin-top: 3px;
+}
+.lu.dxe .dxe-step-tags .dxe-tag:is(.time, .home) {
+  padding-left: 0;
+}
+/* + Add dashboard: a tile at the end, the same size as the others, a step's
+   arrow-width away from the last one; the space is the last tile's, so a
+   wrapped Add starts its line in line with the tiles above. */
+.lu.dxe .dxe-tiles .lu-step:nth-last-child(2):not(.dxe-add-step) {
+  margin-right: 34px;
+}
+.lu.dxe .dxe-add-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: var(--th);
+  width: max(110px, calc(var(--th) * var(--dxe-arw, 16) / var(--dxe-arh, 10)));
+  padding: 8px;
+  border: 1.5px dashed var(--t-border-strong);
+  border-radius: var(--lu-r-xs);
+  background: transparent;
+  color: var(--t-fg-soft);
+  font: 600 13px/1.25 var(--t-font);
+  text-align: center;
+  cursor: pointer;
+}
+.lu.dxe .dxe-add-tile .lu-ico {
+  width: 20px;
+  height: 20px;
+}
+.lu.dxe .dxe-add-tile:hover,
+.lu.dxe .dxe-add-tile[aria-expanded="true"] {
+  border-color: var(--t-fg);
+  color: var(--t-fg);
+  background: color-mix(in oklab, var(--t-fg) 4%, transparent);
+}
+.lu.dxe .dxe-add-tile:focus-visible {
+  outline: 2px solid var(--t-fg);
+  outline-offset: 3px;
+}
+
+/* The open dashboard's details: a band under the strip, not a card in the card. */
+.lu.dxe .dxe-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-4);
+  padding: var(--dxe-pad);
+  border-top: 1px solid var(--t-border);
+  background: color-mix(in oklab, var(--t-fg) 3%, var(--t-surface));
+}
+.lu.dxe .dxe-detail-head {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-3);
+}
+.lu.dxe .dxe-plug {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--t-border-strong);
+  border-radius: var(--lu-r);
+  background: var(--t-surface);
+  color: var(--t-fg);
+  font-size: 22px;
+}
+.lu.dxe .dxe-detail-t {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.lu.dxe .dxe-detail-t b {
+  font-size: var(--t-size-lg);
+  font-weight: 600;
+}
+.lu.dxe .dxe-detail-t b,
+.lu.dxe .dxe-detail-t span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lu.dxe .dxe-detail-t span {
+  font-size: var(--t-size-md);
+}
+.lu.dxe .dxe-name-row {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-1);
+  min-width: 0;
+}
+.lu.dxe .dxe-name-row b {
+  min-width: 0;
+}
+.lu.dxe .dxe-name-row .lu-gear {
+  flex: none;
+}
+/* The gear shows while the panel header is hovered or has focus inside. */
+.lu.dxe .dxe-detail-head:hover .lu-gear,
+.lu.dxe .dxe-detail-head:focus-within .lu-gear {
+  opacity: 1;
+}
+/* Its actions in one row, then × apart from them. */
+.lu.dxe .dxe-detail-acts {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--t-space-2);
+}
+.lu.dxe .dxe-detail-head .dxe-close {
+  flex: none;
+  margin-left: var(--t-space-1);
+}
+.lu.dxe .dxe-detail-acts:empty {
+  display: none;
+}
+
+/* The add picker's cards keep a small thumbnail box of the display's shape. */
+.lu.dxe .dxe-pick-th {
+  display: block;
+  padding: 8px 8px 0 0;
+}
+.lu.dxe .dxe-th {
+  position: relative;
+  display: block;
+  width: var(--dxe-tw);
+  aspect-ratio: var(--dxe-arw, 16) / var(--dxe-arh, 10);
+}
+.lu.dxe .dxe-th .lu-thumb {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+}
+.lu.dxe .dxe-th.is-stack::before,
+.lu.dxe .dxe-th.is-stack::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--lu-r-xs);
+  border: 1px solid color-mix(in oklab, var(--t-fg) 42%, transparent);
+  background: color-mix(in oklab, var(--lu-paper) 85%, var(--t-fg));
+}
+.lu.dxe .dxe-th.is-stack::before {
+  transform: translate(7px, -7px);
+}
+.lu.dxe .dxe-th.is-stack::after {
+  transform: translate(3.5px, -3.5px);
+}
+.lu.dxe .dxe-badge {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  z-index: 2;
+  height: 20px;
+  min-width: 26px;
+  padding: 0 6px;
+  border-radius: var(--lu-r-pill);
+  background: var(--t-fg);
+  color: var(--t-bg);
+  font: 700 10.5px/20px var(--t-font-mono);
+  text-align: center;
+  white-space: nowrap;
+  box-shadow: 0 0 0 2px var(--t-surface);
+}
+.lu.dxe .dxe-step-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.lu.dxe .dxe-step-text > b {
+  font-weight: 600;
+  font-size: 14px;
+}
+.lu.dxe .dxe-step-sub,
+.lu.dxe .dxe-where {
+  font-size: var(--t-size-sm);
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: var(--lu-r-xs);
+  font: 600 10.5px var(--t-font-mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border: 1px solid var(--t-border-strong);
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-tag .lu-ico {
+  width: 11px;
+  height: 11px;
+}
+.lu.dxe .dxe-tag.now {
+  background: var(--lu-acc);
+  border-color: var(--lu-acc);
+  color: var(--lu-acc-fg);
+}
+.lu.dxe .dxe-tag.next {
+  border-color: var(--t-fg);
+  color: var(--t-fg);
+}
+.lu.dxe .dxe-tag.time,
+.lu.dxe .dxe-tag.home {
+  text-transform: none;
+  letter-spacing: 0;
+  font: 600 12px var(--t-font);
+  border-color: transparent;
+  color: var(--t-fg);
+}
+.lu.dxe .dxe-tag.warn {
+  border-color: var(--lu-warn-text);
+  color: var(--lu-warn-text);
+}
+.lu.dxe .dxe-one {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-one .lu-ico {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+/* children: what a dashboard shows one of */
+.lu.dxe .dxe-kids {
+  --dxe-iw: clamp(56px, calc(84px * var(--dxe-arw, 16) / var(--dxe-arh, 10)), 120px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-3);
+}
+.lu.dxe .dxe-kids-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--t-space-1) var(--t-space-3);
+  font-size: var(--t-size-md);
+}
+.lu.dxe .dxe-kids-head .lu-seg {
+  margin-left: auto;
+}
+.lu.dxe .dxe-kids-head .dxe-shared {
+  flex: 1 1 100%;
+  text-align: right;
+}
+.lu.dxe .dxe-grid-items.is-busy {
+  opacity: 0.55;
+}
+.lu.dxe .dxe-strip,
+.lu.dxe .dxe-grid-items {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px;
+}
+.lu.dxe .dxe-grid-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--dxe-iw, 104px), 1fr));
+}
+/* Every item tile is a box in the display's own shape (--dxe-arw/--dxe-arh, set
+   on .dxe-kids): tall on a portrait frame, wide on a landscape one. A picture
+   fills it the way the frame shows it: cropped to cover, or whole where the
+   widget letterboxes (.is-fit). */
+.lu.dxe .dxe-it {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  width: var(--dxe-iw, 104px);
+  min-width: 0;
+  font-size: 11.5px;
+  color: var(--t-fg-soft);
+  text-align: left;
+}
+.lu.dxe .dxe-it.is-render {
+  width: max(var(--dxe-tw), 64px);
+}
+.lu.dxe .dxe-grid-items .dxe-it {
+  width: auto;
+}
+.lu.dxe button.dxe-it {
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 11.5px;
+  line-height: normal;
+  cursor: pointer;
+}
+.lu.dxe .dxe-it-pic {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: var(--dxe-arw, 16) / var(--dxe-arh, 10);
+  border-radius: var(--lu-r-xs);
+  border: 1px solid var(--t-border-strong);
+  background: var(--lu-paper);
+  overflow: hidden;
+}
+.lu.dxe .dxe-it-pic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.lu.dxe .dxe-kids.is-fit .dxe-it-pic img {
+  object-fit: contain;
+}
+.lu.dxe .dxe-it.is-ghost .dxe-it-pic {
+  background: color-mix(in oklab, var(--t-fg) 7%, var(--lu-paper));
+  animation: dxe-pulse 1.2s ease-in-out infinite alternate;
+}
+@keyframes dxe-pulse {
+  to {
+    opacity: 0.55;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lu.dxe .dxe-it.is-ghost .dxe-it-pic {
+    animation: none;
+  }
+}
+.lu.dxe .dxe-it.is-render .dxe-it-pic {
+  width: var(--dxe-tw);
+  aspect-ratio: var(--dxe-arw, 16) / var(--dxe-arh, 10);
+}
+.lu.dxe .dxe-it.is-render .dxe-it-pic img {
+  object-fit: contain;
+}
+.lu.dxe .dxe-it-word {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  padding: 0 8px;
+  font: 600 11.5px/1.25 var(--t-font);
+  color: #3b3934;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.lu.dxe .dxe-it.is-marked .dxe-it-pic {
+  outline: 2px solid var(--lu-acc);
+  outline-offset: 1px;
+}
+.lu.dxe button.dxe-it:hover .dxe-it-pic {
+  border-color: var(--t-fg);
+}
+.lu.dxe .dxe-it-l {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lu.dxe .dxe-it .dxe-tag {
+  align-self: flex-start;
+}
+.lu.dxe .dxe-more {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: stretch;
+  min-height: 56px;
+  padding: 0 14px;
+  border: 1px dashed var(--t-border-strong);
+  border-radius: var(--lu-r);
+  font-size: 13px;
+  cursor: pointer;
+}
+.lu.dxe .dxe-more span {
+  display: flex;
+  flex-direction: column;
+}
+.lu.dxe .dxe-more small {
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-more:hover {
+  border-color: var(--t-fg);
+}
+.lu.dxe .dxe-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--t-border);
+  border-radius: var(--lu-r);
+  background: var(--t-surface-soft);
+}
+.lu.dxe .dxe-grid-tb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+.lu.dxe .dxe-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 280px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--t-border-strong);
+  border-radius: var(--lu-r);
+  background: var(--t-surface);
+}
+/* (an id: the app's own input rules are long :is() chains) */
+#deck-editor .dxe-search input {
+  min-height: 0;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--t-fg);
+  font: 14px var(--t-font);
+  box-shadow: none;
+  outline: none;
+}
+.lu.dxe .dxe-search:focus-within {
+  outline: 2px solid var(--lu-acc);
+  outline-offset: 1px;
+}
+.lu.dxe .dxe-range {
+  margin-left: auto;
+}
+.lu.dxe .dxe-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.lu.dxe .dxe-pg {
+  min-width: 30px;
+  height: 30px;
+  border-radius: var(--lu-r);
+  font: 13px var(--t-font-mono);
+  text-align: center;
+  cursor: pointer;
+}
+.lu.dxe .dxe-pg:hover {
+  background: color-mix(in oklab, var(--t-fg) 6%, transparent);
+}
+.lu.dxe .dxe-pg[aria-current="page"] {
+  box-shadow: inset 0 0 0 1.5px var(--t-fg);
+  font-weight: 600;
+}
+.lu.dxe .dxe-loading {
+  font-size: 13px;
+}
+
+/* per-dashboard settings: one summary line, the editor under it */
+.lu.dxe .dxe-sum {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--t-space-1) var(--t-space-3);
+  padding-top: var(--t-space-3);
+  border-top: 1px solid var(--t-border);
+  font-size: var(--t-size-md);
+}
+/* Edit, Home and Remove together, at the end of the line. */
+.lu.dxe .dxe-sum-r {
+  margin-left: auto;
+  display: inline-flex;
+  gap: var(--t-space-4);
+}
+.lu.dxe .dxe-edit {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px 20px;
+}
+.lu.dxe .dxe-mini {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-mini > span:first-child {
+  font-weight: 500;
+  color: var(--t-fg);
+}
+.lu.dxe .dxe-mini small {
+  font-size: var(--t-size-sm);
+}
+.lu.dxe .dxe-mini.row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.lu.dxe .dxe-mini.row > span:first-child {
+  font-weight: 400;
+}
+.lu.dxe .dxe-cond {
+  grid-column: 1 / -1;
+}
+.lu.dxe .dxe-unit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* add-dashboard row and picker */
+.lu.dxe .dxe-add-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--t-border);
+}
+.lu.dxe .dxe-steps-card > .dxe-add-row:first-child,
+.lu.dxe .dxe-steps:empty + .dxe-add-row {
+  border-top: 0;
+}
+.lu.dxe .dxe-add {
+  color: var(--t-fg);
+  font-weight: 500;
+}
+.lu.dxe .dxe-picker {
+  --dxe-tw: min(80px, calc(60px * var(--dxe-arw, 16) / var(--dxe-arh, 10)));
+  padding: 14px 16px 16px;
+  border-top: 1px solid var(--t-border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.lu.dxe .dxe-sec > .dxe-picker {
+  padding: 16px 0 0;
+  border-top: 0;
+}
+.lu.dxe .dxe-picks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 10px;
+}
+.lu.dxe .dxe-pick {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--t-border);
+  border-radius: var(--lu-r);
+  background: var(--t-surface);
+}
+.lu.dxe .dxe-pick-more {
+  margin: 0;
+  font-size: 13px;
+}
+.lu.dxe .dxe-pick-more a {
+  color: var(--lu-acc-text);
+  font-weight: 600;
+}
+.lu.dxe .dxe-empty {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-2);
+  margin: 0;
+  padding: var(--t-space-4);
+  border: 1px dashed var(--t-border-strong);
+  border-radius: var(--lu-r);
+  font-size: var(--t-size-md);
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-steps-card > .dxe-empty {
+  margin: var(--dxe-pad) var(--dxe-pad) 0;
+}
+
+/* 3 Timing: a card of fields like When it runs; the display's options fold
+   away as its last row. */
+.lu.dxe .dxe-pace > :is(.dxe-opts-none, .dxe-pace-note) {
+  padding: var(--t-space-4) 0;
+}
+.lu.dxe .dxe-pace > * + :is(.dxe-fold, .dxe-opts-none, .dxe-pace-note) {
+  border-top: 1px solid var(--t-border);
+}
+.lu.dxe .dxe-fold > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--t-space-1) var(--t-space-3);
+  padding: var(--t-space-4) 0;
+  font-size: var(--t-size-md);
+  cursor: pointer;
+  list-style: none;
+}
+.lu.dxe .dxe-fold > summary b {
+  font-weight: 600;
+}
+.lu.dxe .dxe-fold > summary::-webkit-details-marker {
+  display: none;
+}
+.lu.dxe .dxe-fold > summary .dxe-soft {
+  font-size: 13px;
+}
+.lu.dxe .dxe-caret {
+  width: 14px;
+  height: 14px;
+  transform: rotate(-90deg);
+  transition: transform 160ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+.lu.dxe .dxe-fold[open] > summary .dxe-caret {
+  transform: none;
+}
+.lu.dxe .dxe-fold-body {
+  padding: 0 0 var(--t-space-4) calc(var(--dxe-label-w) + var(--t-space-4));
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-4);
+}
+.lu.dxe .dxe-opt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.lu.dxe .dxe-opt b {
+  font-weight: 600;
+  font-size: var(--t-size-base);
+}
+.lu.dxe .dxe-opt p {
+  margin: 2px 0 0;
+  font-size: var(--t-size-sm);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.lu.dxe .dxe-opt p .lu-ico {
+  width: 12px;
+  height: 12px;
+  color: var(--t-ok);
+}
+.lu.dxe .dxe-opt-ctl {
+  display: inline-flex;
   align-items: center;
   gap: 12px;
 }
-.dxe-slider-row input[type="range"] {
-  flex: 1;
-  min-width: 60px;
-  accent-color: var(--t-accent);
+.lu.dxe .dxe-lead-s {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--t-space-2);
+  font-size: var(--t-size-md);
 }
-.dxe-num-box {
-  flex: none;
-  width: 118px;
+.lu.dxe .dxe-lead-s .dxe-num {
+  width: 72px;
 }
 
-/* right rail */
-.dxe-rail-col {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-.dxe-rail-card {
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.dxe-set {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-.dxe-avail-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-}
-.dxe-avail-count {
-  font-size: 12px;
-  color: var(--t-fg-soft);
-}
-.dxe-chips {
+/* the new-lineup flow */
+.lu.dxe .dxe-done {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
+  align-items: center;
+  gap: var(--t-space-1) var(--t-space-3);
+  margin-top: var(--t-space-6);
+  font-size: var(--t-size-base);
 }
-/* Addable dashboards: .tg tags that act as buttons (chips.css). */
-.dxe-chip {
+.lu.dxe .dxe-done b {
+  font-weight: 600;
+}
+.lu.dxe .dxe-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+#deck-editor .dxe-dcard {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: var(--t-space-3);
+  border: 1px solid var(--t-border);
+  border-radius: var(--lu-r-card);
+  background: var(--t-surface);
+  text-align: left;
+  font-size: var(--t-size-sm);
+  cursor: pointer;
+}
+.lu.dxe .dxe-dcard:hover {
+  border-color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-dcard[aria-checked="true"] {
+  border-color: var(--lu-acc);
+  box-shadow: inset 0 0 0 1px var(--lu-acc);
+}
+.lu.dxe .dxe-dcard b {
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.lu.dxe .dxe-dcard-th {
+  container-type: inline-size;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 96px;
+  border-radius: var(--lu-r);
+  background: var(--t-surface-sunk);
+}
+.lu.dxe .dxe-dcard-th .lu-thumb {
+  width: min(90cqw, calc(80px * var(--arw) / var(--arh)));
+  height: auto;
+}
+.lu.dxe .dxe-next-step {
+  margin-top: var(--t-space-4);
+}
+
+/* the save bar */
+.lu.dxe .dxe-actionbar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  margin-top: var(--dxe-sec);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  padding: 12px 0;
+  background: var(--t-bg);
+  border-top: 1px solid var(--t-border);
+}
+.lu.dxe .dxe-actionbar-status {
+  flex: 1 1 200px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-actionbar-status.is-dirty {
+  color: var(--t-fg);
+  font-weight: 500;
+}
+.lu.dxe .dxe-actionbar-status.is-err {
+  color: var(--t-danger);
+  font-weight: 500;
+}
+.lu.dxe .dxe-actionbar-status.is-ok {
   color: var(--t-fg);
 }
-.dxe-chip:hover {
-  background: color-mix(in oklab, var(--t-fg) 12%, var(--t-surface));
-  filter: none;
+.lu.dxe .dxe-actionbar-btns {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
-.dxe-chip-plus {
-  color: var(--t-fg-soft);
+.lu.dxe .dxe-actionbar-btns .lu-btn-ghost {
+  color: var(--t-fg);
 }
-.dxe-avail-other {
-  flex-basis: 100%;
-  margin: 6px 0 0;
+
+/* narrow: one column */
+@container dxe (max-width: 640px) {
+  .lu.dxe .dxe-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lu.dxe .dxe-now {
+    --now-w: 120px;
+    --now-h: 120px;
+    width: auto;
+    max-width: none;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+  }
+  .lu.dxe .dxe-now .lu-thumb {
+    flex: none;
+  }
+  #deck-editor .dxe-h1 input.dxe-title {
+    font-size: 22px;
+  }
+  .lu.dxe {
+    --dxe-pad: var(--t-space-3);
+  }
+  /* The controls under the crumb, in reading order, the On switch at the end. */
+  .lu.dxe .dxe-top-ctl {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+  .lu.dxe .dxe-on {
+    margin-left: auto;
+  }
+  .lu.dxe .dxe-fold-body {
+    padding-left: 0;
+  }
+  /* The dashboard's name keeps the line, with ×; its actions go under it. */
+  .lu.dxe .dxe-detail-head {
+    flex-wrap: wrap;
+  }
+  .lu.dxe .dxe-detail-acts {
+    order: 3;
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
+  .lu.dxe .dxe-field {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+  .lu.dxe .dxe-label {
+    padding-top: 0;
+  }
+  .lu.dxe .dxe-days .lu-dt {
+    width: 40px;
+  }
+  .lu.dxe .dxe-lead {
+    margin-left: 0;
+  }
+  /* The tiles: one line that scrolls sideways, as on the Lineups page. */
+  .lu.dxe .dxe-steps-card {
+    --dxe-tile-h: 150px;
+    padding: 0;
+    --dxe-tw: min(84px, calc(64px * var(--dxe-arw, 16) / var(--dxe-arh, 10)));
+  }
+  .lu.dxe .dxe-tiles-scroll {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+  .lu.dxe .dxe-hint {
+    position: sticky;
+    left: 0;
+  }
+  .lu.dxe .dxe-tiles {
+    flex-wrap: nowrap;
+    width: max-content;
+  }
+  .lu.dxe .dxe-picks {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lu.dxe .dxe-it {
+    width: 84px;
+  }
+  .lu.dxe .dxe-more {
+    height: 53px;
+  }
+  .lu.dxe .dxe-actionbar-btns {
+    width: 100%;
+  }
+  .lu.dxe .dxe-actionbar-btns .lu-btn-primary {
+    margin-left: auto;
+  }
 }
-.dxe-chip--other {
-  border: 1px dashed var(--t-border-strong);
-  background: transparent;
-}
-.dxe-chip-where {
-  margin-left: 6px;
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--t-fg-soft);
+@media (prefers-reduced-motion: reduce) {
+  .lu.dxe .dxe-exp .lu-ico,
+  .lu.dxe .dxe-caret {
+    transition: none;
+  }
 }
 
 /* "Bind to this display?" prompt (static/bind_prompt.js), on the wizard's
@@ -817,6 +1808,28 @@
   flex-direction: column;
   gap: 3px;
 }
+/* The Move dialog (deck_editor.js askMove): the warn tint, not red. */
+.dxe-move-dialog .dxe-move-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dxe-move-dialog .dxe-move-lines p {
+  margin: 0;
+}
+.dxe-move-dialog .dxe-move-lines p + p {
+  color: var(--t-fg-soft);
+  font-size: 12.5px;
+}
+html .dxe-move-dialog .wizard-footer button.primary.dxe-caution {
+  background: color-mix(in oklab, var(--t-warn) 30%, var(--t-surface));
+  border-color: color-mix(in oklab, var(--t-warn) 65%, var(--t-border-strong));
+  color: var(--t-fg);
+  box-shadow: none;
+}
+html .dxe-move-dialog .wizard-footer button.primary.dxe-caution:hover {
+  background: color-mix(in oklab, var(--t-warn) 42%, var(--t-surface));
+}
 @media (max-width: 480px) {
   .bind-dialog .wizard-footer {
     flex-wrap: wrap;
@@ -827,145 +1840,6 @@
   .bind-dialog .wizard-footer button {
     flex: 1 1 100%;
   }
-}
-
-/* form controls reuse the app's field styling, all one height */
-.dxe input[type="text"]:not(.dxe-title-input),
-.dxe input[type="number"],
-.dxe input[type="time"],
-.dxe select {
-  width: 100%;
-  height: var(--dxe-ctl-h);
-  box-sizing: border-box;
-  padding: 0 var(--t-space-3);
-  border: 1px solid var(--t-border-strong);
-  border-radius: var(--t-radius-sm);
-  background: var(--t-surface);
-  font: inherit;
-  font-size: 13px;
-  color: var(--t-fg);
-  transition:
-    border-color var(--t-trans-fast),
-    box-shadow var(--t-trans-fast);
-}
-.dxe .dxe-fb-row input[type="number"] {
-  width: 60px;
-}
-.dxe select {
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--t-fg-soft) 50%),
-    linear-gradient(135deg, var(--t-fg-soft) 50%, transparent 50%);
-  background-position:
-    calc(100% - 18px) 50%,
-    calc(100% - 12px) 50%;
-  background-size:
-    6px 6px,
-    6px 6px;
-  background-repeat: no-repeat;
-  padding-right: 30px;
-  cursor: pointer;
-}
-.dxe input:hover,
-.dxe select:hover {
-  border-color: var(--t-fg);
-}
-.dxe input:focus,
-.dxe select:focus {
-  outline: none;
-  border-color: var(--t-accent);
-  box-shadow: var(--t-ring);
-}
-.dxe-interval select {
-  width: auto;
-}
-
-/* fallback (hidden when JS) */
-.dxe-fallback.js-hidden {
-  display: none;
-}
-.dxe-fallback {
-  border: 1px dashed var(--t-border);
-  border-radius: var(--t-radius-sm);
-  margin-top: 14px;
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.dxe-fb-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  font-size: 13px;
-}
-
-/* sticky action bar */
-/* The status text grows with the deck's page chain, and the buttons can't
-   shrink below their labels, so without wrapping the group is pushed past the
-   right edge and Save becomes unreachable (issue #192, phone portrait). Wrap
-   rather than scroll: a sticky bar you have to scroll sideways is no better
-   than one you can't see. ``min-width: 0`` lets the status give up space
-   before that happens. */
-.dxe-actionbar {
-  position: sticky;
-  bottom: 0;
-  margin-top: 20px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 18px;
-  background: color-mix(in oklab, var(--t-bg) 86%, transparent);
-  backdrop-filter: blur(8px);
-  border-top: 1px solid var(--t-border);
-}
-.dxe-actionbar-status {
-  font-size: 12.5px;
-  color: var(--t-muted);
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.dxe-actionbar-btns {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-}
-.dxe-btn-ghost {
-  background: var(--t-surface);
-  border: 1px solid var(--t-border-strong);
-  border-radius: 9px;
-  padding: 9px 16px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--t-fg);
-  cursor: pointer;
-}
-.dxe-btn-ghost:hover {
-  border-color: var(--t-fg);
-}
-.dxe-btn-danger {
-  color: var(--t-danger);
-}
-.dxe-btn-primary {
-  background: var(--t-fg);
-  color: var(--t-bg);
-  border: 1px solid var(--t-fg);
-  border-radius: 9px;
-  padding: 9px 20px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.dxe-btn-primary:hover {
-  opacity: 0.9;
 }
 
 /* ---- "Updates" cadence control on the dashboards list ------------------ */
@@ -1012,3 +1886,36 @@
 }
 
 /* The Lineups page itself (/decks) lives in dx-lineups.css. */
+.lu.dxe .dxe-wk .lu-nflag {
+  display: none;
+}
+.lu.dxe .dxe-wk .lu-trk.flagged {
+  margin: 0;
+}
+.lu.dxe .dxe-loc .lu-more-menu {
+  min-width: 210px;
+}
+.lu.dxe .dxe-loc .lu-more-menu button {
+  white-space: nowrap;
+}
+.lu.dxe .dxe-overridden .dxe-link {
+  font-size: inherit;
+}
+.lu.dxe .dxe-step.is-flash {
+  animation: dxe-flash 1.8s ease-out;
+}
+@keyframes dxe-flash {
+  0%,
+  40% {
+    box-shadow: 0 0 0 3px var(--lu-acc);
+  }
+  100% {
+    box-shadow: 0 0 0 3px transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lu.dxe .dxe-step.is-flash {
+    animation: none;
+    box-shadow: 0 0 0 3px var(--lu-acc);
+  }
+}

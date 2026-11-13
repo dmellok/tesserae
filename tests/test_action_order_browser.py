@@ -139,6 +139,8 @@ _SWEEP_JS = r"""
       && !el.matches('a.dx-qtile--link')
       // a thumbnail or QR code that is a link, and corner close / dismiss icons
       && !(el.tagName === 'A' && el.querySelector('img') && !el.textContent.trim())
+      // a lineup editor tile's full-cover button is the tile itself, not an action in a row
+      && !el.matches('.dxe-sel')
       && !/^(close|dismiss|hide)\b/i.test(el.getAttribute('aria-label') || '')
       && el.getAttribute('type') !== 'hidden' && vis(el))
     .filter((el, _, all) => !all.some((o) => o !== el && o.contains(el)));
@@ -374,7 +376,9 @@ def test_bind_prompt_buttons_read_the_same_way_they_tab(
         try:
             page = browser.new_context(viewport={"width": width, "height": 900}).new_page()
             page.goto(f"{base}/decks/mine/edit", wait_until="load")
-            page.locator("#dxe-avail .dxe-chip--other", has_text="Google Photos").click()
+            page.locator("[data-picker]").click()
+            page.locator("[data-elsewhere-toggle]").click()
+            page.locator('.dxe-picks.is-other [data-add="photos"]').click()
             foot = page.locator("dialog.bind-dialog .wizard-footer button")
             foot.first.wait_for()
             labels = [b.inner_text().strip() for b in foot.all()]

@@ -36,18 +36,20 @@
     const mismatch = pages.some((p) =>
       (p.bound_to || []).some((b) => size(b) && size(display) && size(b) !== size(display))
     );
+    // One line under the title; the buttons say the rest.
     let lead;
     if (pages.length === 1) {
       const where = join((pages[0].bound_to || []).map(label));
-      lead = `It is currently bound to ${where || "another display"}`;
-      lead += mismatch && size(display) ? ` and ${display.name} is ${size(display)}.` : ".";
+      lead =
+        mismatch && size(display)
+          ? `It's currently bound to ${where || "another display"}; here it shows scaled.`
+          : `It's currently bound to ${where || "another display"}.`;
     } else {
-      lead = `${display.name} can only show dashboards bound to it.`;
+      lead = mismatch
+        ? `${display.name} only shows its own dashboards; these show scaled.`
+        : `${display.name} only shows its own dashboards.`;
     }
-    const note = mismatch
-      ? "It will show scaled or letterboxed until you make a version for this display."
-      : "";
-    return { title, lead, note };
+    return { title, lead };
   }
 
   function ask({ display, pages }) {
@@ -57,7 +59,7 @@
         return;
       }
       const opener = document.activeElement;
-      const { title, lead, note } = copy(display, pages);
+      const { title, lead } = copy(display, pages);
       const dlg = el("dialog", "wizard-dialog bind-dialog");
       dlg.setAttribute("aria-labelledby", "bind-dialog-title");
       dlg.setAttribute("aria-describedby", "bind-dialog-body");
@@ -87,14 +89,6 @@
         });
         body.append(ul);
       }
-      if (note) body.append(el("p", "bind-dialog-note", note));
-      body.append(
-        el(
-          "p",
-          "bind-dialog-note",
-          "Bind to both keeps the other display too. Cancel leaves everything as it is."
-        )
-      );
 
       const foot = el("div", "wizard-footer");
       const cancel = el("button", "ghost", "Cancel");

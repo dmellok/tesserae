@@ -159,7 +159,7 @@ def test_editor_page_flags_off_display_members(app: Flask) -> None:
     html = app.test_client().get("/decks/bad/edit").get_data(as_text=True)
     state = json.loads(html.split('id="dxe-data">', 1)[1].split("</script>", 1)[0])
     assert {d["id"] for d in state["devices"]} >= {"hallway", "frame"}
-    assert next(p for p in state["pages"] if p["id"] == "photos")["devices"] == ["frame"]
+    assert state["pages"]["photos"]["devices"] == ["frame"]
 
 
 # -- the other write routes ----------------------------------------------------------

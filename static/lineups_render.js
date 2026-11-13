@@ -49,7 +49,7 @@
   function thumb(name, url, aspect, orientation, cls, title, priority, display, extra) {
     const ar = String(aspect || "16/10").split("/");
     const inner = url
-      ? `<img src="${esc(url)}" alt="" width="${esc(ar[0])}" height="${esc(ar[1])}" loading="${priority ? "eager" : "lazy"}" decoding="async"${priority ? ' fetchpriority="high"' : ""}>`
+      ? `<img src="${esc(url)}" alt="" width="${esc(ar[0])}" height="${esc(ar[1])}" loading="${priority ? "eager" : "lazy"}" decoding="async" referrerpolicy="no-referrer"${priority ? ' fetchpriority="high"' : ""}>`
       : `<span class="lu-thumb-ph" aria-hidden="true">${esc(
           String(cls || "")
             .split(" ")
@@ -90,11 +90,23 @@
     return h ? `Update in ${h} h${m ? ` ${m} min` : ""}` : `Update in ${m} min`;
   }
 
+  // A block's place on the bar; --w lets a short one keep its end when it
+  // grows to the minimum width (dx-lineups.css .lu-blk). A block under
+  // about 15 minutes, or a push, is thin: it draws above its neighbours.
+  // One that starts where the block before it ends grows to the right
+  // instead (grow-r), so it never covers that block's end.
+  const blkStyle = (s) => `left:${s.left_pct}%;width:${s.width_pct}%;--w:${s.width_pct}`;
+  const thin = (s) => s.kind === "push" || (s.kind !== "hold" && s.width_pct < 1);
+  const growsRight = (segs, k) => {
+    const prev = segs[k - 1];
+    return !!prev && prev.kind !== "hold" && prev.end_min >= segs[k].start_min;
+  };
+
   function dayTrack(d, day, editableIds, tall, extraCls) {
     if (tall === undefined) tall = true;
     let html = "";
     let flag = null; // the next advance's flag, when the bar shows one
-    (day.segments || []).forEach((s) => {
+    (day.segments || []).forEach((s, k) => {
       const hold = s.kind === "hold";
       const push = s.kind === "push";
       const ed = tall && !hold && editableIds.includes(s.lineup_id);
@@ -105,6 +117,8 @@
         s.live ? "live" : "",
         s.planned && tall ? "plan" : "",
         s.pending ? "is-pending" : "",
+        thin(s) ? "is-thin" : "",
+        thin(s) && growsRight(day.segments, k) ? "grow-r" : "",
       ]
         .filter(Boolean)
         .join(" ");
@@ -124,7 +138,7 @@
           flag = `<span class="lu-nflag" style="--bl:${s.left_pct};--bw:${s.width_pct};--tp:${nt.pct}" data-in="${nt.in_sec}">${text}</span>`;
         }
       }
-      html += `<div class="${cls}" style="left:${s.left_pct}%;width:${s.width_pct}%" data-lineup="${esc(s.lineup_id)}" data-display="${esc(d.id)}" title="${esc(s.title)}"${edAttr}>${inner}</div>`;
+      html += `<div class="${cls}" style="${blkStyle(s)}" data-lineup="${esc(s.lineup_id)}" data-display="${esc(d.id)}" title="${esc(s.title)}"${edAttr}>${inner}</div>`;
       if (push && tall)
         html += `<span class="lu-blk-side" style="left:calc(${s.left_pct}% + 9px)" title="${esc(s.title)}">${esc(s.label)}</span>`;
     });
@@ -339,6 +353,12 @@
 
   // ``ui.itemChoice(d, l, s)`` is the item the person picked with the arrows on this step
   // (lineups.js), or null: {key, idx, state: "loading" | "ready" | "error" | "busy", thumb_url}.
+  // The lineup editor (deck_editor.js) draws its dashboards with this too and adds, all
+  // optional: ``ui.stepKey(s)`` (data-step), ``ui.stepClass(s)`` and ``ui.stepAttrs(s)`` on
+  // the step, ``ui.tileExtra(s)`` inside the tile, ``ui.captionExtra(s)`` in the caption,
+  // ``ui.pushOverlay === false`` (Push now lives elsewhere; the arrows stay).
+  // A tile is a stack with a ×N badge when the dashboard lists more than one item, or a
+  // "random" (or ×N) badge when it draws one at random.
   function stepHtml(d, l, s, ui) {
     const choice = (ui && ui.itemChoice && ui.itemChoice(d, l, s)) || null;
     const canPush = !!(d.id && l.actions.push_step_url && !s.missing && !s.off_display);
@@ -355,18 +375,28 @@
     const pill = s.pill
       ? `<span class="lu-pill p-${esc(s.pill.kind)}" title="${esc(s.pill.title)}">${s.pill.kind === "now" ? ico("play") : ""}${esc(s.pill.label)}</span>`
       : "";
-    const push = canPush
-      ? `<form method="post" action="${esc(l.actions.push_step_url)}" class="lu-push-form"><input type="hidden" name="index" value="${s.index}"><input type="hidden" name="display_id" value="${esc(d.id)}"><input type="hidden" name="page_id" value="${esc(s.dashboard_id)}"><input type="hidden" name="composition_digest" value="${esc(choice ? "" : s.composition_digest || "")}">${choice ? `<input type="hidden" name="item" value="${esc(choice.key)}">` : ""}<button type="submit" class="lu-push-ov" data-push="${esc(l.id)}:${s.index}" title="${esc(s.push_title)}" aria-label="${esc(s.push_title)}"><i>${ico("send")}</i><span>Push now</span></button></form>`
-      : "";
-    const prevLabel = draw ? "Previous picture" : "Previous item";
-    const nextLabel = draw ? "Draw the next picture" : "Next item";
-    const items = canPick
-      ? `<span class="lu-items" role="group" aria-label="${draw ? `Draw another ${esc(s.name)} picture` : `Choose which ${esc(s.name)} item to push`}"><button type="button" class="lu-it" data-item="${esc(l.id)}:${s.index}:-1" aria-label="${prevLabel}" title="${prevLabel}"${draw && !choice ? " disabled" : ""}>${ico("chevl")}</button><span class="lu-it-pos" aria-hidden="true">${choice && !draw ? `${choice.idx + 1}/${s.items.length}` : ""}</span><button type="button" class="lu-it" data-item="${esc(l.id)}:${s.index}:1" aria-label="${nextLabel}" title="${nextLabel}">${ico("chev")}</button></span>`
-      : "";
-    const count =
-      s.item_count > 1
-        ? `<button type="button" class="lu-count" data-peek="${esc(l.id)}:${s.index}" aria-haspopup="dialog" aria-expanded="false" title="${s.item_count} items in this step. Show them">×${s.item_count}</button>`
+    const push =
+      canPush && !(ui && ui.pushOverlay === false)
+        ? `<form method="post" action="${esc(l.actions.push_step_url)}" class="lu-push-form"><input type="hidden" name="index" value="${s.index}"><input type="hidden" name="display_id" value="${esc(d.id)}"><input type="hidden" name="page_id" value="${esc(s.dashboard_id)}"><input type="hidden" name="composition_digest" value="${esc(choice ? "" : s.composition_digest || "")}">${choice ? `<input type="hidden" name="item" value="${esc(choice.key)}">` : ""}<button type="submit" class="lu-push-ov" data-push="${esc(l.id)}:${s.index}" title="${esc(s.push_title)}" aria-label="${esc(s.push_title)}"><i>${ico("send")}</i><span>Push now</span></button></form>`
         : "";
+    // (The editor names them: s.item_noun "photo", s.draw_label "Draw another".)
+    const noun = s.item_noun || "item";
+    const prevLabel = draw ? "Previous picture" : `Previous ${noun}`;
+    const nextLabel = draw ? s.draw_label || "Draw the next picture" : `Next ${noun}`;
+    const items = canPick
+      ? `<span class="lu-items" role="group" aria-label="${draw ? `Draw another ${esc(s.name)} picture` : `Choose which ${esc(s.name)} item to push`}"><button type="button" class="lu-it" data-item="${esc(l.id)}:${s.index}:-1" aria-label="${esc(prevLabel)}" title="${esc(prevLabel)}"${draw && !choice ? " disabled" : ""}>${ico("chevl")}</button><span class="lu-it-pos" aria-hidden="true">${choice && !draw ? `${choice.idx + 1}/${s.items.length}` : ""}</span><button type="button" class="lu-it" data-item="${esc(l.id)}:${s.index}:1" aria-label="${esc(nextLabel)}" title="${esc(nextLabel)}">${ico("chev")}</button></span>`
+      : "";
+    // A widget that draws a random photo is a collection too: it stacks, and says
+    // "random" when it can't say how many it draws from.
+    const drawN = draw ? Number(s.draw_count) || 0 : 0;
+    const stacked = s.item_count > 1 || draw || !!s.stacked;
+    const count =
+      s.item_count > 1 && !draw
+        ? `<button type="button" class="lu-count" data-peek="${esc(l.id)}:${s.index}" aria-haspopup="dialog" aria-expanded="false" title="${s.item_count} items in this step. Show them">×${s.item_count}</button>`
+        : draw
+          ? `<span class="lu-count is-draw" title="${drawN > 1 ? `Draws one of ${drawN} at random` : "A random one each time it is sent"}">${drawN > 1 ? `×${drawN}` : "random"}</span>`
+          : "";
+    const hook = (name) => (ui && ui[name] ? ui[name](s) || "" : "");
     const cond = s.conditional
       ? ` <span title="Shows only while its conditions pass">${ico("funnel")}</span>`
       : "";
@@ -384,9 +414,9 @@
           ? `<span class="lu-sep loop" title="Loops back to ${esc(l.steps[0].name)}">${ico("loop")}</span>`
           : "";
     return (
-      `<li class="lu-step${cls ? " " + cls : ""}${s.missing ? " is-missing" : ""}${s.off_display ? " is-offdisplay" : ""}" data-step="${s.index}"${s.missing ? ' title="This dashboard was deleted; remove it from the lineup"' : s.off_display ? ` title="${esc(s.off_display_note)}"` : ""}><figure><span class="lu-slot">${pill}</span>` +
-      `<span class="lu-tile${s.item_count > 1 ? " stacked" : ""}${canPick ? " has-items" : ""}${choice && choice.state === "loading" ? " is-loading" : ""}${choice && (choice.state === "error" || choice.state === "busy") ? " is-itemfail" : ""}">${thumb(s.name, picked || s.thumb_url, s.aspect, d.orientation || s.orientation, s.missing ? "missing" : s.off_display ? "offdisplay" : "", null, false, d, s.thumb_url && !s.missing && !s.off_display ? zoomBtn(`step:${l.id}:${s.index}`, `Zoom ${s.name}`) : "")}<span class="lu-scrim" aria-hidden="true"></span>${push}${items}<span class="lu-pushed-msg" aria-hidden="true"></span>${count}</span>` +
-      `<figcaption><span class="lu-step-name">${esc(s.name)}</span><span class="lu-step-meta">${esc(s.position)}${cond}</span>${off}</figcaption></figure>${sep}</li>`
+      `<li class="lu-step${cls ? " " + cls : ""}${s.missing ? " is-missing" : ""}${s.off_display ? " is-offdisplay" : ""}${hook("stepClass") ? " " + hook("stepClass") : ""}" data-step="${esc(ui && ui.stepKey ? ui.stepKey(s) : s.index)}"${hook("stepAttrs")}${s.missing ? ' title="This dashboard was deleted; remove it from the lineup"' : s.off_display ? ` title="${esc(s.off_display_note)}"` : ""}><figure><span class="lu-slot">${pill}</span>` +
+      `<span class="lu-tile${stacked ? " stacked" : ""}${canPick ? " has-items" : ""}${choice && choice.state === "loading" ? " is-loading" : ""}${choice && (choice.state === "error" || choice.state === "busy") ? " is-itemfail" : ""}">${thumb(s.name, picked || s.thumb_url, s.aspect, d.orientation || s.orientation, s.missing ? "missing" : s.off_display ? "offdisplay" : "", null, false, d, s.thumb_url && !s.missing && !s.off_display ? zoomBtn(`step:${l.id}:${s.index}`, `Zoom ${s.name}`) : "")}<span class="lu-scrim" aria-hidden="true"></span>${push}${items}<span class="lu-pushed-msg" aria-hidden="true"></span>${count}${hook("tileExtra")}</span>` +
+      `<figcaption><span class="lu-step-name">${esc(s.name)}</span><span class="lu-step-meta">${esc(s.position)}${cond}</span>${off}${hook("captionExtra")}</figcaption></figure>${sep}</li>`
     );
   }
 
@@ -422,6 +452,10 @@
   }
 
   /* ---------------------------------------------------------------- display */
+  // The new-lineup page, started on this display (the + beside its fold chevron).
+  const newLineupUrl = (id) =>
+    `${window.TESSERAE_URL_PREFIX || ""}/decks/new?display=${encodeURIComponent(id)}`;
+
   function header(vm, d, ui) {
     const op = d.on_screen;
     const editable =
@@ -487,7 +521,7 @@
       `<header class="lu-ds-hdr"><figure class="lu-now-thumb" title="${esc(delivering ? ph.title : op ? `On screen: ${op.name}` : fr ? fr.title : ph.title)}">${qt ? `<span class="lu-now-wrap">${thumbHtml}<span class="lu-qthumb" role="group" aria-label="${esc(qt.title)}" title="${esc(qt.title)}">${thumb(qt.name, qt.thumb_url, qt.aspect, qt.orientation, "", null, false, d)}<span class="lu-qtag">${ico("clock")}<span>${esc(qt.label)}</span></span></span></span>` : thumbHtml}</figure>` +
       `<div class="lu-ds-name-row"><div class="lu-ds-title"><h2>${esc(d.name)}</h2>${d.settings_url ? `<a class="lu-gear" href="${esc(d.settings_url)}" title="${esc(d.name)} settings" aria-label="${esc(d.name)} settings">${ico("gear")}</a>` : ""}</div><span class="lu-ds-tags">${tags}</span></div>` +
       `<div class="lu-ds-state">${show}${next}</div>${today}` +
-      `<span class="lu-ds-ctl"><button class="lu-ibtn lu-ds-add" type="button" data-open-timed-wizard data-wizard-display="${esc(d.id)}" aria-haspopup="dialog" aria-label="New lineup for ${esc(d.name)}" title="New lineup for ${esc(d.name)}">${ico("plus")}</button><button class="lu-fold lu-ds-fold" type="button" data-collapse="${esc(d.id)}" aria-expanded="${collapsed ? "false" : "true"}" aria-controls="lu-dsb-${esc(d.id)}" aria-label="${esc(d.name)}: collapse or expand">${ico("caret")}</button></span></header>`
+      `<span class="lu-ds-ctl"><a class="lu-ibtn lu-ds-add" href="${esc(newLineupUrl(d.id))}" aria-label="New lineup for ${esc(d.name)}" title="New lineup for ${esc(d.name)}">${ico("plus")}</a><button class="lu-fold lu-ds-fold" type="button" data-collapse="${esc(d.id)}" aria-expanded="${collapsed ? "false" : "true"}" aria-controls="lu-dsb-${esc(d.id)}" aria-label="${esc(d.name)}: collapse or expand">${ico("caret")}</button></span></header>`
     );
   }
 
@@ -554,7 +588,7 @@
       // its initial, never the step's picture standing in for it.
       const url = it && it.key ? it.thumb_url : (it && it.thumb_url) || s.thumb_url;
       items.push(
-        `<li class="lu-pk-item">${thumb(s.name, url, s.aspect, d.orientation || s.orientation, "thumb-frame--letterbox", label, false, d)}` +
+        `<li class="lu-pk-item">${thumb(s.name, url, s.aspect, d.orientation || s.orientation, s.item_fit ? "it fit thumb-frame--letterbox" : "it", label, false, d)}` +
           "</li>"
       );
     }
@@ -652,7 +686,7 @@
       const hold = s.kind === "hold";
       const push = s.kind === "push";
       if (hold) {
-        html += `<div class="lu-blk hold${s.live ? " live" : ""}" style="left:${s.left_pct}%;width:${s.width_pct}%" data-lineup="${esc(s.lineup_id)}" data-display="${esc(d.id)}" title="${esc(s.title)}"></div>`;
+        html += `<div class="lu-blk hold${s.live ? " live" : ""}" style="${blkStyle(s)}" data-lineup="${esc(s.lineup_id)}" data-display="${esc(d.id)}" title="${esc(s.title)}"></div>`;
         if (s.end_min - s.start_min >= 20) {
           const past = nowAbs !== null && nowAbs >= s.start_min;
           const acc = s.is_current || s.live;
@@ -675,6 +709,8 @@
         s.live ? "live" : "",
         s.planned ? "plan" : "",
         open && !push ? "open" : "",
+        thin(s) ? "is-thin" : "",
+        thin(s) && growsRight(day.segments, k) ? "grow-r" : "",
       ]
         .filter(Boolean)
         .join(" ");
@@ -709,7 +745,7 @@
         });
         inner += `<span class="lu-blk-l">${esc(s.label)}${s.pending ? '<i class="lu-edot" title="Unsaved change"></i>' : ""}</span>`;
       }
-      html += `<div class="${cls}" style="left:${s.left_pct}%;width:${s.width_pct}%" data-b="${k}" data-lineup="${esc(s.lineup_id)}" data-display="${esc(d.id)}" title="${esc(s.title)}"${edAttr}${role}>${inner}</div>`;
+      html += `<div class="${cls}" style="${blkStyle(s)}" data-b="${k}" data-lineup="${esc(s.lineup_id)}" data-display="${esc(d.id)}" title="${esc(s.title)}"${edAttr}${role}>${inner}</div>`;
     });
     (day.pause || []).forEach((p) => {
       html += `<i class="lu-pz" style="left:${p.left_pct}%;width:${p.width_pct}%" title="${esc(p.title)}">${ico("moon")}</i>`;
@@ -945,6 +981,15 @@
       const sel = l.days.map((on, i) => (on ? i : -1)).filter((i) => i >= 0);
       l.days_text = sel.length === 7 ? "every day" : sel.map((i) => DAYS[i]).join(", ");
     });
+    return rebuildWeek(copy, d, nowWeekday, nowMin);
+  }
+
+  /**
+   * ``copy``'s week and day bars recomputed from its lineups (``d`` is the
+   * display it was copied from, for what is live now). Unlike withPending, it
+   * also shows a lineup that was taken out or switched off as gone.
+   */
+  function rebuildWeek(copy, d, nowWeekday, nowMin) {
     const liveSeg = (
       d.day.is_today ? d.day : d.week.find((x) => x.is_today) || d.day
     ).segments.find((s) => s.live && s.kind !== "hold");
@@ -953,6 +998,249 @@
     copy.week = DAYS.map((_, i) => previewDay(copy, model, i, liveId, nowWeekday, nowMin));
     copy.day = copy.week[copy.selected_day];
     return copy;
+  }
+
+  /* ------------------------------------------------------------ editing a block on the bar */
+  // Drag, resize and arrow-key a lineup's block. Shared by the Lineups page
+  // (which saves from it) and the lineup editor (which stages it). The caller
+  // says which block is which (find) and what a change does (commit).
+  const SNAP = 15;
+  const winOf = (l) => [
+    l.window.start_min,
+    l.window.is_point ? l.window.start_min : l.window.end_min,
+  ];
+
+  // Other lineups' windows on the given days (points for single pushes).
+  function obstacles(ed, l, days) {
+    const out = [];
+    ed.lineups.forEach((o) => {
+      if (o.id === l.id || !o.window || !o.enabled || o.window.wraps) return;
+      if (!o.days.some((on, i) => on && days[i])) return;
+      const [s, e] = winOf(o);
+      out.push({ s, e, o });
+    });
+    return out;
+  }
+  function clash(ed, l, s, e, days) {
+    return obstacles(ed, l, days).find((b) =>
+      b.s === b.e
+        ? b.s >= s && b.s < Math.max(e, s + 1)
+        : s === e
+          ? s >= b.s && s < b.e
+          : s < b.e && e > b.s
+    );
+  }
+  function room(ed, l, os, oe) {
+    let lo = 0;
+    let hi = DAY_MIN;
+    let loBy = null;
+    let hiBy = null;
+    obstacles(ed, l, l.days).forEach((b) => {
+      if (b.e <= os && b.e >= lo) {
+        lo = b.s === b.e ? b.s + SNAP : b.e;
+        loBy = b.o;
+      }
+      if (b.s >= oe && b.s <= hi && !(b.s === oe && b.s === b.e && os === oe)) {
+        hi = b.s;
+        hiBy = b.o;
+      }
+    });
+    return { lo, hi, loBy, hiBy };
+  }
+  function proposal(ed, l, mode, os, oe, dm) {
+    const { lo, hi, loBy, hiBy } = room(ed, l, os, oe);
+    const push = !!l.window.is_point;
+    const maxE = push ? Math.min(hi, DAY_MIN - SNAP) : hi;
+    let s = os;
+    let e = oe;
+    let stop = null;
+    if (mode === "move") {
+      s = os + dm;
+      e = oe + dm;
+      if (s < lo) {
+        e += lo - s;
+        s = lo;
+        stop = loBy;
+      }
+      if (e > maxE) {
+        s -= e - maxE;
+        e = maxE;
+        stop = hiBy;
+      }
+    } else if (mode === "l") {
+      s = Math.min(Math.max(os + dm, lo), oe - SNAP);
+      if (os + dm < lo) stop = loBy;
+    } else {
+      e = Math.max(Math.min(oe + dm, hi), os + SNAP);
+      if (oe + dm > hi) stop = hiBy;
+    }
+    return { s, e, stop, pause: overlapsPause(ed.pause, s, e) };
+  }
+
+  const tipText = (l, p, grid) => {
+    const t = l.window.is_point ? `at ${clock(p.s)}` : clockRange(p.s, p.e);
+    const days = l.days.map((on, i) => (on ? DAYS[i] : "")).filter(Boolean);
+    const applies =
+      grid && days.length > 1
+        ? `<span class="lu-tip-stop">applies to ${days.join(", ")}</span>`
+        : "";
+    return `<b>${t}</b>${applies}${p.stop ? `<span class="lu-tip-stop">stops at ${esc(p.stop.name)}</span>` : ""}${p.pause ? `<span class="lu-tip-warn">${ico("pause")}Quiet hours</span>` : ""}`;
+  };
+
+  // cfg: host (the page's bars), readOnly() -> bool,
+  // find(blk) -> {ed, l, ...} | null (ed: the display as edited, l: the lineup in it),
+  // commit(ctx, start_min, end_min). Returns {active(), justDragged()}.
+  function barEdit(cfg) {
+    const host = cfg.host;
+    let drag = null;
+    let justDragged = false;
+    const blkOf = (e) => e.target.closest && e.target.closest(".lu .lu-blk[data-edit]");
+    function endDrag(apply) {
+      const g = drag;
+      drag = null;
+      if (!g) return;
+      if (g.tip) g.tip.remove();
+      (g.ghosts || []).forEach((x) => x.remove());
+      g.trk.classList.remove("dragging");
+      g.blk.classList.remove("is-drag", "is-stopped");
+      try {
+        if (g.blk.hasPointerCapture && g.blk.hasPointerCapture(g.pid))
+          g.blk.releasePointerCapture(g.pid);
+      } catch {
+        /* already released */
+      }
+      if (!g.moved) return;
+      justDragged = true;
+      setTimeout(() => {
+        justDragged = false;
+      }, 0);
+      if (!apply || !g.p || (g.p.s === g.os && g.p.e === g.oe) || !g.blk.isConnected) {
+        g.blk.style.left = g.left;
+        g.blk.style.width = g.width;
+        g.blk.style.setProperty("--w", String(parseFloat(g.width)));
+        return;
+      }
+      const s = Math.max(0, Math.min(DAY_MIN - SNAP, g.p.s));
+      const e = g.l.window.is_point ? s : Math.max(s + SNAP, Math.min(DAY_MIN, g.p.e));
+      if ([s, e].every(Number.isFinite)) cfg.commit(g.ctx, s, e);
+    }
+    document.addEventListener("pointerdown", (e) => {
+      if (drag) endDrag(false); // a lost pointerup never leaves a drag stuck
+      const blk = blkOf(e);
+      if (!blk || e.button !== 0) return;
+      const trk = blk.closest(".lu-trk");
+      if (!trk || cfg.readOnly() || trk.clientWidth <= 0) return;
+      const ctx = cfg.find(blk);
+      if (!ctx) return;
+      const { ed, l } = ctx;
+      const [os, oe] = winOf(l);
+      const h = e.target.closest(".lu-h");
+      const mode = h ? h.dataset.h : "move";
+      trk.insertAdjacentHTML("beforeend", '<span class="lu-drag-tip" role="status"></span>');
+      const tip = trk.lastElementChild;
+      const grid = trk.classList.contains("tl");
+      const ghosts = [];
+      if (grid) {
+        trk.classList.add("dragging");
+        host.querySelectorAll(`.lu-tlg-trk`).forEach((other) => {
+          if (other === trk || !other.closest(`.lu-ds[data-display="${CSS.escape(ctx.d.id)}"]`))
+            return;
+          if (!l.days[Number(other.dataset.day)]) return;
+          other.insertAdjacentHTML(
+            "beforeend",
+            `<i class="lu-ghost" style="left:${(os / DAY_MIN) * 100}%;width:${((oe - os) / DAY_MIN) * 100}%" title="Applies here too"></i>`
+          );
+          ghosts.push(other.lastElementChild);
+        });
+      }
+      drag = {
+        grid,
+        ghosts,
+        blk,
+        trk,
+        ctx,
+        ed,
+        l,
+        os,
+        oe,
+        mode,
+        x0: e.clientX,
+        W: trk.clientWidth,
+        moved: false,
+        left: blk.style.left,
+        width: blk.style.width,
+        tip,
+        pid: e.pointerId,
+      };
+      try {
+        blk.setPointerCapture(e.pointerId);
+      } catch {
+        /* the document listeners still drive the drag */
+      }
+      blk.classList.add("is-drag");
+      e.preventDefault();
+    });
+    document.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      if (!drag.blk.isConnected) {
+        endDrag(false);
+        return;
+      }
+      let dm = Math.round((((e.clientX - drag.x0) / drag.W) * DAY_MIN) / SNAP) * SNAP;
+      if (!Number.isFinite(dm)) dm = 0;
+      if (dm) drag.moved = true;
+      const p = proposal(drag.ed, drag.l, drag.mode, drag.os, drag.oe, dm);
+      drag.p = p;
+      const pc = (m) => (m / DAY_MIN) * 100;
+      drag.blk.style.left = pc(p.s) + "%";
+      if (!drag.l.window.is_point) {
+        drag.blk.style.width = pc(p.e - p.s) + "%";
+        drag.blk.style.setProperty("--w", String(pc(p.e - p.s)));
+      }
+      drag.blk.classList.toggle("is-stopped", !!p.stop);
+      drag.tip.innerHTML = tipText(drag.l, p, drag.grid);
+      if (drag.grid) {
+        // The window belongs to the lineup: ghost the change on its other days.
+        drag.ghosts.forEach((g) => {
+          g.style.left = pc(p.s) + "%";
+          g.style.width = drag.l.window.is_point ? "10px" : pc(p.e - p.s) + "%";
+        });
+      }
+      const mid = ((pc(p.s) + pc(p.e)) / 2 / 100) * drag.W;
+      const w = drag.tip.offsetWidth;
+      drag.tip.style.left = Math.max(0, Math.min(drag.W - w, mid - w / 2)) + "px";
+    });
+    document.addEventListener("pointerup", () => drag && endDrag(true));
+    document.addEventListener("pointercancel", () => drag && endDrag(false));
+    window.addEventListener("blur", () => drag && endDrag(false));
+    document.addEventListener(
+      "keydown",
+      (e) => {
+        if (e.key === "Escape" && drag) {
+          drag.moved = true;
+          endDrag(false);
+          e.stopPropagation();
+          return;
+        }
+        if (!["ArrowLeft", "ArrowRight"].includes(e.key) || cfg.readOnly()) return;
+        const blk = blkOf(e);
+        if (!blk) return;
+        e.preventDefault();
+        const ctx = cfg.find(blk);
+        if (!ctx) return;
+        const { ed, l } = ctx;
+        const [os, oe] = winOf(l);
+        const dm = e.key === "ArrowLeft" ? -SNAP : SNAP;
+        const mode = e.shiftKey && !l.window.is_point ? (e.altKey ? "l" : "r") : "move";
+        const p = proposal(ed, l, mode, os, oe, dm);
+        if (p.s === os && p.e === oe) return;
+        const s = Math.max(0, Math.min(DAY_MIN - SNAP, p.s));
+        const en = l.window.is_point ? s : Math.max(s + SNAP, Math.min(DAY_MIN, p.e));
+        if ([s, en].every(Number.isFinite)) cfg.commit(ctx, s, en);
+      },
+      true
+    );
+    return { active: () => !!drag, justDragged: () => justDragged };
   }
 
   window.TesseraeLineupsRender = {
@@ -974,6 +1262,7 @@
     scopeEmpty,
     dayPop,
     row,
+    stepHtml,
     header,
     display,
     unassigned,
@@ -981,6 +1270,13 @@
     peek,
     timeline,
     withPending,
+    rebuildWeek,
     overlapsPause,
+    SNAP,
+    winOf,
+    room,
+    clash,
+    proposal,
+    barEdit,
   };
 })();

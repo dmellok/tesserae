@@ -1,295 +1,77 @@
-{% from "_preview_color.html" import attrs as color_attrs with context %}
 {% extends "_base.html" %}
+{% import "_lineups.html" as lu %}
+{#- The lineup editor. One page per lineup: what is on screen and its slice of
+    the display's day, then 1 When it runs, 2 Dashboards, 3 Timing, over a
+    sticky Save bar. GET /decks/new is the same page as three guided steps
+    (display, when, dashboards) that create the lineup.
 
-{% block title %}{{ deck.name if deck else 'New deck' }} · Lineups{% endblock %}
+    static/deck_editor.js draws everything from the JSON island below
+    (app.deck_routes._editor_state) and saves through /decks/editor-save or
+    creates through /decks/new/lineup. The day bar, day tiles and thumbnails
+    are the Lineups page's own (static/lineups_render.js, dx-lineups.css). -#}
+{% block title %}{{ deck.name if deck else 'New lineup' }} · Lineups{% endblock %}
+{% block page_class %}dxe-page{% endblock %}
 
 {% block main %}
-<div class="dxe" id="deck-editor">
-  <script type="application/json" id="dxe-data">{{ editor_state | tojson }}</script>
-
-  <form method="post" action="{{ url_for('decks.editor_save') }}" id="deck-form">
+<script type="application/json" data-lu-icons>{{ lu.LU_ICONS|tojson }}</script>
+<div class="lu dxe{% if not deck %} is-new{% endif %}" id="deck-editor">
+  <script type="application/json" id="dxe-data">{{ editor_state|tojson }}</script>
+  <form method="post" action="{{ url_for('decks.editor_save') }}" id="deck-form" novalidate>
     <input type="hidden" name="deck_id" value="{{ deck.id if deck else '' }}">
-    <input type="hidden" name="pages" id="dxe-pages-field" value="">
 
-    {# Header: breadcrumb + editable title, and the enabled switch. #}
-    <div class="dxe-head">
-      <div class="dxe-head-left">
-        <nav class="dxe-crumb">
-          <a href="{{ url_for('auth.settings') }}">SETTINGS</a>
-          <span>/</span>
-          <a href="{{ url_for('decks.index') }}">LINEUPS</a>
-        </nav>
-        <input type="text" name="name" id="dxe-title" class="dxe-title-input"
-               value="{{ deck.name if deck else '' }}" placeholder="Untitled deck" autocomplete="off">
-      </div>
-      <div class="dxe-head-right">
-        <span class="dxe-status-word" id="dxe-status-word">{{ 'Enabled' if deck is none or deck.enabled else 'Disabled' }}</span>
-        <label class="switch dxe-switch">
-          <input type="checkbox" name="enabled" {% if deck is none or deck.enabled %}checked{% endif %}>
-          <span class="switch-track"><span class="switch-thumb"></span></span>
+    <div class="dxe-top">
+      <nav class="dxe-crumb" aria-label="Breadcrumb">
+        <a href="{{ url_for('decks.index') }}">Lineups</a>
+        <span aria-hidden="true">/</span>
+        <span id="dxe-crumb-here">{{ 'New lineup' if not deck else '' }}</span>
+      </nav>
+      {% if deck %}
+      <div class="dxe-top-ctl">
+        <div class="dxe-loc" id="dxe-loc" role="group" aria-label="Display"></div>
+        <label class="dxe-on">
+          <span id="dxe-on-word">{{ 'On' if deck.enabled else 'Off' }}</span>
+          <span class="switch dxe-switch">
+            <input type="hidden" name="enabled" value="0">
+            <input type="checkbox" name="enabled" id="dxe-enabled" {% if deck.enabled %}checked{% endif %}
+                   aria-label="Lineup on">
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+          </span>
         </label>
       </div>
+      {% endif %}
     </div>
 
-    <div class="dxe-body">
-      {# ---- Left: flip order + tuning ---- #}
-      <div class="dxe-main-col">
-      <section class="dxe-card dxe-main">
-        <div class="dxe-main-head">
-          <h2 class="dxe-h2">Flip order</h2>
-          <span class="dxe-meta" id="dxe-meta"></span>
-          <span class="dxe-wraps">&#8635; wraps to first</span>
-        </div>
-
-        {# Advance: segmented control + conditional interval + hint. #}
-        <div class="dxe-advance">
-          <span class="dxe-mono-label">ADVANCE</span>
-          {% set adv = deck.advance if deck else advance_default %}
-          <div class="dxe-seg-track" role="radiogroup" aria-label="Advance mode">
-            <label class="dxe-seg"><input type="radio" name="advance" value="manual" {% if adv == 'manual' %}checked{% endif %}><span>By hand</span></label>
-            <label class="dxe-seg"><input type="radio" name="advance" value="timer" {% if adv == 'timer' %}checked{% endif %}><span>On a timer</span></label>
-            <label class="dxe-seg"><input type="radio" name="advance" value="both" {% if adv == 'both' %}checked{% endif %}><span>Both</span></label>
-          </div>
-          <span class="dxe-interval" id="dxe-interval-wrap">
-            {# This is the FALLBACK dwell, not the loop period: a page with
-               its own dwell ignores it entirely (discussion #266 confusion).
-               Label it for what it is and let the hint carry the loop total. #}
-            <span class="dxe-every" title="Used for pages without their own dwell">default dwell</span>
-            <select name="advance_interval_minutes" id="dxe-interval">
-              {% set ai = deck.advance_interval_minutes if deck else 30 %}
-              {% if ai not in (5, 15, 30, 60) %}
-              <option value="{{ ai }}" selected>{{ ai }} min</option>
-              {% endif %}
-              <option value="5" {% if ai == 5 %}selected{% endif %}>5 min</option>
-              <option value="15" {% if ai == 15 %}selected{% endif %}>15 min</option>
-              <option value="30" {% if ai == 30 %}selected{% endif %}>30 min</option>
-              <option value="60" {% if ai == 60 %}selected{% endif %}>1 hour</option>
-            </select>
-          </span>
-          <span class="dxe-adv-hint" id="dxe-adv-hint"></span>
-        </div>
-
-        <div class="dxe-rail" id="dxe-rail"></div>
-        <div class="dxe-panel" id="dxe-panel" hidden></div>
-
-        {# No-JS source of truth for per-page data. JS hides this. #}
-        <fieldset class="dxe-fallback" id="dxe-fallback">
-          <legend>Deck pages</legend>
-          {% for p in page_meta %}
-          {% set idx = member_ids.index(p.id) if p.id in member_ids else none %}
-          <div class="dxe-fb-row{% if p.missing %} is-missing{% endif %}" data-page="{{ p.id }}">
-            <label><input type="checkbox" name="member" value="{{ p.id }}"
-                     {% if p.id in member_ids %}checked{% endif %}> {{ p.name }}{% if p.missing %} <small class="dxe-missing-id">{{ p.id }}</small>{% endif %}</label>
-            <input type="number" name="order[{{ p.id }}]" min="1" max="99"
-                   value="{{ (idx + 1) if idx is not none else loop.index }}" aria-label="Position">
-            <label><input type="radio" name="home" value="{{ p.id }}"
-                     {% if home_id == p.id %}checked{% endif %}> home</label>
-            <select name="override[{{ p.id }}]" aria-label="Refresh override">
-              {% set ov = override_map.get(p.id) %}
-              <option value="">deck default</option>
-              <option value="5" {% if ov == 5 %}selected{% endif %}>every 5 min</option>
-              <option value="30" {% if ov == 30 %}selected{% endif %}>every 30 min</option>
-              <option value="0" {% if ov == 0 %}selected{% endif %}>never</option>
-            </select>
-            <input type="number" name="dwell[{{ p.id }}]" min="1" max="10080"
-                   value="{{ dwell_map.get(p.id, '') }}" placeholder="dwell" aria-label="Dwell minutes">
-          </div>
-          {% endfor %}
-        </fieldset>
-      </section>
-
-      {# ---- Tuning card: timing + conditions folds, below the pages ---- #}
-      <section class="dxe-card dxe-tuning">
-        {# Advanced timing (rotation parity): only meaningful when auto-advancing. #}
-        <details class="dxe-fold" id="dxe-adv-more">
-          <summary>
-            <i class="ph-bold ph-caret-right dxe-fold-caret" aria-hidden="true"></i>
-            <i class="ph-bold ph-clock-countdown" aria-hidden="true"></i>
-            <span>Advanced timing</span>
-            <span class="dxe-fold-hint">days · start/stop · priority · render lead</span>
-          </summary>
-          <div class="dxe-adv-grid">
-            <div class="dxe-set">
-              <span class="dxe-mono-label">DAYS</span>
-              {% set dows = deck.advance_days_of_week if deck else [0,1,2,3,4,5,6] %}
-              <div class="dxe-days">
-                {% for i, lbl in [(0,'Mon'),(1,'Tue'),(2,'Wed'),(3,'Thu'),(4,'Fri'),(5,'Sat'),(6,'Sun')] %}
-                <label class="dxe-day"><input type="checkbox" name="advance_days" value="{{ i }}"
-                       {% if i in dows %}checked{% endif %}><span>{{ lbl }}</span></label>
-                {% endfor %}
-              </div>
-            </div>
-            <div class="dxe-set">
-              <span class="dxe-mono-label">START AT</span>
-              <input type="time" name="advance_anchor"
-                     value="{{ deck.advance_anchor if deck else '00:00' }}">
-              <p class="dxe-help">daily time the cycle begins</p>
-            </div>
-            <div class="dxe-set">
-              <span class="dxe-mono-label">STOP AT</span>
-              <input type="time" name="advance_end_at"
-                     value="{{ deck.advance_end_at if deck and deck.advance_end_at else '' }}">
-              <p class="dxe-help">blank cycles until midnight</p>
-            </div>
-            <div class="dxe-set">
-              <span class="dxe-mono-label">MODE</span>
-              <select name="advance_mode">
-                {% set amode = deck.advance_mode if deck else 'scheduled' %}
-                <option value="scheduled" {% if amode == 'scheduled' %}selected{% endif %}>timed rotation</option>
-                <option value="priority" {% if amode == 'priority' %}selected{% endif %}>first page whose conditions match</option>
-              </select>
-            </div>
-            <div class="dxe-set">
-              <span class="dxe-mono-label">MIN HOLD (MIN)</span>
-              <input type="number" name="advance_min_hold_minutes" min="0" max="120"
-                     value="{{ deck.advance_min_hold_minutes if deck else 5 }}">
-              <p class="dxe-help">minimum time on a page before switching</p>
-            </div>
-            <div class="dxe-set">
-              <span class="dxe-mono-label">PRIORITY</span>
-              <input type="number" name="advance_priority"
-                     value="{{ deck.advance_priority if deck else 0 }}">
-              <p class="dxe-help">higher wins when a schedule is also due</p>
-            </div>
-            <div class="dxe-set">
-              <label class="dxe-mono-label" for="dxe-lead">RENDER LEAD (S)</label>
-              <input type="number" id="dxe-lead" name="advance_smart_sync_lead_s" min="0" max="600"
-                     value="{{ deck.advance_smart_sync_lead_s if deck else 10 }}">
-              <p class="dxe-help">how early before the predicted wake to render</p>
-            </div>
-          </div>
-        </details>
-
-        {# Per-page conditions (#167 consolidation): the only place these are
-           authored now that the cycle form is gone. Rendered for saved decks;
-           a brand-new deck saves first, then conditions appear here. #}
-        {% if deck and deck.pages %}
-        {% set conditioned = deck.pages | selectattr('conditions') | list | length %}
-        <details class="dxe-fold" id="dxe-conditions"
-                 {% if request.args.get('open') == 'conditions' %}open{% endif %}>
-          <summary>
-            <i class="ph-bold ph-caret-right dxe-fold-caret" aria-hidden="true"></i>
-            <i class="ph-bold ph-funnel" aria-hidden="true"></i>
-            <span>Page conditions</span>
-            <span class="dxe-fold-hint">
-              {%- if conditioned -%}{{ conditioned }} of {{ deck.pages | length }} page{{ 's' if deck.pages | length != 1 }} conditioned
-              {%- else -%}none set
-              {%- endif -%}
-            </span>
-          </summary>
-          <div class="dxe-advanced-body">
-            <p class="dxe-help">Show a page only while its conditions pass. In
-              scheduled mode the cycle skips a failing page; in priority mode
-              the first passing page wins. Empty = always shown.</p>
-            {% for dp in deck.pages %}
-            <div class="dxe-set">
-              <label class="dxe-mono-label">{{ page_names.get(dp.page_id, dp.page_id) | upper }}</label>
-              <div class="condition-picker" data-condition-picker>
-                <textarea name="conditions[{{ dp.page_id }}]" rows="2" spellcheck="false"
-                          placeholder="[]">{% if dp.conditions %}{{ dp.conditions | tojson(indent=2) }}{% endif %}</textarea>
-              </div>
-            </div>
-            {% endfor %}
-          </div>
-        </details>
-        {% else %}
-        <p class="dxe-help dxe-tuning-hint">Save the deck first, then page
-          conditions appear here.</p>
-        {% endif %}
-      </section>
+    <header class="dxe-hero" id="dxe-hero">
+      <figure class="dxe-now" id="dxe-now" hidden></figure>
+      <div class="dxe-hero-main">
+        <h1 class="dxe-h1">
+          <input type="text" name="name" id="dxe-title" class="dxe-title" maxlength="80"
+                 aria-label="Lineup name"
+                 value="{{ deck.name if deck else '' }}" autocomplete="off" spellcheck="false"
+                 placeholder="{{ 'Name it (or leave it for later)' if not deck else 'Lineup name' }}">
+        </h1>
+        <p class="dxe-model" id="dxe-model"></p>
+        <div class="dxe-status" id="dxe-status-lines"></div>
       </div>
+      <div class="dxe-daybar" id="dxe-daybar" hidden></div>
+    </header>
 
-      {# ---- Right rail ---- #}
-      <aside class="dxe-rail-col">
-        <section class="dxe-card dxe-rail-card">
-          <h2 class="dxe-h2">Deck</h2>
-          <div class="dxe-set">
-            <label class="dxe-mono-label" for="dxe-device">DISPLAY</label>
-            <select name="device_ids" id="dxe-device">
-              <option value="">Choose a display…</option>
-              {% for d in device_meta %}
-              <option value="{{ d.id }}" {{ color_attrs(d.id) }} {% if deck and d.id in deck.device_ids %}selected{% endif %}>{{ d.name }}</option>
-              {% endfor %}
-            </select>
-            <p class="dxe-help">Only dashboards bound to this display can be added to the deck.</p>
-          </div>
-          <div class="dxe-set">
-            <label class="dxe-mono-label" for="dxe-cadence-num">BACKGROUND REFRESH</label>
-            {% set cad = deck.refresh_interval_minutes if deck else 15 %}
-            <div class="dxe-slider-row">
-              <input type="range" id="dxe-cadence-range" min="0" max="360" step="5" value="{{ cad }}"
-                     aria-label="Background refresh minutes">
-              <div class="dxe-dwell-box dxe-num-box">
-                <input type="number" id="dxe-cadence-num" name="refresh_interval_minutes"
-                       min="0" max="1440" value="{{ cad }}" class="dxe-dwell-inp">
-                <span class="dxe-dwell-suf">min</span>
-              </div>
-            </div>
-            <p class="dxe-help" id="dxe-cadence-help">How often member dashboards re-render out of view; takes over from each dashboard's own "Updates" setting while it's in this lineup.</p>
-          </div>
-          {# Smart sync: promoted per-deck switch (the lead window stays under
-             Advanced timing). Hidden by JS while advance is by-hand. #}
-          <div class="dxe-set" id="dxe-smartsync-wrap">
-            <div class="dxe-switch-row">
-              <label class="dxe-mono-label" for="dxe-smartsync">SMART SYNC</label>
-              <label class="switch dxe-switch">
-                <input type="checkbox" id="dxe-smartsync" name="advance_smart_sync"
-                       {% if deck and deck.advance_smart_sync %}checked{% endif %}>
-                <span class="switch-track"><span class="switch-thumb"></span></span>
-              </label>
-            </div>
-            <p class="dxe-help">Render just before a battery panel wakes instead
-              of on the fixed cadence. Needs the device's sleep telemetry;
-              without it the normal timing applies.</p>
-          </div>
-          {# Only meaningful when the deck waits for a person. An auto-advancing
-             deck reclaims its own panel at the next boundary, and a timeout
-             shorter than the advance interval parks it on home in between.
-             deck_editor.js hides and disables this for timer / both. #}
-          <div class="dxe-set" id="dxe-returnhome-wrap">
-            <label class="dxe-mono-label" for="dxe-returnhome">RETURN HOME AFTER</label>
-            <select name="timeout" id="dxe-returnhome">
-              {% set to = deck.home_timeout_minutes if deck else 0 %}
-              <option value="0" {% if to == 0 %}selected{% endif %}>off</option>
-              <option value="5" {% if to == 5 %}selected{% endif %}>5 idle min</option>
-              <option value="15" {% if to == 15 %}selected{% endif %}>15 idle min</option>
-              <option value="60" {% if to == 60 %}selected{% endif %}>60 idle min</option>
-            </select>
-            <p class="dxe-help" id="dxe-returnhome-help">Snaps back to the home page.</p>
-          </div>
-        </section>
-
-        <section class="dxe-card dxe-rail-card">
-          <div class="dxe-avail-head">
-            <h2 class="dxe-h2">Available pages</h2>
-            <span class="dxe-avail-count" id="dxe-avail-count"></span>
-          </div>
-          <p class="dxe-help" id="dxe-avail-sub"></p>
-          <div class="dxe-chips" id="dxe-avail"></div>
-        </section>
-      </aside>
-    </div>
+    <noscript><p class="dxe-noscript">The lineup editor needs JavaScript.</p></noscript>
+    <div class="dxe-sections" id="dxe-sections"></div>
   </form>
 
-  {# Sticky action bar #}
-  <div class="dxe-actionbar">
-    <span class="dxe-actionbar-status" id="dxe-status"></span>
-    <div class="dxe-actionbar-btns">
-      {% if deck %}
-      <form method="post" action="{{ url_for('decks.push', deck_id=deck.id) }}" class="inline">
-        <button type="submit" class="dxe-btn-ghost">Push to panel</button>
-      </form>
-      <form method="post" action="{{ url_for('decks.delete', deck_id=deck.id) }}" class="inline"
-            onsubmit="return confirm('Delete deck {{ deck.name }}?');">
-        <button type="submit" class="dxe-btn-ghost dxe-btn-danger">Delete</button>
-      </form>
-      {% endif %}
-      <button type="button" class="dxe-btn-ghost" id="dxe-discard"
-              data-lineups-url="{{ url_for('decks.index') }}">Discard</button>
-      <button type="submit" class="dxe-btn-primary" form="deck-form">Save deck</button>
-    </div>
+  <div class="dxe-actionbar" id="dxe-actionbar">
+    <span class="dxe-actionbar-status" id="dxe-save-state" role="status" aria-live="polite"></span>
+    <div class="dxe-actionbar-btns" id="dxe-actionbar-btns"></div>
   </div>
+  {% if deck %}
+  <form method="post" action="{{ url_for('decks.delete', deck_id=deck.id) }}" id="dxe-delete-form" hidden></form>
+  {% endif %}
+  <p class="lu-sr-only" id="dxe-live" role="status" aria-live="polite"></p>
 </div>
+<script src="{{ url_for('static', filename='lineups_api.js') }}" defer></script>
+<script src="{{ url_for('static', filename='lineups_render.js') }}" defer></script>
+<script src="{{ url_for('static', filename='lineups_lightbox.js') }}" defer></script>
 <script src="{{ url_for('static', filename='deck_editor.js') }}" defer></script>
 <script type="module" src="{{ url_for('static', filename='condition-picker.js') }}"></script>
 {% endblock %}

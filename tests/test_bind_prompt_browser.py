@@ -114,12 +114,25 @@ _BIND = re.compile(r"^Bind to (?!both)")
 
 
 def _save(page: Any) -> None:
-    page.locator("#deck-form").evaluate("f => f.requestSubmit()")
-    page.wait_for_url(re.compile(r".*/decks(\?|#|$).*"))
-    # The Lineups page is still fetching thumbnails; closing the browser
-    # mid-response leaves werkzeug's file handle open (ResourceWarning).
-    # (Not "networkidle": the page holds an event stream open.)
+    """Save lineup: the editor saves, then reloads itself."""
+    with page.expect_navigation():
+        page.locator("[data-save]").click()
+    # Thumbnails are still loading; closing the browser mid-response leaves
+    # werkzeug's file handle open (ResourceWarning).
     page.wait_for_function("() => [...document.images].every(i => i.complete)")
+
+
+def _steps(page: Any) -> list[str]:
+    return [r.get_attribute("data-step") for r in page.locator("[data-step]").all()]
+
+
+def _other(page: Any, page_id: str) -> Any:
+    """The Add button of a dashboard bound to another display, in the picker."""
+    if not page.locator("#dxe-picker").count():
+        page.locator("[data-picker]").click()
+    if not page.locator(".dxe-picks.is-other").count():
+        page.locator("[data-elsewhere-toggle]").click()
+    return page.locator(f'.dxe-picks.is-other [data-add="{page_id}"]')
 
 
 def test_adding_a_dashboard_from_another_display_asks_first(real: tuple[str, Flask]) -> None:
@@ -128,9 +141,9 @@ def test_adding_a_dashboard_from_another_display_asks_first(real: tuple[str, Fla
     base, app = real
     with sync_playwright() as p:
         browser, page, errors = _editor(p, base)
-        chip = page.locator("#dxe-avail .dxe-chip--other", has_text="Google Photos")
+        chip = _other(page, "photos")
         assert chip.count() == 1
-        assert page.locator("#dxe-avail .dxe-chip", has_text="Weather").count() == 1
+        assert page.locator('.dxe-picks:not(.is-other) [data-add="weather"]').count() == 1
 
         # Cancel: the dialog closes, the step is not added, nothing is bound.
         chip.click()
@@ -138,21 +151,18 @@ def test_adding_a_dashboard_from_another_display_asks_first(real: tuple[str, Fla
         assert dlg.get_by_role("heading").inner_text().startswith("Bind “Google Photos” to ")
         assert "currently bound to" in dlg.inner_text()
         _answer(page, "Cancel")
-        assert [
-            c.get_attribute("data-page") for c in page.locator("#dxe-rail .dxe-pcard").all()
-        ] == ["clock"]
-        assert page.locator("#dxe-pages-field").input_value() == "clock"
+        assert _steps(page) == ["clock"]
 
         # Escape cancels too.
         chip.click()
         page.keyboard.press("Escape")
         page.locator("dialog.bind-dialog").wait_for(state="detached")
-        assert page.locator("#dxe-rail .dxe-pcard").count() == 1
+        assert _steps(page) == ["clock"]
 
         # Bind: added to the lineup, and bound to this display only on save.
         chip.click()
         _answer(page, _BIND)
-        assert page.locator("#dxe-rail .dxe-pcard").count() == 2
+        assert _steps(page) == ["clock", "photos"]
         assert _bound(app, "photos") == ["frame"]  # nothing changes until Save
         _save(page)
         assert _members(app) == ["clock", "photos"]
@@ -167,7 +177,7 @@ def test_bind_to_both_keeps_the_other_display(real: tuple[str, Flask]) -> None:
     base, app = real
     with sync_playwright() as p:
         browser, page, errors = _editor(p, base)
-        page.locator("#dxe-avail .dxe-chip--other", has_text="Google Photos").click()
+        _other(page, "photos").click()
         _answer(page, "Bind to both")
         _save(page)
         assert _members(app) == ["clock", "photos"]
@@ -182,19 +192,29 @@ def test_switching_display_asks_and_cancel_reverts(real: tuple[str, Flask]) -> N
     base, app = real
     with sync_playwright() as p:
         browser, page, errors = _editor(p, base)
-        sel = page.locator("#dxe-device")
-        assert sel.input_value() == "hallway"
-        sel.select_option("frame")
-        dlg = page.locator("dialog.bind-dialog")
+        loc = page.locator("#dxe-loc")
+        assert loc.inner_text().startswith("On hallway")
+
+        def move() -> Any:
+            # Move to another display… lives in the ⋯ menu by the On switch.
+            page.locator("[data-loc-more]").click()
+            page.locator("[data-move]").click()
+            mv = page.locator("dialog.dxe-move-dialog")
+            mv.wait_for(state="visible")
+            mv.locator("select").select_option("frame")
+            mv.locator("[data-ok]").click()
+            return page.locator("dialog.bind-dialog:not(.dxe-move-dialog)")
+
+        dlg = move()
         assert dlg.get_by_role("heading").inner_text().startswith("Bind “Clock” to ")
         _answer(page, "Cancel")
-        assert sel.input_value() == "hallway"  # put back, nothing changed
-        assert page.locator("#dxe-rail .dxe-pcard.is-offdisplay").count() == 0
+        assert loc.inner_text().startswith("On hallway")  # nothing changed
+        assert page.locator(".dxe-step .dxe-tag.warn").count() == 0
 
-        sel.select_option("frame")
+        move()
         _answer(page, _BIND)
-        assert sel.input_value() == "frame"
-        assert page.locator("#dxe-rail .dxe-pcard.is-offdisplay").count() == 1
+        assert loc.inner_text().startswith("Moving to frame")
+        assert page.locator(".dxe-step .dxe-tag.warn").count() == 1
         _save(page)
         assert app.config["DECK_STORE"].get("mine").device_ids == ["frame"]
         assert _bound(app, "clock") == ["frame"]
@@ -211,14 +231,14 @@ def test_an_already_broken_lineup_asks_on_save(real: tuple[str, Flask]) -> None:
     )
     with sync_playwright() as p:
         browser, page, errors = _editor(p, base, "bad")
-        card = page.locator("#dxe-rail .dxe-pcard.is-offdisplay")
-        assert card.count() == 1 and "Not on this display" in card.inner_text()
-        page.locator("button[form=deck-form][type=submit]").click()
+        card = page.locator(".dxe-step .dxe-tag.warn")
+        assert card.count() == 1 and "Not on this display" in (card.text_content() or "")
+        page.locator("[data-save]").click()
         _answer(page, "Cancel")
         assert _bound(app, "photos") == ["frame"]  # nothing saved
-        page.locator("button[form=deck-form][type=submit]").click()
-        _answer(page, "Bind to both")
-        page.wait_for_url(re.compile(r".*/decks(\?|#|$).*"))
+        page.locator("[data-save]").click()
+        with page.expect_navigation():
+            _answer(page, "Bind to both")
         assert _bound(app, "photos") == ["frame", "hallway"]
         assert errors == []
         browser.close()

@@ -31,6 +31,7 @@
   'cal': '<rect x="2.5" y="3.5" width="11" height="10" rx="1.5"/><path d="M2.5 6.5h11M5.5 2v3M10.5 2v3"/>',
   'send': '<path d="M14 2 7 9M14 2l-4.5 12L7 9 2 6.5z"/>',
   'info': '<circle cx="8" cy="8" r="6"/><path d="M8 7.2v3.6M8 5.2v.1"/>',
+  'warn': '<path d="M8 2.2 14.2 13H1.8Z"/><path d="M8 6.4v3.2M8 11.4v.1"/>',
   'gear': '<path d="M6.6 1.8h2.8l.4 1.7 1.1.6 1.7-.5 1.4 2.4-1.3 1.2v1.6l1.3 1.2-1.4 2.4-1.7-.5-1.1.6-.4 1.7H6.6l-.4-1.7-1.1-.6-1.7.5-1.4-2.4 1.3-1.2V6.5L2 5.3l1.4-2.4 1.7.5 1.1-.6z"/><circle cx="8" cy="8" r="1.9"/>',
   'x': '<path d="M4 4l8 8M12 4l-8 8"/>',
   'play': '<path d="M5 3.5v9l7-4.5z" fill="currentColor" stroke="none"/>',
@@ -81,7 +82,7 @@
 {%- set hold = s.kind == 'hold' -%}
 {%- set push = s.kind == 'push' -%}
 {%- set ed = tall and not hold and s.lineup_id in editable_ids -%}
-<div class="lu-blk{% if hold %} hold{% endif %}{% if push %} push{% endif %}{% if s.live %} live{% endif %}{% if s.planned and tall %} plan{% endif %}" style="left:{{ s.left_pct }}%;width:{{ s.width_pct }}%" data-lineup="{{ s.lineup_id }}" data-display="{{ d.id }}" title="{{ s.title }}"
+<div class="lu-blk{% if hold %} hold{% endif %}{% if push %} push{% endif %}{% if s.live %} live{% endif %}{% if s.planned and tall %} plan{% endif %}{% if push or (not hold and s.width_pct < 1) %} is-thin{% if loop.previtem and loop.previtem.kind != 'hold' and loop.previtem.end_min >= s.start_min %} grow-r{% endif %}{% endif %}" style="left:{{ s.left_pct }}%;width:{{ s.width_pct }}%;--w:{{ s.width_pct }}" data-lineup="{{ s.lineup_id }}" data-display="{{ d.id }}" title="{{ s.title }}"
 {%- if ed %} data-edit tabindex="0" role="button" aria-label="{{ s.title }}. Drag or use arrow keys to move{% if not push %}, Shift+arrows to resize the end, Alt+Shift+arrows the start{% endif %}. Click to open."{% else %} role="group" aria-label="{{ s.title }}"{% endif %}>
 {%- if ed and not push %}<i class="lu-h" data-h="l" aria-hidden="true"></i><i class="lu-h" data-h="r" aria-hidden="true"></i>{% endif -%}
 {%- if not hold and not push %}{% for t in s.ticks if t.next or not (day.is_today and day.now_min is not none) or t.minute > day.now_min %}{% if t.next %}<i class="lu-tick next" style="left:{{ t.pct }}%" data-tip="Next refresh {{ t.label }}" aria-hidden="true"></i>{% else %}<i class="lu-tick" style="left:{{ t.pct }}%" data-tip="Refresh {{ t.label }}" aria-hidden="true"></i>{% endif %}{% endfor %}<span class="lu-blk-l">{{ s.label }}</span>{% endif -%}
@@ -204,11 +205,11 @@
 {%- set can_push = d.id and l.actions.push_step_url and not s.missing and not s.off_display -%}
 {%- set can_pick = can_push and (s.pick_items or s.draw_items) and l.actions.step_item_url -%}
 {%- set zoom_html -%}{% if s.thumb_url and not s.missing and not s.off_display %}{{ zoom_btn('step:' ~ l.id ~ ':' ~ s.index, 'Zoom ' ~ s.name) }}{% endif %}{%- endset -%}
-<span class="lu-tile{% if s.item_count > 1 %} stacked{% endif %}{% if can_pick %} has-items{% endif %}">{{ thumb(s.name, s.thumb_url, s.aspect, d.orientation if d.orientation else s.orientation, cls='missing' if s.missing else ('offdisplay' if s.off_display else ''), display=d, extra=zoom_html) }}<span class="lu-scrim" aria-hidden="true"></span>
+<span class="lu-tile{% if s.item_count > 1 or s.draw_items or s.stacked %} stacked{% endif %}{% if can_pick %} has-items{% endif %}">{{ thumb(s.name, s.thumb_url, s.aspect, d.orientation if d.orientation else s.orientation, cls='missing' if s.missing else ('offdisplay' if s.off_display else ''), display=d, extra=zoom_html) }}<span class="lu-scrim" aria-hidden="true"></span>
 {%- if can_push %}<form method="post" action="{{ l.actions.push_step_url }}" class="lu-push-form"><input type="hidden" name="index" value="{{ s.index }}"><input type="hidden" name="display_id" value="{{ d.id }}"><input type="hidden" name="page_id" value="{{ s.dashboard_id }}"><input type="hidden" name="composition_digest" value="{{ s.composition_digest or '' }}"><button type="submit" class="lu-push-ov" data-push="{{ l.id }}:{{ s.index }}" title="{{ s.push_title }}" aria-label="{{ s.push_title }}"><i>{{ ico('send') }}</i><span>Push now</span></button></form>{% endif -%}
 {%- if can_pick %}<span class="lu-items" role="group" aria-label="{{ ('Draw another ' ~ s.name ~ ' picture') if s.draw_items else ('Choose which ' ~ s.name ~ ' item to push') }}"><button type="button" class="lu-it" data-item="{{ l.id }}:{{ s.index }}:-1" aria-label="{{ 'Previous picture' if s.draw_items else 'Previous item' }}" title="{{ 'Previous picture' if s.draw_items else 'Previous item' }}"{% if s.draw_items %} disabled{% endif %}>{{ ico('chevl') }}</button><span class="lu-it-pos" aria-hidden="true"></span><button type="button" class="lu-it" data-item="{{ l.id }}:{{ s.index }}:1" aria-label="{{ 'Draw the next picture' if s.draw_items else 'Next item' }}" title="{{ 'Draw the next picture' if s.draw_items else 'Next item' }}">{{ ico('chev') }}</button></span>{% endif -%}
 <span class="lu-pushed-msg" aria-hidden="true"></span>
-{%- if s.item_count > 1 %}<button type="button" class="lu-count" data-peek="{{ l.id }}:{{ s.index }}" aria-haspopup="dialog" aria-expanded="false" title="{{ s.item_count }} items in this step. Show them">×{{ s.item_count }}</button>{% endif -%}
+{%- if s.draw_items %}<span class="lu-count is-draw" title="{{ ('Draws one of ' ~ s.draw_count ~ ' at random') if s.draw_count > 1 else 'A random one each time it is sent' }}">{{ ('×' ~ s.draw_count) if s.draw_count > 1 else 'random' }}</span>{% elif s.item_count > 1 %}<button type="button" class="lu-count" data-peek="{{ l.id }}:{{ s.index }}" aria-haspopup="dialog" aria-expanded="false" title="{{ s.item_count }} items in this step. Show them">×{{ s.item_count }}</button>{% endif -%}
 </span>
 <figcaption><span class="lu-step-name">{{ s.name }}</span><span class="lu-step-meta">{{ s.position }}{% if s.conditional %} <span title="Shows only while its conditions pass">{{ ico('funnel') }}</span>{% endif %}</span>
 {%- if s.off_display %}<span class="lu-step-off" title="{{ s.off_display_note }}">Not on this display</span>{% if d.id and l.actions.bind_url %}<button type="button" class="lu-bind" data-bind="{{ l.id }}:{{ s.index }}" title="{{ s.off_display_note }}. Bind it to {{ d.name }} too so it can show here.">Bind to {{ d.name }}</button>{% endif %}{% endif -%}
@@ -275,7 +276,7 @@
 <p class="lu-nextl" title="{{ d.next_line.title }}">{{ d.next_line.before }}{% if d.next_line.at %} <b>{{ d.next_line.at }}</b>{% endif %}{% if d.next_line.after %} {{ d.next_line.after }}{% endif %}</p>
 </div>
 <div class="lu-today"><div class="lu-today-bar">{{ day_track(d, d.day, editable_ids) }}{{ day_scale(d.day, vm.time_cycle) }}</div>{{ day_pick(d, d.day, vm.now.weekday) }}</div>
-<span class="lu-ds-ctl"><button class="lu-ibtn lu-ds-add" type="button" data-open-timed-wizard data-wizard-display="{{ d.id }}" aria-haspopup="dialog" aria-label="New lineup for {{ d.name }}" title="New lineup for {{ d.name }}">{{ ico('plus') }}</button><button class="lu-fold lu-ds-fold" type="button" data-collapse="{{ d.id }}" aria-expanded="true" aria-controls="lu-dsb-{{ d.id }}" aria-label="{{ d.name }}: collapse or expand">{{ ico('caret') }}</button></span>
+<span class="lu-ds-ctl"><a class="lu-ibtn lu-ds-add" href="{{ url_for('decks.editor') }}?display={{ d.id|urlencode }}" aria-label="New lineup for {{ d.name }}" title="New lineup for {{ d.name }}">{{ ico('plus') }}</a><button class="lu-fold lu-ds-fold" type="button" data-collapse="{{ d.id }}" aria-expanded="true" aria-controls="lu-dsb-{{ d.id }}" aria-label="{{ d.name }}: collapse or expand">{{ ico('caret') }}</button></span>
 </header>
 <div class="lu-ds-body" id="lu-dsb-{{ d.id }}">
 <div class="lu-sched">{% if d.lineups %}<ol class="lu-rows">{% for l in d.lineups %}{{ row(d, l, seen) }}{% endfor %}</ol>{% else %}<p class="lu-none">No lineups on this display yet.</p>{% endif %}</div>

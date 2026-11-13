@@ -26,7 +26,7 @@
   if (!vm || !Array.isArray(vm.displays)) return;
   R.setTimeCycle(vm.time_cycle);
 
-  const SNAP = 15;
+  const SNAP = R.SNAP;
   const DAY_MIN = 1440;
   const reduceMotion = () =>
     window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -184,10 +184,7 @@
     return x;
   }
   const effLineup = (d, id) => effective(d).lineups.find((l) => l.id === id);
-  const winOf = (l) => [
-    l.window.start_min,
-    l.window.is_point ? l.window.start_min : l.window.end_min,
-  ];
+  const winOf = R.winOf;
   const sameDays = (a, b) => a.every((v, i) => !!v === !!b[i]);
 
   function setPending(d, l, change) {
@@ -228,72 +225,8 @@
   }
   const pendingCount = (d) => Object.keys(st.pending[d.id] || {}).length;
 
-  // Other lineups' windows on the given days (points for single pushes).
-  function obstacles(ed, l, days) {
-    const out = [];
-    ed.lineups.forEach((o) => {
-      if (o.id === l.id || !o.window || !o.enabled || o.window.wraps) return;
-      if (!o.days.some((on, i) => on && days[i])) return;
-      const [s, e] = winOf(o);
-      out.push({ s, e, o });
-    });
-    return out;
-  }
-  function clash(ed, l, s, e, days) {
-    return obstacles(ed, l, days).find((b) =>
-      b.s === b.e
-        ? b.s >= s && b.s < Math.max(e, s + 1)
-        : s === e
-          ? s >= b.s && s < b.e
-          : s < b.e && e > b.s
-    );
-  }
-  function room(ed, l, os, oe) {
-    let lo = 0;
-    let hi = DAY_MIN;
-    let loBy = null;
-    let hiBy = null;
-    obstacles(ed, l, l.days).forEach((b) => {
-      if (b.e <= os && b.e >= lo) {
-        lo = b.s === b.e ? b.s + SNAP : b.e;
-        loBy = b.o;
-      }
-      if (b.s >= oe && b.s <= hi && !(b.s === oe && b.s === b.e && os === oe)) {
-        hi = b.s;
-        hiBy = b.o;
-      }
-    });
-    return { lo, hi, loBy, hiBy };
-  }
-  function proposal(ed, l, mode, os, oe, dm) {
-    const { lo, hi, loBy, hiBy } = room(ed, l, os, oe);
-    const push = !!l.window.is_point;
-    const maxE = push ? Math.min(hi, DAY_MIN - SNAP) : hi;
-    let s = os;
-    let e = oe;
-    let stop = null;
-    if (mode === "move") {
-      s = os + dm;
-      e = oe + dm;
-      if (s < lo) {
-        e += lo - s;
-        s = lo;
-        stop = loBy;
-      }
-      if (e > maxE) {
-        s -= e - maxE;
-        e = maxE;
-        stop = hiBy;
-      }
-    } else if (mode === "l") {
-      s = Math.min(Math.max(os + dm, lo), oe - SNAP);
-      if (os + dm < lo) stop = loBy;
-    } else {
-      e = Math.max(Math.min(oe + dm, hi), os + SNAP);
-      if (oe + dm > hi) stop = hiBy;
-    }
-    return { s, e, stop, pause: R.overlapsPause(ed.pause, s, e) };
-  }
+  // The bar's edit rules are shared with the lineup editor (lineups_render.js).
+  const { room, clash } = R;
   function commit(d, id, s, e) {
     const ed = effective(d);
     const l = ed.lineups.find((x) => x.id === id);
@@ -2069,144 +2002,26 @@
   });
 
   /* ------------------------------------------------------------ bar drag */
-  let drag = null;
-  let justDragged = false;
   // Phones and narrow cards get a read-only bar (as in the mockup); edits go
   // through the time inputs and day tiles. Tablets drag with any pointer.
   const phoneMQ = window.matchMedia(
     "(pointer: coarse) and (max-width: 600px), (pointer: coarse) and (max-height: 500px)"
   );
   const barReadOnly = () => phoneMQ.matches || host.clientWidth <= 602;
-  const tipText = (l, p, grid) => {
-    const t = l.window.is_point ? `at ${R.clock(p.s)}` : R.clockRange(p.s, p.e);
-    const days = l.days.map((on, i) => (on ? R.DAYS[i] : "")).filter(Boolean);
-    const applies =
-      grid && days.length > 1
-        ? `<span class="lu-tip-stop">applies to ${days.join(", ")}</span>`
-        : "";
-    return `<b>${t}</b>${applies}${p.stop ? `<span class="lu-tip-stop">stops at ${R.esc(p.stop.name)}</span>` : ""}${p.pause ? `<span class="lu-tip-warn">${R.ico("pause")}Quiet hours</span>` : ""}`;
-  };
-  document.addEventListener("pointerdown", (e) => {
-    if (drag) endDrag(false); // a lost pointerup never leaves a drag stuck
-    const blk = e.target.closest && e.target.closest(".lu .lu-blk[data-edit]");
-    if (!blk || e.button !== 0) return;
-    const trk = blk.closest(".lu-trk");
-    if (!trk || barReadOnly() || trk.clientWidth <= 0) return;
-    const d = displayById(blk.dataset.display);
-    const ed = d && effective(d);
-    const l = ed && ed.lineups.find((x) => x.id === blk.dataset.lineup);
-    if (!l || !l.window) return;
-    const [os, oe] = winOf(l);
-    const h = e.target.closest(".lu-h");
-    const mode = h ? h.dataset.h : "move";
-    trk.insertAdjacentHTML("beforeend", '<span class="lu-drag-tip" role="status"></span>');
-    const tip = trk.lastElementChild;
-    const grid = trk.classList.contains("tl");
-    const ghosts = [];
-    if (grid) {
-      trk.classList.add("dragging");
-      host.querySelectorAll(`.lu-tlg-trk`).forEach((other) => {
-        if (other === trk || !other.closest(`.lu-ds[data-display="${CSS.escape(d.id)}"]`)) return;
-        if (!l.days[Number(other.dataset.day)]) return;
-        other.insertAdjacentHTML(
-          "beforeend",
-          `<i class="lu-ghost" style="left:${(os / DAY_MIN) * 100}%;width:${((oe - os) / DAY_MIN) * 100}%" title="Applies here too"></i>`
-        );
-        ghosts.push(other.lastElementChild);
-      });
-    }
-    drag = {
-      grid,
-      ghosts,
-      blk,
-      trk,
-      d,
-      ed,
-      l,
-      os,
-      oe,
-      mode,
-      x0: e.clientX,
-      W: trk.clientWidth,
-      moved: false,
-      left: blk.style.left,
-      width: blk.style.width,
-      tip,
-      pid: e.pointerId,
-    };
-    try {
-      blk.setPointerCapture(e.pointerId);
-    } catch {
-      /* the document listeners still drive the drag */
-    }
-    blk.classList.add("is-drag");
-    e.preventDefault();
+  const edit = R.barEdit({
+    host,
+    readOnly: barReadOnly,
+    find: (blk) => {
+      const d = displayById(blk.dataset.display);
+      const ed = d && effective(d);
+      const l = ed && ed.lineups.find((x) => x.id === blk.dataset.lineup);
+      return l && l.window ? { d, ed, l } : null;
+    },
+    commit: (ctx, s, e) => commit(ctx.d, ctx.l.id, s, e),
   });
-  document.addEventListener("pointermove", (e) => {
-    if (!drag) return;
-    if (!drag.blk.isConnected) {
-      endDrag(false);
-      return;
-    }
-    let dm = Math.round((((e.clientX - drag.x0) / drag.W) * DAY_MIN) / SNAP) * SNAP;
-    if (!Number.isFinite(dm)) dm = 0;
-    if (dm) drag.moved = true;
-    const p = proposal(drag.ed, drag.l, drag.mode, drag.os, drag.oe, dm);
-    drag.p = p;
-    const pc = (m) => (m / DAY_MIN) * 100;
-    drag.blk.style.left = pc(p.s) + "%";
-    if (!drag.l.window.is_point) drag.blk.style.width = pc(p.e - p.s) + "%";
-    drag.blk.classList.toggle("is-stopped", !!p.stop);
-    drag.tip.innerHTML = tipText(drag.l, p, drag.grid);
-    if (drag.grid) {
-      // The window belongs to the lineup: ghost the change on its other days.
-      drag.ghosts.forEach((g) => {
-        g.style.left = pc(p.s) + "%";
-        g.style.width = drag.l.window.is_point ? "10px" : pc(p.e - p.s) + "%";
-      });
-    }
-    const mid = ((pc(p.s) + pc(p.e)) / 2 / 100) * drag.W;
-    const w = drag.tip.offsetWidth;
-    drag.tip.style.left = Math.max(0, Math.min(drag.W - w, mid - w / 2)) + "px";
-  });
-  function endDrag(apply) {
-    const g = drag;
-    drag = null;
-    if (!g) return;
-    if (g.tip) g.tip.remove();
-    (g.ghosts || []).forEach((x) => x.remove());
-    g.trk.classList.remove("dragging");
-    g.blk.classList.remove("is-drag", "is-stopped");
-    try {
-      if (g.blk.hasPointerCapture && g.blk.hasPointerCapture(g.pid))
-        g.blk.releasePointerCapture(g.pid);
-    } catch {
-      /* already released */
-    }
-    if (!g.moved) return;
-    justDragged = true;
-    setTimeout(() => {
-      justDragged = false;
-    }, 0);
-    if (!apply || !g.p || (g.p.s === g.os && g.p.e === g.oe) || !g.blk.isConnected) {
-      g.blk.style.left = g.left;
-      g.blk.style.width = g.width;
-      return;
-    }
-    commit(g.d, g.l.id, g.p.s, g.p.e);
-  }
-  document.addEventListener("pointerup", () => drag && endDrag(true));
-  document.addEventListener("pointercancel", () => drag && endDrag(false));
-  window.addEventListener("blur", () => drag && endDrag(false));
   document.addEventListener(
     "keydown",
     (e) => {
-      if (e.key === "Escape" && drag) {
-        drag.moved = true;
-        endDrag(false);
-        e.stopPropagation();
-        return;
-      }
       const gridBlk = e.target.closest && e.target.closest(".lu .lu-tlg-trk .lu-blk[tabindex]");
       if (gridBlk && (e.key === "Enter" || e.key === " ")) {
         e.preventDefault();
@@ -2219,19 +2034,7 @@
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         openRow(blk.dataset.lineup, blk.dataset.display);
-        return;
       }
-      if (!["ArrowLeft", "ArrowRight"].includes(e.key) || barReadOnly()) return;
-      e.preventDefault();
-      const d = displayById(blk.dataset.display);
-      const ed = effective(d);
-      const l = ed.lineups.find((x) => x.id === blk.dataset.lineup);
-      const [os, oe] = winOf(l);
-      const dm = e.key === "ArrowLeft" ? -SNAP : SNAP;
-      const mode = e.shiftKey && !l.window.is_point ? (e.altKey ? "l" : "r") : "move";
-      const p = proposal(ed, l, mode, os, oe, dm);
-      if (p.s === os && p.e === oe) return;
-      commit(d, l.id, p.s, p.e);
     },
     true
   );
@@ -2329,12 +2132,13 @@
     // travelled (a slipped click on Firefox).
     const wr = e.target.closest(".lu-tlg-row");
     if (wr && !e.target.closest(".lu-wb-more")) {
-      if (!justDragged && !travelled(e)) toggleWeekRow(wr.dataset.display, Number(wr.dataset.day));
+      if (!edit.justDragged() && !travelled(e))
+        toggleWeekRow(wr.dataset.display, Number(wr.dataset.day));
       return;
     }
     // A block on the day bar opens its lineup.
     const blk = e.target.closest(".lu-blk:not(.hold)");
-    if (blk && !justDragged) {
+    if (blk && !edit.justDragged()) {
       openRow(blk.dataset.lineup, blk.dataset.display);
       return;
     }
@@ -2342,7 +2146,8 @@
     if (!t) {
       // The whole row header / display header folds, except its own
       // controls. Ignore text selections and the end of a drag.
-      if (justDragged || String(window.getSelection ? window.getSelection() : "") !== "") return;
+      if (edit.justDragged() || String(window.getSelection ? window.getSelection() : "") !== "")
+        return;
       if (
         e.target.closest(
           "input, select, textarea, label, .lu-win-edit, .lu-name-edit, .lu-days, .lu-more, .lu-peek, .lu-today, .lu-row-actions"
@@ -2469,7 +2274,7 @@
       document.activeElement &&
       document.activeElement.closest &&
       document.activeElement.closest(".lu-tlg-row.is-open");
-    if (openRowEl && !drag) {
+    if (openRowEl && !edit.active()) {
       toggleWeekRow(openRowEl.dataset.display, Number(openRowEl.dataset.day), false);
       const lab = openRowEl.querySelector(".lu-tlg-lab");
       if (lab) lab.focus();
@@ -2600,7 +2405,7 @@
     const wizard = document.getElementById("timed-wizard");
     return (
       document.hidden ||
-      !!drag ||
+      edit.active() ||
       !!sdrag ||
       moving ||
       (wizard && wizard.open) ||
@@ -2726,7 +2531,7 @@
   if ("ResizeObserver" in window) {
     new ResizeObserver(() =>
       requestAnimationFrame(() => {
-        if (barReadOnly() !== lastRO && !drag && !busy()) render();
+        if (barReadOnly() !== lastRO && !edit.active() && !busy()) render();
         else fit();
       })
     ).observe(host);

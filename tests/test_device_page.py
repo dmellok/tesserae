@@ -714,7 +714,8 @@ def test_the_lineup_editor_hands_the_page_cards_each_dashboards_size(app: Flask)
     assert re.search(r'"h":\s*2560', body) and re.search(r'"w":\s*1440', body)
     assert re.search(r'"h":\s*480', body) and re.search(r'"w":\s*800', body)
     js = (REPO_ROOT / "static" / "deck_editor.js").read_text()
-    assert "--thumb-ar" in js and "is-portrait" in js
+    # Drawn with the Lineups page's thumbnail, in the dashboard's own ratio.
+    assert "R.thumb(" in js and "`${w}/${h}`" in js
 
 
 def test_every_thumbnail_is_one_frame_that_covers_its_box() -> None:

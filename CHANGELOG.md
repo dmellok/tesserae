@@ -14,6 +14,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - Lineups: click a lineup's name to rename it in place; Enter or clicking away saves, Escape cancels.
 - Lineups: a daily push can take an end time ("06:00-18:00"); with several dashboards it then steps through them in that window. Remove the end to go back to a single push.
 - Lineups: drag a lineup's dashboards left or right to reorder them, or press Alt+Left / Alt+Right on one; it saves on drop.
+- Lineup editor: rebuilt as When it runs, Dashboards and Timing, under what is on screen and the display's day bar.
+- Lineup editor: each dashboard says what it is ("Gallery · 412 photos") and opens to its items in a searchable grid, its first eight in the display's own shape.
+- Lineup editor: only the options that apply are shown; Priority when lineups overlap, Min hold when something can cut a dashboard short.
+- Lineup editor: Push now and a ... menu (Move to another display, Delete) sit top right by the On switch; a move applies on Save.
+- Lineup editor: drag or arrow-key this lineup's block on the day bar to set its time, click another lineup's block to open it, and Show all puts every day's bar in the header.
+- Lineup editor: a gear by a dashboard's name opens it in the dashboard editor; its arrows pick the item Push now sends, and the item control reads Rotate items or Show chosen.
+- Lineups: New lineup, and the + beside each display, open a three-step new-lineup page.
+- Lineups: album widgets that draw a random photo show as a stack badged "random" (or x N), with a Recent photos strip in the editor.
+- Widgets: item hooks can return a preview `thumb` per item and take a `ctx` (cell size, display); see the widget guide.
 
 ### Changed
 
@@ -42,6 +51,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - The lineup's current step follows its conditions and priority mode, and reads as held when every rule fails, instead of showing the clock's slot.
 - The Lineups Next pill, tick and countdown follow what the scheduler will send: minimum hold, rules, priority mode and a sleeping display's check-in.
 - "Next update" counts a dashboard's own Updates refresh, not only the next lineup change. A battery display still sleeps to its own interval and does not wake early for these.
+- Lineups: the quiet-hours warning says what happens and only shows when a save changes the times, days or display.
+- Lineups: widget preview images (e.g. Immich) load under Home Assistant ingress instead of showing "?".
+- Lineups and the lineup editor: a short block on the day bar is a sliver of its own, 1px from its neighbours, never under them.
+- Lineup editor: a daily or interval lineup edits its own time, a window with several dashboards takes them in turn, and cut to one it keeps its pace.
+- Lineup editor: Smart sync can be switched off again, and a daily or interval lineup set to also take taps now runs.
+- Lineup editor: saving keeps a lineup's other displays and the settings it doesn't show, and a save from a stale tab is refused instead of undoing newer edits.
+- Lineup editor: Timing follows each dashboard's own time and quiet hours count only on their days.
+
+### Security
+
+- Widgets: a widget's lineup item hooks (`lineup_items`, `lineup_item_count`) run inside its declared network allowlist, like its data fetch; a listing is capped at 5000 entries and its `lineups.noun` is letters only.
 
 ## [0.511.0], 2026-11-13
 
