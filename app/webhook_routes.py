@@ -196,6 +196,8 @@ def push() -> tuple[Response, int] | Response:
         "event_id": result.event_id,
         "error": result.error,
     }
+    if result.warning:
+        payload["warning"] = result.warning
     if result.status == "sent":
         targets = sorted(device_ids) if device_ids else page_targets(page_id)
         quiet_fn = getattr(_push_manager(), "device_in_quiet_hours", None)
