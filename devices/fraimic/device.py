@@ -15,6 +15,10 @@ import json
 import re
 from typing import Any
 
+# Catalog SKUs (hardware/fraimic/*.json) share this module; the marker lets
+# ``app.fraimic.is_fraimic_device`` recognise them without a registry lookup.
+PROTOCOL = "fraimic"
+
 # The frame's own schedule takes an interval of 60 minutes or more, or up to
 # four times a day (REST API guide, "Wake Schedule"). Shorter intervals and
 # longer lists are done by rewriting the schedule at every wake

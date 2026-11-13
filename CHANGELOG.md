@@ -8,6 +8,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Fraimic: the Large Canvas (31.5") and the Standard Canvas (13.3") are in the hardware catalog, so **Add device → Fraimic** has a **Model** choice that sets the panel size, and both are listed on the compatibility page. A frame added before this keeps working as it is.
 - Device kinds can place a config field in a named group (`group`) and show it only for some values (`show_if`).
 - Lineups: a + beside each display's chevron starts a new lineup for that display.
 - Lineups: a day tile you click shows a check (runs) or an x (off) for a moment, and a small one until the change is saved.
@@ -26,6 +27,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Changed
 
+- Docs: the Fraimic quickstart and the compatibility page carry Fraimic's discount code for Tesserae readers (TESSERAE10, 10% off at fraimic.com), with a disclosure that Fraimic supplied the Large Canvas free and that sales made with the code pay the project a commission.
 - Fix contextual help buttons in the canvas editor.
 - Keep selection marks and reorder handles visible for selected list items.
 - Samsung The Frame: its Power and Art Mode settings sit in groups of their own, and the Home Assistant switch field shows only when Power control is a Home Assistant switch.

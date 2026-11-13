@@ -279,6 +279,15 @@ def settings_area(area: str) -> str | Response:
     visionect_kinds, visionect_listener = (
         visionect_routes.add_card_context() if area == "devices" else ([], None)
     )
+    fraimic_kinds = (
+        [
+            {"value": d.id, "label": str(d.name)}
+            for d in fraimic.fraimic_kinds(current_app.config["DEVICE_REGISTRY"])
+            if d.id != fraimic.KIND  # the catalog models; the generic kind is the fallback
+        ]
+        if area == "devices"
+        else []
+    )
 
     return render_template(
         "settings.html",
@@ -294,6 +303,7 @@ def settings_area(area: str) -> str | Response:
         discovered_mqtt=discovered_mqtt,
         discovered_sig=discovered_sig,
         visionect_kinds=visionect_kinds,
+        fraimic_kinds=fraimic_kinds,
         visionect_listener=visionect_listener,
         default_transport=default_transport,
         broker_configured=broker_configured,

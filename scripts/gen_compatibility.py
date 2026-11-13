@@ -34,6 +34,7 @@ VENDOR_ORDER: list[tuple[str, str]] = [
     ("seeed", "Seeed Studio"),
     ("m5stack", "M5Stack"),
     ("lilygo", "LILYGO"),
+    ("fraimic", "Fraimic"),
     ("paperlesspaper", "paperlesspaper"),
     ("pimoroni", "Pimoroni"),
     ("remarkable", "reMarkable"),
@@ -66,7 +67,11 @@ AFFILIATE_DISCLOSURE = (
     "discount at checkout. Nothing on this page is "
     "listed because of it, and the tested / not-tested status of every panel "
     "is reported the same way it always has been. Links without the tag are "
-    "plain product links."
+    "plain product links.\n\n"
+    "    Fraimic links are plain links, with a discount code instead: "
+    "**TESSERAE10** takes 10% off at fraimic.com. Fraimic supplied a Large "
+    "Canvas to Tesserae free of charge, and Tesserae earns a commission on "
+    "sales made with the code."
 )
 
 # Vendor id -> URL. Displayed as the section link so a reader can jump
@@ -74,6 +79,7 @@ AFFILIATE_DISCLOSURE = (
 VENDOR_URL: dict[str, str] = {
     "seeed": "https://www.seeedstudio.com/",
     "m5stack": "https://m5stack.com/",
+    "fraimic": "https://fraimic.com/",
     "paperlesspaper": "https://paperlesspaper.de/en",
     "pimoroni": "https://shop.pimoroni.com/",
     "remarkable": "https://remarkable.com/",
@@ -123,6 +129,19 @@ VENDOR_INTRO: dict[str, str] = {
         "(Chrome / Edge, WebUSB, no toolchain). The Badgers run "
         "[tesserae-device-badger](https://github.com/dmellok/tesserae-device-badger) "
         "as an app in their own launcher."
+    ),
+    "fraimic": (
+        "Framed Spectra 6 colour e-paper canvases on battery, driven over the "
+        "frame's own local REST API: no Fraimic account, app, cloud or firmware "
+        "change. Tesserae sets the frame's wake schedule, uploads the latest "
+        "picture at each wake and puts it back to sleep, with wakes as close as "
+        "five minutes apart; see the [Fraimic quickstart](quickstart/fraimic.md). "
+        "The Large Canvas is confirmed on the bench, and the Standard Canvas by "
+        "a community report.\n\n"
+        "The code **TESSERAE10** takes 10% off either canvas at "
+        "[fraimic.com](https://fraimic.com/). Fraimic supplied the Large Canvas "
+        "free of charge, and Tesserae earns a commission on sales made with the "
+        "code."
     ),
     "paperlesspaper": (
         "Open-hardware e-paper picture frames (ESP32-C6, NiMH cells) that run "

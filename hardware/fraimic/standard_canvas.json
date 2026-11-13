@@ -1,0 +1,26 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "fraimic_standard_canvas",
+  "name": "Fraimic Standard Canvas (13.3\")",
+  "vendor": "Fraimic",
+  "url": "https://fraimic.com/products/standard-canvas",
+  "icon": "frame-corners",
+  "description": "Fraimic's 13.3\" Spectra 6 canvas in a 14x18\" walnut frame, 1200x1600 hung upright, on battery. Tesserae drives it over the frame's local REST API with no app, cloud or firmware change: it sets the wake schedule, uploads the latest picture at each wake and puts the frame back to sleep.",
+  "protocol": "fraimic",
+  "renderers": [
+    "fraimic_bin"
+  ],
+  "panel": {
+    "w": 1200,
+    "h": 1600,
+    "orientation": "portrait",
+    "name": "Fraimic 13.3\" Spectra 6 (EL133UF1)",
+    "gamut": "spectra_6",
+    "native_w": 1200,
+    "native_h": 1600
+  },
+  "buttons": false,
+  "touch": false,
+  "image_format": "bin",
+  "notes_md": "Confirmed by a community report: a Tesserae user runs one. The picture layout follows Fraimic's converter spec for this panel, and the wake handling is the same as the Large Canvas, which is confirmed on the bench. Needs firmware 0.2.31 or later for the wake schedule. See the [Fraimic quickstart](https://docs.tesserae.ink/quickstart/fraimic/).\n\nThe code **TESSERAE10** takes 10% off at fraimic.com. Fraimic supplied a Large Canvas to Tesserae free of charge, and Tesserae earns a commission on sales made with the code."
+}

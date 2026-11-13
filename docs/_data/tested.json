@@ -47,8 +47,8 @@
     },
     "fraimic_bin": {
       "status": "Partial",
-      "hardware": "Fraimic 31.5\" Large Canvas (EL315), firmware 0.2.31",
-      "notes": "Byte order and colour codes confirmed on the 31.5\" panel with an asymmetric test pattern uploaded to /api/image. The wake-schedule loop and the 13.3\" layout have not been run on hardware yet."
+      "hardware": "Fraimic 31.5\" Large Canvas (EL315), firmware 0.2.31; 13.3\" Standard Canvas by community report",
+      "notes": "Byte order and colour codes confirmed on the 31.5\" panel with an asymmetric test pattern uploaded to /api/image, and the wake schedule runs on that frame. The 13.3\" canvas is confirmed by a community report, not on the bench."
     }
   }
 }
