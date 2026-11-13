@@ -28,6 +28,7 @@
     },
     "power_control": {
       "type": "select",
+      "group": "Power",
       "label": "Power control",
       "default": "tv",
       "choices": [
@@ -48,6 +49,7 @@
     },
     "power_switch": {
       "type": "string",
+      "group": "Power",
       "label": "Home Assistant switch",
       "default": "",
       "placeholder": "switch.living_room_tv",
@@ -58,6 +60,7 @@
     },
     "sleep_when_in_use": {
       "type": "select",
+      "group": "Power",
       "label": "Still in use at quiet hours",
       "default": "60",
       "choices": [
@@ -82,6 +85,7 @@
     },
     "matte_style": {
       "type": "select",
+      "group": "Art Mode",
       "label": "Mat",
       "default": "none",
       "choices": [
@@ -130,6 +134,7 @@
     },
     "matte_colour": {
       "type": "select",
+      "group": "Art Mode",
       "label": "Mat colour",
       "default": "polar",
       "choices": [
@@ -202,22 +207,24 @@
     },
     "take_over_slideshow": {
       "type": "select",
+      "group": "Art Mode",
       "label": "TV's own slideshow",
       "default": "off",
       "choices": [
         {
           "value": "off",
-          "label": "Turned off by Tesserae"
+          "label": "Managed by Tesserae"
         },
         {
           "value": "keep",
-          "label": "Left as set on the TV"
+          "label": "Managed by the TV"
         }
       ],
-      "help": "The TV's slideshow would replace Tesserae's picture on its own timer. Turned off, the page schedule decides what shows; your other Art Mode photos stay on the TV."
+      "help": "The TV's slideshow can replace Tesserae's picture on its own timer. Managed by Tesserae, Tesserae turns the slideshow off, so the page schedule decides what shows and your other Art Mode photos stay on the TV. Managed by the TV, its slideshow setting is left as you set it on the TV."
     },
     "keep_on_tv": {
       "type": "select",
+      "group": "Art Mode",
       "label": "Frames kept on the TV",
       "default": "2",
       "choices": [

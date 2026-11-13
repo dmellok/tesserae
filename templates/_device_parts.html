@@ -205,7 +205,10 @@
 {%- set value = section.state.get(field.name, field.get('default', '')) -%}
 {%- set ftype = field.get('type', 'string') -%}
 {%- set show_if = field.get('show_if') -%}
-{%- set wrap_attrs = ('data-show-if="' ~ (show_if|tojson|forceescape) ~ '"') if show_if else '' -%}
+{#- ``show_if`` names other fields of the same kind by their plain form names
+    (static/components.js, ``data-show-if-plain``); the first render hides the
+    field when the saved values say it doesn't apply. -#}
+{%- set wrap_attrs = ('data-show-if="'|safe ~ (show_if|tojson|forceescape) ~ '" data-show-if-plain'|safe ~ ('' if option_visible(field, section.state, section.fields) else ' hidden')|safe) if show_if else '' -%}
 {%- if ftype in ('boolean', 'switch') -%}
   {%- if awake -%}
   {%- set aval = section.state.get(awake.name, awake.get('default', '')) -%}

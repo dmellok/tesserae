@@ -16,6 +16,7 @@ the transport once at the end.
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -1316,7 +1317,10 @@ def devices_update_combined(instance_id: str) -> Response:
         redirect_to = _calibration_page_redirect(instance_id)
     else:
         redirect_to = _device_page_redirect(
-            instance_id, _section if _section in _DEVICE_PAGE_SECTIONS else None
+            instance_id,
+            _section
+            if _section in _DEVICE_PAGE_SECTIONS or re.fullmatch(r"grp-[a-z0-9-]{1,40}", _section)
+            else None,
         )
 
     devices_registry = devices()
