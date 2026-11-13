@@ -1,139 +1,82 @@
 # REST transport
 
-Tesserae ships two delivery transports for getting frames out to your
-panels:
+Choose how your screens receive images:
 
-- **REST** (default for new installs in v0.52+). Devices poll Tesserae
-  over HTTP. No broker required. Simpler setup, lower-overhead for new
-  users.
-- **MQTT** (the original). Devices subscribe to a broker. Lower wake-
-  cycle latency (no polling interval), but you need a broker (the
-  bundled amqtt or an external Mosquitto).
+- REST is the default for new installs in v0.52+. Screens check Tesserae over HTTP. No message broker needed.
+- MQTT sends updates through a message broker, such as the built-in amqtt or a separate Mosquitto server. Screens receive them without waiting for a poll.
 
-Both transports stay supported. Existing MQTT installs continue to work
-unchanged; this page is for new installs going REST-first, and for
-existing MQTT users who want to convert a device to REST.
+Both transports stay supported. Existing MQTT installs continue to work unchanged.
 
 ## When to pick REST
 
-Pick REST when:
+Use REST when:
 
-- You don't already run an MQTT broker
-- You don't want to install Mosquitto or use the bundled amqtt
-- You're battery-powered + happy with the firmware-chosen poll interval
-  (typically 10-60 minutes for an e-ink panel)
-- You're behind NAT and don't want to expose a broker port
+- You don't have a broker and don't want to run one.
+- Your battery-powered screen can wait for its next check-in, typically every 10-60 minutes.
+- You're behind NAT and don't want to expose a broker port.
 
-Pick MQTT when:
+Use MQTT when:
 
-- You already run Mosquitto (Home Assistant users typically do)
-- You want sub-second push from compose → panel
-- You have always-on clients (Pi-side) that benefit from event-driven
-  updates instead of polling
+- You already run Mosquitto, as many Home Assistant users do.
+- You want updates in under a second.
+- Your Pi or other client stays on and benefits from immediate updates.
 
-You can mix: some devices on REST, some on MQTT. Tesserae's push
-pipeline reads `Device.transport` per instance and skips MQTT publish
-for REST devices automatically.
+You can use REST and MQTT devices on the same server. Tesserae only publishes MQTT messages for MQTT devices.
 
 ## MQTT ↔ REST capability mapping
 
-If you're coming from a working MQTT setup, this table shows the REST
-equivalent of every MQTT capability Tesserae uses.
-
-| Capability | MQTT (current) | REST (v0.52+) | Notes / trade-offs |
-|---|---|---|---|
-| **Frame delivery** | Server publishes retained message to `tesserae/<device_id>/frame/<ext>` with payload `{url}`. Device subscribes; broker pushes message on subscribe (retained) and on each new render. | Server caches latest frame per device. Device GETs `/api/v1/device/<id>/frame` → 200 + `{url, format, panel_w, panel_h, render_id}` + `ETag` header. | MQTT is sub-second push; REST is bounded by the device's poll interval. Battery devices wake on a cycle anyway, so for the e-ink target the difference is theoretical. |
-| **Retain semantics** | Broker stores last retained message indefinitely. Fresh subscriber gets it on connect, retain flag = 1 on the inbound. | Server stores latest render per device in `data/core/latest_renders.json`. Any GET returns it. ETag-driven `If-None-Match` returns 304 if unchanged, so a sleeping client saves a fetch + paint cycle when nothing changed. | REST is actually richer: the 304 path saves panel-refresh time (~10s on Spectra 6) AND battery. MQTT retain doesn't tell the client "this is the same as last time." |
-| **Status heartbeat** | Device publishes JSON to `tesserae/<device_id>/status`. Server subscribes (per-device + wildcard for discovery). | Device POSTs JSON to `/api/v1/device/<id>/status`. | Parsed via the same `device.parse_status` hook in both transports; merged into the same `DEVICE_STATUS` cache. Settings → Devices freshness dot looks identical. |
-| **Config push (server → device)** | Server publishes retained JSON to `tesserae/<device_id>/config` when user saves on Settings → Devices. Device subscribes. | Server's response to `POST /status` includes the current `config` block and `next_poll_s`. Firmware applies on each wake. | MQTT propagates config in real time; REST propagates on the device's next wake. For sleep intervals measured in minutes / hours, both feel equivalent. One round-trip per wake instead of two. |
-| **Discovery (unknown device)** | Server wildcard-subscribes to `tesserae/+/status`. Any heartbeat from an unregistered device id appears in the Discovered strip. | Firmware POSTs `/api/v1/device/discover` (unauthenticated). Entry added to the same `DiscoveryCache` that MQTT feeds. Shows up in the same Discovered strip. | MQTT discovery is incidental (any client publishing status is discovered). REST requires an explicit announce call. Either way ends up in the same admin UI. |
-| **Device → server auth** | Broker-level: username + password set in broker config, used by every client. One shared credential. | Per-device bearer token in the `Authorization: Bearer <token>` header (or `X-Tesserae-Token` fallback). Tokens are unique per device, revocable per device. | REST is a meaningful security improvement: revoking one device's access doesn't affect the others. |
-| **Server → device auth** | Same broker creds; topic ACLs are not enforced by amqtt's default config. | Server-side token validation checks the URL device id matches the token's owner. Cross-device access returns 403. | REST has real per-device isolation at the auth layer; MQTT's bundled-broker setup gives effectively shared credentials. |
-| **First-boot pairing** | User flashes broker host + port + username + password into firmware (captive portal, build-time config, etc.). | User generates a 6-digit pairing code on Settings → Devices → Add device → REST API → Issue pairing code, flashes that into firmware. Firmware POSTs `/api/v1/device/register` once, persists the device token, wipes the pairing code. | REST replaces "type 4 broker fields" with "type 1 pairing code." Friendlier UX, single rotation point if compromised. |
-| **Idempotent registration** | N/A (no register step). | POST `/register` with an already-registered `device_id` returns 200 + `reused_existing: true` + the existing token. A firmware retry after a network glitch is safe. | MQTT doesn't have this problem because there's no pairing step. |
-| **Brute-force protection** | None at the broker level (amqtt) for credential guessing. The shared credential makes guessing one device's worth of access trivial anyway. | `POST /register` is rate-limited (10 failed attempts / 60s / IP) with `Retry-After` on 429. Successful registers release the bucket. | A real win for REST. The 6-digit code's 20 bits of entropy is meaningful only with rate limiting; without it, a brute force takes minutes. |
-| **Transport lifecycle** | Persistent TCP connection. Keepalive packets. Reconnect logic on broker drop. | Stateless HTTP. No connection to maintain. | REST is simpler in firmware: no connection state, no keepalive, no reconnect path. Each wake makes one or two requests and exits. |
-| **Server lifecycle / broker** | Needs a broker process (bundled amqtt or external Mosquitto). Broker has its own restart / health / log story. | Just the Tesserae server itself. | One fewer service to operate. The bundled amqtt stays in tree for users who want MQTT but is no longer auto-enabled on fresh installs. |
-| **HA Assistant integration** | Tesserae publishes HA MQTT discovery configs to `homeassistant/+/config`. HA picks them up via its own MQTT subscription. | Not implemented for REST in v0.52. HA discovery still requires an MQTT broker. | Phase 2+ work. For now, HA integration users keep MQTT enabled or use Tesserae's HA App with Mosquitto. |
-| **Multicast / wildcard fanout** | One published message reaches every subscriber; broker handles fanout. | Each subscriber GETs independently. Each request hits the server. | Doesn't matter for the typical e-ink fleet (1–10 panels). Would matter at hundreds. |
-| **Cross-device observability** | One MQTT explorer subscribed to `tesserae/#` sees the entire fleet's traffic. | One admin session sees device status via Settings → Devices. No equivalent "tee" of all device traffic. | Operationally MQTT is easier to debug live. REST is easier to debug from logs (every request is in the access log). |
-| **Manual firmware diagnostics** | Firmware can publish to arbitrary topics; admin reads via any MQTT client. | Firmware POSTs `/api/v1/device/<id>/log` → server's EventLog. Visible on Settings → Events. | REST integrates with the EventLog instead of needing an external client. |
-| **TLS** | Mosquitto can do TLS with certificate management. amqtt's TLS story is less battle-tested. | HTTP only in v1. HTTPS via reverse proxy (Caddy / NGINX) works since firmware just sees the URL. | Equivalent in practice if both rely on a reverse-proxy frontend. |
-| **Latency from compose → panel** | Sub-second (publish + subscriber wake). | Bounded by `next_poll_s`. Default 60s for a Pi client, 15min for a battery client. | MQTT wins when "instant" matters (dev preview / manual Send). REST wins everywhere battery is the priority. |
-| **Setup / install cost (new user)** | Install Mosquitto, edit `mosquitto.conf`, open `:1883`, generate creds, paste into Tesserae + every client. ~10 minutes for a first-time installer. | Run Tesserae. Plug the device in; it shows up in the Discovered strip; click Register. No service to install, no code typed into firmware. < 1 minute. | The headline reason REST is the v0.52+ default. |
-| **Migration** | N/A. | Per-device flip: Settings → Devices → Switch to REST (or to MQTT). Token persists across flips so flipping back is one click. | A heterogeneous fleet is fine — some devices MQTT, some REST. |
+| Capability | MQTT | REST |
+|---|---|---|
+| Frame delivery | Retained `{url}` on `tesserae/<device_id>/frame/<ext>`. Sent on subscription and each new render. | `/api/v1/device/<id>/frame` returns 200, `{url, format, panel_w, panel_h, render_id}` and an `ETag`. Delivery waits for the device's next poll. |
+| Retain semantics | Broker keeps the last message indefinitely. New subscribers receive it with retain flag 1, even if unchanged. | `If-None-Match` returns 304 for an unchanged image. This skips downloading and drawing, saving battery and about 10s on Spectra 6. |
+| Status heartbeat | JSON on `tesserae/<device_id>/status`. | JSON to `/api/v1/device/<id>/status`. Both update the same status indicator under Settings → Devices. |
+| Config push (server → device) | Saving on Settings → Devices sends retained JSON to `tesserae/<device_id>/config` immediately. | `POST /status` returns `config` and `next_poll_s`. Settings apply on the next wake, in one exchange rather than two. |
+| Discovery | Status on `tesserae/+/status` discovers unknown devices automatically. | Firmware calls `/api/v1/device/discover` without authentication. Both appear in the same Discovered strip. |
+| Device → server auth | All clients share the broker username and password. | Each device has its own revocable token: `Authorization: Bearer <token>` or `X-Tesserae-Token`. Revoking one leaves others connected. |
+| Server → device auth | amqtt doesn't enforce topic access rules by default. | The token must match the URL's device id. Cross-device access returns 403. |
+| First-boot pairing | Enter broker host, port, username and password in firmware. | Call `/api/v1/device/discover`, click Register, then receive the token on the next `/discover` poll. Alternatively, use a 6-digit code from Settings → Devices → Add device → REST API → Issue pairing code. Call `/api/v1/device/register`, save the token and erase the code. |
+| Registration retries | No registration step. | Repeating `/register` for an existing `device_id` returns 200, `reused_existing: true` and the existing token. Network retries are safe. |
+| Brute-force protection | amqtt doesn't limit password guesses. Credentials are shared. | `POST /register` allows 10 failed attempts per 60s per IP. A 429 response includes `Retry-After`; successful registrations clear the count. A 6-digit code has 20 bits of entropy and needs this limit to resist guesses. |
+| Connection | Persistent TCP, with keepalive and reconnection. | Stateless HTTP. Each wake makes one or two requests; no connection state to maintain. |
+| Broker | Separate amqtt or Mosquitto process to monitor. | Only Tesserae is needed. Built-in amqtt remains available but isn't enabled automatically on fresh installs. |
+| Home Assistant | Discovery messages on `homeassistant/+/config`. | HA discovery still needs MQTT; REST didn't implement it in v0.52. Keep a broker enabled, including with the HA App. |
+| Sending to many screens | One message reaches every subscriber. | Each screen makes its own request. The difference is small for 1 to 10 panels, but matters at hundreds. |
+| Debugging all devices | An MQTT explorer on `tesserae/#` sees all device traffic. | Settings → Devices shows status, without a live copy of all traffic. Every request appears in the access log. |
+| Firmware logs | Read arbitrary diagnostic topics with an MQTT client. | `/api/v1/device/<id>/log` forwards logs to the EventLog under Settings → Events. |
+| TLS encryption | Mosquitto supports certificates; amqtt's TLS is less tested. | HTTP only in v1. Use an HTTPS reverse proxy such as Caddy or NGINX. Both can use a proxy. |
+| Update delay | Under a second for an awake subscriber. | Controlled by `next_poll_s`: default 60s for Pi, 15min for battery clients. MQTT suits previews and manual Send; REST suits battery use. |
+| Setup | Install Mosquitto, edit `mosquitto.conf`, open `:1883` and enter credentials on every client. About 10 minutes for a first install. | Start Tesserae, connect the device and click Register. Under 1 minute, with no extra service or firmware code to type. |
+| Migration | No migration step. | Switch each device under Settings → Devices → Switch to REST or Switch to MQTT. The token persists, so switching back takes one click. Mixed setups work. |
 
 ## How REST works end-to-end
 
-1. **Server hosts the endpoints**. Tesserae's HTTP server (waitress
-   in prod) serves `/api/v1/device/<id>/...` routes for frame fetch,
-   status heartbeats, config polls, and first-boot registration.
-2. **Firmware polls on its wake cycle**. A battery-powered client
-   wakes, fetches the latest frame URL, paints it, posts a heartbeat,
-   then deep-sleeps. One round trip per wake.
-3. **No broker credentials to thread.** Instead of typing broker host
-   + port + username + password into firmware, the device announces
-   itself to Tesserae on first boot, you click **Register** in the
-   admin UI, and Tesserae hands the device its per-device access
-   token automatically. The token is stored in flash; the user never
-   sees it.
+1. Tesserae serves the `/api/v1/device/<id>/...` routes for device communication.
+2. A battery-powered device wakes and downloads the image. It draws it, sends status, then sleeps. One exchange per wake.
+3. On first boot, click **Register** to pair the device. Tesserae sends its access token automatically, and the device saves it in flash. You don't need broker credentials or a visible token.
 
 ## Adding a new REST device
 
-The default path is zero-typed-credentials, you just need to be at
-the admin UI when the device boots.
+Have **Settings → Devices** open when the device starts. You won't need to type a code or token.
 
-1. Flash your firmware in REST mode and point it at the Tesserae
-   server URL (e.g. `http://tesserae.local:8765`) via whatever
-   first-boot mechanism the firmware uses (captive portal,
-   build-time config, serial). No code or token needed at this step.
-2. Power the device on. On first boot it POSTs
-   `/api/v1/device/discover` with its MAC address and identity.
-3. **Settings → Devices**. The device shows up under the **Discovered**
-   strip with the announced kind + panel dims.
-4. Click **Register**. Optionally rename / pick a different panel
-   preset. Tesserae creates the instance, mints a per-device access
-   token, and primes its MAC.
-5. The firmware retries `/discover` on its next wake (default 30 s),
-   sees the MAC now matches, and receives the token in the
-   response. From here it polls `/api/v1/device/<id>/frame` like any
-   other device. The token persists in flash; you never see it
-   again.
+1. Flash REST firmware. Set the server URL, such as `http://tesserae.local:8765`, using the firmware's setup method.
+2. Start the device. It sends its MAC address and identity to `/api/v1/device/discover`.
+3. Find it under **Settings → Devices → Discovered**, with its reported kind and panel size.
+4. Click **Register**. Optionally rename it or change the panel preset. Tesserae creates the device and its token, matched to its MAC address.
+5. On the next wake (default 30 s), firmware calls `/discover` again and receives its token. It saves the token in flash and starts polling `/api/v1/device/<id>/frame`. You don't need to copy the token.
 
-The same Discovered strip surfaces MQTT-discovered devices, TRMNL
-self-provisioning announces, and REST `/discover` polls; the only
-difference is the transport column.
+The Discovered strip also lists MQTT and TRMNL devices alongside REST `/discover` devices. The transport column tells them apart.
 
 ### Pre-pairing with a 6-digit code (optional)
 
-For environments where you can't be at the admin UI when the device
-first boots, sealed appliances, BLE-provisioned devices, devices
-shipped on a kiosk image, you can pre-mint a token via a one-shot
-pairing code instead.
+Use a one-time pairing code if you can't open the admin UI during first boot. This also suits sealed appliances or devices set up through Bluetooth.
 
-1. **Settings → Devices → Add device → REST API**. Click **Issue pairing
-   code**. A six-digit code appears (10-minute TTL).
-2. Type the code into the firmware's setup form alongside the
-   server URL.
-3. First boot, the firmware POSTs `/api/v1/device/register` with
-   `X-Pairing-Code: <code>` instead of `/discover`. Tesserae creates
-   the instance and returns the token in the same response, no
-   admin click required.
-
-Either path yields the same end state: a registered device with a
-per-device bearer token. Pick whichever matches your bring-up flow.
+1. Open **Settings → Devices → Add device → REST API → Issue pairing code**. The six-digit code expires after 10 minutes.
+2. Enter it in the firmware's setup form with the server URL.
+3. On first boot, firmware calls `/api/v1/device/register` with `X-Pairing-Code: <code>` instead of `/discover`. Tesserae creates the device and returns its token. No admin click needed.
 
 ## REST API reference
 
-The device-facing endpoints and their full request / response shapes,
-status codes, auth, pairing, frame formats, scheduling behaviour, and
-the steady-state loop are documented once, authoritatively, in the
-**[Client protocol spec](../dev/client-protocol.md)**. That page tracks
-`main` and is the reference to build a client against; this page stays
-focused on the operator story (when to choose REST, adding and switching
-devices, migrating from MQTT).
-
-Quick orientation, see the spec for the full shapes:
+Use the [Client protocol spec](../dev/client-protocol.md) when building a client. It tracks `main` and defines the full API and device loop.
 
 | Endpoint | Purpose |
 |---|---|
@@ -143,114 +86,59 @@ Quick orientation, see the spec for the full shapes:
 | `POST /api/v1/device/register` | Pre-pairing with a 6-digit code (optional; idempotent on retry). |
 | `POST /api/v1/device/<id>/log` | Forward a client log line to Settings → Events. |
 
-All under `/api/v1/device/`, per-device bearer token
-(`Authorization: Bearer <token>`, or the `X-Tesserae-Token` header for
-firmware HTTP libs that dislike `Authorization`).
+These routes are under `/api/v1/device/`. Registered devices authenticate with `Authorization: Bearer <token>` or `X-Tesserae-Token`. The second header supports HTTP libraries that can't use `Authorization`.
 
 ## Switching a device between transports
 
-Settings → Devices → click the device card → **Switch to MQTT** (or
-**Switch to REST**) at the bottom. The device's id / panel settings /
-per-clone renderer settings stay; only the transport flips.
+Open the device card under **Settings → Devices**. At the bottom, click **Switch to MQTT** or **Switch to REST**.
 
-- **REST → MQTT**: drops the `transport: "rest"` flag from the manifest.
-  The next render publishes to the device's status / config / frame
-  topics over MQTT. The access token is kept in case the user flips
-  back to REST later.
-- **MQTT → REST**: sets the flag, mints a per-device access token if
-  one doesn't exist, shows the token in a one-shot reveal so you can
-  copy it into firmware.
+Switching keeps the device id, panel settings and per-clone renderer settings.
 
-The switch only changes what the server does; nothing is sent to the
-device, so it is offered only where the client on the device could
-follow. Boards running `tesserae-device-firmware` (the reTerminal
-family, XIAO, M5Stack, Xteink and the other flashed ESP32 boards), the
-KOReader plugin and PicPak speak REST only, so their cards show no
-**Switch to MQTT**. An instance of one of those that an older version
-let you switch is put back on REST when the server starts.
+- REST to MQTT removes `transport: "rest"` from the manifest. The next render sends status, config and frame messages over MQTT. Tesserae keeps the access token for switching back.
+- MQTT to REST creates a token if needed and shows it once. Copy it into the firmware.
+
+This only changes the server. It doesn't reconfigure the device, so the option appears only for clients that support both transports.
+
+Boards running `tesserae-device-firmware` use REST only, as do the KOReader plugin and PicPak. This includes reTerminal, XIAO, M5Stack and Xteink. Their cards have no **Switch to MQTT**.
+
+If an older version let you switch one of these, Tesserae returns it to REST at startup.
 
 ## Synchronized wake (optional)
 
-By default each device counts its sleep from whenever it last checked
-in, so two panels on the same interval drift apart and repaint at
-unrelated moments. **Synchronized wake** pins the wake grid to the wall
-clock instead: open the device card → **Schedule** section → *Advanced:
-synchronized wake* → **Wake on the clock**.
+Normally, devices sleep from their last check-in, so screens on the same interval drift apart. **Synchronized wake** makes them update together at clock times.
 
-- **On the clock**: keeps the sleep interval as the period but lands
-  every wake on `anchor + multiples of it` in local time. A 15-minute
-  panel anchored at `00:00` wakes at :00 / :15 / :30 / :45; every
-  device set to the same grid repaints together.
-- **At set times only**: the device wakes only at the times you list
-  (e.g. `07:00, 12:30, 19:00`), ignoring the interval. Good for very
-  long battery life on content that changes a few times a day.
+Open the device card → **Schedule** → *Advanced: synchronized wake* → **Wake on the clock**.
 
-The **Apply to all** switch copies the setting to every REST
-device in one save, which is the quickest way to put a whole fleet on
-one grid. Grid points inside quiet hours are skipped, and the server
-learns each device's wake-to-paint latency after a cycle or two so the
-paint itself, not just the check-in, lands on the grid. No firmware
-update is required; firmware that understands the optional `wake_at`
-field lands tighter still (see the client protocol spec).
+| Setting | When the device wakes |
+|---|---|
+| **On the clock** | Keep the interval, with wakes at `anchor + multiples of it` in local time. A 15-minute interval anchored at `00:00` wakes at :00 / :15 / :30 / :45. |
+| **At set times only** | Ignore the interval and use listed times, such as `07:00, 12:30, 19:00`. This saves battery for pages that change a few times daily. |
+
+Use **Apply to all** to copy the setting to every REST device. Wakes during quiet hours are skipped.
+
+After one or two cycles, Tesserae learns the delay from waking to drawing. It adjusts wake times so images appear together. Firmware that supports `wake_at` can be more precise, but no firmware update is required.
 
 ## Firmware
 
-The Tesserae repo's `notes/prompts/` directory has self-contained
-prompts for Claude Code (or any AI coding assistant) for porting
-existing firmware to REST:
-
-- `notes/prompts/rest-firmware-pi.md` — Raspberry Pi clients
-  (paho-mqtt → requests)
-- `notes/prompts/rest-firmware-esp32-idf.md` — ESP-IDF firmware
-  (esp-mqtt → esp_http_client; covers tesserae-device-esp32-bin,
-  tesserae-device-esp32-bw, tesserae-device-photopainter-7.3-bin)
-- `notes/prompts/rest-firmware-pico-sdk.md` — Pico SDK firmware
-  (REST-only path for new RP2350 builds)
-
-Each prompt is self-contained: drop it into a fresh Claude Code
-session in the firmware repo and it has everything needed (API
-reference, library suggestions, constraints, acceptance criteria).
+To port existing firmware to REST, build against the
+[Client protocol spec](../dev/client-protocol.md).
 
 ## Security notes
 
-- **6-digit codes have 20 bits of entropy** (~1M values). The rate
-  limiter caps brute force at 10 failed attempts per IP per minute,
-  so cracking a random code requires patience and is detectable in
-  the logs. For LAN-only homelabs this is acceptable; if you expose
-  Tesserae to the public internet, layer additional access control
-  (reverse-proxy auth, Tailscale, VPN) on top.
-- **Per-device tokens are 20-character alphanumeric** (~120 bits of
-  entropy). Sufficient for direct bearer-token auth on a LAN; not
-  designed for public internet exposure on their own.
-- **The discovery endpoint is unauthenticated** (firmware has no
-  token yet). It shares the register endpoint's rate limiter so an
-  attacker can't spam the Discovered strip.
-- **HTTP only in v1**. No TLS support yet; the server runs HTTP on
-  the LAN. If you need encryption, stack a reverse proxy
-  (Caddy, NGINX Proxy Manager, Cloudflare Tunnel) and have firmware
-  point at the HTTPS-fronted endpoint.
+- A 6-digit code has 20 bits of entropy, about 1 million values. Guesses are limited to 10 failures per IP per minute and appear in logs. This is acceptable on a private LAN; public access needs extra protection, such as reverse-proxy login, Tailscale or a VPN.
+- Device tokens have 20 alphanumeric characters, about 120 bits of entropy. They are suitable for a LAN, but need extra protection on the public internet.
+- Discovery is unauthenticated because new devices have no token. It shares registration's rate limit to prevent spam.
+- The server uses HTTP only in v1. For encryption, use an HTTPS reverse proxy such as Caddy, NGINX Proxy Manager or Cloudflare Tunnel.
 
 ## Remote access over the internet (Cloudflare Tunnel)
 
-You can run the server at home and drive a device that lives somewhere
-else (a frame at the office, a relative's house) by putting Tesserae
-behind a Cloudflare Tunnel, so nothing on your home router is
-port-forwarded. Two settings make this safe.
+A Cloudflare Tunnel lets a remote screen reach your home server without forwarding router ports. Configure these settings:
 
-1. **Turn on signed render URLs.** Settings → Server → Network &
-   integrations → *Allow REST clients on public networks* (off by default). With it on,
-   the server hands each device a short-lived, signed URL for its frame
-   image; unsigned requests to `/renders/` are refused even from the
-   public side. Leave it off and render artifacts stay reachable only
-   from your LAN or an authenticated session, so a remote device can't
-   fetch its image.
+1. Turn on **Settings → Server → Network & integrations → Allow REST clients on public networks**. It's off by default. Devices then receive short-lived signed image URLs; unsigned requests to `/renders/` are refused.
 
-2. **If you add Cloudflare Access, exclude the device paths.** Access
-   puts an interactive login (SSO, email OTP) in front of the tunnel.
-   That is right for the web UI, but a headless device can't complete a
-   login, so an Access policy covering everything will break it. Add a
-   **Bypass** policy (or scope your Access policy to exclude) these two
-   paths:
+   With it off, images are limited to your LAN or an authenticated session. A remote device won't be able to download them.
+
+2. If using Cloudflare Access, exclude the device paths below. Access requires interactive login, such as SSO or an email code, which a device can't complete. Add a **Bypass** policy or exclude these paths from your Access policy:
 
    | Path | Why it's safe to exclude from Access |
    |---|---|
@@ -259,24 +147,14 @@ port-forwarded. Two settings make this safe.
 
    Everything else, including the admin UI, stays behind Access.
 
-Pre-pair the device on your LAN before it leaves (see *Pre-pairing with a
-6-digit code* above) so you never expose `/register` to the internet.
-The registration endpoint is rate-limited regardless, but pre-pairing
-removes the surface entirely.
+Pair the device on your LAN before taking it elsewhere. Use the 6-digit code method above. This avoids exposing `/register` publicly, even though it is rate-limited.
 
 ## Migrating an MQTT install to REST
 
-You don't need to. Existing MQTT installs keep working unchanged; the
-REST transport sits alongside MQTT. If you want to flip a device,
-use the per-device toggle described above.
+To move a device to REST, use the per-device toggle described above.
 
-If you want to flip the entire install:
+To move the whole setup:
 
-1. Settings → Server → Network & integrations → Default transport for new devices = REST. New devices
-   added via the wizard default to REST.
-2. For existing MQTT devices, use the per-device toggle to move them
-   one at a time. Each switch reveals the new bearer token for that
-   device which needs to be flashed into firmware.
-3. Once every device is on REST, you can stop the broker (Settings →
-   Server → MQTT broker → uncheck "Built-in broker"; for external Mosquitto,
-   stop the service yourself).
+1. Set **Settings → Server → Network & integrations → Default transport for new devices** to REST. The device wizard then uses REST by default.
+2. Switch existing devices one at a time. Each switch shows a bearer token that you must add to the firmware.
+3. Once all devices use REST, stop the broker. For the built-in broker, uncheck **Settings → Server → MQTT broker → Built-in broker**. Stop an external Mosquitto service yourself.

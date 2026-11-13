@@ -1,17 +1,14 @@
 # Widget stability tiers
 
-Every widget that hits the network depends on an upstream, and not
-every upstream is equally reliable. Tesserae's tiers say what to expect
-when your widget suddenly shows an error after a year of working fine.
+These tiers describe how likely a widget's data source is to break.
 
 ## Stable
 
-Backed by an official, documented API. Won't break unless the upstream
-ships a deliberate breaking change (which usually comes with notice).
+Stable widgets use official, documented APIs. They break only when the provider deliberately makes a breaking change, usually with notice.
 
 | Widget | Upstream |
 |---|---|
-| `weather_now`, `weather_hourly`, `weather_forecast` | open-meteo.com |
+| `weather_now`, `weather_now_scenic`, `weather_hourly`, `weather_forecast` | open-meteo.com |
 | `weather_air_quality`, `weather_pollen_count` (Open-Meteo path) *(marketplace)* | open-meteo.com |
 | `f1_next`, `f1_last_race`, `f1_weekend`, `f1_standings_drivers` *(marketplace)* | jolpi.ca/ergast (maintained Ergast successor) |
 | `news_rss` | any RSS 2.0 / Atom 1.0 feed |
@@ -30,9 +27,9 @@ ships a deliberate breaking change (which usually comes with notice).
 
 ## Best-effort
 
-Undocumented endpoint, but used by enough open-source projects for long
-enough that breakage would be a notable event. Failure mode is usually
-"widget returns an error payload until somebody updates the parser."
+Best-effort widgets use undocumented endpoints that many open-source projects have used for years.
+A break would affect enough projects to be noticeable.
+The widget usually shows an error until someone updates its parser.
 
 | Widget | Why best-effort |
 |---|---|
@@ -41,9 +38,8 @@ enough that breakage would be a notable event. Failure mode is usually
 
 ## Fragile
 
-Scraping or relying on a soft policy. Most likely to break with no
-notice. The widget will surface an error payload rather than silently
-serve stale data.
+Fragile widgets scrape web pages or depend on a policy that can change without notice.
+They are the most likely to break. They show an error instead of silently serving old data.
 
 | Widget | Why fragile |
 |---|---|

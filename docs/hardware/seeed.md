@@ -1,32 +1,18 @@
 # Seeed ePaper devices
 
-The **Seeed reTerminal E-Series** is the ready-to-go hardware path for
-Tesserae: pre-assembled, battery-powered, no toolchain required. All
-four reTerminal SKUs plus the XIAO ePaper family run one shared
+The reTerminal E-Series and XIAO ePaper devices share
 [Tesserae-native firmware](https://github.com/dmellok/tesserae-device-firmware),
-flashable from Chrome or Edge in a couple of clicks at
+which you can flash from Chrome or Edge at
 [tesserae.ink/flash](https://tesserae.ink/flash).
-
-!!! info "Group photo landing shortly"
-    A dedicated shot of all six Seeed SKUs painting Tesserae dashboards
-    side by side is coming here. Until then, individual devices are
-    visible on the [home page's rack shot](../index.md).
 
 ## Why the reTerminal E-Series
 
-- **Browser flash.** No ESP-IDF toolchain, no `esptool.py`, no
-  serial voodoo. Plug in over USB-C, hit the flasher at
-  [tesserae.ink/flash](https://tesserae.ink/flash), pick your model,
-  paint.
-- **Battery-powered.** All four E-Series SKUs ship with a battery in
-  the case. Deep-sleep between renders; days to weeks of runtime
-  depending on refresh cadence.
-- **No assembly.** Bare panels want a controller board, a battery
-  wire-up, a case. The reTerminal E-Series arrives as a finished
-  device.
-- **Four sizes.** 7.5" mono, 7.3" Spectra 6 colour, 10.3" mono with
-  16-level greyscale, 13.3" Spectra 6 colour. Same firmware, same
-  wire format family, same Tesserae onboarding.
+- Flash over USB-C at [tesserae.ink/flash](https://tesserae.ink/flash).
+  You don't need ESP-IDF or `esptool.py`. No manual serial setup is needed.
+- All four models include a battery and sleep between updates.
+  Seeed rates the E1003 and E1004 for up to six months.
+  The E1004 rating assumes one refresh per day; more frequent updates drain the battery faster.
+- No assembly is needed. All four sizes use the same setup process.
 
 ## SKUs
 
@@ -37,8 +23,10 @@ flashable from Chrome or Edge in a couple of clicks at
 | [reTerminal E1003](https://www.seeedstudio.com/reTerminal-E1003-p-6731.html) | 10.3" | Mono, 16-level grey | 1872×1404 |
 | [reTerminal E1004](https://www.seeedstudio.com/reTerminal-E1004-p-6692.html) | 13.3" | Spectra 6 (6-colour) | 1200×1600 |
 
-The wider [Seeed XIAO ePaper](https://www.seeedstudio.com/category/Boards/XIAO-Series.html)
-family is supported via the same unified firmware:
+The [reTerminal Sticky](https://www.seeedstudio.com/reTerminal-Sticky-p-6861.html)
+(480×800 portrait, 4-level grey, touch) uses the same firmware as kind `seeed_reterminal_sticky`.
+
+Supported [Seeed XIAO ePaper](https://www.seeedstudio.com/category/Boards/XIAO-Series.html) devices:
 
 | Model | Panel | Colour | Resolution |
 |---|---|---|---|
@@ -49,16 +37,16 @@ family is supported via the same unified firmware:
 | [XIAO 7.5" ePaper Panel](https://www.seeedstudio.com/XIAO-7-5-ePaper-Panel-p-6416.html) (C3, integrated) | 7.5" | Mono | 800×480 |
 | [TRMNL 7.5" (OG) DIY Kit](https://www.seeedstudio.com/TRMNL-7-5-Inch-OG-DIY-Kit-p-6481.html) (XIAO ESP32-S3 Plus) | 7.5" | Mono | 800×480 |
 
-The last two are different products around the same glass and are not
-interchangeable at the firmware level, so they register as separate
-kinds (`xiao_epaper_panel_75_c3` and `xiao_epaper_75`). The integrated
-C3 panel reports no battery level; the hardware has no divider to an
-ADC pin, so Tesserae shows no battery for it rather than showing it as
-flat.
+The last two products use the same screen but need different firmware:
 
-The XIAO SKUs share panel families with the reTerminal E1004 (EE02) and
-E1001 (both 7.5" boards), so the wire format is proven; extending
-coverage to the rest of the XIAO ePaper range is on the roadmap.
+| Product | Device kind |
+|---|---|
+| XIAO 7.5" ePaper Panel (C3) | `xiao_epaper_panel_75_c3` |
+| TRMNL 7.5" (OG) DIY Kit | `xiao_epaper_75` |
+
+The C3 panel cannot measure battery level, so Tesserae leaves it blank.
+
+Coverage for the remaining XIAO ePaper range is on the roadmap.
 
 ## Getting started
 
@@ -68,32 +56,28 @@ coverage to the rest of the XIAO ePaper range is on the roadmap.
 3. Open [tesserae.ink/flash](https://tesserae.ink/flash), pick your
    model, hit **Connect & flash**.
 4. Follow the [unified Seeed quickstart](../quickstart/seeed-unified.md)
-   for onboarding, Wi-Fi setup, and pairing with your Tesserae server.
+   to set up Wi-Fi and pair the device with Tesserae.
 
 ## Front buttons
 
-The reTerminal E-Series ships with three front buttons that Tesserae
-can bind to any server-side action: rotate through the dashboards on
-this panel, jump straight to a specific one, force a fresh render,
-fire a webhook. Configure the mapping per device in the **Button map** under the
-device's **Controls** section. Defaults to
-`left → rotate_prev`, `right → rotate_next`, `refresh → refresh`;
-see [Physical buttons](../install/buttons.md) for the full action
-list and common patterns.
+The three front buttons can run any server action.
+Use them to rotate this screen's dashboards or jump to a specific one.
+They can also draw a fresh picture or call a webhook.
+
+Set each device's **Button map** under **Controls**.
+Defaults: `left → rotate_prev`, `right → rotate_next`, `refresh → refresh`.
+
+See [Physical buttons](../install/buttons.md) for all actions and examples.
 
 ## Firmware source
 
 The firmware is open source and lives at
 [github.com/dmellok/tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware).
-Built with ESP-IDF, one board header per Seeed SKU, releases wired via
-GitHub Actions on each Tesserae tag. Bugs and hardware notes welcome as
-issues or PRs on that repo.
+It is built with ESP-IDF. GitHub Actions publishes releases on each Tesserae tag.
+Report bugs and hardware notes as issues or PRs there.
 
 ## Also on the site
 
-- Full [compatibility matrix](../compatibility.md), all vendors, every
-  panel Tesserae supports.
-- [Unified Seeed quickstart](../quickstart/seeed-unified.md), covering
-  every SKU listed above.
-- [Older TRMNL BYOS path for Seeed](../quickstart/seeed-reterminal.md),
-  for users who prefer to stay on TRMNL's stock firmware.
+- [Compatibility matrix](../compatibility.md): all supported screens.
+- [Unified Seeed quickstart](../quickstart/seeed-unified.md): setup for every model above.
+- [TRMNL BYOS path for Seeed](../quickstart/seeed-reterminal.md): keep TRMNL's stock firmware.

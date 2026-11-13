@@ -1,40 +1,30 @@
 # PicPak 4.2" BWRY
 
-The **PicPak** is a battery-powered 4.2" 4-colour BWRY
-(black / white / red / yellow) e-paper frame. It runs a community
-firmware authored by
-[@varanu5](https://github.com/varanu5/picpak-tesserae-client) that
-speaks Tesserae's REST device API directly and paints frames the
-`esp32_bin` renderer packs to native BWRY 2-bpp.
+PicPak is a battery-powered e-paper frame. It runs community firmware by
+[@varanu5](https://github.com/varanu5/picpak-tesserae-client) and connects directly to Tesserae.
 
 ## Firmware
 
-- **Repo**: [`varanu5/picpak-tesserae-client`](https://github.com/varanu5/picpak-tesserae-client)
-- **Author**: [@varanu5](https://github.com/varanu5)
-- **Status**: stable, ongoing stress-testing by the author.
-- **Compatibility discussion**: [tesserae#61](https://github.com/dmellok/tesserae/issues/61) —
-  varanu5's write-up of what works, the BWRY palette order, the
-  2-bpp packing layout, and the vertical-scan flip requirement.
+The [`varanu5/picpak-tesserae-client`](https://github.com/varanu5/picpak-tesserae-client) firmware is maintained separately by
+[@varanu5](https://github.com/varanu5). The firmware is stable, and the author continues to stress-test it.
 
-- **Update check**: with online features on, Settings → Devices and the
-  Firmware page compare the version a PicPak reports against the newest
-  release of that repo (via api.tesserae.ink) and show an "update available"
-  chip that links the release. Updates are applied with the web flasher
-  below, not over the air.
+[Compatibility notes](https://github.com/dmellok/tesserae/issues/61) cover what works, BWRY palette order, 2-bpp packing and the required vertical-scan flip.
 
-The firmware is not part of the Tesserae repo; it lives with its
-author. The quickest way on is the browser flasher below; otherwise
-build and flash from the repo per its README. Either way, pair the
-device afterwards in Tesserae's Settings → Devices.
+With Online features on, Settings → Devices and the Firmware page check for newer releases through api.tesserae.ink.
+An "update available" badge links to the release. Install updates with the web flasher below; over-the-air updates aren't supported.
 
 ## Flashing
 
-The **[PicPak Web Flasher](https://picpaktesserae.pages.dev)** writes the
-community firmware straight from your browser over Web Serial, with no
-toolchain to install. Plug the PicPak in over USB, open the flasher in a
-Chromium-based browser (Chrome or Edge), pick the serial port, and flash.
+The [PicPak Web Flasher](https://picpaktesserae.pages.dev) is the quickest way to install the firmware.
+It uses Web Serial, your browser's serial connection. No build tools are needed.
 
-Prefer to build it yourself? Follow the README in
+1. Plug the PicPak in over USB.
+2. Open the flasher in Chrome or Edge.
+3. Pick the serial port and flash.
+
+Then pair the device in Tesserae's Settings → Devices.
+
+To build it yourself, follow the README in
 [`varanu5/picpak-tesserae-client`](https://github.com/varanu5/picpak-tesserae-client).
 
 ## Panel specs
@@ -51,8 +41,7 @@ Prefer to build it yourself? Follow the README in
 
 ## Once paired
 
-The PicPak appears under Settings → Devices → Discovered after the
-firmware first checks in. Assign it a page like any other device.
-Sleep interval is configurable per-device (30 s to 1 week) from the
-device settings; the firmware reads that value on each wake so a
-longer interval takes effect on the next fetch.
+After its first check-in, the PicPak appears under Settings → Devices → Discovered. Assign it a page.
+
+Set its sleep interval in device settings, from 30 s to 1 week.
+The firmware reads this on each wake, so a longer interval takes effect on the next fetch.

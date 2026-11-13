@@ -1,17 +1,19 @@
 # Companion Bluetooth status observations
 
-Tesserae Companion can read a display's mode, battery percentage and firmware
-version over an authenticated Bluetooth connection, then report those readings
-to its paired Tesserae server. Settings shows the last confirmed mode and uses
-newer phone readings in the existing battery and firmware fields, with their
-Bluetooth source and collection time.
+Companion reads a display's mode, battery percentage and firmware over an authenticated Bluetooth connection.
+It sends the readings to its paired server.
+
+Settings shows the last confirmed mode. Newer phone readings update the battery
+and firmware fields, with their Bluetooth source and collection time.
 
 ## Reporting a reading
 
-Clients check the advertised `device_mode_observations` feature before reporting
-mode. The additional `device_status_observations` feature enables the optional
-battery and firmware readings. The paired Companion token needs
-`device_setup:write`, and the display must already be registered.
+Before sending a reading, check:
+
+- The server advertises `device_mode_observations` for mode readings.
+- It also advertises `device_status_observations` for optional battery and firmware readings.
+- The paired Companion token has `device_setup:write`.
+- The display is registered.
 
 Send `PUT /api/app/v1/devices/{device_id}/mode-observation` with a JSON body:
 
@@ -25,25 +27,34 @@ Send `PUT /api/app/v1/devices/{device_id}/mode-observation` with a JSON body:
 }
 ```
 
-Success returns `204`. Mode is `bluetooth` or `wifi`; each timestamp is RFC 3339
-with a timezone and cannot be more than five minutes in the future. `source`
-is a client-defined identifier of 1–32 ASCII characters: a lowercase letter
-followed by lowercase letters, digits or underscores (`[a-z][a-z0-9_]{0,31}`).
-For example, iOS uses `ios_ble`; other clients can use `android_ble` or `web_ble`
-without a server update. The server stores and returns the original identifier.
-Battery percentage is an integer from 0 to 100. Firmware is a nonempty version string,
-up to 128 characters, without control characters.
+Success returns `204`. Readings must meet these rules:
 
-The server merges mode, battery and firmware by their own observation times.
-Delayed retries cannot replace newer values, and omitting a reading preserves
-the saved one. `GET /api/app/v1/devices` includes the saved `mode_observation`
+| Field | Rule |
+| --- | --- |
+| Mode | `bluetooth` or `wifi` |
+| Each timestamp | RFC 3339 with a timezone; no more than five minutes in the future |
+| `source` | Client-defined identifier, 1 to 32 ASCII characters; matches `[a-z][a-z0-9_]{0,31}` |
+| Battery percentage | Integer from 0 to 100 |
+| Firmware | Nonempty version string, at most 128 characters, without control characters |
+
+After the initial lowercase letter, the source can contain lowercase letters, digits or underscores.
+
+iOS uses `ios_ble`. Other clients can use `android_ble` or `web_ble` without a server update.
+
+The server saves and returns the original identifier.
+
+Each reading uses its own observation time. A delayed retry cannot replace a
+newer value; leaving out a reading keeps the saved one.
+
+`GET /api/app/v1/devices` includes the saved `mode_observation`
 for clients with `devices:read`.
 
 ## Meaning of the displayed status
 
-These are saved observations. A newer Wi-Fi heartbeat reading takes precedence
-over an older Bluetooth reading in Settings. The last-confirmed mode line appears
-only after a valid observation exists. Phone reports leave heartbeat
-freshness, reachability, configured transport, quiet hours and push scheduling
-unchanged. A successful report confirms that the server saved the observation;
-it does not send a command to the display.
+Settings uses a newer Wi-Fi heartbeat reading over an older Bluetooth reading.
+The last-confirmed mode appears only after a valid observation.
+
+Reports do not change heartbeat freshness, reachability or configured transport.
+Quiet hours and push scheduling stay unchanged.
+
+A successful report means the server saved the reading. It sends no command to the display.

@@ -1,45 +1,45 @@
 # Quickstart: Waveshare 7.3" PhotoPainter (ESP32-S3)
 
-The Waveshare 7.3" PhotoPainter, an ESP32-S3 with a 6-colour Spectra 6 panel and an integrated battery housing. Battery-powered, deep-sleep between renders.
+The PhotoPainter uses an ESP32-S3 board and a six-colour Spectra 6 panel. It runs on a battery in its built-in housing and sleeps between updates.
 
 ## 01 — Flash the firmware
 
-Open the PhotoPainter's case, plug the ESP32-S3 into your computer over USB while holding the BOOT button, then release.
+Open the case. Hold BOOT while connecting the ESP32-S3 to your computer over USB, then release.
 
-Open the [Tesserae browser flasher](https://tesserae.ink/flash) in Chrome or Edge, pick **Waveshare 7.3" PhotoPainter** in the device dropdown, then click **Connect & flash**. It installs the firmware over Web Serial with no toolchain.
+Open the [Tesserae browser flasher](https://tesserae.ink/flash) in Chrome or Edge. Select **Waveshare 7.3" PhotoPainter**, then click **Connect & flash**. It installs over USB using Web Serial; no build tools needed.
 
-On first boot the PhotoPainter opens a Wi-Fi captive portal (SSID `Tesserae-Setup`). Connect from your phone or laptop, then set:
+On first boot, join `Tesserae-Setup` from your phone or laptop. Enter these on the Wi-Fi setup page:
 
-- **Tesserae server URL**: `http://<your-server>:8765`
-- **Wi-Fi SSID and password**: your home network.
+- Tesserae server URL: `http://<your-server>:8765`
+- Your home Wi-Fi name and password.
 
 Save. The PhotoPainter restarts onto your network.
 
 ## 02 — It pairs itself
 
-The PhotoPainter announces itself on Tesserae's `/api/v1/device/discover` endpoint. Within a few seconds it appears under **Settings → Devices → Discovered**. Click **Register**.
+The device contacts `/api/v1/device/discover`. Within a few seconds, it appears under **Settings → Devices → Discovered**. Click **Register**.
 
 ## 03 — Compose a dashboard
 
 The 7.3" PhotoPainter panel is 800×480 landscape, Spectra 6 six-colour.
 
-1. **Dashboards → New**.
-2. Pick a layout that suits the smaller canvas. The PhotoPainter shines as a photo frame or compact ambient surface.
+1. Open **Dashboards → New**.
+2. Choose a layout for a photo frame or compact display.
 3. Bind the page to the device in the device picker.
-4. Hit **Push**.
+4. Click **Push**.
 
-A full Spectra 6 refresh takes around 20 to 30 seconds; the PhotoPainter wakes, fetches, paints, sleeps.
+A full refresh takes around 20 to 30 seconds. The PhotoPainter downloads and draws the image when it wakes, then sleeps.
 
 ## 04 — Set the refresh
 
 In the dashboard's **Schedules** card:
 
-- **Daily at a set time** is the natural fit for a photo frame, one frame per day.
-- **Smart sync** keeps the PhotoPainter painting a fresh frame without burning battery on idle wakes.
+- Choose **Daily at a set time** to show one photo per day.
+- Turn on **Smart sync** on an **Every N minutes** schedule to get fresh images without wasting battery on idle wakes.
 
-Closed-case battery life with a daily cadence is several months on the integrated cell.
+With the case closed and one daily update, the built-in battery lasts several months.
 
 ## Next steps
 
-- [Picture widgets](https://tesserae.ink/catalog/): the catalog has Immich, Unsplash, and Paperlesspaper Art widgets that fit the PhotoPainter form factor.
-- [Quiet hours](../install/devices.md#per-device-settings) overnight.
+- [Picture widgets](https://tesserae.ink/catalog/) for the PhotoPainter include Immich, Unsplash and Paperlesspaper Art.
+- [Quiet hours](../install/devices.md#quiet-hours) overnight.

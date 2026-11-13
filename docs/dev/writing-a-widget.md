@@ -1,27 +1,26 @@
 # Build a widget with AI
 
-A Tesserae widget is a small, self-contained plugin: a manifest, a `client.js`
-that renders into a Shadow DOM (styles live inline in its `<style>` block), and
-an optional `server.py` for data. That shape, **a tight, documented contract with a fast feedback loop** -
-makes widgets an unusually good fit for AI-assisted coding. You describe what
-you want, the model writes the files against the contract, and you watch it
-render in the browser in seconds.
+A widget needs a manifest and `client.js`. It draws inside an isolated
+Shadow DOM, with styles in its `<style>` block.
+Add `server.py` if it needs data.
 
-This page is the AI workflow. The authoritative spec lives in
-[the widget contract & design system](../widgets.md), keep it open; the model
-should read it too.
+Have the model read [the widget contract & design system](../widgets.md).
+Keep it open while you work.
 
 !!! tip "Works with any capable coding assistant"
-    The examples assume [Claude Code](https://claude.com/claude-code) or a
-    similar agentic tool that can read files and run commands, but the prompts
-    work in any chat model, just paste the contract doc in alongside them.
+    The examples use [Claude Code](https://claude.com/claude-code), which can read files
+    and run commands. Other coding agents work too. For a chat model, paste
+    the contract alongside the prompts.
 
 ## Why this works well
 
-- **The contract is small and explicit.** [`docs/widgets.md`](../widgets.md) defines the whole surface: the `render(shadow, ctx)` signature, the `ctx` shape, the Spectra semantic tokens (`--bg`, `--surface`, `--text-primary`, `--accent-1..6`, etc.) and the orthogonal `data-style` axis, container queries, the e-ink rules. A model that reads it has everything it needs.
-- **There are 37 worked examples** in `plugins/`. "Model your widget on `weather_now`" is a one-line instruction that carries an enormous amount of design and structure.
-- **The feedback loop is seconds.** `/_test/render?plugin=<id>&size=md` renders a single widget with no dashboard. The dev server auto-reloads; refresh to see edits.
-- **Widgets ship a smoke test.** The model can write it and you can run it, objective "did it work" rather than vibes.
+- [`docs/widgets.md`](../widgets.md) defines the contract: `render(shadow, ctx)`, the `ctx` fields,
+  and Spectra tokens (`--bg`, `--surface`, `--text-primary`, `--accent-1..6`, etc.).
+  It also covers the independent `data-style` setting, container queries, and e-ink rules.
+- The 37 widgets in `plugins/` give the model examples. Try "Model your widget on `weather_now`".
+- `/_test/render?plugin=<id>&size=md` renders one widget without a dashboard in seconds.
+  The dev server reloads automatically; refresh to see edits.
+- Have the model write a smoke test, then run it to check the render.
 
 ## Setup
 
@@ -33,20 +32,20 @@ python3 -m venv .venv
 .venv/bin/python -m app.main --dev      # auto-reload + /_test/render enabled
 ```
 
-Sign in once (these routes need the dev server **and** a session, they
-aren't loopback-exempt), then iterate at
+Sign in first. These routes require both the dev server and a session,
+even on loopback. Open
 `http://127.0.0.1:8765/_test/render?plugin=<id>&size=md` (also
 `size=xs|sm|lg`). The whole-gallery review page is at
 `http://127.0.0.1:8765/_test/widgets`.
 
 ## The loop
 
-1. **Orient the model**, point it at the contract + a reference widget.
-2. **Describe the widget**, data source, what each size shows, the layout.
-3. **Let it scaffold** the files under `plugins/<id>/`.
-4. **Render and critique**, open `/_test/render`, paste back a screenshot or describe what's off.
-5. **Write the smoke test** and run `pytest plugins/<id>/`.
-6. **Check the constraints** (below) and open a PR.
+1. Orient the model: point it at the contract + a reference widget.
+2. Describe the widget: data source, what each size shows, the layout.
+3. Let it scaffold the files under `plugins/<id>/`.
+4. Render and critique: open `/_test/render`, paste back a screenshot or describe what's off.
+5. Write the smoke test and run `pytest plugins/<id>/`.
+6. Check the constraints (below) and open a PR.
 
 ## Copy-paste prompts
 
@@ -83,8 +82,7 @@ before we design anything.
 
 ### 2. Describe the widget to build
 
-Fill in the blanks, the more specific the data source and per-size layout, the
-better the first pass:
+Fill in the data source and layout for each size:
 
 ```text
 Build a widget: <id> ("<Display Name>").
@@ -143,30 +141,48 @@ payload. Then run it: .venv/bin/python -m pytest plugins/<id>/ -q
 
 ## The constraints the model must respect
 
-These are the things AI most often gets wrong on e-ink. Call them out explicitly
-(they're all in [the contract](../widgets.md), but worth repeating):
+Tell the model to follow these rules from [the contract](../widgets.md):
 
-- [ ] **Spectra semantic tokens only** (default). Paint from `var(--bg)`, `var(--surface)`, `var(--surface-sunken)`, `var(--text-primary/-secondary/-muted)`, `var(--accent-1..6)` (and `--accent-1-soft..6-soft` for tinted backgrounds), `var(--on-accent)` for text on accent backgrounds. Never hard-coded hex except the documented data-identity carve-out (team/brand/flag colours; see docs/widgets.md). **Exception**: a widget that genuinely needs gradients or layered shapes (scenic weather card, atmospheric clock background) can declare `"design": {"palette": "extended"}` in `plugin.json` and use arbitrary CSS colours. The renderer's Floyd-Steinberg dither approximates them on the panel palette. Reference: [`plugins/weather_now_scenic`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_now_scenic). Strict is still the default; only opt in if the strict tokens can't carry your design.
-- [ ] **Pick an archetype body class.** `.stat-body` / `.list-body` / `.chart-body` / `.status-body` / `.cal-body` / `.wx-body` / `.img-body`, the seven archetypes carry the font-size cascade, gap rhythm, and zoom-aware sizing that keep widgets consistent next to each other on a panel. Don't roll your own body layout.
-- [ ] **Consume style-tunable tokens with fallbacks.** Use `var(--edge-weight, 1px)`, `var(--label-transform, uppercase)`, `var(--pill-radius, 999px)`, etc., defaults live on `:root` (the Standard look); styles override on `[data-style]`. The fallback means an unstyled widget still renders.
-- [ ] **No drawn borders.** Card shapes come from `--bg` vs `--surface` contrast and spacing, not `border:` rules. They dither into invisibility on Spectra 6 anyway.
-- [ ] **Bold, not fill, for big icons.** `ph-bold` reads clean at size; `ph-fill` quantises into blobs.
-- [ ] **No animations / transitions / `requestAnimationFrame`.** The frame is screenshotted; anything mid-flight gets caught half-rendered. `animation: false` on Chart.js too.
-- [ ] **No client-side `fetch`.** Use `server.py`, the renderer waits only for declared `<img>` loads + fonts, not arbitrary fetches, so a client fetch will screenshot before its data arrives. Don't assume internet on the panel side either.
-- [ ] **Idempotent render.** Overwrite `shadow.innerHTML`; don't append (the renderer may call you twice).
-- [ ] **Don't load fonts.** `font-family: inherit` on `:host`; the page font arrives via `--font-family` and `ctx.font.family`.
-- [ ] **No `variant` cell option.** The Spectra rebuild replaced per-widget variants with the orthogonal `data-theme` × `data-style` axes, one widget should compose with every theme and every style instead of shipping N visual directions. If you find yourself reaching for variants, you probably want a new style or a new theme.
-- [ ] **Hero + list layouts don't use `grid-template-rows: 1fr auto`.** Models reach for this when stacking a hero stat on top of a bullet list, and it looks right at `lg`. At `md` / `sm` the `auto` list claims its full content height first and the `1fr` hero collapses to a sliver. Use `grid-template-rows: auto minmax(0, 1fr)` (hero takes its size, list fills) or cap visible list rows per size via `.size-sm .row:nth-child(n+3) { display: none; }`. See [the contract's "Hero + list layouts"](../widgets.md#hero-list-layouts-dont-let-auto-rows-starve-the-hero) section.
-- [ ] **Verify every size in `/_test/render`, not just `md`.** `lg` is forgiving and `md` usually looks fine; `sm` and `xs` are where layouts break. Insist the model produces screenshots at all four sizes before declaring the widget done.
-- [ ] **Translate technical errors to friendly messages.** The `error` string from `server.py:fetch()` lands directly in the cell; `"HTTPError: 404 Not Found"` reads as "broken widget" while `"Country code 'XX' is not supported."` reads as "I typed something wrong." Catch the categories you can name (invalid input, upstream down, rate-limited) and pass everything else through with a tame fallback.
+- [ ] Use Spectra semantic tokens by default: `var(--bg)`, `var(--surface)`, `var(--surface-sunken)`,
+  `var(--text-primary/-secondary/-muted)`, `var(--accent-1..6)` and `--accent-1-soft..6-soft` for tinted backgrounds.
+  Use `var(--on-accent)` for text on accent fills. Hard-coded hex is allowed only for documented team/brand/flag colours.
+
+  If gradients or layered shapes need more colours, declare `"design": {"palette": "extended"}` in `plugin.json`.
+  Floyd-Steinberg dithering converts them to the panel palette. Only opt in when strict tokens cannot express the design.
+  See [`plugins/weather_now_scenic`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_now_scenic).
+- [ ] Choose a body class: `.stat-body` / `.list-body` / `.chart-body` / `.status-body` / `.cal-body` / `.wx-body` / `.img-body`.
+  These handle font sizes, gaps, and zoom. Don't build your own body layout.
+- [ ] Use fallbacks: `var(--edge-weight, 1px)`, `var(--label-transform, uppercase)`, `var(--pill-radius, 999px)`, etc.
+  Standard defaults live on `:root`; styles override them on `[data-style]`.
+  Fallbacks keep unstyled widgets working.
+- [ ] Don't draw borders. Use `--bg` / `--surface` contrast and spacing instead of `border:` rules.
+  Borders disappear when dithered on Spectra 6.
+- [ ] Use `ph-bold` for big icons. `ph-fill` turns into solid blobs.
+- [ ] No animations, transitions, or `requestAnimationFrame`: screenshots can catch them half-rendered.
+  Set `animation: false` on Chart.js too.
+- [ ] No client-side `fetch`. Use `server.py`.
+  Screenshots wait for declared `<img>` loads and fonts, so client fetches can finish too late.
+  Don't assume the panel has internet access.
+- [ ] Overwrite `shadow.innerHTML`; don't append. The renderer may call you twice, so render must be idempotent.
+- [ ] Don't load fonts. Set `font-family: inherit` on `:host`; use `--font-family` and `ctx.font.family` for the page font.
+- [ ] Don't add a `variant` cell option. Use the independent `data-theme` × `data-style` settings.
+  Each widget should work with every theme and style. Add a theme or style for a new visual direction.
+- [ ] Don't use `grid-template-rows: 1fr auto` for a hero above a list.
+  It can look right at `lg`, but at `md` / `sm`, the `auto` list takes height from the `1fr` hero.
+  Use `grid-template-rows: auto minmax(0, 1fr)` or limit rows with `.size-sm .row:nth-child(n+3) { display: none; }`.
+  See [the contract's "Hero + list layouts"](../widgets.md#hero-list-layouts-dont-let-auto-rows-starve-the-hero).
+- [ ] Check every size in `/_test/render`, including `md` and `lg`.
+  Layouts often break at `sm` and `xs`. Get screenshots of all four sizes before calling it done.
+- [ ] Write friendly `error` strings in `server.py:fetch()`; the cell displays them directly.
+  Raw errors like `"HTTPError: 404 Not Found"` need useful explanations, such as `"Country code 'XX' is not supported."`.
+  Handle invalid input, upstream failures, and rate limits; use a calm fallback for other errors.
 
 ## Make it composable (`fragments`)
 
-The canvas editor (Dashboards → New dashboard → *Freeform canvas*)
-lets a user drop widgets onto a freeform canvas and place them anywhere. By
-default a widget places whole. If you want its parts to be individually
-placeable, say the temperature or the sun-times of a weather card on their own,
-declare `fragments` in `plugin.json` and teach `render()` to paint just one:
+Open Dashboards → New dashboard → *Freeform canvas* to place widgets anywhere.
+By default, each widget is placed whole. To place parts separately, such as
+a weather card's temperature or sun times, declare `fragments` in `plugin.json`
+and have `render()` draw the selected part:
 
 ```json
 "fragments": [
@@ -186,30 +202,21 @@ export default function render(shadow, ctx) {
 }
 ```
 
-- **The data path is unchanged.** Your `server.py` `fetch()` still runs once
-  with the instance's options; `ctx.fragment` only decides which markup you
-  paint. So each placed fragment carries its own config (location, entity, etc.)
-  via the normal `cell_options` drawer.
-- **Each fragment must stand alone.** It renders into its own box at the size
-  the user drew, so paint from `100%`/container units and the semantic tokens as
-  always; don't assume the surrounding card's layout is present.
-- **`w`/`h`** are the default box the palette drops the fragment at; the user
-  resizes freely afterward. `full` is optional, list it if the whole-widget
-  placement wants a non-default size.
+- Your `server.py` `fetch()` runs once with the instance's options.
+  `ctx.fragment` selects the markup. Each fragment has its own location, entity, etc. in the `cell_options` drawer.
+- Each fragment must stand alone. Use `100%`/container units and semantic tokens to fit the user's box.
+  Don't depend on the surrounding card's layout.
+- `w`/`h` set the default box size; users can resize it.
+  Declare `full` only if whole-widget placement needs a different default size.
 
-Backward-compatible: a widget with no `fragments` block places as a single whole
-widget (implicit `full`), and `ctx.fragment` is simply absent, so existing
-widgets need no changes. Prefer a handful of meaningful fragments over slicing
-every element; if a piece is really its own thing, a separate small widget (the
-way the `github_*` family is built) is often cleaner than a fragment.
+A widget without `fragments` is placed whole; `ctx.fragment` is `"full"`.
+Prefer a few useful fragments. For independent pieces, consider separate
+widgets, as in the `github_*` family.
 
 ## Structured design first (optional)
 
-For a more involved widget, have the model produce a **filled-in design brief**
-before any code, using the template in
-[`docs/widget-design-brief.md`](../widget-design-brief.md), ASCII mockups per
-size, an icon manifest, a tone-rules table. It front-loads the layout decisions
-and makes the build pass cleaner.
+For a complex widget, fill in [`docs/widget-design-brief.md`](../widget-design-brief.md) before coding.
+Include ASCII mockups for each size, an icon manifest, and a tone-rules table.
 
 ## Lineups arrows (optional)
 
@@ -220,34 +227,43 @@ Declare how in `plugin.json`:
 "lineups": { "pin_option": "paper" }
 ```
 
-and give `server.py` a `lineup_items(options)` returning `[{"key": ..., "label": ...}]`.
-The page then renders the dashboard with `options["paper"]` set to the chosen key,
-and Push now sends exactly that picture. For a widget that cannot name its items
-but looks different on every render, declare `"lineups": { "draw": true }`
-instead: the arrows draw the dashboard again, and the host sets a sequential
-`mode` to `random` for those renders so browsing never moves your cursor. A
-drawing render also carries hidden options `_draw` (a token) and `_browse`
-(how many turns past the current one, for a widget that keeps its own turn:
-show that turn and move nothing).
+Give `server.py` a `lineup_items(options)` returning `[{"key": ..., "label": ...}]`.
+The page renders with `options["paper"]` set to the chosen key.
+Push now sends that picture.
 
-An item may also carry `"thumb": "<image URL>"` (absolute http(s) or an app-relative
-path; anything else is dropped; core adds the app's URL prefix to an app-relative path, so it
-loads under Home Assistant ingress, and `url_for` works too) to show a preview picture in the lineup editor and the
-Lineups page; without one the item shows its rendered thumbnail or a label card. A
-`lineup_items(options, *, ctx=None)` or `lineup_item_count(options, *, ctx=None)` that
-names a `ctx` keyword also gets a plain dict with `data_dir`, `cell_w` and `cell_h` (the
-element's size in px on the target display), `placement_id`, `device_id` (or `None`),
-`panel_w` and `panel_h`; a hook with one argument is called as before.
+If items cannot be named and each render differs, declare `"lineups": { "draw": true }`.
+The arrows draw again. A sequential `mode` becomes `random` for these renders, so browsing does not move your cursor.
 
-Two optional extras for the lineup editor, which lists a dashboard's items in its
-rows: `"lineups": { "noun": "papers" }` names them ("6 papers" instead of "6 items"),
-and a draw widget can report how many items it draws from with
-`lineup_item_count(options)` in `server.py` (an int, or `None` when it can't say;
-without it the editor shows "draw" instead of a count).
+Draw renders also carry `_draw` (a token) and `_browse` (turns past the current one).
+If your widget tracks its own turn, show that turn without advancing it.
+
+An item can also carry `"thumb": "<image URL>"` to show a preview picture in the lineup
+editor and on the Lineups page. Use an absolute http(s) URL or an app-relative path
+(`url_for` works too); anything else is dropped. Core adds the app's URL prefix to an
+app-relative path, so it loads under Home Assistant ingress. An item without a thumb shows
+its rendered thumbnail or a label card.
+
+If `lineup_items(options, *, ctx=None)` or `lineup_item_count(options, *, ctx=None)` takes
+a `ctx` keyword, it also gets a plain dict with:
+
+- `data_dir`
+- `cell_w` and `cell_h`: the element's size in px on the target display
+- `placement_id`
+- `device_id`, or `None`
+- `panel_w` and `panel_h`
+
+A hook with one argument is called as before.
+
+The lineup editor lists a dashboard's items in its rows. Two optional extras help it:
+
+- `"lineups": { "noun": "papers" }` names the items ("6 papers" instead of "6 items").
+- A draw widget can report how many items it draws from with `lineup_item_count(options)`
+  in `server.py`. Return an int, or `None` when it can't say. Without it, the editor shows
+  "draw" instead of a count.
 
 ## Submitting
 
-You have two paths, pick the one that matches your widget's audience:
+You have three paths; pick the one that matches your widget's audience:
 
 ### Bundle into Tesserae itself
 
@@ -257,7 +273,7 @@ For foundational widgets you want every install to ship with:
 - Open a PR against [dmellok/tesserae](https://github.com/dmellok/tesserae).
   New widgets are welcome, especially ones backed by a documented,
   key-free public API (those land in the **Stable** tier; see
-  [Screens & compatibility](../compatibility.md)).
+  [Widget stability tiers](../widgets/tiers.md)).
 - If your widget hits an undocumented or scraped endpoint, say so
   in the PR; it'll be tiered **Best-effort** or **Fragile** so users
   know what to expect.
@@ -269,15 +285,12 @@ automatically in the [widget gallery](../widgets/gallery.md):
 python scripts/capture_widget_shots.py    # single hero shot per widget
 ```
 
-That refreshes `docs/screenshots/widgets/<id>.png` (the gallery's
-default hero image). For visual-regression spot-checks across themes
-or styles, hit `/_test/matrix` in the dev server, it renders one
-widget across the full theme × style grid in a single page.
+That refreshes the gallery image at `docs/screenshots/widgets/<id>.png`.
+Use `/_test/matrix` in the dev server to check one widget across every theme and style.
 
 For ongoing design work, `python scripts/widget_contact_sheet.py`
 builds a single PNG showing your widget at all four sizes
-side-by-side, the easiest "did anything regress?" loop while
-iterating on a polish pass.
+side-by-side so you can check for regressions.
 
 ### Keep it to your own install
 
@@ -286,12 +299,11 @@ Zip the widget folder (the one holding `plugin.json`) and pick it with
 **Upload widget** on Widgets → Installed widgets. A `.tar.gz` works too, and so does a
 zip made with Finder's Compress.
 
-The widget lands in `data/authored/<id>/`, so it survives updates, and it
-shows up in the widget picker straight away. This is also the way in on the
-Home Assistant App, whose data folder you can't reach over Samba or SSH.
-A manifest that doesn't validate is refused with the reason, which helps
-when the widget came from an AI assistant. The folder name becomes the id
-and can't match a bundled widget.
+The widget goes into `data/authored/<id>/`, survives updates, and appears in the picker immediately.
+Use this on the Home Assistant App too; its data folder is unavailable over Samba or SSH.
+
+Invalid manifests are refused with a reason. The folder name becomes the id
+and must not match a bundled widget.
 
 Uploading the same id again replaces it. **Remove** on the widget's row
 deletes it. A widget with an admin page (`blueprint()` in `server.py`) needs
@@ -302,14 +314,9 @@ itself, so upload only code you wrote or have read.
 
 ### Publish through the community catalog
 
-For your own widgets, third-party APIs, niche use cases — anything
-you want users to opt into per install rather than shipping to
-everyone. Your widget lives in its own GitHub repo and ships via a
-PR to the catalog index; users find it on Widgets →
-Browse catalog.
+Use the catalog for widgets users choose to install, including niche uses and third-party APIs.
+Keep the widget in its own GitHub repo and submit a PR to the catalog index.
+Users find it in Widgets → Browse catalog.
 
-See **[Publish a widget through the catalog](publishing-a-widget.md)**
-for the full flow: pinned-release tarballs, sha256 verification, the
-catalog PR template, bundle entries for widget families
-(`_core` + display widgets installed together), and what the
-review checklist looks at.
+Follow [Publish a widget through the catalog](publishing-a-widget.md) for releases and review.
+It also covers bundles, which install `_core` and display widgets together.

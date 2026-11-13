@@ -1,43 +1,45 @@
 # Quickstart: Pi + Pimoroni Inky, automated via cloud-init
 
-The fastest way to stand up a dedicated Raspberry Pi driving a Pimoroni Inky panel. Flash the SD card with Raspberry Pi Imager, drop the cloud-init file into the boot partition as-is, add a line or two to the boot partition's `meta-data`, insert + power on. After one reboot you have the [`tesserae-device-pi`](https://github.com/dmellok/tesserae-device-pi) client running as a systemd service, polling your Tesserae server and keeping itself up to date.
+Set up a new Pi without logging in over SSH. After one reboot, [`tesserae-device-pi`](https://github.com/dmellok/tesserae-device-pi) starts automatically.
+
+For the fastest setup, flash the SD card and add the files below. Your server URL goes in `meta-data`.
 
 !!! tip "Already have the Pi running?"
-    Skip this page; use the manual flow at [Raspberry Pi + Pimoroni Inky](pi-inky.md). cloud-init is for *fresh* SD cards, not for adding the client to a Pi you're already using for something else.
+    Use the [manual install](pi-inky.md). cloud-init only works on fresh SD cards.
 
 ## When to use this
 
-- You're setting up a **new Pi** dedicated to driving an Inky panel.
-- You want **no manual SSH / shell** between flashing the SD card and seeing the panel paint.
+- You're setting up a new Pi dedicated to driving an Inky panel.
+- You want to go from flashing the SD card to the first frame without manual SSH / shell commands.
 - Your Tesserae server is already running and reachable at a known URL on the LAN.
 
-If any of those don't fit, the [manual install path](pi-inky.md) is the better choice; it walks you through the same steps interactively.
+For other setups, use the [manual install path](pi-inky.md).
 
 ## 01 — Flash Raspberry Pi OS Lite
 
-Use [Raspberry Pi Imager](https://www.raspberrypi.com/software/) (Mac / Windows / Linux):
+Use [Raspberry Pi Imager](https://www.raspberrypi.com/software/) on Mac, Windows or Linux.
 
-1. Pick **Raspberry Pi OS Lite (64-bit)**. Lite is enough; no desktop required.
+1. Pick **Raspberry Pi OS Lite (64-bit)**. No desktop needed.
 2. Pick the SD card.
 3. Open **Advanced options** (Ctrl-Shift-X on Win/Linux, Cmd-Shift-X on Mac):
-   - **Set WiFi**: SSID + password + country.
-   - **Set locale**: timezone + keyboard layout.
-   - **Enable SSH** with a public key (paste your `~/.ssh/id_ed25519.pub` or similar) so you can log in later for diagnostics.
-   - **Do NOT set a username here** — the cloud-init file below creates one.
-4. **Save**, then **Write**. Wait for the flash to finish.
+   - **Set WiFi**: enter your network name, password and country.
+   - **Set locale**: choose your timezone and keyboard layout.
+   - **Enable SSH**: paste a public key, such as `~/.ssh/id_ed25519.pub`, for later diagnostics.
+   - **Do NOT set a username here**. cloud-init creates one.
+4. **Save**, then **Write**. Wait for flashing to finish.
 
 ## 02 — Drop in the cloud-init file
 
-After the flash finishes, eject and re-insert the SD card so the BOOT partition shows up in your file browser.
+Eject and reinsert the card. Open its BOOT partition in your file browser.
 
-1. Download [`scripts/pi-client-cloud-init.yaml`](https://github.com/dmellok/tesserae/blob/main/scripts/pi-client-cloud-init.yaml) from the Tesserae repo.
-2. Copy it to the SD card's BOOT partition, renaming it to `user-data` (overwriting whatever Pi Imager wrote there).
-3. Leave `network-config` alone; your WiFi credentials live there.
-4. **Do NOT edit `user-data`.** Per-install settings go in `meta-data` instead. This lets you reuse the same `user-data` verbatim across every Pi you flash.
+1. Download [`scripts/pi-client-cloud-init.yaml`](https://github.com/dmellok/tesserae/blob/main/scripts/pi-client-cloud-init.yaml).
+2. Copy it to BOOT as `user-data`, replacing Pi Imager's file.
+3. Leave `network-config` alone; it contains your Wi-Fi settings.
+4. Don't edit `user-data`. Put settings in `meta-data`, so you can reuse the unchanged `user-data` file on other Pis.
 
 ## 03 — Edit `meta-data`
 
-Open `meta-data` in the same BOOT partition. Pi Imager wrote one line (`instance-id: ...`). Add your server, and optionally a device id, so the file looks like:
+Open BOOT's `meta-data`. It already has an `instance-id: ...` line. Add your server URL and, optionally, a device id:
 
 ```yaml
 instance-id: pi-inky-01
@@ -45,41 +47,35 @@ server_url: http://tesserae.local:8765
 device_id: pi_lounge
 ```
 
-- **`instance-id`** — any short unique id for this Pi. Whatever Pi Imager wrote is fine; if you're flashing multiple Pis, bump the number (`pi-inky-01`, `pi-inky-02`, …).
-- **`server_url`** — your Tesserae server's base URL (whatever you'd type in a browser to reach the web UI). If your Tesserae host doesn't broadcast `tesserae.local` over mDNS, use its IP: `http://192.168.1.10:8765`.
-- **`device_id`** — optional; defaults to `pi_device`. Give each Pi its own when you run more than one: lowercase, 2 to 32 characters, starting with a letter.
+- `instance-id`: a unique name for this Pi. Keep Pi Imager's value, or number your Pis (`pi-inky-01`, `pi-inky-02`, …).
+- `server_url`: the address you use to open Tesserae. If `tesserae.local` isn't available, use an IP address: `http://192.168.1.10:8765`.
+- `device_id`: optional, defaults to `pi_device`. Use a different id for each Pi: lowercase, 2 to 32 characters, starting with a letter.
 
-There is no panel setting: the client reads the panel from the Inky HAT's EEPROM. A `model:` line left over from an older guide is ignored.
+The client detects the panel from the Inky HAT's EEPROM.
 
 Save `meta-data`. Unmount the SD card cleanly.
 
-The `user-data` file references these values via jinja templating (`{{ ds.meta_data.server_url }}`, `{{ ds.meta_data.device_id }}`) so you never edit the big yaml.
-
 ## 04 — Boot the Pi
 
-Insert the SD card into the Pi and power it on. **First boot takes 5 to 10 minutes** because cloud-init:
+Insert the card and power on. First boot takes 5 to 10 minutes. cloud-init:
 
-- Updates apt + installs Python and the Inky runtime deps (`libopenjp2-7`, `libtiff6`, `build-essential`, etc.).
-- Enables SPI + I²C via cloud-init's native `rpi.interfaces` (no `raspi-config` shell-out required).
-- Appends `dtoverlay=spi0-0cs` to `/boot/firmware/config.txt` (frees the chip-select pin for Inky).
-- Creates a `tesserae` user with `gpio` + `spi` group membership.
-- Builds a Python venv in `/home/tesserae/.venvs/tesserae-device-pi` and installs [`tesserae-device-pi`](https://pypi.org/project/tesserae-device-pi/) from PyPI (plus `rpi-lgpio` on a Pi 5).
-- Sets up the update rollback guard, which puts the previous version back if an update fails to start.
-- Symlinks `tesserae-device-pi` into `/usr/local/bin/`.
-- Installs + enables the `tesserae-device-pi` systemd unit.
-- Reboots so SPI / I²C take effect.
+- Updates packages and installs Python with the Inky libraries.
+- Installs [`tesserae-device-pi`](https://pypi.org/project/tesserae-device-pi/), plus `rpi-lgpio` on Pi 5.
+- Enables the panel connections (SPI / I²C) and starts the client at boot.
+- Sets up rollback if an update fails to start.
+- Reboots.
 
-After the reboot the systemd unit starts automatically. From this point the Pi is announcing itself to your Tesserae server every poll interval (default 60s).
+The Pi announces itself to your Tesserae server every poll interval (default 60s).
 
 ## 05 — Pair the Pi
 
 In the Tesserae web UI:
 
-1. **Settings → Devices → Discovered**. The new Pi appears within a couple of poll cycles (under two minutes after the post-cloud-init reboot).
-2. Click **Register** on the entry. Tesserae mints a per-device access token and stores it; the Pi picks it up on its next `/discover` poll and switches to authenticated polling.
-3. The device moves from **Discovered** to the regular **Devices** list.
+1. Open **Settings → Devices → Discovered**. The Pi appears within two poll cycles, under two minutes after reboot.
+2. Click **Register**. Tesserae creates an access token. The Pi gets it on its next `/discover` poll.
+3. The Pi switches to authenticated polling and moves to the **Devices** list.
 
-No tokens to copy. No prompts to type. The MAC-match auto-claim flow handles everything.
+Pairing matches the Pi's MAC address. You don't need to copy a token or answer prompts.
 
 ## 06 — Compose a dashboard
 
@@ -93,31 +89,31 @@ In the editor:
 
 Open the dashboard's **Schedules** card. For a wall-powered Pi:
 
-- **Every N minutes** is the natural fit, refresh as often as the panel's physical refresh cycle allows (15 to 30 seconds for a full Spectra 6 update).
-- **Daily at a set time** for a once-a-day cadence.
+- Choose **Every N minutes** for regular updates. Allow 15 to 30 seconds for a full Spectra 6 refresh.
+- Choose **Daily at a set time** for one update per day.
 
-For battery-powered Pi setups (rare but possible), **smart sync** keeps the panel painting a freshly-rendered frame at each wake without burning battery on idle renders.
+For a battery-powered Pi, use **smart sync**. It draws a fresh image just before the Pi wakes, saving idle work.
 
 ## What to do if something didn't work
 
 | Symptom | Likely cause + fix |
 |---|---|
-| Pi doesn't appear under Discovered after 10 minutes. | SSH into the Pi (`ssh tesserae@<pi-ip>`), check `journalctl -u tesserae-device-pi -f`. Common: `server_url` in meta-data is unreachable, or SPI didn't enable. |
-| Service log says `No EEPROM detected!` | I²C didn't enable. SSH in and run `sudo raspi-config nonint do_i2c 0 && sudo reboot`. |
-| Service log says `Chip Select … currently claimed by spi0 CS0` | The `dtoverlay=spi0-0cs` line is missing from `/boot/firmware/config.txt`. Add it manually and reboot. |
-| Service log says `connection refused` to the server URL | Tesserae server isn't reachable from the Pi's network. Verify `curl http://<server>:8765/healthz` from the Pi. |
-| `config.toml` contains literal `{{ ds.meta_data.server_url }}` | The jinja template didn't render, usually because `user-data` is missing the `## template: jinja` first line. Re-download `pi-client-cloud-init.yaml` from the repo and copy it in fresh. |
-| Pi reboots forever / never finishes cloud-init | Watch progress: `tail -f /var/log/cloud-init-output.log` on the Pi (after SSH-ing in once first boot reaches a login prompt). |
+| Not in Discovered after 10 minutes | Connect with `ssh tesserae@<pi-ip>` and check `journalctl -u tesserae-device-pi -f`. Check that `server_url` is reachable and SPI is enabled. |
+| `No EEPROM detected!` | Enable I²C: `sudo raspi-config nonint do_i2c 0 && sudo reboot`. |
+| `Chip Select … currently claimed by spi0 CS0` | Add `dtoverlay=spi0-0cs` to `/boot/firmware/config.txt`, then reboot. |
+| `connection refused` | Check server access from the Pi: `curl http://<server>:8765/healthz`. |
+| `config.toml` contains `{{ ds.meta_data.server_url }}` | The template didn't render. Check that `user-data` starts with `## template: jinja`. Download a fresh `pi-client-cloud-init.yaml` from the repo. |
+| Repeated reboots or unfinished setup | Once SSH works, watch `tail -f /var/log/cloud-init-output.log`. |
 
 ## What the cloud-init does NOT do
 
-- **Doesn't open any ports** on a host firewall.
-- **Doesn't configure WiFi**: that's in `network-config`, written by Pi Imager.
-- **Doesn't tune `quiet_hours`, smart sync, or other server-side schedule behaviour**: that lives in the Tesserae server's UI on a per-device basis.
-- **Doesn't pin the client to a version**: it installs the newest `tesserae-device-pi` release from PyPI, and from then on the Pi updates itself from **Settings → Firmware**. To pin one, edit the `runcmd` `pip install` line to `tesserae-device-pi==<version>`.
+- It doesn't open firewall ports.
+- It doesn't configure Wi-Fi. Pi Imager writes that to `network-config`.
+- It doesn't change `quiet_hours`, smart sync or other schedule settings. Set these per device in Tesserae.
+- It installs the latest `tesserae-device-pi` release from PyPI. Later updates come through **Settings → Firmware**. To pin a version, change the `runcmd` `pip install` line to `tesserae-device-pi==<version>`.
 
 ## Next steps
 
 - [Compose a multi-cell dashboard](https://tesserae.ink/catalog/): browse the community widget catalog for one-click installs.
-- [Schedule rotations](../install/devices.md#next-steps) to cycle through several dashboards across the day.
+- [Schedule rotations](../install/devices.md#compose-a-dashboard) to cycle through several dashboards across the day.
 - [Add another Pi or panel](../install/devices.md#multiple-panels): re-run this cloud-init on another SD card with a different `instance-id` in meta-data.

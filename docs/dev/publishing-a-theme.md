@@ -1,11 +1,10 @@
 # Publish a theme through the catalog
 
-Themes are catalog-installable in the same way as widgets: a tagged
-release tarball in your own GitHub repo, an entry in the catalog
-index, one-click install from **Widgets → Browse catalog**, managed
-under **Settings → Themes**. The contract is deliberately minimal — one
-manifest file plus one CSS file per theme — so publishing a theme
-doesn't require any Python, JavaScript, or build tooling.
+Publish a theme from a tagged release in your own GitHub repo.
+Add it to the catalog so users can install it from **Widgets → Browse catalog**
+and manage it under **Settings → Themes**.
+
+Each theme needs a manifest and a CSS file. No Python, JavaScript, or build tools are needed.
 
 ## When to publish a theme through the catalog
 
@@ -13,16 +12,12 @@ doesn't require any Python, JavaScript, or build tooling.
 |---|---|
 | **User themes builder** (Settings → Themes → New theme) | Personal palette you want on your own dashboards. Lives in `data/themes/user.json`; never leaves the instance. |
 | **Bundle in Tesserae** (PR against [`static/style/spectra-tokens.css`](https://github.com/dmellok/tesserae/blob/main/static/style/spectra-tokens.css)) | Generally-useful palette that ships to every install; touches the curated Spectra palette family. |
-| **Community catalog** (this page) | Your own theme or pack you want users to opt into — niche aesthetics, brand-specific palettes, holiday packs, monochrome sets, etc. |
-
-The catalog path lets you (a) iterate on your theme in your own repo
-on your own cadence, (b) ship multiple themes in one install as a
-pack, and (c) get listed in the same Browse UI as widgets.
+| **Community catalog** (this page) | Your own theme or pack you want users to opt into: niche aesthetics, brand-specific palettes, holiday packs, monochrome sets, etc. |
 
 ## The tarball convention
 
-A theme entry's release tarball is **flat**: each theme is two files
-at the envelope root, named by id.
+A tarball is a release archive. Put each theme's two files at its root,
+named by id. A pack contains several pairs:
 
 **Single theme** (one pair):
 
@@ -44,10 +39,9 @@ my-pack-v0.1.0/
   my-pack-lavender.css
 ```
 
-The id-prefix trick (`my-pack-rose` rather than just `rose`) avoids
-collisions with themes from other packs and groups your pack's
-themes together in the alphabetical picker. It's optional but
-recommended.
+Use an id prefix such as `my-pack-rose` instead of `rose`.
+It avoids clashes with other packs and groups themes in the alphabetical picker.
+Prefixes are optional but recommended.
 
 ## `theme.json` shape
 
@@ -69,9 +63,8 @@ recommended.
 
 ## `theme.css` shape
 
-One CSS block targeting `[data-theme="<id>"]`. Set whichever Spectra
-tokens you want to override — the bundled cascade fills any token
-you skip with its own default.
+Use one CSS block targeting `[data-theme="<id>"]`.
+Override the Spectra tokens you need; others keep their bundled defaults.
 
 ```css
 [data-theme="my-cool-theme"] {
@@ -96,28 +89,25 @@ you skip with its own default.
 }
 ```
 
-The full Spectra token reference is in
-[Cross-widget design system](../widget-design-system.md). The
-short version:
+See [Cross-widget design system](../widget-design-system.md) for the full token reference.
 
-- **`--bg`** / **`--surface`** / **`--surface-sunken`** — page
+- `--bg` / `--surface` / `--surface-sunken`: page
   background, card surfaces, slightly recessed surfaces.
-- **`--text-primary`** / **`--text-secondary`** / **`--text-muted`** —
+- `--text-primary` / `--text-secondary` / `--text-muted`:
   three legibility tiers.
-- **`--edge`** — borders, dividers, hairline strokes.
-- **`--accent-1`** through **`--accent-6`** — six categorical
+- `--edge`: borders, dividers, hairline strokes.
+- `--accent-1` through `--accent-6`: six categorical
   accents widgets cycle through (chips, indicators, list-row
   highlights). Each has a `-soft` companion for tinted backgrounds.
-- **`--on-accent`** — foreground colour rendered on top of any
+- `--on-accent`: foreground colour rendered on top of any
   filled accent block.
 
 ## What gets validated
 
-When the install path runs (and the catalog CI on every PR), it
-verifies:
+Installation and catalog CI on every PR check these rules:
 
-1. Every `<id>.json` at the envelope root has a matching `<id>.css`.
-   Unpaired files reject the install rather than skip silently.
+1. Every `<id>.json` at the archive root has a matching `<id>.css`.
+   Unpaired files reject the install.
 2. Every manifest's `id` field equals the file stem.
 3. Every CSS file contains a `[data-theme="<id>"]` selector somewhere.
 4. No theme id clashes with a bundled Spectra theme (catalogs can't
@@ -172,16 +162,15 @@ verifies:
    ```
 
 7. Add a screenshot at `screenshots/<entry-id>/lg.png` in the catalog
-   repo — same shape widgets use (3:2 aspect, ~1200×800).
+   repo, the same shape widgets use (3:2 aspect, ~1200×800).
 
-8. Wait for review. The catalog maintainer reads your theme.css
-   end-to-end. Themes have no Python, no JavaScript, and no network
-   egress to audit, so the review is much shorter than a widget's:
+8. Wait for review. The maintainer reads all of theme.css.
+   Themes have no Python, JavaScript, or network calls to audit, so review is shorter than for widgets.
+   The reviewer checks:
 
-   - CSS block targets the declared id?
-   - Every Spectra token a typical card consumes is set (or inherits
-     cleanly)?
-   - Screenshot shows what users would actually see?
+   - The CSS targets the declared id.
+   - Tokens a typical card uses are set or inherit correctly.
+   - The screenshot matches what users will see.
 
 9. Once merged, the theme shows up in everyone's
    **Widgets → Browse catalog** on the next
@@ -189,10 +178,8 @@ verifies:
 
 ## Updates
 
-Bumping a release follows the same flow: bump `version` in your
-catalog entry, push a new tag, capture the new sha256, then open a
-PR updating the entry. The Browse page will show "Update available"
-to users running an older version.
+Bump `version`, push a new tag, and capture the new sha256.
+Open a PR updating the catalog entry. Users with older versions see "Update available" on Browse.
 
 ## Where themes live on disk
 
@@ -202,17 +189,13 @@ to users running an older version.
 | User-built | `data/themes/user.json` (single JSON file, one record per theme) |
 | Community (this page) | `data/themes/community/<id>/theme.json` + `<id>/theme.css` (one folder per installed theme; the marketplace install path lays them down) |
 
-All three sources merge through the same `build_registry()` call,
-land in the same picker, and respect the same "Show in picker"
-toggle — community themes aren't second-class.
+`build_registry()` combines all three sources in one picker.
+The "Show in picker" toggle works for each.
 
 ## What you can't do (yet)
 
-- **Ship JavaScript or Python with a theme.** A theme is colour
-  tokens only. Anything dynamic belongs in a widget.
-- **Override Spectra structural tokens** (e.g. `--stroke-*`,
-  `--radius-*`, `--space-*`). Those live in the structural Style
-  layer, not the colour Theme layer.
-- **Mark a theme as a per-page favourite** with metadata. You can
-  hide it from the picker per-instance via the eye toggle on the
-  browse strip; pinning is a future feature.
+- Ship JavaScript or Python. Themes contain colour tokens only; dynamic behaviour belongs in a widget.
+- Override structural tokens such as `--stroke-*`, `--radius-*`, `--space-*`.
+  These belong to the Style layer. Themes set colours.
+- Mark a theme as a per-page favourite in metadata.
+  Use the browse strip's eye toggle to hide it on your instance. Pinning is not available yet.

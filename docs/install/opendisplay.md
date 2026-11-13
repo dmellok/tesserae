@@ -1,134 +1,110 @@
 # OpenDisplay tags
 
-[OpenDisplay](https://opendisplay.org/) e-paper tags are driven over
-Bluetooth LE, not over the network, so Tesserae reaches them one of two
-ways. Both render the dashboard the same way (a full-colour PNG via the
-`pi_png` renderer); they differ only in who owns the Bluetooth.
+[OpenDisplay](https://opendisplay.org/) tags receive pictures over Bluetooth LE (BLE).
+Tesserae draws a full-colour PNG with the `pi_png` renderer, then sends it through one of two routes:
 
-- **Via Home Assistant** (recommended if you already run HA). Tesserae
-  hands each frame to HA's OpenDisplay integration, which owns the radio.
-  No extra process and no BLE hardware on the Tesserae host. See
-  [Through Home Assistant](#through-home-assistant).
-- **Via the standalone bridge.** A small companion process,
-  `tesserae-opendisplay`, polls Tesserae over the network and pushes to
-  the tags over BLE itself. Use this when you don't run Home Assistant,
-  or you want a dedicated BLE host near a cluster of tags. See
-  [With the standalone bridge](#with-the-standalone-bridge).
+- [Home Assistant](#through-home-assistant), using its OpenDisplay integration.
+- A separate `tesserae-opendisplay` [bridge](#with-the-standalone-bridge), a program on a nearby Bluetooth host.
 
-You can mix both against one Tesserae server: some tags through HA,
-others through a bridge.
+You can use both routes with the same Tesserae server.
 
 ## Through Home Assistant
 
-This path uses the **OpenDisplay tag (via Home Assistant)** device kind.
-Tesserae writes each rendered frame into HA's media folder and calls the
-`opendisplay.upload_image` action; HA's OpenDisplay integration then
-pushes it to the tag over Bluetooth LE and dithers for the panel.
+Choose the **OpenDisplay tag (via Home Assistant)** device kind.
+Tesserae saves each picture in HA's media folder and calls `opendisplay.upload_image`.
+HA converts the colours for the tag and sends the picture over Bluetooth.
+
+Tesserae needs no Bluetooth hardware or extra process.
 
 ### Requirements
 
-1. **Home Assistant** with the **OpenDisplay integration** installed and
-   at least one tag paired, so `opendisplay.upload_image` is available
-   and you have a device to target.
-2. **Tesserae running as the Home Assistant add-on.** The add-on is
-   granted `media:rw`, so Tesserae and HA share the same `/media`
-   folder; that shared folder is how the frame reaches the
-   `opendisplay.upload_image` action (it takes a media source, not a
-   URL).
-3. The **Home Assistant Core plugin** enabled in Tesserae (it makes the
-   service call).
+1. Home Assistant with the OpenDisplay integration installed and at least one tag paired.
+   This provides the `opendisplay.upload_image` action and a tag to target.
+2. Tesserae running as the Home Assistant add-on.
+   The add-on's `media:rw` permission shares `/media` with HA.
+   The upload action needs a media source, not a URL.
+3. The Home Assistant Core plugin enabled in Tesserae.
 
 ### Set it up
 
-1. In Tesserae, **Settings → Devices → Add device**, set **Transport** to
-   **OpenDisplay**, and fill in the tag form that appears. (The Home
-   Assistant form shows automatically when Tesserae runs as the HA add-on;
-   otherwise you get the bridge instructions instead.)
-2. Pick your tag from the **HA device** dropdown. It lists the OpenDisplay
-   devices Home Assistant knows about, so you don't have to copy any ids;
-   Tesserae stores the device id behind the scenes, and if the tag's model
-   reports a resolution it fills the **panel size** for you. Set a
-   **Rotation** if the tag's mounting needs it. (If Home Assistant isn't
-   reachable, or the tag isn't listed, you can type the device id by hand,
-   its internal hex id, not the tag's own name or serial.) The dropdown
-   needs the **Home Assistant Core plugin** configured.
-3. Bind a dashboard to the device and send, the same as any other panel.
-   On each changed frame Tesserae writes
-   `media/tesserae/<device-id>.png` and calls `opendisplay.upload_image`
-   for that tag.
+1. Open **Settings → Devices → Add device** and set **Transport** to **OpenDisplay**.
+   Fill in the tag form.
+   The HA add-on shows this form automatically; other installs show bridge instructions.
 
-Add one device per tag; each targets its own HA device id, so this
-scales to as many tags as HA can drive. The frame uses a stable
-per-device filename overwritten in place, so the media folder never
-grows, and files for removed devices are swept automatically.
+2. Choose the tag from **HA device**. The dropdown needs the Home Assistant Core plugin configured.
+
+   Tesserae saves its id and fills in **panel size** if the tag reports a resolution.
+   Set **Rotation** to match its mounting.
+
+   If HA is unreachable or the tag is missing, enter its internal hex device id by hand.
+   The tag's name and serial number won't work.
+
+3. Assign a dashboard and send it. Each changed picture is written to `media/tesserae/<device-id>.png` and sent to the tag with
+`opendisplay.upload_image`.
+
+Add one Tesserae device per tag, up to however many HA can drive.
+Each uses one file that is overwritten on updates, so files don't accumulate.
+Removing a device cleans up its file automatically.
 
 ### Telemetry
 
-The tag talks to Home Assistant, not to Tesserae, so its battery, signal
-strength, temperature, and firmware version come from HA's entities rather
-than a heartbeat. Tesserae polls HA for them (every 15 minutes by default,
-set by `app.opendisplay_telemetry_interval_s`) and shows them on the device
-card like any other device, battery-drain history included. This uses the
-same Home Assistant Core plugin the push path does; values only appear for
-fields the tag actually reports.
+The device card reads battery, signal strength, temperature, and firmware version from HA.
+Battery-drain history is included.
+
+Tesserae checks every 15 minutes by default.
+Change this with `app.opendisplay_telemetry_interval_s`.
+It uses the Home Assistant Core plugin and only shows values the tag reports.
 
 ### Firmware and SDK compatibility
 
-When Home Assistant sets a tag up, its OpenDisplay integration reads the
-tag's configuration over Bluetooth. If the tag's firmware is newer than the
-`py-opendisplay` SDK the integration ships, HA can hit a config field it
-doesn't recognise and refuse to add the tag or push to it (for example,
-firmware that emits a `DATA_EXTENDED` / `0x2c` config packet an older parser
-rejects). This is an integration/firmware matter, not a Tesserae one:
-Tesserae only renders the frame and hands it to HA. If a tag won't add or
-won't update, check that your OpenDisplay integration and its SDK are recent
-enough for the tag's firmware. The integration's beta / HACS build is often
-ahead of the version bundled with Home Assistant Core.
+Newer tag firmware may be incompatible with HA's `py-opendisplay` SDK, the library that reads tag settings.
+HA may then refuse to add the tag or send pictures.
+For example, an older parser may reject a `DATA_EXTENDED` / `0x2c` configuration packet.
+
+If either fails, check that the integration and SDK support your tag's firmware.
+The beta / HACS build is often newer than the version bundled with Home Assistant Core.
 
 ## With the standalone bridge
 
-This path uses the **OpenDisplay tag** device kind (REST-polled) plus the
-[`tesserae-opendisplay`](https://pypi.org/project/tesserae-opendisplay/)
-bridge. Tesserae renders and serves the frame; the bridge polls it over
-the network and pushes to the tags over BLE.
+Choose the **OpenDisplay tag** device kind and install the
+[`tesserae-opendisplay`](https://pypi.org/project/tesserae-opendisplay/) bridge.
+It checks Tesserae for pictures over the network and sends them to nearby tags over BLE.
 
 ### Requirements
 
-- A machine near your tags with a **Bluetooth LE adapter** (a Pi, a mini
-  PC) to run the bridge on. Python 3.11+.
-- Network reach from that machine to the Tesserae server.
+Run the bridge on a nearby machine with a Bluetooth LE adapter and Python 3.11+.
+A Pi or mini PC works. That machine must be able to reach Tesserae over the network.
 
 ### Set it up
 
-1. In Tesserae, add an **OpenDisplay tag** device (set the panel size),
-   then generate a **pairing code** under **Settings → Devices**.
-2. On the BLE host, install and scan for tags:
+1. Add an **OpenDisplay tag** device in Tesserae and set its panel size.
+   Generate a **pairing code** under **Settings → Devices**.
+
+2. Install the bridge and scan for tags:
 
     ```bash
     pip install tesserae-opendisplay
     tesserae-opendisplay discover
     ```
 
-    `discover` prints a config stub for each tag in range, including the
-    panel size it reads off the tag.
+    `discover` prints a starting configuration for each nearby tag, including its screen size.
 
-3. Create `config.toml` pointing at your server, with one `[[tags]]`
-   block per tag (device id, BLE address, panel size, and the pairing
-   code). Then run it:
+3. Create `config.toml` pointing at Tesserae.
+   Add one `[[tags]]` block per tag with its device id, BLE address, panel size, and pairing code.
+
+   Run the bridge:
 
     ```bash
     tesserae-opendisplay --config config.toml
     ```
 
-The bridge registers each tag on first run, caches the token, and from
-then on pushes only when a frame changes. One bridge drives many tags;
-run several bridges (one per BLE cluster) against the same server to
-cover more tags or more rooms. Full options are in the
-[bridge README](https://github.com/dmellok/tesserae-opendisplay).
+On first run, the bridge registers each tag and saves its token.
+It sends updates only when pictures change.
+
+One bridge can drive many tags. Use several bridges, one per Bluetooth cluster, to cover more rooms.
+Full options are in the [bridge README](https://github.com/dmellok/tesserae-opendisplay).
 
 ## Which path?
 
-- **Run Home Assistant already?** Use the HA path. There's nothing extra
-  to install or keep running, and HA's integration handles the radio and
-  dithering.
-- **No Home Assistant, or want a dedicated BLE host?** Use the bridge.
+- Use HA if you already run it. Its integration handles Bluetooth and colour conversion, with nothing extra to install or run.
+- Use the bridge without HA, or when you want a dedicated Bluetooth host near your tags.

@@ -1,78 +1,86 @@
 # Set up a device
 
-Once the [server is running](server.md) and (for MQTT clients) pointed at your
-broker (**Settings → Server → MQTT broker**), and you've
-[flashed or paired a client](clients.md), you turn that client into a registered
-**device** so dashboards can target it.
+After [installing a client](clients.md), register it so Tesserae can send dashboards to it.
+The [server must be running](server.md).
+For MQTT clients, set the broker under **Settings → Server → MQTT broker**.
 
 ## Register an MQTT client (Pi / ESP32)
 
-1. **Flash a client** for your hardware (see [Install a client](clients.md)). On first run it publishes a heartbeat on `tesserae/<device-id>/status`.
-2. **Settings → Devices.** A client that announced itself shows up in the banner at the top ("heard but not registered") with its kind and panel size pre-filled, click **Register** to turn it into a device instance.
+New devices use REST by default. They announce themselves over HTTP and appear in the same banner.
+See [REST transport](rest-transport.md#adding-a-new-rest-device).
+
+1. Flash a client for your hardware (see [Install a client](clients.md)). It sends a heartbeat on `tesserae/<device-id>/status` at first startup.
+2. Open **Settings → Devices**. Find the client in the "heard but not registered" banner and click **Register**. Its kind and screen size are already filled in.
 
     !!! note "No heartbeat yet?"
         Use **Add device** to create one by hand. Check the broker host in
         **Settings → Server**, and that the client's `device_id` and broker
         credentials match.
 
-3. **Calibrate orientation.** Hit the compass button (**Send orientation card**) beside the **Rotation** dropdown to push a numbered test card to the panel, then tell Tesserae which number landed in the top-left corner; it sets the rotation that makes your dashboard read upright. The **Rotation** dropdown (0 / 90 / 180 / 270°) is there for manual tweaks. A client can also declare its rotation when it registers, which additionally tells Tesserae that the dims it reported are its framebuffer rather than the dashboard canvas (see [the client protocol](../dev/client-protocol.md)); the dropdown edits that afterwards either way.
-4. **Bind a dashboard.** Open the page editor and set the page's **panel** block to match the device's panel size, then pick a layout preset and assign a widget per cell (see [Compose a dashboard](#compose-a-dashboard) below). Send the page to push it to the device.
+3. Click the compass button, **Send orientation card**, beside **Rotation**. Tell Tesserae which number appears in the screen's top-left corner. It sets the rotation for you.
+
+   To set it yourself, pick 0, 90, 180 or 270° in **Rotation**. A client can also report its
+   rotation when it registers (see [the client protocol](../dev/client-protocol.md)); the dropdown
+   still works afterwards.
+
+4. Open the page editor and match the **panel** block to the device's screen size.
+   Choose a layout and a widget for each cell. See [Compose a dashboard](#compose-a-dashboard) for the steps.
+
+   Send the page to the device.
 
 ## Register a TRMNL / KOReader client (HTTP-pull)
 
-Two paths, depending on the client:
+For a TRMNL device on Seeed-built hardware, enter Tesserae's URL in its Wi-Fi setup page.
+The device registers automatically and appears in **Settings → Devices** within seconds.
+You can rename it on its card.
 
-**TRMNL device (auto-provision):** Just point the device at Tesserae's URL via its captive-portal Wi-Fi setup. The TRMNL firmware (running on Seeed-built hardware) calls `/api/setup` with its MAC in the `Id` header on first boot; Tesserae auto-creates a device record, mints an access token, and the device starts polling `/api/display` immediately. The new device appears in **Settings → Devices** within seconds, no admin click required. Auto-provision was wired up in 0.44.1; the device card lets you rename it after the fact.
+KOReader's `trmnl-display` plugin needs a short token instead:
 
-**KOReader on a Kindle (token-typed):** KOReader's `trmnl-display` plugin doesn't send a MAC, so you provision via a short token instead.
-
-1. **Settings → Devices → Add device**, with the **TRMNL client** kind. Tesserae generates a five-character access token and prints it on the card.
-2. **Type the token into the KOReader plugin config.** It calls `/api/setup`, exchanges the token for a permanent device-id + access token, and starts polling `/api/display` on the cadence you configure.
-3. **Calibrate + bind a dashboard** exactly as above, the device appears in the Devices list the moment it completes setup.
+1. Open **Settings → Devices → Add device** and choose **TRMNL client**. Tesserae shows a five-character access token on the card.
+2. Type the token into the KOReader plugin config. It calls `/api/setup` to exchange it for a permanent device id and token. It then checks `/api/display` at your configured interval.
+3. Set the orientation and dashboard as above. The device appears in Devices as soon as setup finishes.
 
 ## Per-device settings
 
-Each registered device carries its own panel block: logical width and height,
-orientation, colour gamut, and underscan (inset content to clear a physical
-mat/bezel) - plus picture-quality controls (dither algorithm, saturation,
-contrast) that tune the output for the specific panel. The width and height are
-**logical**: the composition orientation dashboards are rendered at, not the
-physical size the device reports. A panel that reports 1200×1920 can carry a
-1920×1200 logical size, and the renderer turns the finished dashboard back onto
-the device's own framebuffer. These live on the device, not on the
-renderer, so two panels driven by the same renderer can differ. For TRMNL /
-1-bit panels the dither dropdown carries the full set: Floyd-Steinberg,
-Atkinson, Jarvis-Judice-Ninke, Stucki, Bayer 8×8, halftone, crosshatch, or none.
+Each device has its own dashboard width and height, orientation, saturation, and contrast.
+Other screen settings are:
+
+| Setting | Meaning |
+|---|---|
+| Colour gamut | The colours the screen can show |
+| Underscan | An inset to keep content clear of the frame or bezel |
+| Dither algorithm | The dot pattern used to reproduce colours |
+
+Width and height describe the dashboard's orientation.
+A 1200×1920 screen can use a 1920×1200 dashboard; Tesserae rotates the picture to fit.
+Two screens using the same renderer can have different settings.
+
+For TRMNL and 1-bit screens, choose Floyd-Steinberg, Atkinson, Jarvis-Judice-Ninke, Stucki, Bayer 8×8, halftone, crosshatch, or none.
 
 ### Update delivery
 
-**Update delivery** on the device card decides how a change reaches a panel
-that is already showing the same page. *Auto*, the default, sends a small
-change (a clock tick, a toggled switch) as a partial-refresh patch on firmware
-that supports it, so the panel repaints only the changed area with no full
-flash. A change too large to patch, or a device that was asleep when the patch
-was staged, gets a whole frame and a full repaint on its next poll instead.
+**Update delivery** controls updates to the page already on screen.
+*Auto* is the default. On supported firmware, small changes repaint only the changed area without a full flash.
 
-*Always full refresh* turns the patch path off for that device: every change
-mints a new frame and repaints the whole panel. It is slower and flashes, but
-it is the setting to reach for when small pushed updates look incomplete or
-ghosted. Ghosting that also shows up on timed refreshes, or that follows a
-touch, has a different cause: report it against the firmware rather than
-changing this setting.
+Large changes need a full repaint at the next check-in.
+So do devices that were asleep when the small update was prepared.
 
-The setting is per device, so one panel can be pinned to full refresh while
-the rest stay on Auto.
+Choose *Always full refresh* if small pushed updates leave missing content or traces of the old picture.
+Every change then repaints the whole screen. This is slower and causes a full flash.
+
+Report ghosting on timed refreshes or after touch to the firmware project.
+Those have a different cause; this setting won't fix them.
 
 ### Quiet hours
 
-**Quiet hours** hold automated pushes (schedules, lineups, webhooks) during a
-daily window so a panel does not repaint a dark room. The window is set once in
-**Settings → Server → Quiet hours** and any device can override it on its
-card. Manual sends, Push-now buttons, and physical buttons ignore it.
+**Quiet hours** stop automated updates from schedules, lineups, and webhooks during a daily window.
+
+Set the window in **Settings → Server → Quiet hours**. Each device can override it on its card.
+Manual sends still work, including Push-now and physical buttons.
 
 The window has three parts:
 
-- **Start** and **End**. End earlier than Start wraps midnight, so 22:00 → 07:00
+- **Start** and **End**. An End earlier than Start crosses midnight, so 22:00 → 07:00
   is overnight.
 - **Window applies on**: the weekdays the Start/End window is in force. Each
   day is judged by its own clock: on a ticked day an overnight window covers
@@ -80,113 +88,107 @@ The window has three parts:
 - **Quiet all day**: weekdays that are quiet from midnight to midnight
   whatever the window says.
 
-The window follows the server's time zone, including daylight-saving changes.
-A window that ends in the hour a spring change skips, or in the hour an autumn
-change repeats, ends at the first real moment after its End, and the End minute
-itself is still quiet.
+The window follows the server's time zone and daylight-saving changes.
+If the End falls in a skipped or repeated hour, quiet hours end at the first real moment after it.
+The End minute itself is still quiet.
 
-An office that empties at night and closes at the weekend is Start 20:00, End
-08:00, Monday to Friday ticked under *Window applies on*, and Saturday and
-Sunday ticked under *Quiet all day*: quiet from Friday 20:00 straight through
-to Monday 08:00.
+For an office closed at night and on weekends, set Start to 20:00 and End to 08:00.
+Select Monday to Friday under *Window applies on* and Saturday and Sunday under *Quiet all day*.
 
-**Sleep through quiet hours** goes one step further for battery panels. By
-default a device keeps waking on its interval inside the window, finds nothing
-new, and goes back to sleep; with this on, the server tells it to sleep until
-the window ends instead, which is where the battery saving is. The trade is
-that a manual push made during the window is not seen until the window ends.
-Devices that never sleep (always-on kiosks) are unaffected. Any client that
-honours `next_poll_s` gets this for free; there is nothing to configure on the
-device.
+This keeps the office quiet from Friday 20:00 through Monday 08:00.
 
-**Touch off during quiet hours** is for touch panels. With touch on, the
-touch controller stays awake through every sleep so that a tap can wake the
-panel, and that costs battery all night. With this switch on, a wake inside
-the window is told that touch is off, so the panel puts its touch controller
-to sleep as well. The first wake after the window turns touch back on. Your
-saved touch setting is never changed. A tap does nothing until the window
-ends; the physical buttons still wake the panel. Leave it off if you use the
-panel at night, for example as a bedside light switch; the panel's **Touch
-wake** setting (double tap or swipe) is the alternative that keeps a wake
-available at a lower cost. Always-on panels are unaffected. It pairs well with sleep-through, but works without it: the panel
-then parks its touchscreen on each wake inside the window. It needs firmware
-v1.40.0 or later on the panel; older firmware leaves the touch controller
-running, which is no worse than before. On the device page the switch only
-appears for panels with a touchscreen.
+**Sleep through quiet hours** keeps battery-powered screens asleep until the window ends.
+By default, they keep waking at their normal interval even when there are no updates.
+The trade-off: with this on, a manual push made during the window isn't seen until the window ends.
+
+Always-on screens are unaffected. Any client that follows `next_poll_s` supports this without extra device setup.
+
+**Touch off during quiet hours** saves battery by putting the touch controller to sleep too.
+The switch appears only on touchscreen devices and needs firmware v1.40.0 or later.
+Older firmware leaves the touch controller running.
+
+- Touch turns off when the screen next wakes during quiet hours.
+- Taps do nothing, but physical buttons still wake the screen.
+- The first wake after quiet hours turns touch back on.
+- Your saved touch setting stays unchanged.
+
+This works with or without **Sleep through quiet hours**. Always-on screens are unaffected.
+
+Leave it off if you use the screen at night, such as for a bedside light switch.
+For lower battery use while keeping touch wake available, choose double tap or swipe under **Touch wake**.
 
 ### Device logs
 
-A panel whose firmware supports log upload gets a **Logs** section on its
-device page. Pick **1, 5 or 20 wakes** and the panel uploads its own log on
-each of its next wakes, starting at its next check-in; **Stop** ends a
-collection early. Each upload holds the tail of the previous wake (including
-its paint, which happens with Wi-Fi off) and the current wake up to the
-upload, so you can read what a panel in the field did without a USB cable.
-Uploads are listed with their time, size and line count, and can be viewed on
-the page or downloaded. The newest 20 are kept, up to 1 MB per device, under
-`data/core/device_logs/`, and deleting the device deletes them.
+A device with log-upload support has a **Logs** section on its page.
+Choose **1, 5 or 20 wakes** to collect logs from its next check-ins. **Stop** ends collection early.
 
-When a panel reports a failed paint or an abnormal reset (brownout, panic,
-watchdog), the failure is written to Settings › Events, shown in the Logs
-section as the last detected failure, and the log is collected once on that
-same wake. Turn **Collect a device's log after a failed paint** off in
-**Settings → Server** to stop that automatic upload; the Events row still
-appears. A log contains timings, the Wi-Fi network name, signal strength and
-IP address. The firmware strips URL query strings and tokens before a line is
-kept, and never logs passwords.
+Each log includes the end of the previous wake and the current wake up to the upload.
+That includes the previous repaint, which happens with Wi-Fi off.
+You can view or download logs without a USB cable.
+
+The upload list shows each log's time, size, and line count.
+
+Tesserae keeps the newest 20, up to 1 MB per device. Deleting the device deletes its logs.
+
+Failed repaints and abnormal resets trigger one log upload on the same wake.
+Abnormal resets include:
+
+- Brownouts, when power drops too low.
+- Panics, when the firmware crashes.
+- Watchdog resets, when the device stops responding.
+
+The failure appears in Settings › Events and as the last detected failure under Logs.
+To stop automatic uploads, turn off **Collect a device's log after a failed paint** in **Settings → Server**.
+The Events entry still appears.
+
+Logs contain timings, the Wi-Fi network name, signal strength, and IP address.
+
+The firmware removes URL query strings and tokens before saving log lines. It never logs passwords.
 
 ## Compose a dashboard
 
-The page editor models a dashboard as **one page → one layout preset → one
-widget per cell**.
+1. Open **Top nav → Dashboards → New dashboard**, or choose an existing dashboard.
+   Set its panel block to the target screen size, usually the device you're connecting.
+2. Choose one of the ten layout cards: one cell, two columns, two rows, three rows, 2×2 grid,
+   hero top / bottom / left / right, or hero sandwich.
 
-1. **Top nav → Dashboards → New dashboard** (or pick an existing one). Set its panel
-   block to the size the dashboard targets, usually the size of the device
-   you're binding to.
-2. **Pick a layout preset.** Ten built-in presets are exposed as cards: one
-   cell, two columns, two rows, three rows, 2×2 grid, hero top / bottom /
-   left / right, and hero sandwich. Click the card you want. The "Custom
-   layout" disclosure below lets you snap rows / columns to a grid and
-   drag corners if no preset fits.
-3. **Assign a widget per cell.** Each cell shows a "Choose widget" picker
-   on the left and the widget's per-cell options on the right (place
-   labels, units, the `variant` style dropdown, etc.). Pick from the
-   gallery sidebar; the per-cell form rewrites itself from the widget's
-   `cell_options`.
-4. **Tweak the cell.** A zoom slider per cell scales widget content up
-   or down without changing the cell's footprint on the panel -
-   useful for a "make this number bigger" pass without resizing.
-5. **Bind devices.** Drop devices into the page's **devices** block -
-   one or many. A page bound to several differently-sized panels
-   renders once per distinct panel size and fans each frame out.
-6. **Send.** Hit Send to push immediately, or let the scheduler do it
-   on a schedule set up under **Lineups** in the top nav. For
-   cycling between several dashboards on one device, use a rotation
-   lineup (also under **Lineups**).
+   For a different layout, expand "Custom layout" below.
+   Snap rows and columns to the grid, then drag corners to adjust them.
+
+3. Choose a widget for each cell from the gallery sidebar.
+   Each cell has a "Choose widget" picker on the left and that widget's options on the right.
+   Options include place labels, units, and the `variant` style dropdown.
+
+4. Use each cell's zoom slider to make its content larger or smaller without resizing the cell.
+5. Add one or more devices to the page's **devices** block.
+   Tesserae draws a picture for each screen size and sends it to the matching devices.
+6. Click Send for an immediate update. For scheduled updates, use **Lineups** in the top navigation.
+   To cycle through dashboards, create a rotation lineup there.
 
 ### Dashboard refresh settings
 
-In **Dashboards**, expand a dashboard and find **Refresh settings** below
-its status tiles. **Content updates** controls how often Tesserae updates
-the dashboard content; **Device wake-up interval** controls how often a
-display wakes to check for new content. A dashboard in a Lineup uses the
-Lineup's background refresh cadence instead.
+In **Dashboards**, expand a dashboard and open **Refresh settings** below its status tiles.
 
-Choose a preset to save immediately, or choose **custom**, enter minutes
-for content updates or seconds for device wake-up, and press **Set**.
-Choose **device's own interval** to leave wake timing to the device.
+| Setting | Controls |
+|---|---|
+| Content updates | How often Tesserae updates the dashboard content, in minutes |
+| Device wake-up interval | How often the screen checks for new content, in seconds |
+
+A dashboard in a Lineup uses the Lineup's background refresh interval.
+Choose a preset to save immediately.
+For **custom**, enter the interval and press **Set**.
+
+Choose **device's own interval** to let the device decide when to wake.
 
 ## Multiple panels
 
-Running more than one display? Repeat with a distinct `device-id` per client.
-Each gets its own topics or HTTP token, panel size, and orientation, and a
-dashboard can be bound to one, several, or all of them. A page bound to several
-panels of different sizes renders once per distinct panel and fans each frame
-out only to the displays that share it.
+For multiple displays, repeat with a distinct `device-id` per client.
+Each has its own connection and screen settings.
+A dashboard can target any number of devices. Tesserae draws it once per screen size and sends it to matching devices.
 
 ## Next steps
 
-- [Browse the widget gallery](../widgets/gallery.md) and start composing
-- [Screens & compatibility](../compatibility.md), panel presets, renderers, and what's tested
-- [Physical buttons](buttons.md), bind hardware buttons on the device (Seeed reTerminal front buttons, Inky Impression back buttons, etc.) to rotate through dashboards, jump straight to one, refresh, or fire a webhook
-- [Home Assistant integration](home-assistant.md), surface every device as HA entities via MQTT discovery, or run Tesserae as an HA App
+- [Browse the widget gallery](../widgets/gallery.md).
+- [Check screen compatibility](../compatibility.md).
+- [Set up physical buttons](buttons.md).
+- [Connect Home Assistant](home-assistant.md) or run Tesserae as an HA App.

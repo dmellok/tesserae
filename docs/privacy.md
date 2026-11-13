@@ -1,258 +1,263 @@
 # Privacy
 
-**Tesserae contacts one first-party endpoint, `api.tesserae.ink`, and
-nothing else.** There is no account system and no third-party analytics
-in the app. The single endpoint is used for: checking for app and
-device-firmware updates, reporting an anonymous, aggregate count of how
-many installs use each marketplace widget, and a once-a-day heartbeat of
-low-cardinality facts about the install.
+Tesserae has no account system or third-party analytics in the app.
+Optional reports go to `api.tesserae.ink`. The sections below explain each request.
 
-It is **off by default**. A fresh install never contacts
-`api.tesserae.ink` until you opt in, either at the first-run setup wizard
-(which asks once, with the full detail) or by turning on **Settings →
-System → Online features**. Leave it off and Tesserae never contacts the
-endpoint; the update indicators and install counts simply don't appear.
-Nothing else in the app phones home. Tesserae also never contacts the
-endpoint from a build or dev environment it can positively identify
-(GitHub Actions, Codespaces, or Gitpod), since those are not real installs.
+The app also fetches two public files from GitHub: the widget catalog and release tags.
+Those requests send nothing about your install. Optional cloud relay carries encrypted pictures to remote screens.
 
-What a request may include: your install's random ID, the widget id, and
-your running version. A coarse country is derived from your IP address
-for aggregate geography and the IP is then discarded. No account, no
-personal data, and no IP addresses or User-Agent strings are stored.
+Online features are off by default. A fresh install never contacts `api.tesserae.ink` until you opt in:
 
-Individual widgets you install may make their own external network calls,
-documented in their own READMEs. Those are separate from the app.
+- In the first-run wizard, which asks once and explains the details.
+- In **Settings → System → Online features**.
+
+Leave it off and update indicators and install counts don't appear. Nothing else in the app phones home.
+It never contacts the endpoint from GitHub Actions, Codespaces or Gitpod when it can identify those build or development environments.
+
+The server uses your IP to identify a coarse country for aggregate statistics, then discards the IP.
+No personal data is stored. It stores neither IP addresses nor User-Agent strings.
+
+Widgets may make their own external requests. Each widget's README documents these separately.
 
 ## What the app never sends
 
-Beyond the aggregate `api.tesserae.ink` requests described above, the app
-does not send:
+Beyond the aggregate `api.tesserae.ink` requests described above, the app does not send:
 
-- IP addresses
-- hostnames
-- file paths
-- settings values
-- secrets (passwords, tokens, API keys)
-- push contents
-- dashboard layouts
-- broker addresses
-- anything tied to a real-world identity
+- IP addresses, hostnames or broker addresses
+- File paths, settings values or dashboard layouts
+- Secrets, including passwords, tokens and API keys
+- Push contents or anything tied to a real-world identity
 
-This applies to the app itself. Individual widgets may make external
-network calls documented in their own READMEs.
+This list covers the app itself, not the widgets you install.
 
 ## Install identifier
 
-On first startup Tesserae generates a **random UUID** and stores it
-at `data/core/install_id.json`. The value has no connection to your
-identity, hardware, IP address, or Tesserae account: it's a random
-string, generated with `uuid.uuid4()`, persisted so widgets that
-declare `needs_install_id` (shared-world features like the planned
-tamagotchi pet or dashboard traveler) can key against a stable
-per-install identity across restarts.
+On first startup, Tesserae creates a random identifier and saves it in `data/core/install_id.json`.
+It uses `uuid.uuid4()`.
 
-Widgets can also request a **widget-scoped derivation** via
-`needs_scoped_id`, which returns `SHA-256(install_id + plugin_id)`.
-Different widgets get different derived identifiers so their outbound
-calls can't be correlated by an external service; the `tesserae_status`
-update chip uses this scoped form.
+The ID isn't tied to your identity or an account.
+It doesn't come from your hardware or IP.
 
-The marketplace install count uses the **raw** install ID instead (the
-app-level identity), so a unique install counts once per widget. It
-carries no name or personal data; regenerating the identifier below
-makes you a fresh install from the count's point of view.
+Widgets declaring `needs_install_id` use this stable ID across restarts.
+Planned shared-world widgets, such as the tamagotchi pet and dashboard traveler, can use it to remember your install.
 
-You can regenerate the identifier at any time in
-**Settings → System → Install identifier**. Regeneration resets any
-per-install state the widget side has accumulated (a pet's history, a
-traveler's home waypoint), because from those services' point of view
-you look like a new install.
+Widgets can request a separate ID through `needs_scoped_id`, which returns `SHA-256(install_id + plugin_id)`.
+Each widget gets a different value, so an external service can't link their requests through that ID.
+The `tesserae_status` update indicator uses this form.
+
+Marketplace install counts use the raw install ID. Each install counts once per widget, with no name or personal data.
+
+Regenerate the ID at any time in **Settings → System → Install identifier**.
+Services then see a new install, which resets any state they kept for the old ID.
+This includes a pet's history or a traveler's home waypoint.
+
+Install counts also treat the new ID as a new install.
 
 ## What the app sends to api.tesserae.ink
 
-Everything below rides the single **Online features** switch (off by
-default; you opt in at the first-run wizard or in Settings). Turning it
-off stops all of it.
+The **Online features** switch controls everything below. Turning it off stops all these requests.
 
 ### Marketplace install count
 
-When you install a widget from the marketplace, Tesserae POSTs to
-`https://api.tesserae.ink/widgets/install` with the widget id, your
-install's random ID, and your running version, so the widget's card can
-show an anonymous "how many installs use this" count. Reinstalling the
-same widget does not inflate the count (it dedupes on your install ID).
-The Browse page reads the aggregate counts from
-`https://api.tesserae.ink/widgets/installs`. A coarse country is derived
-from the request IP on the server side and the IP is then discarded.
+Installing a marketplace widget sends a POST request to `https://api.tesserae.ink/widgets/install`.
+It contains the widget ID, your install's random ID and your running version.
+
+This lets the widget's card show an anonymous install count. Reinstalling the same widget doesn't increase it.
+The server counts each install ID once per widget.
+
+The Browse page reads totals from `https://api.tesserae.ink/widgets/installs`.
+The server derives a coarse country from the request IP, then discards the IP.
 
 ### Template marketplace (share + browse)
 
-Sharing a dashboard template is always an explicit action: nothing is sent
-until you press Submit in the Share dialog. A submission POSTs to
-`https://api.tesserae.ink/templates/submit` with the sanitized template JSON
-(the export step strips request headers, options marked secret, and
-install-specific values like Home Assistant entity ids; a credential lint
-blocks the submission if anything key-shaped remains), a rendered preview
-image of the dashboard, your install's random ID, and your running version.
-That preview is a **live render**, so it shows whatever your widgets were
-displaying when you shared: the Share dialog shows you the exact image and
-warns you before you submit, so you can duplicate the dashboard and swap in
-placeholder values first if it contains anything you'd rather not publish.
-Submissions are human-reviewed before they appear publicly. Your public
-author name is a stable pseudonym derived server-side from your install ID
-(e.g. `amber-heron-42`); no real name, email, or account is involved.
-Reporting a template for takedown sends its public slug, your short reason,
-your install's random ID, and your version; the request goes to the same human
-review queue, and a report from the install that published the template is
-flagged there so an author can pull their own work back.
-Browsing templates fetches the public catalog from
-`https://api.tesserae.ink/templates/index.json`; installing one fetches its
-JSON and POSTs an anonymous install count event (same shape as the widget
-install count above). A coarse country is derived from the request IP on the
-server side and the IP is then discarded.
+Sharing sends nothing until you press Submit in the Share dialog.
+The POST request to `https://api.tesserae.ink/templates/submit` contains the cleaned template JSON and a dashboard preview.
+It also includes your install's random ID and running version.
+
+The export removes request headers, options marked secret and install-specific values, such as Home Assistant entity IDs.
+
+A credential check blocks submission if anything resembling a key remains.
+
+The preview shows your widgets' actual content at the time you share.
+The Share dialog displays the exact image and warns you before submission.
+If it contains private details, duplicate the dashboard and replace them with placeholders first.
+
+A person reviews each submission before it appears publicly.
+The server gives you a stable public pseudonym based on your install ID, such as `amber-heron-42`.
+
+Authors have no account. Neither real names nor email addresses are used.
+
+A takedown report sends the template's public slug, your short reason, your install's random ID and your version.
+
+Reports go to the same human review queue. Reports from the publishing install are flagged so authors can withdraw their work.
+
+Browsing fetches the public catalog at `https://api.tesserae.ink/templates/index.json`.
+Installing fetches the template's JSON and POSTs an anonymous install count event, with the same fields as widget install counts.
+The server derives a coarse country from the request IP, then discards the IP.
 
 ### Daily heartbeat
 
-Once a day, Tesserae POSTs to `https://api.tesserae.ink/heartbeat` so the
-maintainer can see how many installs are active and what to prioritise.
-The body is only low-cardinality, aggregate values: your install's random
-ID, the running version and release channel (`stable` for a tagged release,
-`edge` for a main-branch image, `main` for a source checkout that isn't on a
-tag), the OS family (linux/macos/windows), CPU arch, Python minor version,
-deployment kind (docker/ha_addon/pip/lxc/source), transport
-(mqtt/rest/both/none), a **bucketed** device count (`0`, `1`, `2-3`, `4-9`,
-`10+`, never the exact number), a **bucketed** install age (`0`, `1-7`,
-`8-30`, `31-90`, `90+` days since the install ID was minted), and a Home
-Assistant boolean.
+Once a day, Tesserae POSTs to `https://api.tesserae.ink/heartbeat`.
+This helps the maintainer count active installs and decide what to work on.
+It sends these coarse values:
 
-Per device kind you've configured it sends one object with the kind, the
-newest firmware version reported by devices of that kind, the panel's
-declared colour gamut (for example `bwry_4`) and resolution (`800x480`), and
-a **bucketed** wake cadence (`<5m`, `5-15m`, `15-60m`, `1-6h`, `6h+`,
-`always_on`). These describe the hardware SKU, never an individual device.
+| Field | What is sent |
+|---|---|
+| Install ID | Your install's random ID |
+| Version | Running version |
+| Release channel | `stable`: tagged release; `edge`: main-branch image; `main`: source checkout without a tag |
+| Operating system | linux, macos or windows |
+| CPU | Architecture |
+| Python | Minor version |
+| Deployment | docker, ha_addon, pip, lxc or source |
+| Transport | mqtt, rest, both or none |
+| Device count | A range: `0`, `1`, `2-3`, `4-9` or `10+`, never the exact number |
+| Install age | `0`, `1-7`, `8-30`, `31-90` or `90+` days since the ID was created |
+| Home Assistant | A true/false flag |
 
-It also carries a **bucketed** count of paired companion apps (same buckets,
-never a client name, install id, or app version), a **bucketed** count of
-lineups, four feature booleans (cloud relay linked, touch in use, an MCP
-agent connected, quiet hours set: whether the feature is used at all, never how), which
-admin design the install has switched on (`classic`, or `paper`, the default since 0.449, plus `ui_chosen`: whether that design was set by hand or is just the default, so a change of default can be told from a choice), and a
-**bucketed** OTA rollout snapshot (devices offered a firmware release,
-devices already on it, devices whose last report was a failure). The device
-count and kinds cover only the devices you've actually added, not the
-built-in catalogue. No names, paths, layouts, or exact counts. The server
-stores only the **day** (not a timestamp), so the cadence can't become a
-per-install activity trace, and it dedupes to one heartbeat per install per
-day. A coarse country is derived from the request IP and the IP is then
-discarded.
+For each configured device kind, it sends:
 
-The first heartbeat leaves as soon as you opt in (in the wizard, in
-Settings, or from the header prompt); after that the cadence is daily.
+| Field | What is sent |
+|---|---|
+| Kind | Device kind name |
+| Firmware | Newest version reported by devices of that kind |
+| Colour range | The panel's declared gamut, such as `bwry_4` |
+| Resolution | Such as `800x480` |
+| Wake interval | `<5m`, `5-15m`, `15-60m`, `1-6h`, `6h+` or `always_on` |
+
+These describe a hardware model, never an individual device. Counts and kinds cover only devices you've added, not the built-in catalog.
+
+The heartbeat also includes:
+
+| Field | What is sent |
+|---|---|
+| Paired companion apps | Count range, using the device-count ranges above; no client name, install ID or app version |
+| Lineups | Count range |
+| Cloud relay | Whether it is linked |
+| Touch | Whether it is used |
+| MCP agent | Whether one is connected |
+| Quiet hours | Whether they are set |
+| Admin design | `classic` or `paper` (the default) |
+| Design choice | `ui_chosen`: whether someone chose the design or it was the default |
+| Firmware rollout | Count ranges for devices offered a release, already on it, or whose last report failed |
+
+Feature flags say only whether a feature is used, never how.
+No names or paths are sent; neither are layouts or exact counts.
+
+The server stores only the day, so reports can't form a timed activity trace.
+It keeps one heartbeat per install per day. It derives a coarse country from the request IP, then discards the IP.
+
+The first heartbeat is sent as soon as you opt in through the wizard, Settings or the header prompt.
+After that, it is sent daily.
 
 ### App update check (header badge + `tesserae_status`)
 
 Tesserae checks for a newer release by fetching
 `https://api.tesserae.ink/version/latest?channel=stable&current=<v>&install=<scoped-id>`.
-Two things use it: the web UI's header shows an "update available" badge
-when a newer release exists (checked once in the background, cached for
-several hours, never blocking a page), and the `tesserae_status` widget
-shows the same as an on-panel chip when its update indicator is enabled.
-The `install` parameter is a scoped, one-way derivation of your install
-identifier (not the raw id), so it can't be correlated with the daily
-heartbeat. No IP address or User-Agent is stored; only a coarse country
-lookup plus the query params. Both are off when Online features is off,
-and the widget chip is additionally off per placement by default.
+The header shows an "update available" badge when a newer release exists.
+
+It checks once in the background and caches the result for several hours. It never blocks a page.
+
+The `tesserae_status` widget can show the same indicator on your screen.
+It is off by default for each placement. Both checks stop when Online features is off.
+
+The `install` parameter is a separate, one-way ID derived from your install identifier.
+It isn't the raw ID and can't be linked to the daily heartbeat.
+The server stores only the query parameters and a coarse country lookup, with no IP address or User-Agent.
 
 ### Widget update count (sidebar badge)
 
-The Widgets entry in the sidebar counts installed catalog widgets with a
-newer release. The only request behind it is the catalog index itself
-(`widgets.json` on GitHub, the same file Browse catalog reads), fetched in
-the background at most once an hour and compared against what is installed
-locally. Nothing about your install is sent; GitHub sees an ordinary fetch
-of a public file. Off when Online features is off, and
-**Settings → Widgets → Catalog updates** hides the count on its own.
+The Widgets sidebar counts installed catalog widgets with newer releases.
+It reads `widgets.json` from GitHub, the same public file Browse catalog uses.
+Tesserae fetches it in the background at most once an hour and compares versions locally.
+
+GitHub receives no install details. Online features off stops the check.
+**Settings → Widgets → Catalog updates** hides only the count.
 
 ### Server release check (Docker and non-git installs)
 
-On an install with no git checkout (the Docker image, a release tarball),
-the Updates card in **Settings → System** asks GitHub's public API for the
-newest release tag (`api.github.com/repos/dmellok/tesserae/tags`), in the
-background, at most once an hour while that page is open. Nothing about
-your install is sent; GitHub sees an ordinary API request. Off when Online
-features is off: the card then just links to the releases page. A git
-checkout's **Check for updates** button runs `git fetch` instead, and only
-when you press it.
+Without a git checkout, the Updates card in **Settings → System** checks GitHub's public API.
+This includes Docker images and release archives. It fetches the newest release tag from `api.github.com/repos/dmellok/tesserae/tags`.
+
+This runs in the background at most once an hour while that page is open.
+GitHub receives no install details. With Online features off, the card only links to the releases page.
+
+For git checkouts, **Check for updates** runs `git fetch` only when you press it.
 
 ### Device firmware check
 
-Tesserae looks up the latest known firmware version for each of your
-registered device kinds against
-`https://api.tesserae.ink/firmware/<kind>/latest`, so the Devices card
-shows "v1.1.0 (v1.2.0 available)" when a device is behind. The lookup
-happens lazily (first Devices page render, then on demand every 60 min).
-The only outbound data is the device kind name; no install identifier,
-no device-specific fields. With Online features off, the Devices card
-still shows the firmware version each device reports in its heartbeat;
-the "update available" pill just never fires.
+Tesserae checks `https://api.tesserae.ink/firmware/<kind>/latest` for each registered device kind.
+The Devices card can then show "v1.1.0 (v1.2.0 available)".
+It checks when the Devices page first loads, then on demand every 60 min.
 
-See the [tesserae-api source](https://github.com/dmellok/tesserae-api)
-for the exact server-side implementation.
+The request sends only the device kind name. It includes no install ID or device-specific fields.
+
+With Online features off, the card still shows the version reported in each device's heartbeat.
+It doesn't show an "update available" badge.
+
+See the [tesserae-api source](https://github.com/dmellok/tesserae-api) for the server implementation.
 
 ### Home Assistant App auto-update
 
-When installed as the Home Assistant App, Supervisor manages Tesserae's
-update cycle through Home Assistant's own update infrastructure. That
-path is a Home Assistant feature, not Tesserae phoning home; the
-[Home Assistant privacy policy](https://www.home-assistant.io/privacy/)
-covers what Supervisor sends.
+Home Assistant's Supervisor manages updates to the Tesserae App through Home Assistant's own infrastructure.
+The [Home Assistant privacy policy](https://www.home-assistant.io/privacy/) covers what Supervisor sends.
 
 ## Cloud relay (remote panels)
 
-Separate from the switches above, and off unless you set it up: the
-[remote-panel feature](install/remote-panel.md) lets a panel at another
-location show your dashboards by way of a cloud relay (the hosted
-`relay.tesserae.ink` or [your own](relay/self-host.md)). When enabled,
-your server uploads each rendered frame to the relay for the paired remote
-panel to fetch. The frame is **sealed end-to-end** with a key only your
-server and that panel share, so the relay stores ciphertext only and cannot
-read your dashboards; it sees the encrypted frame plus routing metadata
-(which install and device, frame size, timing). Nothing is sent for a
-device until you pair it, and self-hosting the relay keeps even that
-metadata under your control.
+The [remote-panel feature](install/remote-panel.md) lets screens elsewhere show your dashboards through a cloud relay.
+Use the hosted `relay.tesserae.ink` or [your own](relay/self-host.md).
+This is separate from the switches above and off unless you set it up.
+
+Your server uploads each picture for the paired remote screen to fetch.
+Only your server and that screen share the encryption key.
+The relay stores encrypted data and cannot read your dashboards.
+
+It sees the encrypted picture and routing details: install and device, picture size and timing.
+
+Nothing is sent for a device until you pair it. Hosting your own relay keeps those details under your control too.
 
 ## Per-device telemetry (stays on the server)
 
-Tesserae *does* track per-device diagnostics for the displays you
-register (battery percentage, RSSI, heartbeat cadence, smart-sync
-predictions). That data stays on your server in
-`data/core/device_telemetry.json` and `data/core/battery_history.db`,
-and is only surfaced inside the admin UI (Settings → Devices, the
-battery indicator, smart-sync scheduling). It is never transmitted
-off the box.
+For registered screens, Tesserae tracks battery percentage, signal strength (RSSI), heartbeat timing and smart-sync predictions.
+
+They stay on your server in `data/core/device_telemetry.json` and `data/core/battery_history.db`.
+They never leave the server. They appear only in the admin UI: Settings → Devices, the battery indicator and smart-sync scheduling.
 
 ## Local stats (stays on the server)
 
-The **Stats** page counts what your install does: pushes per day and what
-asked for them, frames painted per display, how often each panel checks
-in, how long a render takes, and how many of each other event the server
-logged. It exists because the event log is capped and rolls over, so
-anything spanning months has to be aggregated as it happens.
+The **Stats** page counts:
 
-Those counters live in `data/core/stats.db` on your server. Nothing reads
-them except the Stats page and your own export button, and there is no
-client or upload path that could send them anywhere. Every row is a date,
-a metric name, a dimension, and an integer: no URLs, no dashboard titles,
-no push contents, and no clock times finer than the day. Dimensions are
-ids you already have (a device id, an event type), and names are resolved
-for display rather than written to the file.
+- Pushes per day and what requested them
+- Pictures drawn per screen
+- How often each screen checks in
+- How long pictures take to draw
+- Other logged events, counted by type
 
-The page carries the controls to match: export the whole store as JSON,
-pause collection, or delete every counter.
+The event log has a size limit. These totals are collected as events happen so they can cover months.
+
+Counters stay in `data/core/stats.db` on your server. Only the Stats page and your export button read them.
+There is no client or upload path to send them anywhere.
+
+| Stored field | What it contains |
+|---|---|
+| Date | Day only, never a finer time |
+| Metric | Metric name |
+| Dimension | An existing ID, such as a device ID or event type |
+| Value | Integer count |
+
+No URLs or dashboard titles are stored, nor any push contents.
+Names are looked up for display and never written to the file.
+
+Use the Stats page to export all counters as JSON, pause collection or delete every counter.
 
 ## Docs site analytics
 
-Aggregate analytics on the documentation site
-(`docs.tesserae.ink`) are kept separately from the app and
-provide a coarse traffic overview only. The docs site honours
-Do-Not-Track headers and skips analytics entirely when DNT is set.
+The docs site (`docs.tesserae.ink`) uses PostHog, separately from the app. It sends two events:
+
+| Event | When | Data |
+|---|---|---|
+| Page view | Each page you open | Page URL, referrer and basic browser info attached by PostHog |
+| `store_outbound_click` | A click on a device vendor's store link | Destination URL and link text |
+
+There is no session recording or other click tracking. Nothing is written to cookies or local storage.
+The site honours Do-Not-Track headers and skips all analytics when DNT is set.

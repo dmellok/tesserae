@@ -1,56 +1,46 @@
 # Build dashboards with AI (MCP)
 
-Tesserae ships an [MCP](https://modelcontextprotocol.io) integration so
-an AI agent (Claude Desktop, Claude Code, or any MCP client) can build **freeform
-(canvas) dashboards** for you: it lists your widgets and devices, lays out a
-canvas, **renders a preview to check its own work**, and pushes to a panel.
+Use [MCP](https://modelcontextprotocol.io) to let an AI agent build canvas dashboards.
+The agent can find widgets and devices, arrange a dashboard, preview it, and push it to a panel.
+Claude Desktop, Claude Code, and other MCP clients work.
 
-The API is on by default; you only need to install the bridge on your agent's
-machine (and copy a token if that machine isn't the one Tesserae runs on).
+The API is on by default. Install the bridge on your agent's machine.
+If Tesserae runs elsewhere, copy an access token too.
 
 ## How it works
 
-The canvas editor is, underneath, a JSON-document editor. The MCP integration
-lets an agent write that same document directly and render a preview PNG to see
-the result, so it can place, look, and adjust:
+Agents edit the same JSON document as the canvas editor and check a PNG preview:
 
 ```
 create_canvas_page → set_canvas → render_preview → (look) → set_canvas → …
 ```
 
-There are two pieces, and they can run on **different machines**:
+Two pieces can run on different machines:
 
-- **The API** (`/api/mcp/*`) is built into Tesserae. It ships with the app, so
-  there's nothing to install on the Tesserae side (Docker, Home Assistant, or
-  source), and it's on out of the box.
-- **The bridge** (`tesserae-mcp`) is a small stdio program your agent launches.
-  It's a separate package, [`tesserae-mcp`](https://github.com/dmellok/tesserae/tree/main/packages/tesserae-mcp)
-  (in this repo under `packages/tesserae-mcp`), installed on **the machine where your agent runs** (your laptop/desktop). It
-  talks to your Tesserae over HTTP.
+- The API (`/api/mcp/*`) comes with Tesserae in Docker, Home Assistant, and source installs.
+- The bridge (`tesserae-mcp`) runs on the agent's machine and calls Tesserae over HTTP.
+  The agent launches it over standard input/output (stdio).
+  Install the separate [`tesserae-mcp`](https://github.com/dmellok/tesserae/tree/main/packages/tesserae-mcp) package from `packages/tesserae-mcp`.
 
-So: nothing to `pip install` inside Tesserae or Home Assistant. You install the
-bridge only on your agent's machine.
+You don't need to `pip install` anything inside Tesserae or Home Assistant.
 
 ---
 
 ## Step 1 — Get a token (remote agents only)
 
-The API is on by default. If your agent runs on the **same machine** as
-Tesserae, skip this step: a direct loopback connection is trusted. If it runs on
-a **different machine** (or reaches Tesserae through a reverse proxy), open
-**Settings → System → MCP**, click **Regenerate token** and copy it; you'll need
-it in Step 3.
+Skip this step for a direct loopback connection on Tesserae's machine; it is trusted.
+For remote or reverse-proxy connections, open **Settings → System → MCP**.
+Click **Regenerate token** and copy it for Step 3.
 
-Don't want agent access at all? Click **Disable MCP API** on the same card (or
+To turn off agent access, click **Disable MCP API** on the same card (or
 set `TESSERAE_EXPERIMENT_MCP=0`), and `/api/mcp` returns 404.
 
 ---
 
 ## Step 2 — Install the bridge (on your agent's machine)
 
-The bridge is a command-line tool, so **[pipx](https://pipx.pypa.io)** is the
-cleanest way to install it: pipx puts it in its own isolated environment and adds
-it to your `PATH`, which is exactly what an MCP client needs.
+Use [pipx](https://pipx.pypa.io) to install the bridge in its own environment
+and add it to your `PATH`:
 
 === "pipx (recommended)"
 
@@ -98,8 +88,8 @@ it to your `PATH`, which is exactly what an MCP client needs.
 
 !!! warning "`error: externally-managed-environment`"
     Homebrew and other modern Python installs block `pip install` into the
-    system Python ([PEP 668](https://peps.python.org/pep-0668/)). That's exactly
-    why pipx (or a venv) is recommended here — both sidestep it. Avoid
+    system Python ([PEP 668](https://peps.python.org/pep-0668/)). Use pipx or a
+    venv to avoid this restriction. Avoid
     `--break-system-packages`.
 
 ---
@@ -109,10 +99,10 @@ it to your `PATH`, which is exactly what an MCP client needs.
 Point your MCP client at the `tesserae-mcp` command, with two environment
 variables:
 
-- **`TESSERAE_URL`** — where your Tesserae is reachable. Default
+- `TESSERAE_URL`: where your Tesserae is reachable. Default
   `http://127.0.0.1:8765`. For a Docker/Home Assistant install, use its LAN
   address, e.g. `http://192.168.1.50:8765`.
-- **`TESSERAE_MCP_TOKEN`** — the token from Step 1. **Omit it** when the agent
+- `TESSERAE_MCP_TOKEN`: the token from Step 1. **Omit it** when the agent
   and Tesserae are on the same machine (loopback is trusted).
 
 === "Claude Code"
@@ -162,8 +152,8 @@ variables:
     Claude Desktop after editing.
 
     !!! note "Desktop can't find `tesserae-mcp`?"
-        GUI apps don't inherit your shell `PATH`, so the bare command may not
-        resolve. Run `which tesserae-mcp` and use the **absolute path** it prints
+        GUI apps don't inherit your shell `PATH`.
+        Run `which tesserae-mcp` and use the absolute path it prints
         (e.g. `/Users/you/.local/bin/tesserae-mcp`) as `"command"`.
 
 ---
@@ -175,40 +165,34 @@ Make sure Tesserae is running, then ask your agent something like:
 > Using Tesserae, build an 800×480 canvas dashboard with the time, today's
 > weather for Melbourne, and my next calendar event, then show me a preview.
 
-It'll call `list_widgets` / `get_widget_options` to see what's available,
-`create_canvas_page`, `set_canvas` to lay it out, and `render_preview` to show
-you the result. Iterate from there ("make the clock bigger", "move weather to the
-top"), and when you're happy, `push_to_device`.
+The agent uses these tools:
+
+- `list_widgets` / `get_widget_options` to find widgets.
+- `create_canvas_page` and `set_canvas` to lay out the dashboard.
+- `render_preview` to show it to you.
+
+Ask for changes, such as "make the clock bigger" or "move weather to the top".
+When ready, use `push_to_device`.
 
 ### Watch it work live
 
-Open the dashboard in Tesserae's canvas editor (Dashboards → the agent-made page,
-tagged **Agent**) while the agent works. The editor updates in real time as the
-agent saves, so you can watch it place and adjust elements. Each element arrives
-on its own: a new one reveals top-down, an edited one pulses, and a code element
-being streamed in holds a running underline until the chunks stop.
+Open the page tagged **Agent** under Dashboards, in the canvas editor, to watch edits appear as the agent saves.
+The right sidebar's **Agent** panel shows the current step and completed work.
+When collapsed, a pill beside the dashboard name shows progress.
 
-An **Agent** panel in the right sidebar narrates the build: the step in flight
-at the top ("Streaming code in · css · +260 B of 833 B"), everything already done
-as ticks below it, with reads and repeated steps folded into single counted
-lines. A pill next to the dashboard name shows the same thing when the sidebar is
-collapsed.
+The sidebar estimates context use (`~6.3k ctx`), the information sent to and from the agent.
+This is a lower bound based on call bytes, not real token usage from your agent's client.
+Reading the widget catalog typically costs more context than all writes combined.
 
-The rail also shows roughly what the build is costing your agent's context
-(`~6.3k ctx`). Tesserae can't see real token usage, which lives in your agent's
-client, so it measures the bytes each call sends and returns and estimates from
-those; treat it as a floor. It's most useful for spotting which calls are
-expensive: reading the widget catalog costs more than every write in a typical
-build combined.
+On any Tesserae page, a toast names the dashboard the agent has started building
+and offers to open it. After a short countdown, it follows automatically.
+Turn following off with the **follow** checkbox on the toast; the choice sticks.
 
-You don't have to be in the editor to notice. On any Tesserae page, a toast names
-the dashboard the agent has started building and offers to open it, following
-after a short countdown. Turn following off with the **follow** checkbox on the
-toast; the choice sticks. It won't navigate away from unsaved edits, a form
+It won't navigate away from unsaved edits, a form
 you're typing in, or an open dialog.
 
 If you start editing while the agent is working, it won't overwrite your unsaved
-changes — you'll get a "changed externally" reload prompt instead.
+changes. You'll get a "changed externally" reload prompt instead.
 
 ---
 
@@ -247,22 +231,20 @@ changes — you'll get a "changed externally" reload prompt instead.
 | `list_schedules` / `create_schedule` / `delete_schedule` | Manage schedules (time-driven pushes) |
 | `list_decks` / `suggest_decks` / `create_deck` / `delete_deck` | Manage decks (pre-rendered linked pages); `suggest_decks` derives them from tap/swipe links |
 
-The write tools (`set_canvas`, `add_element`, `update_element`, `delete_element`,
-`patch_canvas`) accept an optional `base_rev` (the `rev` from `get_canvas`); if the
-page changed since, the write is refused with a conflict so a concurrent UI edit
-isn't clobbered. Prefer `update_element` / `patch_canvas` over resending the whole
-document for a one-field change. Verify a render with `render_report` (structured)
-alongside `render_preview` (image).
+Write tools (`set_canvas`, `add_element`, `add_elements_bulk`, `update_element`,
+`delete_element`, `patch_canvas`) accept optional `base_rev`: the `rev` from `get_canvas`.
+If the page changed, the write returns a conflict and protects the UI edit.
+
+Use `update_element` / `patch_canvas` for single-field changes.
+Check renders with both `render_report` (structured data) and `render_preview` (image).
 
 ---
 
 ## Widget push (authoring)
 
-A separate set of endpoints under `/api/mcp` lets an authoring client (Tesserae
-Studio) install a widget you are building onto a running Tesserae over the network,
-with no shared filesystem, so authoring works against a remote or Home Assistant App
-/ Docker instance. These are developer pushes, not the public catalog flow (no catalog
-entry, no `sha256` gate).
+Studio can install widgets over `/api/mcp` without a shared filesystem.
+This works with remote, Home Assistant App, and Docker installs.
+Developer pushes skip the public catalog entry and `sha256` check.
 
 | Endpoint | What it does |
 | --- | --- |
@@ -272,43 +254,52 @@ entry, no `sha256` gate).
 | `GET /api/mcp/widgets?origin=authored` | List pushed widgets with an `active` flag. |
 | `GET /api/mcp/widgets/<id>/render.png` | Faithful e-ink PNG of a single widget (`size`, `opts`, `theme`, `style`). |
 
-Pushed widgets live under `<data_root>/authored/<id>`, isolated from catalog installs
-and on the persistent volume so they survive restarts / App upgrades. Install is
-guarded: tarballs are size- and count-capped, extracted with tar-slip protection, and
-only `kind: "widget"` manifests that validate against the schema and do not collide
-with a bundled id are accepted; `server.py` is never imported at install time. Reload
-is in-process (fast) unless the widget adds an admin `blueprint()`, which needs a
-restart; when a restart is scheduled the response has `restarting: true` and the client
-polls `/healthz` then `/api/mcp/catalog` until the id appears.
+Pushed widgets live in `<data_root>/authored/<id>`, separate from catalog installs.
+They survive restarts and App upgrades.
+
+Archives have size and entry-count limits. Extraction blocks tar-slip path traversal.
+Only valid `kind: "widget"` manifests with no bundled-id clash are accepted;
+`server.py` is never imported during installation.
+
+Reload happens in-process unless the widget adds an admin `blueprint()`, which needs a restart.
+A scheduled restart returns `restarting: true`.
+The client polls `/healthz`, then `/api/mcp/catalog`, until the id appears.
 
 ---
 
 ## What an agent can place
 
-A canvas element is one of: a **widget** (or a fragment of one), a **decoration**
-(text, rectangle, ellipse, line, icon), a **data primitive** (a widget data field
-shown as a scalable number / text / line / bar / sparkline), or a **custom HTML**
-block (static HTML + CSS in a sandboxed iframe). Elements may sit partly off the
-panel edge. The exact JSON shape for each is in the `set_canvas` tool description.
+| Element | Content |
+|---|---|
+| Widget | A whole widget or fragment |
+| Decoration | Text, rectangle, ellipse, line, or icon |
+| Data primitive | A widget field shown as a scalable number, text, line, bar, or sparkline |
+| Custom HTML | Static HTML + CSS in a sandboxed iframe |
 
-Any element can also carry **live bindings** (`bind`): decorations are otherwise
-static geometry, but a binding reads a widget field each render and maps it through
-a transform to patch the element's props, so a shape reflects data in lockstep with
-the data primitives on the same canvas (no polling). Transforms: `position` (a
-moving marker), `length` (a gauge that grows), `pick` (hop between discrete states),
-`color` (threshold colouring), `gradient` (a value interpolated smoothly along
-colour stops, quantised to the panel palette on e-ink), and `icon` (condition to a
-glyph). Full shape in the `set_canvas` tool description.
+Elements may extend past the panel edge. See `set_canvas` for each element's JSON format.
+
+Any element can use live bindings (`bind`). These read a widget field on each
+render and transform the element's properties.
+
+Decorations are static without bindings. With bindings, they follow data
+alongside data primitives, without polling.
+
+| Transform | Effect |
+|---|---|
+| `position` | Move a marker |
+| `length` | Grow a gauge |
+| `pick` | Switch between discrete states |
+| `color` | Change colour at thresholds |
+| `gradient` | Interpolate between colour stops; quantise to the panel palette on e-ink |
+| `icon` | Choose an icon from a condition |
+
+See `set_canvas` for the full format.
 
 ## Give the dashboard its own settings page
 
-A dashboard an agent builds usually has a handful of values that will need
-changing later: the API endpoint behind a code tile, a postcode, an entity id, a
-city. Left as raw element options, changing one means opening the composer and
-finding the right source drawer.
-
-Instead, an agent can declare them. A canvas carries an `inputs` list, one entry
-per value worth asking about, each pointing at where the answer lands:
+Declare dashboard settings so users can change values without opening the composer.
+Examples include an API endpoint, postcode, entity id, or city.
+Add each value to the canvas `inputs` list with a target for the answer:
 
 ```json
 {
@@ -321,27 +312,22 @@ per value worth asking about, each pointing at where the answer lands:
 }
 ```
 
-Tesserae then serves a **Settings** page for that dashboard at
-`/pages/canvas/c/<id>/configure`, linked from the Dashboards list, with one
-field per declared input pre-filled from what the dashboard is currently
-rendering. Set `inputs` with `set_canvas`, or with `patch_canvas` alone once the
-elements are already placed. Full field and slot reference is in the
-`set_canvas` tool description.
+Tesserae adds a Settings page at `/pages/canvas/c/<id>/configure`, linked from Dashboards.
+Each input gets a field pre-filled with the current rendered value.
 
-Two things follow from using the same declaration the template format uses:
+Set `inputs` with `set_canvas`, or use `patch_canvas` after placing elements.
+See `set_canvas` for fields and slots.
 
-- **Sharing asks the same questions.** Declared inputs are what the Share flow
-  offers as install questions, so an installer is asked what the author was
-  asked, with the author's labels rather than derived ones.
-- **A dashboard with no declarations can derive them.** On the Settings page,
-  *Suggest settings* runs the Share flow's own analysis: whatever it would
-  redact and ask an installer about becomes a setting. Existing declarations are
-  kept, so it only ever adds.
+Inputs use the template format's declarations:
+
+- Share uses the same install questions and author-supplied labels.
+- On the dashboard's Settings page, *Suggest settings* finds values Share would redact and ask about, then adds them as settings.
+  It keeps existing declarations and only adds new ones, including on dashboards with none.
 
 `secret: true` keeps a value out of the render context and redacts it on share.
-`mask` is the separate question of whether the settings field is a password box,
-and defaults to `secret`; set it `false` for a value that is sensitive but still
-has to be readable to maintain, a URL being the usual case.
+
+`mask` controls whether the field is a password box. It defaults to `secret`.
+Set it `false` for sensitive values that need to stay readable, such as URLs.
 
 ## Guardrails
 
@@ -353,32 +339,32 @@ has to be readable to maintain, a URL being the usual case.
   always needs the token.
 - Writes only touch **canvas** dashboards, never grid ones.
 - Pages an agent creates are flagged **Agent** in the Dashboards list.
-- Pushing is **always explicit** — the agent must name the device(s); nothing is
+- Pushing is **always explicit**: the agent must name the device(s); nothing is
   pushed automatically.
 
 ---
 
 ## Troubleshooting
 
-**"Cannot reach Tesserae at …"** — Tesserae isn't running at `TESSERAE_URL`, or
+**"Cannot reach Tesserae at …"**: Tesserae isn't running at `TESSERAE_URL`, or
 the port isn't reachable from the agent's machine. Confirm the URL in a browser.
 For a Home Assistant install, the add-on must expose a **direct port** on your
 LAN; an ingress-only setup can't be reached by an external agent.
 
-**HTTP 401 / unauthorized** — the agent is calling from a non-loopback address
+**HTTP 401 / unauthorized**: the agent is calling from a non-loopback address
 without a valid token. Generate one in Settings → System → MCP and set
-`TESSERAE_MCP_TOKEN`. (Same machine as Tesserae? You shouldn't hit this — check
+`TESSERAE_MCP_TOKEN`. (On the same machine as Tesserae, check that
 `TESSERAE_URL` really is `127.0.0.1` and not a reverse-proxied address; a
 proxied request always needs the token.)
 
-**HTTP 404 on every call** — MCP has been switched off. Enable it in Settings →
+**HTTP 404 on every call**: MCP has been switched off. Enable it in Settings →
 System → MCP (and check `TESSERAE_EXPERIMENT_MCP` isn't set to `0`).
 
-**`tesserae-mcp: command not found`** — after `pipx install`, run
+**`tesserae-mcp: command not found`**: after `pipx install`, run
 `pipx ensurepath` and open a new terminal. For Claude Desktop, use the absolute
 path from `which tesserae-mcp` (GUI apps don't inherit your shell `PATH`).
 
-**`externally-managed-environment`** — see the warning in Step 2; use pipx or a
+**`externally-managed-environment`**: see the warning in Step 2; use pipx or a
 venv rather than installing into the system Python.
 
 ---

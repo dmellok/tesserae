@@ -1,38 +1,33 @@
 # Frame-cache collections (contract)
 
-A producer-neutral, content-addressed on-device frame cache. It generalizes the
-existing [deck cache](client-protocol.md#deck-cache-sync-on-device-frame-cache)
-so more than one feature can sync pre-rendered frames to a storage-capable
-display and let the device play them back locally (wake, read card, paint, radio
-off). The first new producer is **offline photo albums** (discussion #177);
-Decks become another producer over time.
+The server renders frames; firmware stores and plays them locally.
+The device wakes, reads its card, paints the frame, then turns off the radio.
+Frames are identified by content hashes.
 
-This is the shared boundary between the Tesserae server (which renders frames and
-emits the manifest) and device firmware (which caches and plays back). It is the
-concrete form of the "state bundles" direction sketched in
-[protocol-v2-touch.md §B3](../protocol-v2-touch.md). Everything here is optional:
+This extends the [deck cache](client-protocol.md#deck-cache-sync-on-device-frame-cache)
+to other features, starting with offline photo albums (discussion #177).
+Decks will become another producer: a feature that supplies frames to the cache.
+The design follows [protocol-v2-touch.md §B3](../protocol-v2-touch.md).
+Everything here is optional:
 a client that never advertises the capability sees no change on any endpoint.
 
-Status: **slice 1 implemented.** The album producer, the
-`/collection` manifest + frame endpoints (paged), the `frame_cache` capability,
-the `/status` `collection` envelope, and ingest of the device playback report
-(surfaced on the Devices card) are built; authoring is the Gallery folder's
-"Use as offline album" action. The cache + playback side ships in
-tesserae-device-firmware (SD-backed offline album playback, v1.12.0 and later).
-Discussion: #177.
+Slice 1 is implemented:
+
+- Albums use the paged `/collection` manifest and frame endpoints.
+- Devices advertise the `frame_cache` capability.
+- `/status` carries a `collection` envelope and accepts playback reports shown on the Devices card.
+- A Gallery folder's "Use as offline album" action creates an album.
+- tesserae-device-firmware v1.12.0 and later handles SD storage and offline playback.
 
 ## Design split
 
-- The **shared cache** owns: capability, the collection manifest (frame id,
+- The shared cache owns: capability, the collection manifest (frame id,
   digest, byte size, cache eligibility, order), content-addressed frame fetch,
   the capacity budget, and version/orphan handling. It understands *frames*, not
   navigation or shuffle.
-- Each **producer** owns an opaque `producer` object in the manifest (a Deck's
+- Each producer owns an opaque `producer` object in the manifest (a Deck's
   link graph, an album's playback settings). The cache never parses it; firmware
   routes it to the matching producer module.
-
-This keeps producer semantics (graph distance, shuffle bags) out of the generic
-sync path.
 
 ## Relationship to the deck cache (v1 compatibility)
 
@@ -58,8 +53,7 @@ is present and usable** (current-state per heartbeat, not sticky, same rule as
 
 - `capacity_bytes` is the storage budget the server plans against.
 - `max_frames` is the firmware's hard cap on cached frames for this slice. The
-  server never puts more than this many `cache: true` frames in a page. Making
-  the limit explicit avoids the server inferring it from bytes.
+  server never puts more than this many `cache: true` frames in a page.
 
 ## Heartbeat: active collection
 
@@ -165,13 +159,12 @@ max-age=31536000`. Same content-addressed semantics as `/deck/frame/<digest>`; a
   already hold.
 - Orphan cleanup is **client-side by contract**: delete cached files the current
   manifest no longer references. The server does not track device-side files.
-- **Forced resync.** Because the version is derived from content, it cannot
-  express "we disagree for a reason the album doesn't show" (an interrupted
-  sync, a swapped card, frames the device dropped). Settings → Devices carries a
+- Forced resync: a content-derived version cannot signal an interrupted
+  sync, a swapped card, or frames the device dropped. Settings → Devices has a
   **Resync** control that folds a per-device token into the version *after* the
   content digest. The manifest body is byte-identical; only the version moves.
-  Firmware needs no support for this: it is indistinguishable from an ordinary
-  content change, which is the point. The device acts on it at its next wake.
+  Firmware needs no extra support: it handles this as an ordinary content
+  change. The device acts on it at its next wake.
 
 ## Producer extensions (opaque to the cache)
 
@@ -194,13 +187,16 @@ module; the shared cache ignores it.
 - `repeat`: `loop` replays in order, `reshuffle` draws a new bag, `once` holds
   the last frame.
 
-Albums are authored from the Picture Gallery admin pages, from MCP, and over the
-Companion API at `/api/app/v1/gallery/folders/{folder_id}/offline-album` behind
-the operator-granted `offline_albums:write` scope. All three write the same
-records and are held to the same rules: one enabled album per display, with a
-take-over that has to be asked for rather than being a consequence of saving, and
-a display whose current report explicitly lacks `frame_cache` refused while one
-that simply hasn't checked in stays bindable.
+Create albums through:
+
+- Picture Gallery admin pages.
+- MCP.
+- The Companion API at `/api/app/v1/gallery/folders/{folder_id}/offline-album`, with the operator-granted `offline_albums:write` scope.
+
+All three write the same records and follow the same rules: one enabled album per display, with explicit
+permission to take over a display when saving. A display whose current report
+explicitly lacks `frame_cache` is refused; one that hasn't checked in stays
+bindable.
 
 ### Deck (`kind: "deck"`, future)
 
@@ -228,13 +224,13 @@ An exact frame digest, if reported at all, is a **last-reported observation**,
 not a live "current screen" contract. The Companion / Devices UI shows collection
 id, version, cached/total, and state, not a guaranteed current image.
 
-The server ingests this report from the `/status` body (both transports go
-through the shared heartbeat recorder), event-logs state/version transitions
-(`cached`/`total` churn during a sync does not qualify), and shows the report on
-the Devices card while the described album is still the one bound to the device.
-Surfacing it through the Companion API is a contract addition (a device-view
-field), agreed through the usual contract-first flow rather than shipped
-unilaterally.
+The shared heartbeat recorder reads the `/status` body on both transports.
+The event log records state/version changes, excluding `cached`/`total` changes
+during sync. The Devices card shows the report while that album remains bound
+to the device.
+
+A Companion API device-view field needs agreement through the contract-first
+process before it ships.
 
 ## Interruption semantics
 
@@ -242,7 +238,7 @@ While a collection is playing:
 
 - A **one-off Image or Dashboard push** to the display *interrupts* playback,
   shows the pushed frame, and playback **auto-resumes at the next interval**.
-- **Reassigning the display's content** (binding a different rotation, deck, or
+- Reassigning the display's content (binding a different rotation, deck, or
   album, or unbinding) *stops* the collection; the device drops playback state on
   the next `/status` (the `collection` envelope disappears or changes `id`).
 

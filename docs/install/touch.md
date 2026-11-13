@@ -1,81 +1,63 @@
 # Touch interactions
 
-A touch-capable panel can react to a tap, a swipe, or a press-drag on
-the dashboard: change the page, rotate, fire a webhook, or call a Home
-Assistant service (dim a light, toggle a switch). Like physical buttons,
-the logic runs **server-side** from **actions** you attach to the
-dashboard; the device only reports where the finger went. Introduced for
-issue #49.
+Touch a dashboard to run an action.
+The screen reports your touch; Tesserae runs the action on the server.
 
-Two sides to it:
-
-- **Authoring** — attach actions to a dashboard in the editor (below).
-  Works for any dashboard; the actions are ignored on display-only
-  panels and act on touch-capable ones.
-- **Implementing** — a client reports the stroke over the REST device
-  API. Any client that can read a touch coordinate and make an HTTP
-  request can do this: an ESP-IDF firmware, a **CircuitPython** board, a
-  Pi, a browser shim. See [Client side](#client-side-any-device).
+- Add actions in the dashboard editor. Any dashboard can have them.
+- Build touch support into a client through the REST device API. See [Client side](#client-side-any-device).
 
 ## Requirements
 
-1. A **touch-capable panel** (a digitizer). The Seeed reTerminal E1003
-   is the reference. A panel reports `touch: true` through the device
-   APIs so the editor and MCP agents know it's tappable.
-2. **Firmware / a client that reports touch** over the REST API (see
-   [Client side](#client-side-any-device)). A display-only panel renders
-   the same dashboard fine; the touch actions just never fire.
-3. Touch **enabled** on the device: open the device from **Settings →
-   Devices** and turn on **Touch input**. On battery boards this
-   keeps the digitizer powered through deep sleep (a few mA), so it's off
-   by default. **Touch linger** keeps the device awake briefly after a
-   touch so follow-up taps skip the deep-sleep wake latency. **Touch wake**
-   (reTerminal E1003 and Sticky, firmware 1.44.0 or later) chooses how the
-   controller waits: *Any tap* keeps it scanning so the first touch wakes
-   the panel; *Double tap or swipe* parks it in its low-power gesture mode,
-   about 1 mA instead of several, where a single first tap does nothing, a
-   double tap or a swipe wakes the panel, and taps then work as usual while
-   it is awake.
+1. A touchscreen. The Seeed reTerminal E1003 is the reference device.
+   It reports `touch: true` so the editor and agents know it supports touch.
+2. Firmware or a client that reports touch through REST. See [Client side](#client-side-any-device).
+   Display-only screens show the same dashboard, but touch actions do nothing.
+3. Turn on **Touch input** under **Settings → Devices**.
+   On battery devices, this keeps the touch controller powered during sleep and uses a few mA.
+   It is off by default.
+
+   **Touch linger** keeps the device awake briefly after a touch, so follow-up taps respond faster.
+
+   **Touch wake** is available on reTerminal E1003 and Sticky with firmware 1.44.0 or later:
+
+   | Mode | Behaviour |
+   |---|---|
+   | Any tap | Keeps scanning; the first tap wakes the screen |
+   | Double tap or swipe | Uses about 1 mA instead of several; a single tap does nothing, but a double tap or swipe wakes it |
+
+   Once awake, normal taps work in either mode.
 
 ## Audible feedback
 
-E-ink repaints in seconds, not milliseconds, so a tap gives the person in
-front of the panel nothing to go on until the whole pipeline (dispatch,
-render, download, flash) has finished. On the Seeed reTerminal E series
-there's a buzzer on the board to close that gap: open the device from
-**Settings → Devices** and turn on **Beep on interaction**, with **Beep
-tone** and **Beep volume** to pick the sound.
+Seeed reTerminal E series devices can beep immediately, while the e-ink repaint takes seconds.
+In **Settings → Devices**, turn on **Beep on interaction**.
+Choose the sound with **Beep tone** and **Beep volume**.
 
-The panel sounds it itself, the moment the touch controller reports the
-stroke, before the server is contacted at all. That's the whole point: a
-beep the server triggered would arrive with the repaint, which is the wait
-it exists to cover. It fires for physical button presses too, so the
-button-only models in the series (E1001, E1002, E1004) get it as well.
+The beep happens on the device before it contacts the server.
+It also works for physical buttons, including the button-only E1001, E1002, and E1004.
 
-Off by default, and worth thinking about before switching it on in a shared
-room. Volume is the drive strength as a percentage: the piezo is loud at
-100 and discreet around 30.
+Beeps are off by default. Consider other people before enabling them in a shared room.
+Volume is the buzzer's drive strength as a percentage: loud at 100, quiet around 30.
 
-The tones are the server's, not the firmware's. Tesserae sends the notes
-themselves (`freq:ms` pairs, `0` for a rest), so picking **Custom** and
-writing `1500:40,2000:40,2600:60` in the box below gets you exactly that,
-and retuning any of the built-in tones never needs a firmware update. Up to
-eight notes, 200-8000 Hz, one second in total: it plays before the tap is
-dispatched, so it has to be brief.
+For a custom tone, choose **Custom** and enter notes such as `1500:40,2000:40,2600:60`.
+Notes use `freq:ms` pairs; `0` is a rest.
+The server sends the notes, so changing tones needs no firmware update.
+
+Use up to eight notes at 200-8000 Hz, with a maximum total length of one second.
+
+The tone plays before Tesserae runs the tap action.
 
 ## Attaching actions in the editor
 
-Every element in the **grid** and **canvas** editors has an
-**Interaction** section (both editors use the same picker, so they
-behave identically). It offers:
+Every element in the grid and canvas editors has the same **Interaction** picker:
 
-- **On tap** — one action, fired on a tap.
-- **Swipe up / down / left / right** — one action per direction; add
-  the directions you want with **+ Add swipe action**.
-- **Make this a slider** — the whole element becomes a 0-100 control:
-  the stroke's end point maps to a value along an axis (vertical fills
-  upward), substituted into the action's `{value}` placeholder. One
-  press-drag-lift sets a light's brightness.
+- On tap: choose one action.
+- Swipe up / down / left / right: use **+ Add swipe action** for each direction you need.
+- Make this a slider: turn the element into a 0-100 control.
+
+A slider uses the end of your drag to set the action's `{value}`.
+It follows the selected axis; vertical sliders increase upward.
+Drag and release to set a light's brightness.
 
 ### The action types
 
@@ -88,79 +70,80 @@ behave identically). It offers:
 | Webhook | Fire an HTTP request (`{value}` is substituted on a slider) |
 | Home Assistant | Call a service (e.g. `light.turn_on`) with a target entity and optional service data |
 
-**Home Assistant** actions run server-side through the Home Assistant
-Core plugin's connection (Settings → Widgets → Home Assistant Core), so
-you don't expose HA to the panel. Pick a service and entity; add extra
-service data as JSON (e.g. `{"brightness_pct": "{value}"}` on a slider).
-Navigation actions (refresh / rotate / step / page) work on any device;
-webhook and HA actions dispatch only when authored here (trusted
-config), never from raw widget markup.
+Home Assistant actions use the **Home Assistant Core** plugin's connection under **Settings → Widgets → Home Assistant Core**.
+The screen doesn't need direct access to HA.
+Choose a service and entity.
+
+Add optional JSON service data, such as `{"brightness_pct": "{value}"}` for a slider.
+
+Navigation actions (refresh, rotate, step, and page) work on any device.
+
+Webhook and HA actions only run when configured in the editor. Raw widget markup cannot trigger them.
 
 ### Touch regions (hotspots)
 
-A dashboard element's on-screen box becomes its touch region
-automatically, so regions always track the design; there are no
-coordinates to place by hand. The **Touch region** element (a
-"hotspot") paints nothing: drop it over anything, including part of a
-code element's output, to make that area tappable.
+Each element's box becomes its touch region automatically, so you don't need to enter coordinates.
+To make another area tappable, place a **Touch region** over it.
+This invisible hotspot also works over part of a code element's output.
 
 ### Code elements
 
-A code element can annotate its own markup. Give it named **Actions**
-(the Interaction card), then reference them from the HTML or JS-built
-DOM:
+In a code element's Interaction card, add named **Actions**.
+Reference those names from HTML or a DOM built by JavaScript:
 
 ```html
 <button data-on-tap="@toggle">Lights</button>
 <div data-on-swipe='{"left":"@next"}'>…</div>
 ```
 
-The `@name` resolves against the element's Actions map, so the
-structured action stays in validated config and the markup carries only
-a reference. Nodes your JavaScript builds **after** first paint are
-picked up too.
+`@name` refers to the element's Actions map.
+The action stays in validated settings; the markup holds only its name.
+Elements added by JavaScript after the first paint work too.
 
 ## Verifying it works
 
-Open the touch-capable device's card → **Touch monitor**. It draws the
-panel at true size and plots touches as they land (taps as dots, swipes
-as arrows), colour-coded by outcome — **fired**, **no target**,
-**blocked** — with the last render's regions overlaid so you can see
-whether a tap hit its target. A dashboard picker previews any
-dashboard's regions without pushing it. **Fade old** dims older marks so
-recent activity stands out.
+Open the device card's **Touch monitor**.
+It shows the screen at true size, with the last render's touch regions overlaid.
+Touches appear as dots for taps and arrows for swipes.
 
-For a machine-readable check while building with an agent,
-`render_report` returns `tap_regions` (what rendered) and `tap_invalid`
-(regions whose action would not dispatch, with a reason). `tap_invalid`
-being empty is the real "this dashboard is wired" signal.
+Their colours show the result: fired, no target, or blocked.
+
+Choose another dashboard to preview its regions without sending it to the screen.
+**Fade old** dims older marks.
+
+For checks with an agent, `render_report` returns:
+
+- `tap_regions`: the regions drawn.
+- `tap_invalid`: regions whose actions would not run, with a reason.
+
+An empty `tap_invalid` means every region's action would dispatch.
 
 ## Client side (any device)
 
-Touch is **transport-agnostic**: the panel reports a raw stroke and the
-server does gesture classification (tap vs directional swipe) and
-hit-testing against the frame's region map. The firmware never needs
-region geometry. This means a **CircuitPython** board, an ESP-IDF
-firmware, a Pi, or any HTTP client can add touch the same way.
+The client reports a stroke. Tesserae decides whether it is a tap or directional swipe and finds the target region.
+The client doesn't need the region coordinates.
 
-Two ways to report a stroke, both over the REST device API:
+Any client that reads touch coordinates and sends HTTP requests can use this.
+Examples include ESP-IDF firmware, CircuitPython, a Raspberry Pi, or a browser shim.
 
-- **On the frame poll (deep-sleep clients):** add `touch_x0`,
-  `touch_y0`, `touch_x1`, `touch_y1`, `touch_ms`, `touch_digest`, and
-  `touch_event_id` to `GET /api/v1/device/<id>/frame`. The action
-  dispatches before the frame lookup, so a page/rotate action's repaint
-  comes back on the same wake.
-- **Out of band (always-on clients):** `POST /api/v1/device/<id>/tap`
+Both reporting methods use the REST device API:
+
+- For deep-sleep clients, add these fields to `GET /api/v1/device/<id>/frame`:
+  `touch_x0`, `touch_y0`, `touch_x1`, `touch_y1`, `touch_ms`, `touch_digest`, and `touch_event_id`.
+
+  The action runs before frame lookup, so a page or rotation change returns its picture on the same wake.
+
+- For always-on clients, send `POST /api/v1/device/<id>/tap`
   with `{"x0","y0","x1"?,"y1"?,"duration_ms"?,"digest","event_id"?}`.
 
-Coordinates are in the served frame's pixel space (before any
-device-side rotation/mirror). `digest` is the ETag of the frame on
-screen, so a stroke against a frame the server has since replaced is
-dropped rather than misfired. Every response is a `200`; on any
-non-dispatched outcome (`stale`, `no_target`, `deduped`, …) the client's
-correct move is the same: re-poll `/frame`. Full field tables, the
-outcome list, and the swipe/slider semantics are in the
-[Client protocol spec](../dev/client-protocol.md#touch-wakes).
+Coordinates use the served picture's pixels, before device-side rotation or mirroring.
+`digest` is the ETag of the picture on screen.
+Tesserae drops strokes for pictures it has since replaced.
+
+Every response is `200`. Re-poll `/frame` after any outcome that didn't run an action, including `stale`, `no_target`, or `deduped`.
+
+For all fields and outcomes, see the [Client protocol spec](../dev/client-protocol.md#touch-wakes).
+It also defines swipe and slider behaviour.
 
 !!! note "Swipes need real motion"
     A swipe is only detected when the reported stroke actually moves

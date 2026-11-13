@@ -1,8 +1,7 @@
 # Install Tesserae via Docker
 
-The official Docker image is the fastest install if you'd rather not
-touch Python. It ships Tesserae plus a known-good Playwright Chromium
-so the webpage / dashboard renderer works out of the box.
+Use Docker to install Tesserae without setting up Python.
+The official image includes Chromium for drawing dashboards and webpages.
 
 The image is hosted on GitHub Container Registry as
 [`ghcr.io/dmellok/tesserae`](https://github.com/dmellok/tesserae/pkgs/container/tesserae).
@@ -14,16 +13,11 @@ moving tags:
 | `:latest` | the most recent [GitHub Release](https://github.com/dmellok/tesserae/releases) | the default `docker-compose.yml`; what the HA App's stable channel ships |
 | `:edge` (alias `:main`) | every commit on `main` | trying a fix before it is released; the HA App's edge channel |
 
-Before 0.418.1 the workflow also moved `:latest` on every commit to
-`main`, so a `docker compose pull` on the default file could land you on
-an edge build. If you want to keep tracking `main`, switch the image
-line to `:edge`.
+To track `main`, use `:edge`.
 
 !!! tip "Pin the tag in setups you care about"
-    `:latest` is convenient for kicking the tyres but moves whenever
-    a new release is published. Pin to a specific version (e.g.
-    `:0.418.1`) so `docker compose pull && up -d` is the deliberate
-    upgrade step.
+    `:latest` changes with each release. Pin a version such as
+    `:0.418.1` to control upgrades with `docker compose pull && up -d`.
 
 ## Quick start
 
@@ -33,28 +27,26 @@ curl -fsSLO https://raw.githubusercontent.com/dmellok/tesserae/main/docker-compo
 docker compose up -d
 ```
 
-That's it. Open `http://<host-ip>:8765` (or
-`http://tesserae.local:8765` once mDNS comes up), the first request
-walks through password setup and the onboarding wizard.
+Open `http://<host-ip>:8765` (or
+`http://tesserae.local:8765` once mDNS comes up). The first request
+opens password setup and the onboarding wizard.
 
 ## Pin the secret key before you store any credentials
 
-Stored secrets (API keys, broker passwords, the Home Assistant token)
-are encrypted at rest. Without `TESSERAE_SECRET_KEY` the key is derived
-from the persisted session secret in `settings.json`. That survives an
-ordinary restart and upgrade, but **it is lost whenever the session
-secret is regenerated**: a data folder restored without `settings.json`,
-or a container recreated without its data volume.
+Set `TESSERAE_SECRET_KEY` before saving API keys, broker passwords or the Home Assistant token.
+It encrypts these stored secrets.
 
-When that happens, the secrets decrypt to an empty string while
-every non-secret setting beside them is intact. The install looks
-configured and is not: the Home Assistant URL is still right, and every
-widget that needs the token reports the install as unconfigured. Nothing
-warns you at the moment the credentials go, only the next time something
-tries to use one.
+Without it, Tesserae derives an encryption key from the session secret in `settings.json`.
+That survives normal restarts and upgrades. It is lost if you:
 
-Generate a key once and put it in the compose file before you enter
-anything worth keeping:
+- Restore data without `settings.json`
+- Recreate a container without its data volume
+
+Stored secrets then read back as empty strings. Other settings, such as the Home Assistant URL, stay intact.
+Widgets that need the lost token report an unconfigured install.
+
+There is no warning when credentials disappear. You find out when something next tries to use them.
+Generate a key once and add it to your compose file:
 
 ```sh
 python3 -c "import secrets; print(secrets.token_hex(32))"
@@ -70,49 +62,41 @@ services:
       - ./data:/app/data
 ```
 
-Tesserae warns at startup while it is running on the derived key, and the
-warning carries a ready-to-paste line. Adding the key later is fine: any
-secret entered *after* it is pinned is safe, while ones entered before are
-still tied to the session secret and want re-entering once.
+Until you set a key, Tesserae's startup warning includes a configuration line you can paste.
+If you add the key later, re-enter earlier secrets once. New secrets use the pinned key.
 
-Treat it like any other secret: it decrypts the credentials in your data
-folder, so it does not belong in the same backup as them, and it does not
-belong in a public repo alongside your compose file.
+Keep the key separate from data backups. It can decrypt their credentials.
+Never put it in a public repo with your compose file.
 
-The default `docker-compose.yml` uses **host networking**, which is
-the right choice for a self-hosted Pi / mini-PC / NAS appliance:
+The default `docker-compose.yml` uses host networking: the container shares the host's network.
+This suits a Pi, mini-PC or NAS:
 
 - The render-frame URL Tesserae embeds in every MQTT push points at
-  the host's real LAN IP, so your panels can actually fetch frames.
+  the host's real LAN IP, so your panels can fetch frames.
 - The built-in MQTT broker is reachable on the host's port 1883
   without you publishing it from a `ports:` block.
 - mDNS works, so `tesserae.local` resolves on the LAN.
 
-Linux only, though. Docker Desktop on Mac / Windows handles host
-networking differently, see [Bridge networking](#bridge-networking)
-below if you're testing there.
+These benefits apply to Linux only. On Docker Desktop for Mac or Windows,
+see [Bridge networking](#bridge-networking).
 
 ## What's in the image
 
-- **Tesserae**, installed from the repo at the tag.
-- **Playwright Chromium**, preinstalled from the
+- Tesserae, installed from the repo at the tag.
+- Playwright Chromium, preinstalled from the
   [official Playwright Python base image](https://hub.docker.com/_/microsoft-playwright-python)
   so the webpage renderer works without `playwright install`. Chromium
   runs with `--disable-dev-shm-usage`, so Docker's default 64 MB
   `/dev/shm` is enough and the compose file needs no `shm_size`.
-- **Waitress** as the WSGI server. Production-tuned by default; no
-  nginx required for a single-user install.
-- **Non-root user** (`pwuser`, uid 1001) for defence in depth. This
-  is not a widget sandbox, widgets still execute in the same Python
-  process and can read anything this user can read (see
+- Waitress, the web server. Ready for normal use; a single-user install needs no nginx.
+- A non-root user (`pwuser`, uid 1001). Widgets still run in the same Python
+  process and can read anything this user can read. They are not isolated from it (see
   [issue #3](https://github.com/dmellok/tesserae/issues/3)).
 
 ## Change the web port
 
-Under **host networking**, Tesserae binds its web port directly on
-the host, so a clash with something already on 8765 (nginx, another
-app) is a real possibility. Move it with the `TESSERAE_BIND_PORT`
-environment variable, no `command:` override needed:
+With host networking, change `TESSERAE_BIND_PORT` if another app uses port 8765.
+No `command:` override is needed:
 
 ```yaml
 services:
@@ -126,9 +110,8 @@ services:
 
 Then browse to `http://<host-ip>:8766`.
 
-Under **bridge networking**, leave the container's internal port
-alone and remap the host side instead: `ports: ["8766:8765"]`, and
-browse to `http://<host-ip>:8766`.
+With bridge networking, map the host port instead: `ports: ["8766:8765"]`.
+Open `http://<host-ip>:8766`.
 
 (`TESSERAE_BIND_PORT` needs image `0.378.0` or newer. On older
 images, override the CMD instead:
@@ -139,14 +122,13 @@ The full list of environment variables and flags lives in the
 
 ## Configuring the MQTT broker
 
-Only needed if your devices use the MQTT transport (REST, the default,
-needs no broker). Two ways to configure it:
+Skip this section if you use REST, the default. MQTT devices need a broker.
 
 ### Use the built-in broker
 
-After first-run, go to **Settings → Server → MQTT broker** and toggle
-**Built-in broker** on. Then expose port 1883 from the container so your
-panels can reach it:
+Turn on **Settings → Server → MQTT broker → Built-in broker**.
+With default host networking, it is already reachable on port 1883.
+With [bridge networking](#bridge-networking), publish port 1883 too:
 
 ```yaml
 services:
@@ -159,19 +141,17 @@ services:
       - ./data:/app/data
 ```
 
-The built-in broker is amqtt, which speaks MQTT v3.1.1 only. Tesserae's
-own Pi / ESP32 clients are fine; if you connect with MQTT Explorer /
-MQTTX / Home Assistant / Node-RED you'll need to set their protocol
-version to 3.1.1, v5 clients get rejected.
+The built-in amqtt broker supports MQTT v3.1.1 only. Version 5 clients are rejected.
+Tesserae's Pi and ESP32 clients work as they are.
+Set version 3.1.1 in MQTT Explorer, MQTTX, Home Assistant or Node-RED.
 
 ### Point at Mosquitto (or HA's broker)
 
-If you already run Mosquitto, point Tesserae at it via **Settings →
-Server → MQTT broker** (host, port, username, password). The compose file
-doesn't need any extra ports for this path.
+In **Settings → Server → MQTT broker**, enter the Mosquitto host, port, username and password.
 
-For a "full MQTT v5 with a Mosquitto sidecar" setup, add the sidecar
-yourself:
+No extra compose ports are needed.
+
+To run MQTT v5, add Mosquitto as a second container:
 
 ```yaml
 services:
@@ -189,41 +169,29 @@ services:
       - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
 ```
 
-Then set the broker host to `mosquitto` in Tesserae's settings (the
-service name is the resolvable hostname inside the compose network).
+Set the broker host to `mosquitto`, its name inside the compose network.
 
-If your broker runs **on the Docker host itself** and Tesserae is on
-bridge networking, the container can't reach it via `localhost` (that
-is the container's own loopback). Either use the host's LAN IP as the
-broker host, or add the standard host alias to the service:
+If the broker runs on the Docker host, bridge networking cannot reach it at `localhost`.
+That address points inside the container. Use the host's LAN IP, or add this alias:
 
 ```yaml
     extra_hosts:
       - "host.docker.internal:host-gateway"
 ```
 
-and set the broker host to `host.docker.internal`. Under host
-networking this doesn't come up, `localhost:1883` just works.
+Then set the broker host to `host.docker.internal`.
+With host networking, `localhost:1883` works directly.
 
 ## Bridge networking
 
-If you can't use host networking, typically Docker Desktop on Mac /
-Windows, or a setup with port conflicts on the host, switch to
-bridge networking. Two things break under bridge that host networking
-got for free, and **both need fixing** before your panels can talk to
-Tesserae:
+Use bridge networking on Docker Desktop or when host ports conflict.
+It gives the container its own network address. Two changes are needed:
 
-1. The **render-frame URL** in every MQTT push and the **MQTT broker
-   URL** the wizard shows your panels both point at
-   `detect_local_ip()`. Under bridge networking that resolves to the
-   container's internal `172.x.x.x` address, which LAN clients can't
-   reach. The fix: set `TESSERAE_HOST_IP` to your host's real LAN IP.
+1. Set `TESSERAE_HOST_IP` to your host's LAN IP.
+   Otherwise, frame URLs and the broker URL use the container's unreachable `172.x.x.x` address.
 2. mDNS multicast doesn't escape the bridge network, so
-   `tesserae.local` won't resolve on the LAN. That one you can't
-   easily fix on bridge, use the host's IP directly, or run a
-   separate mDNS reflector (out of scope here).
-
-The compose snippet:
+   `tesserae.local` won't resolve on the LAN. Use the host's IP directly.
+   A separate mDNS reflector can relay these announcements, but needs setup outside this guide.
 
 ```yaml
 services:
@@ -243,9 +211,9 @@ services:
 
 Find your host's LAN IP with `hostname -I` (first address printed) or
 `ip addr show eth0`. Without `TESSERAE_HOST_IP` set, Tesserae logs a
-loud warning on startup and the admin UI flags the bad URL, but it
-won't auto-fix itself, because the host's IP isn't introspectable
-from inside a bridge-networked container.
+warning on startup and the admin UI flags the bad URL. It cannot
+fix the URL automatically because a bridge-networked container
+cannot detect the host's IP.
 
 ## Upgrading
 
@@ -254,40 +222,32 @@ docker compose pull       # fetch the new image
 docker compose up -d      # recreate with the new image
 ```
 
-Your `./data` volume carries settings, pages, schedules, history, and
-the render cache across the upgrade.
+Your `./data` volume survives upgrades.
 
-The in-app update form on the **Settings → System → Updates** card is
-hidden under Docker, a `git pull` inside a layered filesystem would lose changes
-on the next image rebuild, so upgrades go through `docker compose
-pull` instead. The Settings page surfaces a `docker compose` hint
-instead of the update form.
+**Settings → System → Updates** shows a `docker compose` hint instead of an update form.
+Use `docker compose
+pull` to upgrade. Changes made with `git pull` inside the container would be lost on the next image rebuild.
 
 ## Backups + data export
 
 Two related features under **Settings → System**:
 
-- **Backups** (`Settings → System → Backups`) snapshots the full Tesserae state into a ZIP under `./data/core/backups/` on your host. Use it for periodic safety copies and rollback.
-- **Data export / import** (`Settings → System → Backups → Migrate to another install`) is the one-shot migration ZIP for moving to another self-hosted Tesserae Server, not for routine snapshots.
+- Backups (`Settings → System → Backups`) saves your full state as a ZIP under `./data/core/backups/` on the host.
+  Use it for regular backups and rollback.
+- Data export / import (`Settings → System → Backups → Migrate to another install`) moves your setup to another self-hosted server. Use Backups for routine copies.
 
-Both still work under Docker. Snapshotting `./data` with your normal backup tool (restic, borg, rsnapshot, or a plain cron'd tarball) covers everything Tesserae has, including the in-app backups.
+Both work under Docker. Backing up `./data` also saves everything, including the in-app backups.
+Use restic, borg, rsnapshot or a scheduled tarball.
 
 ## Limits
 
-- **No self-update.** Use `docker compose pull`. The in-app update
-  flow is gated off when `TESSERAE_IN_DOCKER=1` (the image sets that
-  for you).
-- **mDNS needs host networking.** See above.
-- **arm/v7 is not built.** Pi 3 and below would need a different
-  Playwright story; not currently in scope.
-- **Older x86-64 CPUs work.** numpy 2.4 and later ship wheels built
-  for x86-64-v2 (SSE4.2, POPCNT), which a pre-2009 processor, or a VM
-  given a basic CPU model such as Proxmox's default `kvm64`, does not
-  have. The published image pins `numpy<2.4` so it starts there too. If
-  you build the image yourself on hardware you know is x86-64-v2 or
-  arm64, `--build-arg NUMPY_SPEC=` (empty) keeps the newest numpy. On a
-  VM, setting the CPU type to `host` is worth doing anyway.
-- **The image is ~970 MB to pull**, ~2.5 GB on disk uncompressed.
-  Most of that is Chromium and its sandboxes. There's no smaller
-  Tesserae image plan, the renderer fundamentally needs a real
-  browser.
+- No self-update. Use `docker compose pull`. The image sets `TESSERAE_IN_DOCKER=1` to disable in-app updates.
+- mDNS needs host networking. See above.
+- No arm/v7 build. Pi 3 and below need a different Playwright setup, which is not planned.
+- Older x86-64 CPUs work because the image pins `numpy<2.4`.
+  Newer numpy needs x86-64-v2 (SSE4.2 and POPCNT), missing on pre-2009 CPUs and basic VM models such as `kvm64`.
+
+  When building for x86-64-v2 or arm64, `--build-arg NUMPY_SPEC=` keeps the newest numpy.
+  On a VM, consider setting the CPU type to `host`.
+- The download is about 970 MB; unpacked, it uses about 2.5 GB.
+  Most is Chromium and its sandboxes. No smaller image is planned because rendering needs a browser.

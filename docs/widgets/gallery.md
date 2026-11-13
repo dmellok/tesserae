@@ -2,13 +2,13 @@
 
 # Widget gallery
 
-The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-widget.md).
+Tesserae includes 37 widgets. To add your own, put its folder under `plugins/<id>/`; it appears in the editor's picker. See [Build a widget with AI](../dev/writing-a-widget.md).
 
 !!! tip "Looking for more widgets?"
-    Browse the full community catalog at [tesserae.ink/catalog](https://tesserae.ink/catalog/): widgets, themes, and dashboard templates, all installable from **Settings → Widgets → Browse catalog** inside the app.
+    Install community contributions from [tesserae.ink/catalog](https://tesserae.ink/catalog/) in **Settings → Widgets → Browse catalog**.
 
 !!! note "Stability tiers"
-    **Stable** = backed by an official, documented API. **Best-effort** = undocumented but long-lived endpoint. **Fragile** = scraping or a soft policy, convenience only. **Local** = computed on the host, no upstream to break. See [Screens & compatibility](../compatibility.md) for the hardware side.
+    See [Widget stability tiers](tiers.md) for each widget's rating. Local widgets run on your server, with no external data source to break.
 
 ## Weather
 
@@ -48,11 +48,9 @@ The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     ---
 
-    _Screenshot pending, run `python scripts/capture_widget_shots.py`._
-
     Current weather as a pill card with weather-and-time-of-day theming. Uses the extended palette opt-in so soft gradients (sunset, night sky) render on 7-colour e-ink panels via the renderer's dither pass. Data from Open-Meteo (no API key).
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Stable
 
 </div>
 
@@ -182,11 +180,9 @@ The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     ---
 
-    _Screenshot pending, run `python scripts/capture_widget_shots.py`._
-
     Which Home Assistant automations fired, when, and how often. Ranks the most- vs least-fired automation this week, streams a most-recent-first trigger feed, tallies 1h / 24h / 7d trigger counts, and flags any tracked automation that hasn't fired within an expected cadence. Reads automation.* logbook history via the Home Assistant Core plugin.
 
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** -
+    **Sizes:** `xs` `sm` `md` `lg`
 
 -   **Home Assistant, Batteries** &middot; `ha_battery`
 
@@ -206,7 +202,7 @@ The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     Snapshot from one or more Home Assistant camera.* entities. Pulls each entity's entity_picture via HA's REST API and renders it as a still frame, perfect for a door cam, garden cam, or 2×2 grid of indoor cameras on an e-ink display. Multi-camera grids auto-fit; every tile carries a corner timestamp chip and a motion pip when relevant.
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
+    **Sizes:** `sm` `md` `lg`
 
 -   **Home Assistant, Climate** &middot; `ha_climate`
 
@@ -216,7 +212,7 @@ The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     One or more Home Assistant climate / thermostat entities Each entity tints by what the thermostat is doing right now (heating / cooling / idle). Requires the Home Assistant Core plugin.
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
+    **Sizes:** `sm` `md` `lg`
 
 -   **Home Assistant, Dashboard** &middot; `ha_dashboard`
 
@@ -226,7 +222,7 @@ The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     Shows one of your existing Home Assistant dashboards as-is, no rebuilding in Tesserae. The server opens the dashboard in headless Chromium, signed in with the Home Assistant Core token, hides the sidebar and header, and captures the view at the cell's size. Point it at any dashboard path (lovelace/0, dashboard-kitchen/overview). Frames are re-rendered on the interval you set and the last good frame is kept between renders.
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
+    **Sizes:** `sm` `md` `lg`
 
 -   **Home Assistant, Energy** &middot; `ha_energy`
 
@@ -246,7 +242,7 @@ The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     A status grid of several Home Assistant entities. Each row tints by its state (on / off / other), leads with a device-class-aware Phosphor glyph (temperature → thermometer, CO₂ → wind, motion → person walking, …), and shows its current value. Rows that changed within the last 10 minutes pick up an accent-4 wash + a 'just now' / 'Nm ago' badge.
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
+    **Sizes:** `sm` `md` `lg`
 
 -   **Home Assistant, History** &middot; `ha_history`
 
@@ -256,7 +252,7 @@ The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     A numeric Home Assistant sensor over time. Pairs the current value + trend arrow + min/max (in the legend strip, or as a large headline above the chart) with a Chart.js line chart, optional threshold horizontal line, optional fixed y-axis range, min/max marker dots + labels on the curve, and an averaged hourly-profile ghost overlay for long windows. Requires the Home Assistant Core plugin.
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
+    **Sizes:** `sm` `md` `lg`
 
 -   **Home Assistant, Lights** &middot; `ha_lights`
 
@@ -286,7 +282,7 @@ The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     Now-playing tile for a Home Assistant media_player entity, title, artist, album, album art, progress bar with elapsed / remaining stamps, and a track-deterministic SVG waveform glyph. A blurred copy of the album art bleeds behind the body so the cell picks up the album's palette. Requires the Home Assistant Core plugin.
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
+    **Sizes:** `sm` `md` `lg`
 
 -   **Home Assistant, Sensor** &middot; `ha_sensor`
 
@@ -296,7 +292,7 @@ The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     One or more Home Assistant entities as bold value blocks. A single entity fills the cell as a hero number with a trend arrow + 24h sparkline beneath; several lay out as a list with per-row trend + hairline sparkline. Lead glyph picks up the device-class (temperature → thermometer, CO₂ → wind, current → wave-sine, money → coin, etc.). For a full chart with labelled axes use the Home Assistant, History widget. Requires the Home Assistant Core plugin.
 
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** -
+    **Sizes:** `xs` `sm` `md` `lg`
 
 -   **Home Assistant, Todo** &middot; `ha_todo`
 
@@ -306,7 +302,7 @@ The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     Items from a Home Assistant todo list, built-in shopping list, Google Tasks, Microsoft To-Do, CalDAV, anything exposed as a todo.* entity. Lead with the items needing action; show due dates when the integration sets them. Requires HA 2024.5+ (the todo.get_items service with return_response). Requires the Home Assistant Core plugin.
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
+    **Sizes:** `sm` `md` `lg`
 
 -   **Home Assistant, Zones** &middot; `ha_zones`
 
@@ -354,11 +350,9 @@ The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     ---
 
-    _Screenshot pending, run `python scripts/capture_widget_shots.py`._
-
     Approaching vehicles at a stop (or two), from any GTFS feed. Presets for the NYC Subway and BART, live times and delays from GTFS-RT TripUpdates, service alerts, vehicle positions, and an optional split-by-direction board.
 
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** -
+    **Sizes:** `xs` `sm` `md` `lg`
 
 </div>
 
@@ -390,7 +384,7 @@ The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     Embed an external URL in a cell. The composer captures whatever the iframe renders, handy for status pages, public dashboards, or any site that doesn't deny embedding. A URL that points straight at an image (PNG, GIF, JPEG, WebP, SVG) is drawn as an image and scaled to the cell rather than embedded, so tall charts keep their bottom edge. Same headless-render path as the Send tab is used when the panel renders. Pages that fetch their data with JavaScript get a short settle delay after load so the content is captured, not a blank frame; raise it for slow pages. Sites that set X-Frame-Options:DENY or strict CSP cannot be embedded. A page behind header-based auth (bearer token, API key) can be reached by setting Request headers; the server attaches them when the panel renders, scoped to that URL's own origin only.
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
+    **Sizes:** `sm` `md` `lg`
 
 </div>
 
@@ -401,8 +395,6 @@ The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 -   **Countdown, Date** &middot; `countdown_date`
 
     ---
-
-    _Screenshot pending, run `python scripts/capture_widget_shots.py`._
 
     Days remaining until a target date. Glanceable single-number hero with an optional label. Pure client-side, no network.
 
@@ -418,8 +410,6 @@ The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     ---
 
-    _Screenshot pending, run `python scripts/capture_widget_shots.py`._
-
     Battery level for every registered device that reports a battery_pct heartbeat (ESP32-S3, PhotoPainter, etc). Sorted lowest-first so the panel that needs charging surfaces to the top. Predicts days-to-empty from the last seven days of history, when available.
 
     **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** Local
@@ -434,11 +424,9 @@ The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     ---
 
-    _Screenshot pending, run `python scripts/capture_widget_shots.py`._
-
     Dashboard status strip: identity on the left, ambient device telemetry on the right. Renders as a fixed-height bar (48 px) or a resizable block; each chip switches between icon+text, icon-only, or text-only. Temperature and humidity come from the target panel's status heartbeat. Auto-contrasts against a freeform background colour so it stays legible on 1-bit, 4-colour, and Spectra 6 panels. Update chips (app version, panel firmware) surface as a badge dot or accent text, never colour alone.
 
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** -
+    **Sizes:** `xs` `sm` `md` `lg`
 
 </div>
 
@@ -449,8 +437,6 @@ The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 -   **Year, Progress** &middot; `year_progress`
 
     ---
-
-    _Screenshot pending, run `python scripts/capture_widget_shots.py`._
 
     How far through the year you are. Two modes: the current calendar year as a row of weekly dots, or 'life in weeks' as a long-form grid (give a birth year). Pure client-side, no network.
 
