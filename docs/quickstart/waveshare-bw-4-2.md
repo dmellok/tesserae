@@ -1,48 +1,50 @@
 # Quickstart: Waveshare 4.2" B/W (ESP32)
 
-A Waveshare 4.2 inch monochrome e-paper module driven by an ESP32 dev board. Battery-powered, 400×300 1-bpp panel; sips power because the frame is mono.
+Connect an ESP32 board to this 4.2" black-and-white panel. It runs on a battery and uses little power.
 
 !!! note "Pending real-hardware confirmation"
-    This SKU is in the catalog but hasn't been verified end-to-end by the maintainer yet. The protocol path matches the other ESP32 quickstarts and should work; please [open an issue](https://github.com/dmellok/tesserae/issues) if you hit anything unexpected.
+    The maintainer hasn't tested this model on hardware yet. It uses the same protocol as the other ESP32 quickstarts and should work. [Open an issue](https://github.com/dmellok/tesserae/issues) if it doesn't.
 
 ## 01 — Flash the firmware
 
 Plug the ESP32 dev board into your computer over USB while holding the BOOT button, then release.
 
-There isn't a browser flasher for this SKU yet, and the firmware repo doesn't cut binary releases. Clone [tesserae-device-esp32-bw](https://github.com/dmellok/tesserae-device-esp32-bw) and follow the README to build + flash with PlatformIO (`pio run -t upload`). Track [tesserae.ink/flash](https://tesserae.ink/flash) for browser-flash support if it lands.
+Build and flash [tesserae-device-esp32-bw](https://github.com/dmellok/tesserae-device-esp32-bw) with PlatformIO (`pio run -t upload`). Follow its README. There are no ready-made firmware downloads or browser flasher yet.
 
-On first boot the board opens a Wi-Fi captive portal (SSID `Tesserae-Setup`, password `tesserae`). Connect from your phone or laptop, then set:
+Check [tesserae.ink/flash](https://tesserae.ink/flash) for future browser support.
 
-- **MQTT broker URI** (plus credentials if your broker needs them): the broker your Tesserae server uses.
-- **Wi-Fi SSID and password**: your home network.
+On first boot, join `Tesserae-Setup` from your phone or laptop. The password is `tesserae`. Enter these on the Wi-Fi setup page:
+
+- MQTT broker URI: your Tesserae server's message broker address. Include credentials if needed.
+- Your home Wi-Fi name and password.
 
 Save. The board restarts onto your network.
 
 ## 02 — It pairs itself
 
-This firmware talks MQTT: the board publishes a heartbeat on `tesserae/<device_id>/status`. Within a few seconds it appears under **Settings → Devices → Discovered**. Click **Register**.
+The board sends a status message over MQTT on `tesserae/<device_id>/status`. Within a few seconds, it appears under **Settings → Devices → Discovered**. Click **Register**.
 
 ## 03 — Compose a dashboard
 
-The 4.2" B/W panel is 400×300 landscape, 1-bit-per-pixel monochrome. Server-side dithering handles the rest.
+The panel is 400×300 landscape, with one bit per pixel: black or white. Tesserae converts shades to black-and-white dot patterns (dithering).
 
-1. **Dashboards → New**.
-2. Pick a layout that suits the small canvas; high-contrast text, simple icons, and 1-bit illustrations work best.
+1. Open **Dashboards → New**.
+2. Use high-contrast text, simple icons and 1-bit illustrations.
 3. Bind the page to the board in the device picker.
-4. Hit **Push**.
+4. Click **Push**.
 
-The board wakes, fetches a tiny 15 KB packed buffer, paints (a couple of seconds for a 1-bpp refresh), and sleeps.
+The board downloads a 15 KB image when it wakes. Drawing takes a couple of seconds, then the board sleeps.
 
 ## 04 — Set the refresh
 
 In the dashboard's **Schedules** card:
 
-- **Every N minutes** for status displays (next train, kitchen timer, meeting countdown).
-- **Smart sync** for battery-aware wake timing.
+- Choose **Every N minutes** for a status display, such as a train departure board.
+- Turn on **Smart sync** on an **Every N minutes** schedule to save battery through wake timing.
 
-The 1-bpp 4.2" panel is one of the fastest-painting and lowest-power options in the catalog; cadence can be aggressive without hurting battery life.
+This is one of the fastest and lowest-power panels in the catalog. Frequent updates have little effect on battery life.
 
 ## Next steps
 
-- [Per-device settings](../install/devices.md#per-device-settings) for the wake interval and quiet hours.
+- [Wake interval](../install/devices.md#dashboard-refresh-settings) and [quiet hours](../install/devices.md#quiet-hours).
 - [Build a 1-bit widget](../dev/writing-a-widget.md) tuned for monochrome panels.

@@ -108,7 +108,7 @@ def _tier_for(wid: str, manifest: dict, tiers: dict[str, str]) -> str:
     if wid in tiers:
         return tiers[wid]
     needs_net = bool(manifest.get("render", {}).get("needs_network"))
-    return "Local" if not needs_net else "-"
+    return "Local" if not needs_net else ""
 
 
 def _family(wid: str) -> str:
@@ -120,20 +120,22 @@ def _card(manifest: dict, tier: str) -> str:
     name = manifest.get("name", wid)
     desc = manifest.get("description", "").strip()
     sizes = manifest.get("supports", {}).get("sizes", [])
-    size_str = " ".join(f"`{s}`" for s in sizes) if sizes else "-"
     shot = SHOTS_DIR / f"{wid}.png"
-    if shot.exists():
-        img = f"![{wid}]({SHOTS_REL}/{wid}.png)"
-    else:
-        img = "_Screenshot pending, run `python scripts/capture_widget_shots.py`._"
 
-    return (
-        f"-   **{name}** &middot; `{wid}`\n\n"
-        f"    ---\n\n"
-        f"    {img}\n\n"
-        f"    {desc}\n\n"
-        f"    **Sizes:** {size_str} &middot; **Tier:** {tier}\n"
-    )
+    # Screenshot, sizes and tier are each left out when there is nothing to show.
+    parts = [f"-   **{name}** &middot; `{wid}`", "    ---"]
+    if shot.exists():
+        parts.append(f"    ![{wid}]({SHOTS_REL}/{wid}.png)")
+    if desc:
+        parts.append(f"    {desc}")
+    meta: list[str] = []
+    if sizes:
+        meta.append("**Sizes:** " + " ".join(f"`{s}`" for s in sizes))
+    if tier:
+        meta.append(f"**Tier:** {tier}")
+    if meta:
+        parts.append("    " + " &middot; ".join(meta))
+    return "\n\n".join(parts) + "\n"
 
 
 def render() -> str:
@@ -149,27 +151,22 @@ def render() -> str:
     lines.append("# Widget gallery")
     lines.append("")
     lines.append(
-        f"The **{len(widgets)} widgets** that ship with Tesserae. Each is a "
-        "drop-a-folder widget under `plugins/<id>/`; drop your own in and it "
-        "shows up in the editor's picker. Want to build one? See "
+        f"Tesserae includes {len(widgets)} widgets. To add your own, put its folder "
+        "under `plugins/<id>/`; it appears in the editor's picker. See "
         "[Build a widget with AI](../dev/writing-a-widget.md)."
     )
     lines.append("")
     lines.append(
         '!!! tip "Looking for more widgets?"\n'
-        "    Browse the full community catalog at "
-        "[tesserae.ink/catalog](https://tesserae.ink/catalog/): widgets, themes, "
-        "and dashboard templates, all installable from "
-        "**Settings → Widgets → Browse catalog** inside the app."
+        "    Install community contributions from "
+        "[tesserae.ink/catalog](https://tesserae.ink/catalog/) "
+        "in **Settings → Widgets → Browse catalog**."
     )
     lines.append("")
     lines.append(
         '!!! note "Stability tiers"\n'
-        "    **Stable** = backed by an official, documented API. "
-        "**Best-effort** = undocumented but long-lived endpoint. "
-        "**Fragile** = scraping or a soft policy, convenience only. "
-        "**Local** = computed on the host, no upstream to break. "
-        "See [Screens & compatibility](../compatibility.md) for the hardware side."
+        "    See [Widget stability tiers](tiers.md) for each widget's rating. "
+        "Local widgets run on your server, with no external data source to break."
     )
     lines.append("")
 

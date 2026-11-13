@@ -1,17 +1,12 @@
 # Widget design brief, handoff template
 
-Paste this template into your Claude Design conversation and ask it to
-fill out one copy per widget you want built. The output is what gets
-pasted back to Claude Code for the actual build.
+Ask Claude Design to fill in one copy per widget.
+Give the completed brief to Claude Code to build it.
 
-Pair this with [`docs/widgets.md`](widgets.md) (the wire + render
-contract) and [`docs/widget-design-system.md`](widget-design-system.md)
-(the cross-widget rulebook: archetypes, two axes, token layers). Claude
-Design should read both before drafting.
+Have Claude Design read [`docs/widgets.md`](widgets.md) for the contract
+and [`docs/widget-design-system.md`](widget-design-system.md) for layout and styling rules first.
 
-Every section is required unless marked **(optional)**. Omitting a
-required section forces Claude Code to either guess or stop to ask -
-worth filling in even if the answer feels obvious.
+Fill in every section unless marked **(optional)**, even if the answer seems obvious.
 
 ---
 
@@ -43,9 +38,14 @@ and sun times. Data from Open-Meteo (no API key).*
 
 Subset of `["xs", "sm", "md", "lg"]`. Justify exclusions.
 
-Cell dimensions: xs = 180×180 · sm = 380×240 · md = 640×400 · lg = 1200×800.
+| Size | Cell dimensions |
+|---|---|
+| xs | 180×180 |
+| sm | 380×240 |
+| md | 640×400 |
+| lg | 1200×800 |
 
-Example: *xs, sm, md, lg, supports the full range; xs collapses to
+Example: *xs, sm, md, lg: supports the full range; xs collapses to
 just the temp + condition icon.*
 
 Example: *sm, md, lg, skipping xs because the chart needs at least
@@ -67,14 +67,11 @@ The form fields the editor will render. Types: `string` · `textarea` ·
 | `units` | `select` | `metric` | Units | `metric` (Metric °C) · `imperial` (Imperial °F) |
 
 !!! note "No `variant` option for visual direction"
-    Pre-Spectra widgets shipped multiple visual "directions" behind a
-    `variant` select (Refined / Geometric / Swiss / Data). Spectra
-    replaced that with the `data-style` axis at page level, widgets
-    now render **one** shape. Don't add a `variant` option for
-    direction; if your widget legitimately needs a layout shape choice
-    (e.g. a now-playing-style card's `stack` vs `side`), name it
-    `layout` and use shape-describing values, not design-language
-    names.
+    Use `data-style` at page level for visual direction. Each widget renders one shape.
+    Don't add a `variant` option for visual direction.
+
+    For layout choices such as a now-playing card's `stack` vs `side`, name the option
+    `layout`. Values must describe shapes, not design styles.
 
 ---
 
@@ -122,8 +119,8 @@ origin fetches; **B** for purely computed widgets (time of day, etc.).
 
 ## 6. `ctx.data` shape
 
-The JSON `server.py` returns (or `null` if client-side). The contract
-between server.py and client.js, be explicit about units and types.
+Describe the JSON returned by `server.py`, or `null` for client-side widgets.
+State units and types so server.py and client.js agree.
 
 ```json
 {
@@ -150,9 +147,8 @@ For error: `{"error": "<message>"}`.
 
 ## 7. Layout mockups
 
-One block per supported size, ASCII mockup + a numbered annotation
-list. Don't worry about pixel-perfection; communicate hierarchy,
-grouping, and which theme token / icon goes where.
+For each size, add an ASCII sketch and numbered notes.
+Show hierarchy, grouping, and token/icon placement. Exact pixels are not needed.
 
 ### lg (1200×800), full feature
 
@@ -170,12 +166,12 @@ grouping, and which theme token / icon goes where.
 └──────────────────────────────────────────────────────────────────┘
 
 [1] place label, uppercase, weight 700, `--text-secondary`. ph-map-pin
-    (regular, `--accent-4`) before the text.
+    (bold, `--accent-4`) before the text.
 [2] stats, 4 columns. label uppercase muted; value weight 700.
     Icons (left of each value): ph-thermometer-simple at bold weight
     (`--accent-2`), ph-drop-half at bold (`--accent-4`), ph-wind at bold
     (`--text-secondary`), ph-sun-dim at bold (tone by UV band).
-[3] sun row, `ph-duotone ph-sun-horizon` + `ph-duotone ph-moon-stars`
+[3] sun row, `ph-bold ph-sun-horizon` + `ph-bold ph-moon-stars`
     (`--accent-4`).
 ```
 
@@ -201,37 +197,35 @@ grouping, and which theme token / icon goes where.
 
 ## 8. Icon manifest
 
-Every Phosphor icon the widget uses, with weight. Drives which icon
-stylesheets get `<link>`-ed inside the shadow root.
+List every Phosphor icon and weight. This determines the stylesheets loaded
+with `<link>` inside the shadow root.
 
 | name                  | weight   | where                  |
 |-----------------------|----------|------------------------|
 | `cloud-sun`           | bold     | hero condition icon    |
-| `map-pin`             | regular  | place label            |
+| `map-pin`             | bold     | place label            |
 | `thermometer-simple`  | bold     | feels-like stat        |
 | `drop-half`           | bold     | humidity stat          |
 | `wind`                | bold     | wind stat              |
 | `sun-dim`             | bold     | UV stat                |
-| `sun-horizon`         | duotone  | sunrise row            |
-| `moon-stars`          | duotone  | sunset row             |
+| `sun-horizon`         | bold     | sunrise row            |
+| `moon-stars`          | bold     | sunset row             |
 | `arrow-up`/`arrow-down` | bold   | range high/low         |
-| `warning-circle`      | regular  | error state            |
+| `warning-circle`      | bold     | error state            |
 
-Weights needed: `regular`, `bold`, `duotone`. (Each weight adds one
-`<link>` and ~250 KB font, only ship what you use.) **Default to
-`bold` for prominent / hero icons**, `fill` quantises into solid
-blobs on Spectra 6 and reads heavier than intended; `bold` is the
-outline-with-presence the design language calls for.
+Use `bold` only; `spectra-widgets.css` already imports it.
+Other weights add a `<link>` and ~150 KB font each. Ship only what you use.
+
+Default to `bold`: `fill` becomes solid blobs on Spectra 6 and looks too heavy.
+`bold` keeps outlines legible.
 
 ---
 
 ## 9. Tone rules (semantic colour)
 
-If element colour depends on data, table it. Output is **always** a
-Spectra semantic token, paint from `--accent-1..6` (reach by **role**,
-not by hue), `--text-primary` / `--text-secondary` / `--text-muted`,
-`--surface` / `--surface-sunken`. The active theme provides whatever
-colour the role carries.
+Table any colours that depend on data. Always output a Spectra semantic token:
+`--accent-1..6` by role, `--text-primary` / `--text-secondary` / `--text-muted`,
+or `--surface` / `--surface-sunken`. The theme sets each role's colour.
 
 Accent slots by role:
 
@@ -257,32 +251,26 @@ Example (weather_now):
 | UV value        | uv < 3                 | `--accent-3`  | positive / safe band |
 | UV value        | uv 3–7.9               | `--accent-2`  | warning band |
 | UV value        | uv ≥ 8                 | `--accent-1`  | alert, burn risk |
-| range high arrow|,                      | `--accent-1`  | peak |
-| range low arrow |,                      | `--accent-5`  | secondary |
+| range high arrow| (any)                  | `--accent-1`  | peak |
+| range low arrow | (any)                  | `--accent-5`  | secondary |
 | rain pill       | rain ≥ 30%             | `--accent-4`  | primary water |
 
 ### Extended palette: when strict tokens don't fit
 
-The accent table above is the right answer for almost every widget.
-For *scenic / decorative* widgets (a weather card whose whole point
-is a sunset gradient, an atmospheric clock background), the strict
-palette can't express what the design wants. Those widgets declare
-`"design": {"palette": "extended"}` in `plugin.json` and use
-arbitrary CSS colours; the renderer's Floyd-Steinberg dither
-approximates them on the panel palette.
+Scenic widgets may need gradients or colours beyond the strict palette.
+Declare `"design": {"palette": "extended"}` in `plugin.json` to use arbitrary CSS colours.
+Floyd-Steinberg dithering approximates them on the panel palette.
 
 Trade-offs you take on:
 
-- Themes no longer change the widget's look, the widget owns its
-  colour story end to end.
-- The dithered output reads differently from the browser preview.
-  Soft scenery dithers well; fine details on gradients read worse.
-  Catalog reviewers will judge the *dithered* output, not the
-  browser preview.
-- BW + 3-colour panels degrade harder than 7-colour Spectra; an
-  extended-palette widget is at its best on the colour panels.
+- Themes no longer change the widget's look; the widget sets its
+  own colours.
+- Soft scenery dithers well; fine details on gradients read worse.
+  Reviewers judge the dithered result. The browser preview looks different.
+- BW and 3-colour panels lose more detail than 6-colour Spectra.
+  Extended palettes work best on colour panels.
 
-Only opt in if the strict tokens genuinely can't carry the design.
+Only opt in if the strict tokens can't carry the design.
 Reference:
 [`plugins/weather_now_scenic`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_now_scenic).
 
@@ -307,7 +295,7 @@ What gets hidden / shrunk as the cell gets smaller. Be specific.
 |-----------------------|--------------------------------------------------------|
 | `ctx.data.error` set  | render error card with `ph-warning-circle` + message  |
 | `ctx.data.points` empty | render `state-empty` block: "No data available"     |
-| field is `null`       | show `-` (em-dash)                                     |
+| field is `null`       | show `-` (hyphen)                                      |
 | temp out of range     | clamp to int + ° suffix (e.g. `45°`)                   |
 
 ---
@@ -325,13 +313,10 @@ Anything that doesn't fit above. Examples:
 
 ---
 
-# Minimal example brief
+## Minimal example brief
 
-Below is what a brief for a **`year_progress`** widget, a single
-horizontal bar showing how much of the year is done, would look
-like. It's intentionally short because the widget is small; longer
-widgets (charts, multi-section dashboards) need proportionally more
-detail in sections 6, 7, 9, 10.
+`year_progress` shows how much of the year is done in one horizontal bar.
+For charts or larger dashboards, add more detail in sections 6, 7, 9, 10.
 
 ---
 
@@ -349,7 +334,7 @@ current calendar year we are.
 
 ## 2. Sizes supported
 
-xs, sm, md, lg, bar collapses gracefully at xs.
+xs, sm, md, lg; the bar shrinks to fit at xs.
 
 ## 3. Cell options
 
@@ -367,7 +352,7 @@ Client-side only. Compute `pct = (today - jan_1) / (dec_31 - jan_1)`.
 
 ## 6. `ctx.data` shape
 
-`null`, widget is fully client-side.
+`null`; the widget is fully client-side.
 
 ## 7. Layout mockups
 
@@ -401,10 +386,10 @@ Client-side only. Compute `pct = (today - jan_1) / (dec_31 - jan_1)`.
 
 | name             | weight  | where        |
 |------------------|---------|--------------|
-| `calendar-check` | regular | head icon    |
-| `warning-circle` | regular | error state  |
+| `calendar-check` | bold    | head icon    |
+| `warning-circle` | bold    | error state  |
 
-Weights: `regular` only.
+Weights: `bold` only.
 
 ## 9. Tone rules
 
@@ -424,7 +409,7 @@ Weights: `regular` only.
 
 ## 11. Edge cases
 
-None, purely computed from today's date.
+None; purely computed from today's date.
 
 ## 12. Notes
 

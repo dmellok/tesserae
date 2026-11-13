@@ -1,19 +1,32 @@
 # Quickstart: Bloomin8 Canvas
 
-The Bloomin8 Canvas is a battery colour e-paper frame. Its firmware has a Schedule Pull API: you give it an upstream server, a token and a wake time, and from then on it wakes, asks the server for a picture, paints it and sleeps until the time the server gives back. Tesserae acts as that server. No flashing, no Home Assistant needed.
+Connect your battery-powered Bloomin8 Canvas colour frame to Tesserae through its Schedule Pull API. You don't need to flash it or use Home Assistant.
 
 !!! warning "Built against Bloomin8's spec, not yet tested on a Canvas"
-    This path follows Bloomin8's [Schedule Pull API document](https://github.com/ARPOBOT-BLOOMIN8/eink_canvas_home_assistant_component/blob/main/docs/Schedule_Pull_API.md) and has not been run against real hardware yet. If you try it, please report how it went on [issue #344](https://github.com/dmellok/tesserae/issues/344), with the Canvas log if something goes wrong.
+    This setup follows Bloomin8's [Schedule Pull API document](https://github.com/ARPOBOT-BLOOMIN8/eink_canvas_home_assistant_component/blob/main/docs/Schedule_Pull_API.md). It hasn't been tested on hardware. Report results on [issue #344](https://github.com/dmellok/tesserae/issues/344), with the Canvas log if something fails.
 
 ## 01 — Add the Canvas in Tesserae
 
-1. **Settings → Devices → Add device**, kind **Bloomin8 Canvas**.
-2. The panel defaults to the 13.3" Canvas, 1200×1600 portrait. Pick landscape if the frame hangs sideways; for the smaller Canvas, set the panel to 480×800.
-3. Save. Tesserae shows the device's access token once, with the upstream URL and a ready-made command for the next step. The device card can show the token again later.
+1. Open **Settings → Devices → Add device** and choose **Bloomin8 Canvas**.
+2. Set the panel:
+
+    | Canvas | Resolution (portrait) |
+    |---|---|
+    | 13.3" (default) | 1200×1600 |
+    | Smaller Canvas | 480×800 |
+
+    Choose landscape if it hangs sideways.
+
+3. Save. Copy the access token, upstream URL and command shown for the next step. You can reveal the token again on the device card.
 
 ## 02 — Point the Canvas at Tesserae
 
-The Canvas takes its pull settings over its own local HTTP API, so it has to be awake: press its button, or wake it from the Bloomin8 app. Then, from any machine on the same network (replace `CANVAS_IP`, `TESSERAE`, `TOKEN` and the time).
+Wake the Canvas with its button or the Bloomin8 app. Run the command from a computer on the same network. Replace these values:
+
+- `CANVAS_IP`: the Canvas address.
+- `TESSERAE`: your Tesserae address.
+- `TOKEN`: the device's access token.
+- The time: your first wake time.
 
 macOS or Linux:
 
@@ -36,24 +49,36 @@ $body = @{ upstream_on = $true; upstream_url = "http://TESSERAE:8765/api/bloomin
 Invoke-RestMethod -Method Put -Uri "http://CANVAS_IP/upstream/pull_settings" -ContentType "application/json" -Body $body
 ```
 
-`cron_time` is the first wake, in UTC with a trailing `Z`. A minute or two ahead is fine. After that first pull Tesserae sets every wake. To check what the Canvas holds, `GET` the same address (in PowerShell, `Invoke-RestMethod http://CANVAS_IP/upstream/pull_settings`).
+Set `cron_time` to a minute or two ahead, in UTC with a trailing `Z`. Tesserae sets later wake times.
 
-`TESSERAE` is the address and port of Tesserae itself, which the token pop-up fills in for you. With the Home Assistant App that is the HA host on the App's port, 8765 unless you changed it, not HA's own port 8123.
+To check the saved settings, `GET` the same address. In PowerShell, use `Invoke-RestMethod http://CANVAS_IP/upstream/pull_settings`.
 
-The Canvas downloads its picture from the same address, so `upstream_url` must be reachable from the Canvas: plain `http://` on your network works, and `https://` needs a certificate from a public authority (Let's Encrypt is fine). It doesn't follow redirects, so point it at Tesserae directly rather than at a URL that forwards.
+`TESSERAE` is Tesserae's address and port; the token pop-up fills it in. For the Home Assistant App, use the HA host and the App's port, normally 8765. Don't use HA's port 8123.
+
+The Canvas must be able to reach `upstream_url` to download images:
+
+- `http://` works on your local network.
+- `https://` needs a certificate from a public authority, such as Let's Encrypt.
+- Redirects don't work. Use Tesserae's direct address.
 
 ## 03 — Bind a dashboard
 
-Bind a page, schedule or rotation to the Canvas like any other device. On each wake the Canvas gets the latest frame as a full-colour JPEG and does its own colour conversion for the panel. A landscape dashboard is sent turned on its side and marked as landscape, which is how the Canvas expects it.
+Bind a page, schedule or rotation to the Canvas.
+
+It downloads a full-colour JPEG on each wake and converts it to its panel colours. Tesserae turns landscape images sideways and marks them as landscape, as the Canvas requires.
 
 ## 04 — Wakes and battery
 
-The device card's **Wake interval** (default 30 minutes) is the longest the Canvas sleeps. When the bound page has a scheduled change coming up, Tesserae wakes it just after the change instead, so a morning dashboard lands at the time it was scheduled for. Manual **Send** and Home Assistant triggers can't be predicted, so they show on the next wake.
+The device card's **Wake interval** is the longest the Canvas sleeps. It defaults to 30 minutes.
 
-When nothing has changed since the last picture the Canvas confirmed painting, Tesserae tells it so and it goes back to sleep without repainting, which saves battery.
+For a scheduled page change, Tesserae wakes the Canvas just after the change. Manual **Send** and Home Assistant triggers appear at the next wake.
 
-The battery level the Canvas reports on each pull shows on the device card, in battery history and in Home Assistant.
+If the last confirmed image hasn't changed, the Canvas sleeps without drawing it again. This saves battery.
+
+Each wake reports battery level to the device card, battery history and Home Assistant.
 
 ## Stopping
 
-Send `{"upstream_on": false}` to the same `pull_settings` address while the Canvas is awake. Deleting the device in Tesserae doesn't stop it: the Canvas keeps waking hourly and getting "unknown token" replies until it is turned off this way.
+While the Canvas is awake, send `{"upstream_on": false}` to `pull_settings`.
+
+Deleting it in Tesserae doesn't stop it waking. It will keep waking hourly with "unknown token" errors until you turn pulling off.

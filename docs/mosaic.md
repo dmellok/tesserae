@@ -1,11 +1,12 @@
 # Looks
 
-Looks is an open design system for e-ink dashboards: five complete page styles for code
-elements. A code element built from its components takes one look from a single attribute, and
-reads at every panel size, in colour and on one-bit panels. In code the library keeps its original
-name, Mosaic: the global is `Mosaic`, the classes start with `m-`, and the source lives at
-[dmellok/tesserae-mosaic](https://github.com/dmellok/tesserae-mosaic). (A Mosaic layout, in the
-cloud editor, is a dashboard made of widget tiles; the two are unrelated.)
+Looks is an open design system with five page styles for e-ink dashboard code elements.
+Choose a look with one attribute. Components stay readable at every screen size, in colour or one-bit (black or white).
+
+In code, the library is called Mosaic. The global is `Mosaic`, and CSS classes start with `m-`.
+Get the source at [dmellok/tesserae-mosaic](https://github.com/dmellok/tesserae-mosaic).
+
+A Mosaic layout in the cloud editor means a dashboard of widget tiles. It is unrelated to this library.
 
 | Look | What it is |
 |---|---|
@@ -15,8 +16,8 @@ cloud editor, is a dashboard made of widget tiles; the two are unrelated.)
 | `pixel` | Pixel type, pixel-art icons and dithered windows. |
 | `os7` | The classic Macintosh System 7: pinstriped windows, a menu bar, dialogs. |
 
-It is optional. A code element opts in by using it: a `data-look`, Mosaic's classes, or a call to
-`Mosaic.`. Tesserae then inlines the core, that look, the script, the look's fonts and its icons.
+Looks is optional. A code element loads it through a `data-look` attribute, Mosaic's classes or a call to `Mosaic.`.
+Tesserae includes the core styles, chosen look and script, plus that look's fonts and icons.
 
 ```html
 <main class="m" data-look="almanac"><div class="m-page">
@@ -30,6 +31,5 @@ Mosaic.clock(document.querySelector(".m-clock"));
 Mosaic.ready();   // loads the look's fonts, then fits [data-fit] text and trims lists
 ```
 
-The components, tokens and script are documented in the
-[Mosaic README](https://github.com/dmellok/tesserae-mosaic#readme). To update the vendored copy,
-build Mosaic and run `python3 scripts/sync_mosaic.py`.
+See the [Mosaic README](https://github.com/dmellok/tesserae-mosaic#readme) for the full documentation.
+To update the bundled copy, build Mosaic and run `python3 scripts/sync_mosaic.py`.

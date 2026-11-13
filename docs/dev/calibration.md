@@ -1,22 +1,17 @@
 # Palette calibration
 
-Tesserae's Calibration tab (Settings → Devices → any instance →
-**Calibration**) collects everything that lets a user match a panel's
-rendered output to what their eyes see, without a colorimeter. The
-core primitive is the **palette profile**: a JSON blob describing the
-six or seven RGB values the panel actually reproduces, plus tone-
-mapping / dither / edge knobs that live around the palette itself.
+Open Settings → Devices → any instance → **Calibration** to adjust the panel's
+colours without a colorimeter. A palette profile stores its six or seven RGB
+colours in JSON, with tone, dither and edge settings.
 
 ## Where profiles live
 
-- **Bundled** presets ship in the source tree at
+- Bundled presets ship in
   [`app/palette_profiles/bundled.py`](https://github.com/dmellok/tesserae/blob/main/app/palette_profiles/bundled.py).
-  These are read-only; every entry carries `based_on` +
-  `attribution` fields so the Calibration tab can render an
-  "attribution" line under the picker.
-- **User** profiles live at `data/palette_profiles/<slug>.json`.
-  Anything a user saves via "Save as new profile" or imports via
-  "Import profile from JSON" lands here.
+  They are read-only. Their `based_on` + `attribution` fields supply the
+  attribution line under the picker.
+- User profiles live at `data/palette_profiles/<slug>.json`.
+  "Save as new profile" and "Import profile from JSON" both write here.
 
 A device's active profile lives in the settings store at
 `settings.devices.<instance_id>.palette_profile_slug`. Empty string
@@ -54,44 +49,36 @@ means no override (the built-in `_CALIBRATED_PALETTES` in
 }
 ```
 
-Unknown top-level fields are ignored on load, so profiles are
-forward-compatible with schema additions. Out-of-range tone values
-are clamped rather than rejected. Bad hex codes fall through to
+Unknown top-level fields are ignored, so newer profiles can load with extra
+fields. Tone values outside the allowed range are clamped. Bad hex codes use
 `#000000` so a corrupt profile can't crash a render.
 
 ## What v0.67.0 (phase 1) wires
 
-- **Palette override** flows through the app-side push manager into
-  each `.bin` renderer (`esp32_bin`, `pi_bin`, `pico_bin`) as an
-  optional kwarg on
+- The push manager passes the palette override to each `.bin` renderer
+  (`esp32_bin`, `pi_bin`, `pico_bin`) as an optional keyword argument on
   [`pack_to_panel_bin`](https://github.com/dmellok/tesserae/blob/main/app/quantizer.py).
   When a device has an active profile AND the renderer clone has
   `calibrated=True`, the profile's palette wins over the built-in
   `_CALIBRATED_PALETTES` lookup. `trmnl_png_color` also honours the
   override server-side.
-- **Contrast + saturation** move to the Calibration tab (they were
-  under Rendering → Picture quality). Storage is unchanged; both
-  fields still write to `settings.renderers.<clone_id>.contrast` and
+- Contrast and saturation are in the Calibration tab.
+  They write to `settings.renderers.<clone_id>.contrast` and
   `.saturation`.
 
 ## What v0.67.1 (phase 2) adds
 
-- **`exposure` (-100..+100)** — linear brightness shift, applied
-  before palette quantisation. `_apply_exposure` in
-  `app/quantizer.py` short-circuits on the neutral value so
-  no-profile devices pay no cost.
-- **`s_curve` (-100..+100)** — sigmoid mid-tone punch. Positive
-  values push mid-tones away from grey (more contrast), negative
-  values flatten them.
-- **`serpentine` (bool)** — reverses every other row's scan
-  direction on error-diffusion dithers so diagonal "worming"
-  artefacts disappear from gradient regions.
-- **`diffusion_strength` (0..200)** — scales propagated error
-  amount on error-diffusion dithers. 100 = default, <100 = softer
-  / flatter, 0 = nearest-neighbour quantise, >100 = exaggerated
-  (rarely useful).
-- **UI**: sliders + toggle on the Calibration tab card writing to
-  the active profile via
+- `exposure` (-100..+100): shifts brightness linearly before reducing colours
+  to the palette. `_apply_exposure` in `app/quantizer.py` skips the neutral
+  value; devices without a profile pay no cost.
+- `s_curve` (-100..+100): adjusts mid-tone contrast with a sigmoid curve.
+  Positive values push mid-tones away from grey; negative values flatten them.
+- `serpentine` (bool): reverses alternate scan rows during error-diffusion
+  dithering. This removes diagonal "worming" patterns from gradients.
+- `diffusion_strength` (0..200): scales the error passed to neighbouring pixels.
+  100 is the default; <100 is softer, 0 uses the nearest palette colour,
+  and >100 exaggerates the effect (rarely useful).
+- Calibration sliders and the toggle update the active profile through
   `POST /settings/devices/<id>/palette/update-tone`. Editing a
   bundled preset forks it into an editable copy on first tweak;
   user profiles are edited in place.
@@ -101,75 +88,64 @@ are clamped rather than rejected. Bad hex codes fall through to
 Edge handling, wired for `esp32_bin` / `pi_bin` /
 `pico_bin`:
 
-- **`smoothing_radius` (0-3 px)** — Gaussian blur applied to the
-  source before tone mapping. Softens antialiased edges before
-  error-diffusion has a chance to build a noisy tail along them.
-  Zero-cost fast path at `radius=0`.
-- **`preserve_line_art` (bool)** — post-dither pass. Detects sharp
-  edges in the tone-mapped source via `ImageFilter.FIND_EDGES` on
-  the luminance channel, thresholds at 40/255 and dilates 3x3.
-  Detected pixels get replaced with plain nearest-neighbour
-  quantise output; the surrounding photographic regions keep their
-  full error-diffusion dither. Cost is one extra
-  `Image.quantize(dither=NONE)` pass plus a mask copy; near-zero on
-  all-photo sources.
+- `smoothing_radius` (0-3 px): Gaussian blur before tone mapping.
+  It softens antialiased edges to prevent noisy dither trails.
+  `radius=0` skips the work at no cost.
+- `preserve_line_art` (bool): protects sharp edges after dithering.
+  It runs `ImageFilter.FIND_EDGES` on tone-mapped luminance, thresholds at
+  40/255 and dilates 3x3. Edge pixels use the nearest palette colour;
+  photographic regions keep full error-diffusion dithering.
+
+  This costs one extra `Image.quantize(dither=NONE)` pass and a mask copy.
+  The cost is near-zero for all-photo sources.
 
 ## What v0.306.0 adds
 
-- **`protect_native_colours` (0-48)** — tolerance, as Euclidean
-  distance in sRGB, for holding pixels that already sit on one of the
-  panel's own colours. A pixel that matches a palette entry generates
-  no error of its own but still receives its neighbours', so a flat
-  background beside saturated content gets pushed off its colour and
-  speckles. Above 0, those pixels keep their colour: they take the
-  same nearest-neighbour override `preserve_line_art` uses, and on the
-  error-diffusion dithers they also stop passing error onward, so a
-  protected region can't collect error from one side and dump it out
-  the other.
+- `protect_native_colours` (0-48): keeps pixels close to the panel's own
+  colours, measured as Euclidean distance in sRGB. Without protection,
+  neighbouring pixels can spread dither error into a matching colour and
+  cause speckles, even though that colour produces no error itself.
 
-  The mask is computed on the tone-mapped source, after exposure, the
-  S-curve, LAB compression and the calibrated pre-pass have moved the
-  pixels, since a mask built on the original would miss what it means
-  to protect. The bundled light themes paint a warm paper background
-  rather than pure white, so a tolerance around 16-24 is what catches
-  them; 0 (off) renders byte-for-byte as before.
+  Above 0, matching pixels use the nearest-colour override from
+  `preserve_line_art`. With error-diffusion dithering, they also stop passing
+  error onward. This prevents error spreading through a protected region.
 
-  Wired for `esp32_bin` / `pi_bin` / `pico_bin` and, unusually for an
-  edge knob, `esp32_bw_bin`: black and white is the gamut where a
-  background has least to gain from diffusion. Deliberately not wired
-  for the greyscale packers, where the 16-level ramp puts nearly every
-  pixel close to some entry and the same guard would flatten
-  photographs instead of cleaning backgrounds.
+  The mask uses the source after exposure, the S-curve, LAB compression and
+  the calibrated pre-pass. An earlier mask would miss colours those steps
+  changed. Around 16-24 catches bundled light themes' warm paper backgrounds;
+  0 (off) keeps the previous byte-for-byte output.
+
+  Supported by `esp32_bin` / `pi_bin` / `pico_bin` and `esp32_bw_bin`.
+  Black-and-white backgrounds gain little from diffusion. Greyscale packers
+  exclude this control: almost every pixel is near a colour in the 16-level
+  ramp, so protection would flatten photographs.
 
 ## What v0.67.4 adds
 
-- **LAB dynamic-range compression** (`lab_compress_min` /
-  `lab_compress_max` on the profile, 0-100) — `_compress_lab_range`
+- LAB dynamic-range compression (`lab_compress_min` /
+  `lab_compress_max` on the profile, 0-100): `_compress_lab_range`
   rescales L* only, leaving hue alone. Overrides the linear
   `_compress_to_calibrated_range` when set; the default `(0, 100)` is
   a no-op.
-- **Colour-match modes** (`rgb` / `lab` / `chroma-aware`) on the
+- Colour-match modes (`rgb` / `lab` / `chroma-aware`) on the
   error-diffusion dithers. `chroma-aware` weights a*/b* 2x to keep hue
   over lightness.
 
 ## What still isn't wired (later phases)
 
-- **`pi_png`** — palette override would need a client-side
-  change on `tesserae-device-pi`.
-- **`trmnl_png`** — mono; palette calibration doesn't apply.
+- `pi_png` uses the `inky` library to match colours to the panel.
+  Palette override needs a client-side change on `tesserae-device-pi`.
+- `trmnl_png` is mono; palette calibration doesn't apply.
 
 ## What phase 1 doesn't cover
 
-- `pi_png` (Pi client, uses the `inky` library for gamut projection)
-  — palette override would need a client-side change on
-  `tesserae-device-pi`.
-- `trmnl_png` (mono) — no palette calibration meaningful.
-- The advanced tone knobs (see above).
+Phase 1 has the same client exclusions above. It also excludes the advanced
+tone controls.
 
 ## Adding a new bundled preset
 
 1. Grab the palette hexes from your source (epdoptimize's
-   `default-palettes.json` is the current wellspring).
+   `default-palettes.json` is the current source).
 2. Add a `_profile(...)` call to `BUNDLED_PROFILES` in
    [`app/palette_profiles/bundled.py`](https://github.com/dmellok/tesserae/blob/main/app/palette_profiles/bundled.py)
    with a stable slug, human-facing name, `family`, and

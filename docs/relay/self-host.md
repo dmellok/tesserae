@@ -1,11 +1,10 @@
 # Self-host the relay
 
-The [remote-panel feature](../install/remote-panel.md) can use the hosted
-`relay.tesserae.ink`, or your own relay. Self-hosting keeps the whole path under
-your control; the relay is zero-knowledge either way, so it only ever sees
-encrypted frames.
+Use the [remote-panel feature](../install/remote-panel.md) with
+`relay.tesserae.ink` or your own relay. Self-hosting puts the whole path under
+your control. Either relay sees only encrypted frames.
 
-There are two ways to run your own, and they run the **same** `src/index.js`:
+Both options run the same `src/index.js`:
 
 | | [Cloudflare Worker](#option-a-cloudflare-worker) | [Container](#option-b-container-no-cloudflare) |
 |---|---|---|
@@ -14,8 +13,8 @@ There are two ways to run your own, and they run the **same** `src/index.js`:
 | Expiring pairing records | R2 lifecycle rule | swept in-process, hourly |
 | Runs on | Cloudflare | anything with Docker, or plain Node 18+ |
 
-The wire contract is identical, so a panel that paired against one relay moves
-to the other by changing its base URL. No firmware change is involved.
+Both options use the same protocol. Change the panel's base URL to switch
+relays; no firmware change is needed.
 
 ## Option A: Cloudflare Worker
 
@@ -35,8 +34,7 @@ Cloudflare dashboard for a stable hostname if you like.
 
 ## Option B: Container (no Cloudflare)
 
-The same Worker module runs on Node with the filesystem standing in for R2.
-Nothing about the protocol changes.
+The Worker code runs on Node and stores files on disk instead of R2.
 
 ```sh
 docker run -d --name tesserae-relay \
@@ -45,13 +43,14 @@ docker run -d --name tesserae-relay \
   ghcr.io/dmellok/tesserae-relay:latest
 ```
 
-`:latest` follows the most recent tagged release, and `:0.1` / `:0.1.0` pin
-progressively harder. `:edge` tracks `main` for anyone who wants unreleased
-changes, and every build publishes an immutable `sha-<commit>` tag. Prefer a
-release tag for anything a panel depends on: `:edge` moves under you.
+- `:latest` follows the most recent tagged release.
+- `:0.1` pins a minor version; `:0.1.0` pins an exact release.
+- `:edge` tracks `main`, including unreleased changes.
+- Every build has an immutable `sha-<commit>` tag.
 
-The relay is versioned separately from Tesserae. The two are coupled by the
-wire contract, not by a version number, and the relay changes far more slowly.
+Prefer a release tag for a panel you rely on; `:edge` can change.
+Relay versions are separate from Tesserae versions and change far more slowly.
+They only need to agree on the protocol.
 
 To build it yourself instead:
 
@@ -79,9 +78,8 @@ the `/v1` contract so it can never collide with a relay route.
 
 ### Put TLS in front of it
 
-The container speaks plain HTTP. Both your Tesserae install and the remote
-panel reach the relay over the public internet, so terminate TLS in front of
-it. With Caddy that is two lines:
+The container speaks plain HTTP. Both Tesserae and the remote panel connect
+over the public internet, so put an HTTPS proxy in front. With Caddy:
 
 ```caddy
 relay.example.com {
@@ -89,43 +87,41 @@ relay.example.com {
 }
 ```
 
-This is the part Cloudflare was doing for free. A relay has to be publicly
-reachable by definition, so plan on a small VPS rather than a machine behind
-your home router. What you are exposing is a zero-knowledge mailbox that holds
-opaque sealed blobs and never sees a frame key, which is a far smaller surface
-than exposing a Tesserae install.
+Cloudflare provides TLS for free. Your own relay needs a public address, so
+plan on a small VPS instead of a machine behind your home router.
+
+The mailbox holds encrypted data and never sees a frame key.
+This exposes far less than a Tesserae install.
 
 ### Run one instance
 
-Storage is a plain directory and several replicas over a shared volume would
-race on the read-modify-write paths, token rotation in particular. R2's strong
-consistency is doing quiet work in the Worker deployment. One container.
+Run one container. Multiple containers sharing a directory can overwrite each
+other's changes, particularly during token rotation. The Worker relies on R2's
+strong consistency.
 
 ## Point Tesserae at it
 
-**Settings → Cloud relay**, set the relay URL to your relay's origin (the
-Worker URL, or the hostname in front of your container), and **Register this
-install**. Everything else (adding a remote panel, pairing) is the same as with
-the hosted relay.
+In **Settings → Cloud relay**, enter your Worker URL or your container's public
+hostname. Click **Register this install**. Add and pair remote panels the same
+way as with the hosted relay.
 
 ## Cost
 
-**Worker.** One R2 bucket holds the sealed frames and the small install/token/pairing
-records. A panel polling every 15–60 minutes is a few requests per day and a few
-KB per frame, well inside Cloudflare's free tier. There are no Durable Objects
-(v1 is scheduled-poll-only and R2 is strongly consistent), so no paid Workers
-plan is required.
+Worker: one R2 bucket holds encrypted frames and small install, token and
+pairing records. A panel polling every 15–60 minutes uses a few requests per
+day and a few KB per frame, within Cloudflare's free tier.
 
-**Container.** The same traffic against a directory. A mailbox holds one sealed
-frame per device, so storage is bounded by how many panels you have rather than
-by how long the relay has been running.
+No paid Workers plan is required. Scheduled polling and R2's strong consistency
+mean v1 needs no Durable Objects.
+
+Container: the same traffic uses a directory on disk. Each mailbox holds one
+encrypted frame, so storage grows with panel count, not time.
 
 ## Storage cleanup
 
-Frame blobs are self-cleaning: each upload deletes the frame it supersedes, so a
-device's mailbox holds only its latest sealed frame. The short-lived pairing
-records (the `code/` and `pair/` prefixes) are checked for expiry on read but not
-deleted, so add an R2 **lifecycle rule** to expire those prefixes after a day:
+Each upload replaces the device's previous frame. Expired pairing records
+are checked on read but remain in storage. Add an R2 lifecycle rule to delete
+records under `code/` and `pair/` after a day:
 
 ```sh
 wrangler r2 bucket lifecycle add tesserae-relay expire-pairing-codes   "code/" --expire-days 1 -y
@@ -133,23 +129,22 @@ wrangler r2 bucket lifecycle add tesserae-relay expire-pairing-records "pair/" -
 wrangler r2 bucket lifecycle list tesserae-relay   # confirm
 ```
 
-(Or the same thing via the Cloudflare dashboard: R2 → tesserae-relay →
-Settings → Object lifecycle rules.) Nothing else grows unbounded; frame and
-token records are one-per-device.
+Or use the Cloudflare dashboard: R2 → tesserae-relay → Settings → Object
+lifecycle rules. Frame and token records are one-per-device; nothing else
+grows without a limit.
 
-**On the container** there are no lifecycle rules, so it does this itself: an
-hourly in-process sweep deletes `code/` and `pair/` records whose `expires_at`
-has passed, and touches nothing else. Frame blobs still self-clean on upload as
-above, so a mailbox holds one sealed frame per device either way.
+The container deletes expired `code/` and `pair/` records hourly, using
+`expires_at`. It touches nothing else and needs no lifecycle rules.
 
 ## Analytics (optional)
 
-The Worker writes aggregate counts (frames pushed, mailboxes created / removed)
-to a Workers Analytics Engine dataset for a dashboard. Cloudflare-only: the
-container never has the binding, so the same code path is a no-op there. It's fire-and-forget and
-a no-op if you remove the `analytics_engine_datasets` binding from
-`wrangler.jsonc`. No frame content is involved (it's sealed); the recorded ids
-are opaque. Query it via the Analytics Engine SQL API, sample queries are in
+The Worker counts frames pushed and mailboxes created or removed in Workers
+Analytics Engine. It sends these counts without waiting for a reply.
+Frame content stays encrypted, and recorded ids are opaque.
+
+Analytics is off in the container. To disable it in the Worker, remove the
+`analytics_engine_datasets` binding from `wrangler.jsonc`.
+Query counts through the Analytics Engine SQL API; examples are in
 `packages/relay/README.md`.
 
 ## Restricting who can register (hosted operators)

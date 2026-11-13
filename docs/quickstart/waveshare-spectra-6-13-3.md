@@ -1,46 +1,46 @@
 # Quickstart: Waveshare 13.3" Spectra 6 (ESP32-S3)
 
-The Waveshare 13.3" Spectra 6 e-paper board with an ESP32-S3-WROOM-2 driver. Battery-powered, deep-sleep between renders, the maintainer's primary daily driver.
+Use the ESP32-S3-WROOM-2 board to drive this battery-powered panel. It sleeps between updates. This is the maintainer's everyday display.
 
 ## 01 — Flash the firmware
 
 Plug the ESP32-S3-WROOM-2 board into your computer over USB. Hold the BOOT button while plugging in, then release.
 
-Open the [Tesserae browser flasher](https://tesserae.ink/flash) in Chrome or Edge, pick **Waveshare 13.3" Spectra 6** in the device dropdown, then click **Connect & flash**. It installs the firmware over Web Serial with no toolchain.
+Open the [Tesserae browser flasher](https://tesserae.ink/flash) in Chrome or Edge. Select **Waveshare 13.3" Spectra 6**, then click **Connect & flash**. It installs over USB using Web Serial; no build tools needed.
 
-On first boot the board opens a Wi-Fi captive portal (SSID `Tesserae-Setup`). Connect from your phone or laptop, then set:
+On first boot, join `Tesserae-Setup` from your phone or laptop. Enter these on the Wi-Fi setup page:
 
-- **Tesserae server URL**: `http://<your-server>:8765`
-- **Wi-Fi SSID and password**: your home network.
+- Tesserae server URL: `http://<your-server>:8765`
+- Your home Wi-Fi name and password.
 
 Save. The board restarts onto your network.
 
 ## 02 — It pairs itself
 
-The board announces itself on Tesserae's `/api/v1/device/discover` endpoint. Within a few seconds it appears under **Settings → Devices → Discovered**. Click **Register**.
+The device contacts `/api/v1/device/discover`. Within a few seconds, it appears under **Settings → Devices → Discovered**. Click **Register**.
 
 ## 03 — Compose a dashboard
 
-The 13.3" Spectra 6 panel is firmware-native portrait at 1200×1600 (the firmware reads that stride regardless of how you mount the panel). The composer handles the rotation upstream, so build your layout however the panel hangs on the wall.
+The panel is 1200×1600 in portrait. The editor rotates the image for you, so design for how you've mounted it.
 
 1. **Dashboards → New**.
 2. Pick a layout preset that suits the Spectra 6 six-colour palette.
 3. Bind the page to the board in the device picker.
 4. Hit **Push**.
 
-The board wakes, fetches the frame, paints it (around 30 seconds for a full Spectra 6 refresh), and goes back to deep sleep.
+When it wakes, the board downloads and draws the image, then sleeps. A full Spectra 6 refresh takes around 30 seconds.
 
 ## 04 — Set the refresh
 
 In the dashboard's **Schedules** card:
 
-- **Every N minutes** or **Daily at a set time** for fixed cadences.
-- **Smart sync** to render just before each wake, so the panel always shows a fresh frame without burning battery on idle renders.
+- Choose **Every N minutes** or **Daily at a set time** for regular updates.
+- Turn on **Smart sync** on an **Every N minutes** schedule to prepare each image just before the board wakes. This saves battery and idle work.
 
-Smart sync plus a multi-hour wake interval is what gets multi-month battery life on a single LiPo.
+With smart sync and several hours between wakes, one LiPo battery lasts several months.
 
 ## Next steps
 
-- [Quiet hours](../install/devices.md#per-device-settings) to skip overnight renders.
-- [Battery monitoring](../install/devices.md#per-device-settings): the board reports voltage on each wake; Tesserae shows the history.
+- [Quiet hours](../install/devices.md#quiet-hours) to skip overnight renders.
+- Battery monitoring: the board reports voltage on each wake, and Tesserae shows the history on the **Device batteries** page.
 - [Pair a second board](../install/devices.md#multiple-panels) to drive two Waveshare panels at once.

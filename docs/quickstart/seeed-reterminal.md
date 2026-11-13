@@ -1,69 +1,75 @@
 # Quickstart: Seeed reTerminal E-Series (TRMNL BYOS)
 
-The Seeed reTerminal E Series e-paper terminals: E1001 (7.5" mono), E1002 (7.3" Spectra 6), E1003 (10.3" mono, 16-level grey), and E1004 (13.3" Spectra 6). All ship with Seeed's SenseCraft HMI firmware and need a re-flash to talk to Tesserae.
+Flash TRMNL firmware to connect your reTerminal to Tesserae. Its factory-installed SenseCraft HMI firmware can't use Tesserae as a server (BYOS).
 
 !!! tip "There's a native Tesserae firmware path"
-    This page covers the **TRMNL BYOS** flashing path. There's also a native Tesserae firmware for the reTerminal E-series with a browser-based flasher at [tesserae.ink/flash](https://tesserae.ink/flash); see the [unified Seeed guide](seeed-unified.md) for that flow. Pick whichever fits your setup.
+    You can also use native Tesserae firmware through [tesserae.ink/flash](https://tesserae.ink/flash). Follow the [unified Seeed guide](seeed-unified.md).
 
-    Stay on this page if you want to run TRMNL's firmware and use Tesserae as the BYOS server, or if the unified firmware doesn't yet cover your specific board revision.
+    Use this page for TRMNL firmware, or if native firmware doesn't cover your board revision.
 
 !!! note "Verified vs Pending"
-    All four E-Series boards are confirmed on real hardware running the native Tesserae firmware (the [unified Seeed guide](seeed-unified.md)). On this page's TRMNL BYOS path, the E1003 has been confirmed end-to-end; the E1001, E1002, and E1004 use the same flashing flow. E1004 support was merged into TRMNL's firmware in October 2026; if the TRMNL web flasher doesn't list it for you yet, use the native firmware.
+    The E1003 is confirmed working through TRMNL BYOS. The other three models use the same flashing steps.
+
+    All four are tested with native Tesserae firmware; see the [unified Seeed guide](seeed-unified.md). Use native firmware if TRMNL's flasher doesn't list the E1004.
 
 ## 01 — Flash TRMNL firmware
 
-The reTerminal ships with Seeed's SenseCraft HMI by default, which doesn't speak BYOS. Two flashers handle the re-flash:
+Use one of these flashers:
 
-- **[TRMNL Web Flasher](https://trmnl.com/flash)**: recommended. Browser-based, works for every supported device. Use this for the freshest firmware.
-- **Seeed reTerminal E-Series Firmware Flasher**: an alternative Seeed-hosted channel, exclusive to E1001 / E1002 / E1003. Linked from [Seeed's wiki](https://wiki.seeedstudio.com/reterminal_e10xx_trmnl/). Use this if the upstream TRMNL release lags behind what Seeed has packaged.
+- Use [TRMNL Web Flasher](https://trmnl.com/flash) for the latest firmware on supported devices.
+- Seeed's reTerminal E-Series Firmware Flasher supports E1001, E1002 and E1003 only.
 
-Plug the device into your computer over USB while holding the BOOT button (or however the flasher prompts), then click **Install**.
+    Find it on [Seeed's wiki](https://wiki.seeedstudio.com/reterminal_e10xx_trmnl/). Use it if Seeed has a newer packaged release.
 
-After flashing, the device opens a Wi-Fi captive portal. Connect from your phone or laptop, then set:
+Hold BOOT while connecting the device to your computer over USB, or follow the flasher's prompt. Click **Install**.
 
-- **BYOS server URL**: `http://<your-server>:8765`
-- **Wi-Fi SSID and password**: your home network.
+After flashing, open the device's Wi-Fi setup page from your phone or laptop. Enter:
+
+- BYOS server URL: `http://<your-server>:8765`
+- Your home Wi-Fi name and password.
 
 Save. The reTerminal restarts onto your network.
 
 ## 02 — It pairs itself
 
-On first boot the device calls Tesserae's `/api/setup` with its MAC and auto-provisions. It appears under **Settings → Devices** within seconds. No token to type.
+The device registers automatically through `/api/setup` using its MAC address. It appears under **Settings → Devices** within seconds. You don't need to type a token.
 
-The flashed firmware sends a `Model` header that Tesserae maps to the panel dimensions:
+The reTerminal starts at 800×480. Its first `/api/display` check supplies the real size in `Width` and `Height`. Tesserae only uses `Model` to choose sizes for TRMNL's own boards.
 
 | Model | Resolution | Notes |
 |---|---|---|
-| `reTerminal E1001` | 800×480 | 7.5" mono |
-| `reTerminal E1002` | 800×480 | 7.3" Spectra 6 |
-| `reTerminal E1003` | 1404×1872 portrait | 10.3" mono, 16-level grey |
-| `reTerminal E1004` | 1200×1600 | 13.3" Spectra 6 |
+| reTerminal E1001 | 800×480 | 7.5" mono |
+| reTerminal E1002 | 800×480 | 7.3" Spectra 6 |
+| reTerminal E1003 | 1872×1404 | 10.3" mono, 16-level grey |
+| reTerminal E1004 | 1200×1600 | 13.3" Spectra 6 |
 
 ### Per-model references
 
-- **E1002**: the panel is Spectra 6, with six inks (black, white, red, yellow, blue and green), the same family as the E1004 on a smaller canvas. For practical colour layout patterns, see the [colour-for-calendars discussion on r/trmnl](https://www.reddit.com/r/trmnl/comments/1ucr8b2/color_for_calendars_is_here/).
-- **E1004**: E1004 support landed in TRMNL's firmware in [usetrmnl/trmnl-firmware#771](https://github.com/usetrmnl/trmnl-firmware/pull/771) (October 2026), building on earlier bring-up work by [@limengdu](https://github.com/limengdu) ([#410](https://github.com/usetrmnl/trmnl-firmware/pull/410)) and [@oetiker](https://github.com/oetiker) ([#445](https://github.com/usetrmnl/trmnl-firmware/pull/445)). The native Tesserae firmware is proven on E1004 hardware and paints in full Spectra 6 colour; see the [unified Seeed guide](seeed-unified.md).
+- For E1002 colour layouts, see the [colour-for-calendars discussion on r/trmnl](https://www.reddit.com/r/trmnl/comments/1ucr8b2/color_for_calendars_is_here/). Its six Spectra 6 inks match the E1004; the screen is smaller.
+- E1004 TRMNL support: [#771](https://github.com/usetrmnl/trmnl-firmware/pull/771), with earlier work by [@limengdu](https://github.com/limengdu) ([#410](https://github.com/usetrmnl/trmnl-firmware/pull/410)) and [@oetiker](https://github.com/oetiker) ([#445](https://github.com/usetrmnl/trmnl-firmware/pull/445)). Native firmware is tested in full colour; see the [unified Seeed guide](seeed-unified.md).
 
 ## 03 — Compose a dashboard
 
 In the editor:
 
-1. **Dashboards → New**.
-2. Build a layout that suits the panel. The E1003's 16-level greyscale and tall portrait aspect lend themselves to monochrome-friendly typography. The E1002's Spectra 6 palette and 800×480 canvas suit photo-led layouts.
+1. Open **Dashboards → New**.
+2. Choose a layout:
+    - E1003: greyscale text.
+    - E1002: photos on its 800×480 colour screen.
 3. Bind the page to the device in the device picker.
-4. Hit **Push**.
+4. Click **Push**.
 
-The reTerminal wakes, fetches the rendered frame from Tesserae, paints, and sleeps.
+The reTerminal downloads and draws the image when it wakes, then sleeps.
 
 ## 04 — Set the refresh
 
-The reTerminal polls Tesserae's BYOS endpoint on its own cadence (≥60 seconds; the floor is in the manifest). In the dashboard's **Schedules** card:
+The reTerminal checks for images at least 60 seconds apart. Open the dashboard's **Schedules** card:
 
-- **Smart sync** renders just before each wake, so the panel always gets a fresh frame without burning battery on idle renders.
-- Seeed rates the E1003 and E1004 at up to six months of battery life (the E1004 figure assumes one refresh a day). A shorter wake cadence drains the battery faster.
+- Turn on **Smart sync** on an **Every N minutes** schedule to draw each image just before the device wakes.
+- Seeed rates E1003 and E1004 battery life at up to six months. The E1004 figure assumes one refresh daily. More frequent wakes use more battery.
 
 ## Next steps
 
 - [Build a widget tuned for greyscale](../dev/writing-a-widget.md) for the E1003's 16-level palette.
 - [Browse community widgets](https://tesserae.ink/catalog/).
-- [Per-device settings](../install/devices.md#per-device-settings) for the wake interval and quiet hours.
+- [Wake interval](../install/devices.md#dashboard-refresh-settings) and [quiet hours](../install/devices.md#quiet-hours).

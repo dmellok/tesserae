@@ -1,18 +1,15 @@
 # Custom CSS on a dashboard
 
-Every dashboard has a **Custom CSS** box under Appearance in the dashboard
-editor. What you put there is applied to the page, and also inside every
-widget on the dashboard, so you can hide a title row, shrink a label, or
-recolour one widget without touching the widget itself.
+Open **Appearance → Custom CSS** in the dashboard editor to change how it looks.
+Your CSS applies to the page and every widget.
+Use it to hide a title row, shrink a label, or recolour one widget.
 
-The box is per dashboard. Two dashboards that want the same tweak each carry
-their own copy.
+Each dashboard keeps its own CSS. To use a change on two dashboards, copy it to both.
 
 ## Hooks you can rely on
 
-Widgets render inside a shadow root, so page-level selectors would normally
-stop at the widget's edge. Tesserae copies your CSS into each widget as well,
-which is why the selectors below work.
+Widgets use a shadow root, a browser boundary that normally blocks page-level CSS.
+Tesserae copies your CSS inside each widget, so these selectors work:
 
 | Selector | What it is |
 | --- | --- |
@@ -25,11 +22,9 @@ which is why the selectors below work.
 | `.cell` | A cell on the page (outside the widgets). |
 | `.panel` | The whole page. |
 
-These classes come from the shared widget stylesheet, so they are stable
-across widgets that use it. A widget's own inner classes (a specific label, a
-row) are that widget's business and may change between versions; use the
-browser's inspector on the editor preview to find them, and expect to revisit
-after an update.
+These shared classes stay stable across widgets that use them.
+Other classes inside a widget may change between versions.
+Find them with your browser's inspector on the editor preview, and check them again after updates.
 
 ## Examples
 
@@ -67,9 +62,7 @@ Change one widget's accent without changing the theme:
 
 - The preview updates when you leave the box, like the other text fields.
 - Theme and style pickers still apply; your CSS runs after them and wins ties.
-- A closing `</style>` tag in the box is neutralised on save, since the text
-  is printed into a style element. Everything else is passed through as
-  written, so a typo in a rule is simply ignored by the browser.
+- Tesserae neutralises a closing `</style>` tag on save because the CSS goes inside a style element. Everything else passes through as written. The browser ignores rules with typos.
 - The box holds up to 20,000 characters.
 - Canvas dashboards do not need this: a code element on a canvas carries its
   own HTML and CSS.

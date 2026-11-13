@@ -1,23 +1,21 @@
 # Build widgets with Studio
 
-[Tesserae Studio](https://github.com/dmellok/tesserae-studio) is a companion app for
-authoring Tesserae widgets end to end: a code editor with live and faithful preview, a
-widget linter, data-schema mining, and an MCP authoring server an AI agent drives from
-scaffold to a registered, rendering widget. Studio is a separate app that connects to a
-running Tesserae for render fidelity and the widget registry.
+[Tesserae Studio](https://github.com/dmellok/tesserae-studio) gives you an editor
+and previews for writing widgets. It runs separately from Tesserae.
+Connect it to Tesserae for live data, accurate renders, and widget registration.
 
 There are two ways to use it, and they share one workspace:
 
-- **The web UI** (a Monaco editor + live/faithful preview) at `http://localhost:8770`.
-- **An AI agent** over MCP (`tesserae-studio-mcp`), which drives the same build loop
-  through tools. See [MCP servers: install & use](mcp-servers.md) to set that up.
+- Use the web UI at `http://localhost:8770`: a Monaco editor with live and faithful previews.
+- Use an AI agent over MCP (`tesserae-studio-mcp`).
+  Set it up with [MCP servers: install & use](mcp-servers.md).
 
-If you would rather hand-write a widget without Studio, see
+To build without Studio, see
 [Build a widget with AI](writing-a-widget.md) and the [Widget contract](../widgets.md).
 
 ## What you need first
 
-Studio runs in one of three modes; more of it lights up as you connect more:
+Choose a mode based on what you connect:
 
 | Mode | You have | You get |
 | --- | --- | --- |
@@ -25,10 +23,8 @@ Studio runs in one of three modes; more of it lights up as you connect more:
 | **disk** | a local `tesserae` checkout | + Spectra assets and the plugin schema from disk |
 | **live** | a running Tesserae reachable over HTTP | + live `fetch()` data and **faithful e-ink render** |
 
-For real work you want **live mode**: point Studio at a running Tesserae so it can run your
-`server.py`, screenshot the true dithered output, and register the widget. A faithful e-ink
-render is the only thing that shows real dither; the in-browser preview is for speed, not
-ground truth.
+Use live mode to run `server.py`, check the dithered output, and register the widget.
+Only the faithful e-ink render shows real dithering. The browser preview is faster.
 
 ## Install and run
 
@@ -83,7 +79,7 @@ Configuration (environment variables; point it at Tesserae for live mode):
 
 ## Anatomy of a widget
 
-A widget is a folder of files (the seed widget `examples/hello_stat` is the minimal shape):
+Start with the minimal widget in `examples/hello_stat`:
 
 ```
 hello_stat/
@@ -93,7 +89,7 @@ hello_stat/
   tests/test_smoke.py  # optional but recommended: renders at every size
 ```
 
-`client.js` is an ES module whose default export paints into a shadow root, idempotently:
+`client.js` is an ES module. Its default export replaces the shadow root's content on each render:
 
 ```javascript
 export default function (shadow, ctx) {
@@ -106,7 +102,7 @@ export default function (shadow, ctx) {
 }
 ```
 
-`server.py` (only when the widget needs data) returns a plain dict, and never raises:
+Add `server.py` only for data fetching. Return a dict; never raise:
 
 ```python
 def fetch(options, settings, *, ctx):
@@ -117,45 +113,39 @@ def fetch(options, settings, *, ctx):
     return {"value": 42}
 ```
 
-The [Widget contract](../widgets.md) is the authoritative reference for the manifest,
-`ctx`, Spectra tokens, and fragments.
+See the [Widget contract](../widgets.md) for the manifest, `ctx`, Spectra tokens, and fragments.
 
 ## The build loop
 
-Whether you drive it in the editor or through the agent, the loop is the same. The agent
-version runs these as MCP tools (see [MCP servers](mcp-servers.md)); the UI exposes the same
-actions as buttons.
+Agents use [MCP servers](mcp-servers.md) for these tools. The UI has buttons for the same actions.
 
-1. **Scaffold.** `scaffold_widget(name, archetype, server=true)`. Archetypes:
-   `stat | list | chart | status | weather | calendar | image`. You get a fragment-first,
-   lint-clean skeleton. For a family of widgets sharing one data source + an admin page, use
-   `scaffold_bundle(name, members)` (it makes a `<name>_core` companion plus members).
-2. **Edit.** Read the generated files, then edit them. Keep `client.js` painting from
-   Spectra tokens and branching on `ctx.cell.fragment`; keep `server.py` returning dicts.
-3. **Lint until clean.** `lint_widget` runs the Golden Rules + the manifest schema. Fix
-   every error before moving on (rules below).
-4. **Register.** `register_widget` wires the widget into the connected Tesserae so it gets
-   live data and faithful render. Co-located Studio uses a local symlink; a remote / Home
-   Assistant Tesserae gets an HTTP push over MCP.
-5. **Mind the restart gate (new widgets only).** A brand-new widget's `client.js` is not
-   served until Tesserae reloads the static-asset route for the new plugin id. Register
-   swaps in the new registry and hot-loads `server.py`, but a fresh id's asset route needs a
-   reload. Symptom: a blank cell or "Failed to fetch dynamically imported module
-   .../client.js" on a **new** widget. Confirm with `probe_widget_data`: if it returns your
-   real server output, `server.py` is loaded and only the static asset is 404ing, so it is
-   the gate, not a JS bug. **Widget updates skip this entirely**; edits to an
-   already-registered widget serve immediately.
-6. **Faithful render.** `faithful_render(size=xs|sm|md|lg)` returns the true dithered PNG. To
-   check live data across every size at once, build a contact-sheet canvas via the
-   [dashboards MCP](mcp.md) and `render_preview` it. `sm`/`xs` are where layouts overflow,
-   check them.
-7. **Mine the data schema.** `mine_data_schema(apply=true)` once the data shape is final, so
-   the widget's fields are bindable by the canvas editor's data primitives.
+1. Create files with `scaffold_widget(name, archetype, server=true)`. Choose an archetype:
+   `stat | list | chart | status | weather | calendar | image`.
+   The generated widget passes lint and supports fragments.
+
+   For shared data and an admin page, use `scaffold_bundle(name, members)`.
+   It creates a `<name>_core` companion and member widgets.
+2. Read and edit the files. Use Spectra tokens in `client.js` and branch on `ctx.cell.fragment`.
+   Keep `server.py` returning dicts.
+3. Run `lint_widget` to check the Golden Rules and manifest schema. Fix every error before continuing.
+4. Call `register_widget` for live data and faithful rendering.
+   Local Studio uses a symlink; remote / Home Assistant installs get an HTTP push over MCP.
+5. Restart gate: reload Tesserae for a new widget's `client.js` route.
+   Registration replaces the registry and loads `server.py`, but new asset routes need a reload.
+
+   A blank cell or "Failed to fetch dynamically imported module .../client.js" can mean the route is missing.
+   Call `probe_widget_data`: real server output confirms `server.py` loaded and the static asset returns 404.
+   Existing widgets serve edits immediately; they do not need this reload.
+6. Run `faithful_render(size=xs|sm|md|lg)` for a dithered PNG.
+   To check live data at all sizes together, build a contact-sheet canvas with
+   [dashboards MCP](mcp.md) and `render_preview` it. Check `sm`/`xs` for overflow.
+7. Run `mine_data_schema(apply=true)` once the data format is final.
+   This lets canvas data primitives bind to the widget's fields.
 
 ## The linter (the Golden Rules)
 
-`lint_widget` enforces these. Errors block; warnings are strong nudges. They exist because
-e-ink screenshots a still frame at an unknown size on a fixed palette.
+`lint_widget` checks these rules for still images, variable cell sizes, and a fixed palette.
+Errors block progress. Warnings are strong recommendations.
 
 **Errors:**
 
@@ -185,52 +175,49 @@ Spectra tokens you paint from: `--surface`, `--surface-sunken`, `--text-primary`
 
 ## Secrets, options, and egress
 
-- **Per-cell config** (a location, a label): declare it in `cell_options[]`; read it in
+- Per-cell config (a location, a label): declare it in `cell_options[]`; read it in
   `fetch()` via `options.get(...)`.
-- **Secrets** (API keys): declare a `settings[]` field with `"secret": true`; read it via
+- Secrets (API keys): declare a `settings[]` field with `"secret": true`; read it via
   `settings.get(...)`. Never put a key in `cell_options`.
-- **Network egress**: declare every host in `requires: ["network:api.example.com",
+- Network egress: declare every host in `requires: ["network:api.example.com",
   "settings:plugin"]`. Cache polite fetches in `ctx["data_dir"]`. Error strings render
   verbatim, so make them friendly and actionable.
 
-Before you code a metric, check what the upstream API actually returns for a plain key. If a
-stat needs OAuth / analytics / history the API does not expose, adapt honestly (snapshot
-into `data_dir` for deltas, or swap an impossible metric for a real one) and flag the
-substitution.
+Check what the API returns for a plain key before choosing a metric.
+If OAuth, analytics, or history is unavailable, save snapshots in `data_dir`
+to calculate changes, or choose a supported metric. Say when you substitute one.
 
 ## Bundles and admin pages
 
 `scaffold_bundle(name, members, admin=true)` creates a family:
 
-- a `<name>_core` companion (`kind: "data"`) that owns the shared data + a `choices()`
-  function (so member `select` options can list live values) and an optional Flask admin
-  page under `templates/<core_id>/index.html`,
-- one or more member widgets wired to read the core via the plugin registry.
+- A `<name>_core` companion (`kind: "data"`) holds shared data.
+  Its `choices()` function supplies live values for member `select` options.
+  It can have a Flask admin page at `templates/<core_id>/index.html`.
+- One or more member widgets read the core through the plugin registry.
 
 Register the core and each member for the family to work live.
 
 ## Publishing to the catalog
 
-When a widget is ready to share, it ships through the community catalog, not bundled into
-Tesserae (see [Publish via the catalog](publishing-a-widget.md)):
+Share widgets through the community catalog; don't bundle them into Tesserae.
+See [Publish via the catalog](publishing-a-widget.md):
 
 1. `package_widget` builds the release tarball and reports its `sha256` + folders.
-2. `generate_catalog_entry(author, tags, release, source)` builds and validates a
-   marketplace entry against the real schema (`tags` are a closed enum; `description`
-   <= 280 chars; identity is filled from your manifest).
-3. `open_catalog_pr(...)` (dry-run by default) drafts the PR to `tesserae-widgets`: the
-   `widgets.json` diff plus the required `screenshots/<id>/lg.png`. Opening the real PR
-   needs the widget to live in its own public GitHub repo with a tagged release so
-   `tarball_url` resolves.
+2. `generate_catalog_entry(author, tags, release, source)` creates and validates a catalog entry.
+   Use allowed `tags` values; `description` must be <= 280 chars. Identity comes from the manifest.
+3. `open_catalog_pr(...)` drafts a PR to `tesserae-widgets` in dry-run mode by default.
+   It includes the `widgets.json` diff and required `screenshots/<id>/lg.png`.
+   To open it, publish the widget in its own public GitHub repo with a tagged release that `tarball_url` can reach.
 
 ## Troubleshooting
 
-- **Blank cell / "Failed to fetch dynamically imported module .../client.js" on a new
-  widget** → the restart gate (step 5), not a bug. `probe_widget_data` returning your real
+- Blank cell / "Failed to fetch dynamically imported module .../client.js" on a new
+  widget → the restart gate (step 5), not a bug. `probe_widget_data` returning your real
   output confirms it; reload/restart Tesserae rather than re-editing the JS. An
   **already-registered** widget with this symptom is a genuine `client.js` error.
-- **Faithful render fails / times out** → Tesserae isn't reachable, or the widget isn't
+- Faithful render fails / times out → Tesserae isn't reachable, or the widget isn't
   registered. Check `studio_health`.
-- **Live data shows the demo sample** → `server.py` errored or isn't configured;
+- Live data shows the demo sample → `server.py` errored or isn't configured;
   `widget_data` / `probe_widget_data` report `source: live | sample | error`; never treat
   sample/error as real.

@@ -13,6 +13,7 @@ Run from the repo root:  ``python scripts/gen_compatibility.py``
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -61,13 +62,10 @@ VENDOR_ORDER: list[tuple[str, str]] = [
 AFFILIATE_DISCLOSURE = (
     '!!! info "Some links are affiliate links"\n'
     "    Seeed product links and the Pimoroni Inky Frame and Inky Impression "
-    "links on this page "
-    "carry a Tesserae affiliate tag: a purchase made through one pays a small "
-    "commission that goes back into the project, and a Seeed link also gets a "
-    "discount at checkout. Nothing on this page is "
-    "listed because of it, and the tested / not-tested status of every panel "
-    "is reported the same way it always has been. Links without the tag are "
-    "plain product links.\n\n"
+    "links carry a Tesserae affiliate tag. Buying through them pays a small "
+    "commission to the project. Seeed links also give a discount at checkout.\n\n"
+    "    Tags do not affect which products are listed or their tested / not-tested "
+    "status. Other links are plain product links.\n\n"
     "    Fraimic links are plain links, with a discount code instead: "
     "**TESSERAE10** takes 10% off at fraimic.com. Fraimic supplied a Large "
     "Canvas to Tesserae free of charge, and Tesserae earns a commission on "
@@ -99,36 +97,34 @@ VENDOR_URL: dict[str, str] = {
 VENDOR_INTRO: dict[str, str] = {
     "seeed": (
         "The reTerminal E-Series and XIAO ePaper family run the "
-        "[Tesserae-native firmware](https://github.com/dmellok/tesserae-device-firmware); "
-        "flash from the browser in one click at "
-        "[tesserae.ink/flash](https://tesserae.ink/flash) (Chrome / Edge, "
-        "Web Serial, no toolchain). Battery-powered, no assembly required. "
+        "[Tesserae-native firmware](https://github.com/dmellok/tesserae-device-firmware). "
+        "Flash in one click at [tesserae.ink/flash](https://tesserae.ink/flash) "
+        "using Chrome or Edge with Web Serial; no build tools are needed. "
+        "They run on batteries and need no assembly.\n\n"
         'The XIAO 7.5" and TRMNL 7.5" OG DIY Kit also run the TRMNL BYOS '
-        "firmware path if you'd rather stay on stock."
+        "firmware if you prefer stock."
     ),
     "m5stack": (
         "Runs the "
-        "[Tesserae-native firmware](https://github.com/dmellok/tesserae-device-firmware). "
-        "The PaperS3's glass has no controller chip: the ESP32-S3 drives the "
-        "panel's parallel bus directly and the 16 greys come from a waveform "
-        "table in the firmware, so greyscale tuning is a build-time edit rather "
-        "than a vendor LUT. That also means no partial refresh yet, and so no "
-        "tap echo or on-device touch widgets on this SKU. The original M5Paper "
-        'shares the same 4.7" glass but reaches it through an IT8951 controller '
-        "on the classic ESP32-D0WDQ6-V3, so it reuses the reTerminal E1003's "
-        "greyscale driver unchanged; both M5Paper SKUs consume the identical "
-        "259200-byte frame."
+        "[Tesserae-native firmware](https://github.com/dmellok/tesserae-device-firmware)."
+        "\n\n- PaperS3: the ESP32-S3 drives the parallel panel bus directly, without a controller chip. "
+        "Its firmware waveform table produces 16 greys; tuning requires a build-time edit instead of a vendor LUT. "
+        "Partial refresh, tap echo and on-device touch widgets are not supported yet.\n"
+        '- Original M5Paper: the same 4.7" glass, with an IT8951 controller on the ESP32-D0WDQ6-V3. '
+        "It uses the reTerminal E1003's greyscale driver unchanged. "
+        "Both M5Paper SKUs use the same 259200-byte frame."
     ),
     "pimoroni": (
-        "The Inky Impressions run from a Raspberry Pi with "
-        "[tesserae-device-pi](https://github.com/dmellok/tesserae-device-pi). "
-        "The Inky Frame carries its own Pico and runs "
-        "[tesserae-device-inkyframe](https://github.com/dmellok/tesserae-device-inkyframe); "
-        "flash it from the browser at "
+        "- Inky Impressions: use a Raspberry Pi with "
+        "[tesserae-device-pi](https://github.com/dmellok/tesserae-device-pi).\n"
+        "- Inky Frame: has its own Pico and runs "
+        "[tesserae-device-inkyframe](https://github.com/dmellok/tesserae-device-inkyframe). "
+        "Flash in your browser at "
         "[tesserae.ink/flash/inky-frame](https://tesserae.ink/flash/inky-frame) "
-        "(Chrome / Edge, WebUSB, no toolchain). The Badgers run "
+        "using Chrome or Edge with WebUSB; no build tools are needed.\n"
+        "- Badgers: run "
         "[tesserae-device-badger](https://github.com/dmellok/tesserae-device-badger) "
-        "as an app in their own launcher."
+        "as an app in their launcher."
     ),
     "fraimic": (
         "Framed Spectra 6 colour e-paper canvases on battery, driven over the "
@@ -144,55 +140,47 @@ VENDOR_INTRO: dict[str, str] = {
         "code."
     ),
     "paperlesspaper": (
-        "Open-hardware e-paper picture frames (ESP32-C6, NiMH cells) that run "
-        "the [Tesserae-native firmware](https://github.com/dmellok/tesserae-device-firmware) "
-        "in place of the vendor's cloud firmware; flash from "
-        "[tesserae.ink/flash](https://tesserae.ink/flash). Flashing overwrites "
-        "the region that holds the frame's vendor cloud certificate; "
-        "paperlesspaper support can re-provision a frame that wants the vendor "
-        "service back, or back up that region first to keep your own copy. The "
-        "OpenPaper 7 and the OpenPaper L are both confirmed on the bench."
+        "Open-hardware picture frames with ESP32-C6 and NiMH batteries. "
+        "Install [Tesserae-native firmware](https://github.com/dmellok/tesserae-device-firmware) "
+        "instead of the vendor's cloud firmware at "
+        "[tesserae.ink/flash](https://tesserae.ink/flash).\n\n"
+        "Flashing overwrites the vendor cloud certificate. Back up its region first to keep a copy. "
+        "paperlesspaper support can restore cloud access if you want to return to the vendor service.\n\n"
+        "OpenPaper 7 and OpenPaper L are confirmed on hardware."
     ),
     "remarkable": (
-        "E-ink writing tablets running the "
+        "Use the "
         "[tesserae.remarkable](https://github.com/partridgeworks/tesserae.remarkable) "
-        "client, an AppLoad app that lives inside the tablet's own interface "
-        "(Developer Mode plus the XOVI/AppLoad runtime required). It speaks the "
-        "v1 REST device API, paints the server-dithered frame through the "
-        "tablet's display stack, and deep-sleeps between polls on an RTC "
-        "alarm. The reMarkable 2 is confirmed on hardware; the reMarkable 1 "
-        "and Paper Pro entries are built but not yet confirmed."
+        "client, an AppLoad app inside the tablet's interface. "
+        "Developer Mode and the XOVI/AppLoad runtime are required.\n\n"
+        "It uses the v1 REST device API to draw server-dithered frames through the tablet's display system. "
+        "It deep-sleeps between polls and wakes on an RTC alarm.\n\n"
+        "reMarkable 2 is confirmed on hardware. reMarkable 1 and Paper Pro builds are not yet confirmed."
     ),
     "amazon": (
-        "Kindles are e-readers, not dashboard panels, and need a jailbreak "
-        "before KOReader can be installed. With the "
+        "Jailbreak the Kindle before installing KOReader. The "
         "[Tesserae KOReader plugin](https://github.com/dmellok/tesserae-koreader) "
-        "a Kindle pairs with a claim code, fetches 16-level greyscale frames on "
-        "the interval the server sets, and sleeps in between on KOReader builds "
-        "that expose the hardware alarm. The plugin reports the real screen size "
-        "at pairing, so any Kindle KOReader runs on works; the models listed are "
-        "the ones with a store entry and a known resolution."
+        "pairs with a claim code and downloads 16-level greyscale frames at the server's chosen interval. "
+        "It sleeps between downloads on KOReader builds that expose the hardware alarm.\n\n"
+        "Any Kindle running KOReader works; the plugin reports its actual screen size when pairing. "
+        "The listed models have a store entry and known resolution."
     ),
     "kobo": (
-        "Kobo readers run KOReader without a jailbreak. The same "
+        "Kobo readers run KOReader without a jailbreak. Use the same "
         "[Tesserae KOReader plugin](https://github.com/dmellok/tesserae-koreader) "
-        "applies, and KOReader's hardware wake is native on Kobo, so the reader "
-        "sleeps between refreshes out of the box."
+        "with native hardware wake, so the reader sleeps between refreshes without extra setup."
     ),
     "xteink": (
-        "E-readers rather than dedicated dashboard panels. These run "
+        "These e-readers run "
         "[CrossInk](https://github.com/uxjulia/CrossInk) firmware with "
-        "Tesserae client support, which paints the dashboard as the reader's "
-        "sleep screen on an explicit sleep transition rather than on a timer, "
-        "so the radio never wakes the device on its own. The panels are "
-        "mounted portrait, so the manifests compose at the portrait "
-        "dimensions and let `esp32_bw_bin` pack at the landscape "
-        "firmware-native stride."
+        "Tesserae support. The dashboard appears as the sleep screen when the device enters sleep, without a timer. "
+        "The radio never wakes it on its own.\n\n"
+        "Panels are mounted portrait. Frames are composed at portrait dimensions, then "
+        "`esp32_bw_bin` packs them at the firmware's native landscape stride."
     ),
     "community": (
-        "Hardware supported by community-authored firmware. Each SKU below "
-        "links to the firmware repo that talks Tesserae's device API on that "
-        "hardware; credit sits with the firmware's author on the linked repo."
+        "These devices use community firmware that speaks Tesserae's device API. "
+        "Each SKU links to its firmware repo, where its author is credited."
     ),
 }
 
@@ -244,6 +232,20 @@ def _manifests(directory: Path) -> list[dict]:
     return out
 
 
+# A period followed by a space ends the first sentence, unless it is the
+# one closing "e.g." or "i.e.".
+_SENTENCE_END = re.compile(r"(?<!e\.g)(?<!i\.e)\.\s")
+
+
+def _first_sentence(desc: str) -> str:
+    """The first sentence of a manifest description, to keep a table cell short."""
+    if not desc:
+        return ""
+    end = _SENTENCE_END.search(desc)
+    first = desc[: end.start()] if end else desc
+    return first.rstrip(".") + "."
+
+
 def _panel_table() -> list[str]:
     rows = ["| Preset | Native resolution | Panel |", "|---|---|---|"]
     for choice in PANEL_PRESET_CHOICES:
@@ -277,8 +279,7 @@ def _renderer_table() -> list[str]:
         repos = CLIENT_REPOS.get(rid) or []
         client = "<br>".join(f"[{label}]({url})" for label, url in repos) if repos else "-"
         desc = m.get("description", "").strip().replace("\n", " ")
-        # Keep the table cell short, first sentence only.
-        first = desc.split(". ")[0].rstrip(".") + "." if desc else ""
+        first = _first_sentence(desc)
         rows.append(f"| `{rid}` | `.{ext}` | {client} | {first} |")
     return rows
 
@@ -291,7 +292,7 @@ def _device_table() -> list[str]:
         dims = f"{panel.get('w', '?')}×{panel.get('h', '?')}" if panel else "-"
         renderers = ", ".join(f"`{r}`" for r in m.get("renderers", [])) or "-"
         desc = m.get("description", "").strip().replace("\n", " ")
-        first = desc.split(". ")[0].rstrip(".") + "." if desc else ""
+        first = _first_sentence(desc)
         rows.append(f"| `{did}` | {dims} | {renderers} | {first} |")
     return rows
 
@@ -338,10 +339,8 @@ def _hardware_sections() -> list[str]:
     out.append("## Hardware SKUs")
     out.append("")
     out.append(
-        "Per-vendor catalog of specific device / panel SKUs Tesserae ships "
-        "manifests for. Each entry maps to a device kind (protocol) + "
-        "renderer combination that Tesserae picks automatically once the "
-        "device pairs. Click a product name for the vendor's own page."
+        "Tesserae chooses each model's protocol and renderer when it pairs. "
+        "Click a product name for the vendor's page."
     )
     out.append("")
     out.append(AFFILIATE_DISCLOSURE)
@@ -422,27 +421,24 @@ def render() -> str:
     out.append("# Screens & compatibility")
     out.append("")
     out.append(
-        "Tesserae renders a dashboard headlessly and delivers the frame to a small "
-        "client that paints your panel. Delivery is either MQTT (retained frame "
-        "topic, always-on clients wake and receive) or REST (battery-poll clients "
-        "hit `/api/v1/device/<id>/frame`). What panel you can drive comes down to "
-        "which **hardware SKU** you have, which **client / protocol** talks to it, "
-        "and which **renderer** produces the exact byte format the panel needs."
+        "Tesserae draws dashboards in a hidden browser. "
+        "It sends pictures to client software, which drives your screen. "
+        "Your hardware model, client protocol and renderer must agree on the picture's byte format.\n\n"
+        "- MQTT: always-on clients wake and receive frames from a retained topic.\n"
+        "- REST: battery-poll clients request `/api/v1/device/<id>/frame`."
     )
     out.append("")
     out.append(
-        "The **Hardware SKUs** section below is the fastest way to find your "
-        "device. Every SKU listed there ships as a data-only manifest under "
-        "`hardware/<vendor>/<sku>.json` and shows up automatically in Tesserae's "
-        "Settings → Devices → Add Device kind picker with the right dims, gamut, "
-        "and renderer wired up."
+        "Find your device under Hardware SKUs below. Its data-only definition in "
+        "`hardware/<vendor>/<sku>.json` adds it to Settings → Devices → Add Device "
+        "with dimensions, colour range and renderer already set."
     )
     out.append("")
     out.append("## Panel presets")
     out.append("")
     out.append(
-        "Built-in sizes (Settings → Panel). Pick `custom` for anything not listed, "
-        "the dimensions are all that matter to the renderer."
+        "Choose a built-in size from Panel size in Settings → Devices → Add device. "
+        "Use `custom` for unlisted screens; the renderer only needs the dimensions."
     )
     out.append("")
     out.extend(_panel_table())
@@ -450,8 +446,8 @@ def render() -> str:
     out.append("## Renderers")
     out.append("")
     out.append(
-        "A renderer turns the composition PNG into the exact bytes a client wants. "
-        "Each ships as a drop-a-folder plugin under `renderers/<id>/`."
+        "A renderer converts the dashboard PNG to the client's byte format. "
+        "Each is a plugin folder under `renderers/<id>/`."
     )
     out.append("")
     out.extend(_renderer_table())
@@ -459,9 +455,9 @@ def render() -> str:
     out.append("## Device kinds")
     out.append("")
     out.append(
-        "The bundled client kinds Tesserae knows how to talk to. A flashed client "
-        "announces itself on `tesserae/<device-id>/status` and shows up under "
-        "Settings → Devices → Discovered. See "
+        "Supported clients appear under Settings → Devices → Discovered after flashing. "
+        "They announce themselves over MQTT on `tesserae/<device-id>/status`, "
+        "or over REST with `POST /api/v1/device/discover`. See "
         "[Install a client](install/clients.md) and [Set up a device](install/devices.md)."
     )
     out.append("")
@@ -471,9 +467,9 @@ def render() -> str:
     out.append("## What's been tested on real hardware")
     out.append("")
     out.append(
-        "Honest status from the maintainer's own bench. Untested doesn't mean "
-        "broken, it means nobody's confirmed it yet. Got one working? "
-        "[Open a PR or issue](https://github.com/dmellok/tesserae/issues) and "
+        "Results from the maintainer's hardware. Untested means unconfirmed, not broken. "
+        "If yours works, "
+        "[open a PR or issue](https://github.com/dmellok/tesserae/issues) and "
         "we'll mark it."
     )
     out.append("")

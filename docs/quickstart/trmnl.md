@@ -1,46 +1,47 @@
 # Quickstart: TRMNL OG / TRMNL X
 
-The flagship TRMNL devices: TRMNL OG (800×480 mono, 7.5") and TRMNL X (1872×1404, 16 grey levels, 10.3"). Both ship with stock firmware that speaks the TRMNL BYOS protocol, so no flashing is required.
+Connect a TRMNL to Tesserae using its stock firmware. You don't need to flash it. BYOS means "bring your own server"; here, that server is Tesserae.
+
+| Model | Screen | Resolution (landscape) | Colours |
+|---|---|---|---|
+| TRMNL OG | 7.5" | 800×480 | Black and white |
+| TRMNL X | 10.3" | 1872×1404 | 16 greys |
 
 !!! tip "Want to use Tesserae as your sender for TRMNL devices?"
-    This is what TRMNL's own [Private API documentation](https://docs.trmnl.com/go/private-api/introduction) explicitly endorses: *"With a device's API key you can request content without a TRMNL device or TRMNL firmware."* Tesserae acts as your BYOS server.
+    TRMNL supports this setup. See its [Private API documentation](https://docs.trmnl.com/go/private-api/introduction).
 
 ## 01 — Point the device at your Tesserae server
 
-On the device's Wi-Fi captive portal (or via the TRMNL app, if you've used one):
+Open the device's Wi-Fi setup page, or use the TRMNL app if you've used it before. Set:
 
 - **API base URL**: `http://<your-server>:8765`
 
-That's the whole flash-equivalent step. The device's stock firmware does the rest.
-
 ## 02 — It pairs itself
 
-On its next poll, the device calls Tesserae's `/api/setup` with its MAC and auto-provisions. It appears under **Settings → Devices** within seconds. No token to type.
+On its next check-in, the device calls `/api/setup` with its MAC address and registers automatically. It appears under **Settings → Devices** within seconds. You don't need to enter a token.
 
-Tesserae detects the device model from the `Model` HTTP header the firmware sends:
-
-- `Model: TRMNL` → 800×480 OG.
-- `Model: x` → 1872×1404 X, provisioned on the `trmnl_x` kind and sent a 4-bit greyscale PNG (16 greys). The 1-bit renderer stays selectable on the device card.
-- Unknown models default to 800×480 OG dimensions.
+Tesserae reads the `Model` header the firmware sends. A TRMNL X (`Model: x`) gets 1872×1404 and a 16-grey PNG; you can switch it to the 1-bit renderer on its device card. Any other model gets the OG size, 800×480.
 
 ## 03 — Compose a dashboard
 
 In the editor:
 
-1. **Dashboards → New**.
-2. The TRMNL OG is 800×480 landscape mono (4 greys on TRMNL firmware 1.6.0 and later if you pick the `trmnl_png_gray4` renderer on its device card); the X is 1872×1404 landscape with 16-level greyscale. Reach for high-contrast type and 1-bit illustration on the OG; the X has enough resolution for serif text and finer rules.
+1. Open **Dashboards → New**.
+2. Design for your panel:
+    - OG: high-contrast text and 1-bit illustrations. Firmware 1.6.0 or later supports 4 greys with the `trmnl_png_gray4` renderer.
+    - X: landscape, 16 greys. Its resolution supports serif text and fine lines.
 3. Bind the page to the device in the device picker.
-4. Hit **Push**.
+4. Click **Push**.
 
-The device polls on its own cadence (configured in the device's firmware), pulls the rendered frame, paints, and sleeps.
+The firmware controls how often the device wakes. It downloads and draws the image, then sleeps.
 
 ## 04 — Set the refresh
 
-The TRMNL firmware controls its own wake schedule from device-side settings. Tesserae's job is to keep a fresh frame ready when the device asks for one. In the dashboard's **Schedules** card:
+In the dashboard's **Schedules** card:
 
-- **Smart sync** is the right pick for battery TRMNL devices. Tesserae renders just before the device's next expected wake, so the panel always gets a freshly-rendered frame.
+- Turn on **Smart sync** on an **Every N minutes** schedule. Tesserae draws each image just before the device's expected wake.
 
-The standard TRMNL OG manages multi-month battery life on its default 60-minute cadence; the X is similar.
+The OG's default wake interval is 60 minutes, for several months of battery life. The X is similar.
 
 ## Next steps
 

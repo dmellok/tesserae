@@ -1,32 +1,30 @@
 # OTA update contract
 
-The wire contract for over-the-air firmware updates: how the server describes a
-pending update, how a device verifies it, and where the description travels.
-This is the shared boundary between the Tesserae server (which signs) and the
-device firmware (which verifies and applies). Discussion: #121.
+This contract covers pending firmware updates, verification and delivery.
+The server signs updates; device firmware verifies and applies them. Discussion: #121.
 
-Status: the signer, verifier, published test key, and signed fixtures exist
-(`app/ota/`, `tests/fixtures/ota/`); the `/status` capability handshake and
-descriptor delivery are wired (`app/rest_api.py`, `app/state/ota_staging.py`,
-staged via `python -m app.ota.stage`); the production signing Worker + R2 image
-hosting and the per-kind rollout controls (`python -m app.ota.release`) are live.
-The state-reporting shape below (device → server) is specified and ingested:
-the server records the latest report on the device's live status (a Devices-card
-chip) and event-logs each lifecycle transition (`app/ota/report.py`,
-`app/transport_wiring.py`). The update admin UI (Settings → Firmware,
-`app/settings/firmware_routes.py`) wraps the same release state the CLI writes
-as a flat device list: check for updates, then queue / withdraw each device
-(the queue is the release store's per-device offer set, one-shot per release
-version). A per-device "Auto" switch opts a device into every new release
-(`app/ota/auto.py`, evaluated on heartbeat; a paused release is never
-auto-resumed). The fleet-level canary / promote / pause controls live in the
-page's collapsed Advanced section and in the `python -m app.ota.release` CLI.
+The update system is live:
+
+- Signing, verification, a published test key and signed fixtures are in
+  `app/ota/` and `tests/fixtures/ota/`.
+- `/status` handles capability checks and descriptor delivery through
+  `app/rest_api.py` and `app/state/ota_staging.py`. Stage updates with `python -m app.ota.stage`.
+- The production signing Worker and R2 image hosting are live.
+  `python -m app.ota.release` controls releases per device kind.
+- Device reports appear as a Devices-card chip; each lifecycle change goes to the event log.
+  See `app/ota/report.py` and `app/transport_wiring.py`.
+- Settings → Firmware lists devices and uses the same release state as the CLI
+  (`app/settings/firmware_routes.py`). Check for updates, then queue or withdraw
+  each device. The queue is the release store's per-device offer set, one-shot per release version.
+- Each device's "Auto" switch opts into every new release (`app/ota/auto.py`, checked on heartbeat).
+  A paused release is never auto-resumed.
+- Canary, promote and pause controls are in the collapsed Advanced section and the `python -m app.ota.release` CLI.
 
 ## Roles
 
-- **Server / pipeline** holds the private signing key, builds the manifest,
+- Server / pipeline holds the private signing key, builds the manifest,
   signs it, hosts the image, and hands the descriptor to a device on `/status`.
-- **Device firmware** holds the *public* verification key, verifies the
+- Device firmware holds the *public* verification key, verifies the
   descriptor, streams the image, checks it against the signed digest, applies
   it to the inactive slot, and reboots.
 
@@ -66,26 +64,25 @@ The decoded `payload` is a JSON object with every one of these keys:
 | `size_bytes` | int | Exact image length. |
 | `sha256` | string | Lowercase hex SHA-256 of the image. |
 
-`size_bytes` and `sha256` are inside the signed payload, so the signature binds
-the metadata **and** the image identity: a device can stream the image straight
-to flash while hashing, and a single digest comparison at the end proves the
-bytes match what was signed, without buffering the image in RAM.
+The signed `size_bytes` and `sha256` identify the image as well as its metadata.
+A device can stream to flash while hashing, then compare the digest once.
+It needs no image buffer in RAM.
 
 ## Verification order
 
 The firmware performs, and the reference verifier (`app/ota/verify.py`) mirrors,
 these checks in order. Each stop has a stable reason code:
 
-1. **Signature** over the raw decoded payload bytes. Fail → `bad_signature`
+1. Signature over the raw decoded payload bytes. Fail → `bad_signature`
    (or `malformed_descriptor` if the fields don't base64url-decode / the
    signature isn't 64 bytes).
-2. **Parse + shape**: JSON object, all manifest keys present, `schema_version`
+2. Parse + shape: JSON object, all manifest keys present, `schema_version`
    recognised. Fail → `malformed_manifest` / `schema_version`.
-3. **Target**: `device_kind` matches this device; `fw_version` is not the
+3. Target: `device_kind` matches this device; `fw_version` is not the
    version already running. Fail → `kind_mismatch` / `already_current`.
    Whether a version actually *advances* (semver ordering, downgrade policy) is
    the firmware's decision; the contract only refuses a no-op.
-4. **Image**, after download: exact `size_bytes`, then `sha256`. Fail →
+4. Image, after download: exact `size_bytes`, then `sha256`. Fail →
    `size_mismatch` / `digest_mismatch`.
 
 A device verifies checks 1-3, decides to fetch, then re-checks 4 as the image
@@ -129,7 +126,7 @@ server keeps offering a staged descriptor until it is cleared.
 
 A device reports the outcome of its OTA lifecycle back to the server by adding
 report fields to the same `ota` object it already sends for the capability
-handshake. One namespace, so a device that speaks OTA sends one object:
+handshake:
 
 ```json
 { "...normal heartbeat fields...": "...",
@@ -180,8 +177,7 @@ failures surface as `rejected` with the reason rather than a phase of their own.
 ### Reason codes
 
 `reason` is meaningful only on a terminal phase. All lowercase snake_case;
-the pre-download codes reuse the verifier's reasons (see **Verification order**)
-so one vocabulary spans verify and apply.
+the pre-download codes reuse the verifier's reasons (see **Verification order**).
 
 - `confirmed` → `ok`.
 - `rejected` → `bad_signature`, `malformed_descriptor`, `malformed_manifest`,
@@ -226,21 +222,22 @@ X-Tesserae-Ota-Attempt: 98980c          (optional: attempt_id)
 ```
 
 The body is the same redacted UTF-8 log text as a routine upload, capped at
-64 KB. The server files it as `ota-<UTC stamp>.log`, apart from routine
-batches (the newest 10 kept, up to 512 KB per device), and shows it under
-**OTA logs** on the device page. An unknown `X-Tesserae-Log-Kind` is stored
-as a routine batch. A client that never advertised `logs.schema` still gets
-its OTA logs stored and shown.
+64 KB. The server stores `ota-<UTC stamp>.log` separately from routine batches
+and shows it under **OTA logs** on the device page.
+
+It keeps the newest 10 OTA logs, up to 512 KB per device.
+An unknown `X-Tesserae-Log-Kind` is stored as a routine batch.
+A client that never advertised `logs.schema` still gets its OTA logs stored and shown.
 
 When to send one:
 
-1. **The attempt ends in the same wake**: any `rejected` from the apply-time
+1. The attempt ends in the same wake: any `rejected` from the apply-time
    gate (`battery_low`, `battery_unknown`) or any `failed`. Send the log of
    that wake, while the network is still up.
-2. **Before the reboot into a new image**: the download, the checks and the
+2. Before the reboot into a new image: the download, the checks and the
    slot switch. A client that reboots before it could send keeps the log and
    sends it on the next boot.
-3. **The first boot after the switch resolves**: `confirmed` or
+3. The first boot after the switch resolves: `confirmed` or
    `rolled_back`. Send that boot's log, up to the point it reported, plus
    whatever survived from the boot that failed.
 
@@ -264,7 +261,8 @@ python -m app.ota.stage --data-root data --device-id hall_esp --descriptor d.jso
 ```
 
 The store is `<data-root>/core/ota_pending.json`; the server reads it on the next
-heartbeat, no restart needed. An admin UI for this is a later slice.
+heartbeat without a restart. This per-device store has no admin UI; Settings →
+Firmware writes the release store below.
 
 ## Rollout (per kind)
 
@@ -300,8 +298,7 @@ so an already-updated device isn't re-offered. A per-device staged descriptor
 - Published **public** keys live in `ota/keys/<key_id>.pub` (hex). `python -m
   app.ota.stage` verifies a descriptor against the key matching its `key_id`
   before staging, so a mis-signed descriptor is refused at staging time. This is
-  a staging-side gate; the firmware embeds its own key set and is the real trust
-  anchor.
+  a staging-side gate; the firmware embeds its own trusted key set and is the real trust anchor.
 - `tests/fixtures/ota/` carries a **test-only** keypair (published seeds, key_id
   `test-ed25519-1`) and four signed fixtures (`valid`, `wrong_key`, `truncated`,
   `digest_mismatch`) so firmware can self-test the verifier. See that

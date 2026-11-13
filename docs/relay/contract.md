@@ -1,40 +1,42 @@
 # Cloud relay contract
 
-The wire contract for running a panel at a remote location without exposing the
-home instance to the internet. A small cloud **relay** is a per-device mailbox
-that both ends reach *outbound*: the home instance seals each rendered frame and
-`PUT`s it; the remote panel polls and decrypts it. This is the shared boundary
-between the Tesserae server, the relay Worker, and the device firmware.
+Run a remote panel without exposing your home instance to the internet.
+The relay is a mailbox for each device; both ends connect outbound.
+Home encrypts each frame and `PUT`s it; the panel polls and decrypts it.
 
-Status: `app/relay_crypto.py` (frame sealing + key derivation) and its
-fixed-vector tests exist. The relay Worker (`packages/relay/`), the home-side
-transport (`app/relay_publisher.py`, `app/relay_pairing.py`,
-`app/relay_client.py`), and the Settings UI are the rest of the feature. This
-document is authoritative for all three sides; the golden vectors below are
-load-bearing.
+The contract covers three parts:
+
+- Frame encryption and key derivation: `app/relay_crypto.py`, with fixed test vectors.
+- The relay Worker: `packages/relay/`.
+- Home transport: `app/relay_publisher.py`, `app/relay_pairing.py` and `app/relay_client.py`, plus the Settings UI.
+
+The crypto code and tests exist. This contract defines behaviour for the server,
+relay and firmware. The golden vectors below define the expected cryptographic results.
 
 ## Roles and trust model
 
-- **Home instance** renders locally, holds the per-device frame key, seals each
+- Home instance renders locally, holds the per-device frame key, seals each
   frame, and uploads it to the relay. Outbound HTTPS only, never accepts an
   inbound connection.
-- **Relay** (Cloudflare Worker + R2; no Durable Object, since scheduled-poll
+- Relay (Cloudflare Worker + R2; no Durable Object, since scheduled-poll
   delivery has no long-poll to coordinate) stores the latest **sealed** frame
   per device and brokers pairing. It authenticates both
   ends but is **zero-knowledge**: it holds ciphertext, both public keys, and the
   read token, never the frame key.
-- **Panel firmware** derives the frame key at pairing, polls its mailbox, and
+- Panel firmware derives the frame key at pairing, polls its mailbox, and
   decrypts. Holds the relay URL, its device token, and its frame key in NVS.
 
-The frame key is an X25519 + HKDF shared secret that is **never transmitted**.
+The frame key is an X25519 + HKDF shared secret that is never transmitted.
 The relay therefore cannot decrypt a dashboard even though it can validate a
 poll.
 
 ## Base URL and versioning
 
-All routes are under `/v1`. The hosted relay is `https://relay.tesserae.ink`;
-a self-hosted Worker uses its own origin (`packages/relay/`). The relay base URL
-is per-install configuration on the home side, so the two are interchangeable.
+All routes are under `/v1`. The hosted relay is `https://relay.tesserae.ink`.
+A self-hosted Worker uses its own origin (`packages/relay/`). Set the relay base
+URL per home install to use either one.
+`GET /` (outside `/v1`) answers
+`{ "product": "tesserae-relay", "api": { "version": 1 } }`.
 
 **Send a descriptive `User-Agent`.** The hosted relay sits behind Cloudflare bot
 protection, which blocks known-bot user agents (e.g. `Python-urllib`) with a
@@ -46,10 +48,10 @@ client sends `tesserae/relay`.
 Bearer tokens in `Authorization: Bearer <token>`, compared timing-safe. The
 relay stores only `sha256(token)`.
 
-- **Publisher token** — issued to a home install at registration; authorizes
+- Publisher token: issued to a home install at registration; authorizes
   everything an install does (pairing broker, frame upload, revoke) under its
   own `install_id`.
-- **Device token** — minted by the home instance per remote panel, forwarded to
+- Device token: minted by the home instance per remote panel, forwarded to
   the panel once through the relay at pairing; authorizes exactly one mailbox
   (`GET .../frame`).
 
@@ -90,8 +92,9 @@ Body: { "install_pubkey": "<base64url X25519, 32 bytes>", "label": "<optional>" 
 → 201 { "install_id": "<opaque>", "publisher_token": "<token, shown once>" }
 ```
 
-An **entitlement hook** runs first (default: allow). A gated relay can require a
-Sponsors/paid check here without any contract change; a rejection is `403`.
+An entitlement hook checks registration permission first (default: allow).
+A relay can require a Sponsors or payment check without changing the contract;
+rejection returns `403`.
 
 ## Pairing (remote rendezvous)
 
@@ -126,7 +129,9 @@ The panel never reaches the home LAN. Pairing is brokered through the relay:
 POST /v1/i/<install>/pair/codes            (publisher)
 Body (optional): { "ttl_seconds": <int> }   (clamped to 300..86400; default 600)
 → 201 { "code": "<6+ chars>", "expires_at": "<iso8601>" }
+```
 
+```
 POST /v1/pair                              (unauthenticated)
 Body: { "code": "<code>", "panel_pubkey": "<base64url X25519>",
         "panel_w": <int?>, "panel_h": <int?>, "model": "<kind id?>",
@@ -134,12 +139,14 @@ Body: { "code": "<code>", "panel_pubkey": "<base64url X25519>",
 → 202 { "status": "pending" }   (unknown/expired code → 404 pairing_expired;
                                  code already claimed by a different
                                  panel_pubkey → 409 conflict)
+```
 
-`panel_w` / `panel_h` / `model` / `gamut` are an **optional self-report**: the
+`panel_w` / `panel_h` / `model` / `gamut` are an optional self-report: the
 panel tells home its geometry, device kind, and colour gamut so the operator
 doesn't have to pre-enter them. Home uses them to fill in anything the pairing
-slot left blank (slot wins when both are present). `model` is a Tesserae
-device-kind id (e.g. `esp32_client`), and home falls back to that default when
+slot left blank (slot wins when both are present).
+
+`model` is a Tesserae device-kind id (e.g. `esp32_client`), and home falls back to that default when
 neither names a valid kind; `gamut` is a Tesserae gamut id (e.g. `waveshare_e6`,
 `mono`). Report the gamut whenever the build's differs from the kind's default:
 home resolves (`model`, `gamut`) to the most specific hardware-catalog kind, so
@@ -147,32 +154,38 @@ a grayscale or BWR build gets the renderer that packs at its bit depth (an
 E1001 grayscale build needs 2-bpp 96000-byte frames, not the mono kind's 1-bpp
 48000) without the operator pre-selecting the SKU.
 
+```
 GET  /v1/i/<install>/pair/pending          (publisher)
 → 200 { "pending": [ { "code": "…", "panel_pubkey": "…", "panel_w": <int?>,
                        "panel_h": <int?>, "model": "<id?>", "gamut": "<id?>" } ] }
+```
 
+```
 POST /v1/i/<install>/pair/<code>/complete  (publisher)
 Body: { "device_id": "<id>", "device_token": "<token>",
         "device_token_sha256": "<hex>", "home_pubkey": "<base64url X25519>",
         "config": { … } }
 → 200 {}
+```
 
+```
 GET  /v1/pair/<code>                        (unauthenticated, poll)
 → 200 { "status": "ready", "install_id": "…", "home_pubkey": "…",
         "device_token": "…", "device_id": "…", "config": { … } }
    or 200 { "status": "pending" }
 ```
 
-The plaintext `device_token` transits the relay only to reach the panel: home
-hands it over in `complete`, and `GET /v1/pair/<code>` returns it. That GET
-answers `ready` again if the panel asks again (it may have lost or failed to
-parse the first response). The panel's first authenticated poll proves it
-stored the token, and the relay then deletes the pair record and the code,
-keeping only `device_token_sha256` for future poll validation. A code binds to
-the first `panel_pubkey` that claims it; the same key again is a retry and is
-accepted. The frame
-key is **not** part of pairing: both sides derive it from the exchanged public
-keys.
+Home sends the plaintext `device_token` through `complete`;
+`GET /v1/pair/<code>` delivers it to the panel. Repeated GETs still return
+`ready`, in case a response was lost or could not be parsed.
+
+The first authenticated panel poll proves the token was stored.
+The relay then deletes the pair record and code, keeping only
+`device_token_sha256` for poll validation.
+
+A code binds to the first `panel_pubkey` that claims it; retries with that key
+are accepted. Both sides derive the frame key from the exchanged public keys;
+the key itself never passes through pairing.
 
 Codes are single-use and expire (default 10 minutes). Pairing state is
 short-lived; mailbox state is not.
@@ -195,8 +208,8 @@ Headers: If-None-Match: "<last etag>"
    200 + sealed body, with ETag + the same X-Tesserae-* metadata headers
 ```
 
-The frame **body** is opaque to the relay. The metadata headers are
-**plaintext** (panel dimensions and render hints are not sensitive); only the
+The frame body is opaque to the relay. The metadata headers are
+plaintext (panel dimensions and render hints are not sensitive); only the
 image is sealed. A firmware that wants everything sealed can ignore the headers
 and read the dimensions from the decrypted payload instead.
 
@@ -211,11 +224,11 @@ The 16-byte GCM tag is appended by the cipher, so `len(sealed) == 12 + len(frame
 
 ## Device status (telemetry)
 
-A relay panel never reaches the home instance, so its heartbeat is relayed too.
-The panel `POST`s the **same status JSON it would send a home REST server**
-(battery, RSSI, firmware, etc. — whatever the device kind's `parse_status`
-consumes); the relay stores the latest; the home instance pulls it and feeds it
-through its normal status pipeline (live cache, battery history, events).
+The panel `POST`s the same status JSON it would send a home REST server:
+battery, RSSI, firmware and other fields its `parse_status` consumes.
+The relay stores the latest report.
+
+Home pulls it into the normal status pipeline: live cache, battery history and events.
 
 ```
 POST /v1/i/<install>/d/<device>/status      (device token)
@@ -227,12 +240,12 @@ GET  /v1/i/<install>/d/<device>/status      (publisher token)
    204   (none posted yet)
 ```
 
-Status is **plaintext** (operational telemetry, not dashboard content), stored
+Status is plaintext (operational telemetry, not dashboard content), stored
 one-per-device and overwritten on each post; it's dropped when the device is
 revoked. `received_at` is the relay's receive time, so it doubles as
 `last_seen` for the panel. The panel should post status on its normal wake
 cadence (typically alongside the frame poll). This channel is optional: without
-it, a relay device simply shows no battery / signal / firmware and an unknown
+it, a relay device shows no battery / signal / firmware and an unknown
 last-seen.
 
 ### Buttons over the relay
@@ -264,13 +277,13 @@ Because the status slot is latest-only, a button-carrying post could be
 overwritten by a later idle beat before the home instance pulls it. Firmware
 should therefore repeat `button` + `button_event_id` unchanged on **every**
 status post of the same wake; the home side de-duplicates on the event id, so
-repeats are safe and an overwrite no longer loses the press. A monotonically
-increasing `button_event_id` is required on this path (the REST time-window
-fallback is unreliable over a polled relay).
+repeats are safe and an overwrite no longer loses the press. Firmware should
+send a monotonically increasing `button_event_id` on this path: the home side
+accepts a press without one, but then falls back to the REST time window, which
+is unreliable over a polled relay.
 
-The status POST's response carries the current config etag when a config doc
-exists (see below), so a firmware that posts status learns about a config
-change without an extra request:
+When a config document exists, the status POST returns its etag.
+Firmware can detect config changes without an extra request:
 
 ```
 → 200 { "config_etag": "<etag>" }    (or {} before any config was pushed)
@@ -350,13 +363,13 @@ sealed (hex)  = 00112233445566778899aabb4fa3210211222b8aa47f010d2a30fc71c
    `unseal` the body with `frame_key` and paint; on `304`/`204`, keep the
    current image. No long-poll in v1.
 5. On the same wake, `POST .../status` with the device's status JSON (battery,
-   RSSI, `fw_version`, etc. — the same body a REST client posts to a home
+   RSSI, `fw_version`, etc., the same body a REST client posts to a home
    `/status` endpoint), so the Devices UI shows battery / signal / firmware /
    last-seen. Optional, but recommended.
 6. When the status response's `config_etag` differs from the stored one (or
    on a wake where status wasn't posted), `GET .../config` with
    `If-None-Match`; on `200`, `unseal` with `frame_key`, apply the JSON
-   (sleep interval, button wake, button map — same fields as a REST status
+   (sleep interval, button wake, button map, the same fields as a REST status
    response's `config` block), and store the new etag. Optional: a firmware
    that skips this simply keeps its pairing-time config.
 7. On a button wake, include `button` + `button_event_id` in the status body

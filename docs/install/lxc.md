@@ -1,37 +1,51 @@
 # Install Tesserae via LXC
 
-Tesserae runs cleanly inside a Linux container, alongside the [Docker](docker.md) and bare-metal install paths. LXC containers are heavier than Docker but less constrained, closer to a small VM than a single-process sandbox, which suits anyone already running Proxmox VE on a homelab box or Ubuntu MicroCloud on a Raspberry Pi.
+Use LXC if you already run one of these container hosts:
 
-This page covers both:
+- Proxmox VE for x86 / amd64 computers.
+- Ubuntu MicroCloud for arm64 Raspberry Pi hosts.
 
-- **Proxmox VE** for x86 / amd64 hosts (homelab servers, NUCs, mini-PCs).
-- **Ubuntu MicroCloud** for arm64 Raspberry Pi hosts.
+Both use LXC / LXD, Linux containers that work more like small virtual machines than [Docker](docker.md).
+They are heavier than Docker but have fewer restrictions.
 
-Both wrap the same underlying LXC / LXD stack. Proxmox ships a nicer web UI; MicroCloud has less overhead and is the right pick on a Pi. Proxmox has an unofficial arm64 port maintained outside the official project, so on Raspberry Pi hardware MicroCloud is the safer path.
+Proxmox has a nicer web UI; MicroCloud uses fewer resources.
+Proxmox's arm64 port is unofficial and maintained separately. MicroCloud is the safer choice on a Raspberry Pi.
 
 !!! tip "On Proxmox VE? Use the helper script"
-    One command on the Proxmox host creates the container and installs Tesserae for you. See [Proxmox VE helper script](#proxmox-ve-helper-script) below and skip the manual steps.
+    The [helper script](#proxmox-ve-helper-script) creates the container and installs Tesserae with one command.
+    Run it on the Proxmox host to skip the manual steps.
 
 !!! tip "Or just install bare-metal"
-    If you don't already use containers, the [manual install path](server.md#manual-install) on bare-metal Linux is simpler. LXC is for people who want their applications isolated in a container without Docker's process-model constraints.
+    If you don't already use containers, the [manual install path](server.md#manual-install) on bare-metal Linux is simpler.
 
 ## Hardware sizing
 
-Confirmed on a Raspberry Pi CM4 with 8GB RAM: roughly 1.5GB resident with a running Tesserae instance and a small composed dashboard. **4GB is comfortable**, **2GB also confirmed working** with about 1GB of headroom after install. Webpage-widget rendering is the spikiest component; if you compose heavy dashboards, leave headroom.
+Tested on a Raspberry Pi CM4 with 8GB RAM:
 
-For the container's root device, 2GB is sufficient. With thin provisioning, the on-disk footprint matches actual usage anyway.
+| Resource | Guidance |
+| --- | --- |
+| RAM in use | About 1.5GB with Tesserae and a small dashboard running |
+| 4GB RAM | Comfortable |
+| 2GB RAM | Confirmed working, with about 1GB free after install |
+| Root disk | 2GB is enough |
+
+Webpage widgets cause the largest memory spikes. Leave room for these if your dashboards are heavy.
+With thin provisioning, the disk uses space only as needed.
 
 ## Create the container
 
 === "Proxmox VE (x86)"
 
-    1. **Base template:** download the current Debian Trixie LXC template via **Datacenter → Storage → CT Templates** in the Proxmox web UI. Use the standard template, not the cloud variant.
-    2. **Create CT:** standard container, 2GB root disk, 2–4GB RAM, unprivileged. Pick a hostname (`tesserae` is fine).
+    1. Download the current Debian Trixie LXC template via **Datacenter → Storage → CT Templates**.
+       Use the standard template, not the cloud variant.
+    2. Create an unprivileged standard container:
+       use a 2GB root disk and 2 to 4GB RAM. Pick a hostname, such as `tesserae`.
     3. Start the container and open its console from the Proxmox UI.
 
 === "Ubuntu MicroCloud (Raspberry Pi)"
 
-    Install MicroCloud from a running Raspberry Pi OS install; the [upstream MicroCloud docs](https://canonical.com/microcloud/docs) cover the setup in detail. Then launch a container from the current Trixie image (not the cloud variant):
+    Install MicroCloud on Raspberry Pi OS using the [MicroCloud docs](https://canonical.com/microcloud/docs).
+    Then launch the current Trixie image, without cloud-init:
 
     ```sh
     lxc launch images:debian/trixie tesserae
@@ -45,7 +59,7 @@ For the container's root device, 2GB is sufficient. With thin provisioning, the 
 
 ## Inside the container
 
-The container starts as a minimal Debian. Install the packages Tesserae needs, plus the conveniences worth having:
+Install the required packages and a few utilities in the Debian container:
 
 ```sh
 apt update
@@ -53,7 +67,8 @@ apt install -y git python3 python3.13-venv
 apt install -y openssh-server less rsync
 ```
 
-`python3.13-venv` is the Trixie name; on Bookworm it's `python3.11-venv`. The Trixie image is recommended because Tesserae targets Python 3.11+ and a current Python ships with the base image.
+Use `python3.13-venv` on Trixie or `python3.11-venv` on Bookworm.
+Trixie is recommended: its included Python meets Tesserae's Python 3.11+ requirement.
 
 Create a non-root user to own the install:
 
@@ -61,58 +76,91 @@ Create a non-root user to own the install:
 adduser --gecos "" tesserae
 ```
 
-SSH in as that user (if you installed `openssh-server`) or `su tesserae` from the container shell, then follow the [manual install steps](server.md#manual-install) on the main install page.
+SSH in as that user if you installed `openssh-server`, or run `su tesserae` from the container shell.
+Then follow the [manual install steps](server.md#manual-install).
 
-Once the venv is built and Tesserae starts cleanly, the [systemd service path](server.md#run-as-a-service-linux) keeps it running across reboots. The systemd unit runs identically inside the container as on bare metal.
+Once Tesserae starts, [install the systemd service](server.md#run-as-a-service-linux) to keep it running across reboots.
+It works the same inside the container as on a direct install.
 
 ## Proxmox VE helper script
 
-If you run Proxmox VE, a [community-scripts](https://community-scripts.org/) style installer does the whole job from the host shell: it creates an unprivileged Debian 13 container, installs the newest Tesserae release with Chromium, and starts it as a systemd service. Run this on the Proxmox host:
+This [community-scripts](https://community-scripts.org/) style installer:
+
+- Creates an unprivileged Debian 13 container
+- Installs the newest Tesserae release with Chromium
+- Starts Tesserae as a systemd service
+
+Run it on the Proxmox host:
 
 ```sh
 COMMUNITY_SCRIPTS_URL=https://raw.githubusercontent.com/dmellok/tesserae/main/scripts/proxmox \
   bash -c "$(curl -fsSL https://raw.githubusercontent.com/dmellok/tesserae/main/scripts/proxmox/ct/tesserae.sh)"
 ```
 
-The first thing it asks is the release channel: type `stable` for the newest tagged release or `edge` to track the `main` branch, within ten seconds, or it takes `stable`. Set `var_tesserae_channel=edge` in the environment to skip the question. The container dialog that follows offers Default, which applies the script's sizes without asking, and Advanced, which asks about CPU, RAM, disk, network and the rest. When it finishes it prints the container's address; open `http://<container-ip>:8765/` to land on the setup wizard. Inside the container, `update` moves Tesserae to the newest release or commit on the channel you picked. State lives in `/opt/tesserae_data`, and the listen port and other environment settings are in `/opt/tesserae_data/tesserae.env`.
+1. Choose a channel within ten seconds:
+    - `stable`: newest tagged release; the default if you do not answer
+    - `edge`: follows `main`
+
+    Set `var_tesserae_channel=edge` beforehand to skip this question.
+2. Choose Default to use the script's sizes, or Advanced to choose your own settings:
+   CPU, RAM, disk, network and other options.
+3. Open the printed address, `http://<container-ip>:8765/`, to start setup.
+
+Run `update` inside the container to get the newest release or commit on your chosen channel.
+Data lives in `/opt/tesserae_data`. Set the port and other environment options in `/opt/tesserae_data/tesserae.env`.
 
 The script sources live at [`scripts/proxmox/`](https://github.com/dmellok/tesserae/tree/main/scripts/proxmox) in the repo.
 
 ## Automation with cloud-init
 
-MicroCloud and Proxmox both support cloud-init, so the package install, user creation, venv build, and systemd setup can be baked into a single config you reuse across containers (or hyperscaler instances).
+Use cloud-init on MicroCloud or Proxmox to repeat the setup across containers or cloud servers.
+One config installs packages, creates the user and sets up Python and systemd.
 
-A ready-to-use config lives at [`scripts/cloud-init.yaml`](https://github.com/dmellok/tesserae/blob/main/scripts/cloud-init.yaml) in the repo. Pass it to MicroCloud via:
+Pass [`scripts/cloud-init.yaml`](https://github.com/dmellok/tesserae/blob/main/scripts/cloud-init.yaml) to MicroCloud:
 
 ```sh
 lxc launch images:debian/trixie/cloud tesserae \
   --config=user.user-data="$(cat scripts/cloud-init.yaml)"
 ```
 
-Note the `/cloud` suffix on the image name. The slim `images:debian/trixie` image used in the manual section above does not include cloud-init, so the user-data block never runs. The `/cloud` variant ships with cloud-init pre-installed and is the right pick for any automated provisioning path.
+Use the `/cloud` image, which includes cloud-init.
+The slim `images:debian/trixie` image cannot run the user-data block.
 
-On Proxmox, paste the same file into **Datacenter → CT → Cloud-Init → User Data**. Edit the `ssh_authorized_keys` block first to add your public key so you can log in once the container's up.
+On Proxmox, paste the file into **Datacenter → CT → Cloud-Init → User Data**.
+First add your public key to `ssh_authorized_keys` so you can log in.
 
-The config installs the newest tagged Tesserae release, resolved from the repo when the container boots rather than written into the file, so a freshly downloaded copy is never out of date. The checkout sits on the `main` branch at that release, so the in-app updater (Settings → System) can move it forward. To pin one version instead, replace the tag lookup in the `runcmd` block with `tag=vX.Y.Z`.
+At startup, the config looks up and installs the newest tagged release.
+It uses the `main` branch at that release, so **Settings → System** can update it later.
+To pin a version, replace the tag lookup in `runcmd` with `tag=vX.Y.Z`.
 
 !!! tip "If `microcloud init` didn't auto-detect your storage"
-    Some MicroCloud installs don't pick up NVMe / dedicated storage on their own. If `lxc launch` complains it has no pool to land the container in, list pools with `lxc storage list` and pass the right name through:
+    MicroCloud may miss NVMe or dedicated storage. If `lxc launch` reports no storage pool,
+    find one with `lxc storage list` and pass its name:
 
     ```sh
     lxc launch images:debian/trixie/cloud tesserae --storage <pool-name> \
       --config=user.user-data="$(cat scripts/cloud-init.yaml)"
     ```
 
-First boot takes 5 to 10 minutes on a Pi (dominated by `pip install` plus the Playwright Chromium download); follow progress with `tail -f /var/log/cloud-init-output.log` inside the container.
+First startup takes 5 to 10 minutes on a Pi, mostly for `pip install` and the Chromium download.
+Follow progress inside the container with `tail -f /var/log/cloud-init-output.log`.
 
-The config runs `playwright install-deps chromium` (root-side apt install of runtime libs) and `playwright install chromium` (download the Playwright-pinned browser into the `tesserae` user's cache), so the webpage widget and **Send → Webpage** tab work out of the box on both x86 and arm64 Trixie images. Playwright's bundled Chromium is the supported path for 64-bit Linux; the [system-browser fallback](server.md#chromium-for-webpage-rendering) is only needed for 32-bit Raspberry Pi OS.
+The config installs the browser needed by the webpage widget and **Send → Webpage**:
+
+- `playwright install-deps chromium` installs system libraries as root.
+- `playwright install chromium` downloads the browser into the `tesserae` user's cache.
+
+This works on x86 and arm64 Trixie. Use Playwright's bundled Chromium on 64-bit Linux.
+Only 32-bit Raspberry Pi OS needs the [system-browser fallback](server.md#chromium-for-webpage-rendering).
 
 !!! warning "LAN-only by design"
-    Don't run Tesserae open to the internet. The auth model is a single-password gate intended for a trusted home LAN, not a public-facing service. Use a homelab box, a Pi on your LAN, or a private network on whatever host you pick. If you need remote access, put Tesserae behind a VPN (Tailscale, WireGuard, ZeroTier) rather than exposing it directly.
+    Don't expose Tesserae to the internet. Its single-password login is intended for a trusted home network.
+    Use a local computer or a private network on your chosen host.
+    For remote access, use a VPN such as Tailscale, WireGuard or ZeroTier.
 
 ## Config and persistent state
 
-Tesserae does not use `~/.config/` (no XDG Base Directory convention). All persistent state lives in a single `data/` directory next to the install:
+All saved data lives in `data/` next to the install. Tesserae does not use `~/.config/`:
 
 ```
 /home/tesserae/tesserae/data/
@@ -123,9 +171,11 @@ Tesserae does not use `~/.config/` (no XDG Base Directory convention). All persi
 └── marketplace/           installed widgets / fonts / themes from the catalog
 ```
 
-Back up `/home/tesserae/tesserae/data/` to preserve your dashboard pages, device registrations, theme picks, plugin settings, and the sqlite event log. The directory is the only stateful thing in the install; everything else is recreated by re-cloning the repo.
+Back up `/home/tesserae/tesserae/data/`. It contains all saved state; everything else can be restored by cloning the repo again.
 
-If you'd rather mount the data dir as an LXC volume so the container itself is disposable, point it at a host path with `lxc config device add tesserae data disk source=/srv/tesserae path=/home/tesserae/tesserae/data`. Override the data location via `TESSERAE_DATA_ROOT` if you want it somewhere other than the install dir.
+To keep data outside a disposable container, mount a host directory:
+`lxc config device add tesserae data disk source=/srv/tesserae path=/home/tesserae/tesserae/data`.
+Use `TESSERAE_DATA_ROOT` to choose a different data location.
 
 ## Next steps
 
