@@ -6,6 +6,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.511.0], 2026-11-13
+
 ### Added
 
 - Fraimic: wakes closer than an hour and more than four a day. **Wake every** goes down to 5 minutes with a **Counted from** anchor, and **At set times each day** takes any number of times. The frame's own schedule can't express these, so Tesserae leads the frame along: at each wake it writes the next four wake times, the first being the wake it wants and the rest a fallback if one is missed. Hourly-or-slower intervals from midnight and up to four times still use the frame's own schedule.
