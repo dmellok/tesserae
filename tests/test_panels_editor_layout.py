@@ -47,6 +47,11 @@ def test_editor_is_classic_by_default(app: Flask) -> None:
     assert 'id="panels-rail"' not in html
 
 
+def test_editor_loads_contextual_help_script(app: Flask) -> None:
+    html = _editor(app, app.test_client())
+    assert 'src="/static/info-pop.js?v=' in html
+
+
 def test_editor_follows_the_paper_design(app: Flask) -> None:
     app.config["SETTINGS_STORE"].patch_section("app", {"ui_design": "paper"})
     html = _editor(app, app.test_client())
