@@ -156,6 +156,23 @@ def _preview_digest(ev: EventRow) -> str | None:
     return candidate if isinstance(candidate, str) and candidate else None
 
 
+def preview_shape(devices: Any, device_ids: list[str]) -> tuple[int, int] | None:
+    """The shape (width, height) of the display a push went to, so its
+    thumbnail takes the display's own ratio; ``None`` when the push went to no
+    known display (the thumbnail then shows the picture whole)."""
+    from app.panel import device_panel
+
+    for did in device_ids:
+        device = devices.devices.get(did) if devices is not None else None
+        try:
+            panel = device_panel(device) if device is not None else None
+        except (KeyError, TypeError, ValueError):
+            panel = None
+        if panel is not None and panel.w > 0 and panel.h > 0:
+            return (panel.w, panel.h)
+    return None
+
+
 def history_view(rows: list[EventRow], *, fold_presses: bool = False) -> list[dict[str, Any]]:
     """Shape raw event rows for the History page: page name instead of id,
     humanised time, friendly device labels.
@@ -234,6 +251,7 @@ def history_view(rows: list[EventRow], *, fold_presses: bool = False) -> list[di
         if not device_ids and ev.target in device_meta:
             device_ids = [ev.target]
         target_devices = [device_meta[did] for did in device_ids if did in device_meta]
+        shape = preview_shape(devices, device_ids)
         # Press rows carry the pressed button, resolved action, and
         # resulting page in ``extra``. Fold those into a short detail
         # string the template renders below the main row so the "what
@@ -267,6 +285,7 @@ def history_view(rows: list[EventRow], *, fold_presses: bool = False) -> list[di
                 # Raw ids behind the chips, for the per-display filter.
                 "device_ids": [d["id"] for d in target_devices],
                 "preview_device_ids": device_ids,
+                "preview_shape": shape,
                 "rel": _relative(ev.timestamp),
                 # v0.69.6 (issue #52 item 2): render in the user's configured
                 # timezone rather than the container's local (UTC on Docker /

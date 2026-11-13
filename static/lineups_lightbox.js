@@ -46,7 +46,7 @@
       `<div class="lu-lb-card">` +
       `<header class="lu-lb-head"><div class="lu-lb-titles"><h2 id="lu-lb-title" data-lb-title></h2><p class="lu-lb-sub" data-lb-sub></p></div>` +
       `<button type="button" class="lu-ibtn lu-lb-x" data-lb-close title="Close" aria-label="Close">${ico("x")}</button></header>` +
-      `<div class="lu-lb-stage" data-lb-stage><span class="lu-thumb l" data-lb-thumb><span class="lu-thumb-ph" aria-hidden="true"></span></span>` +
+      `<div class="lu-lb-stage" data-lb-stage><span class="thumb-frame lu-thumb l" data-lb-thumb><span class="lu-thumb-ph" aria-hidden="true"></span></span>` +
       `<span class="lu-lb-load" data-lb-load hidden role="status"><i class="lu-lb-spin" aria-hidden="true"></i><span>Drawing this one</span></span></div>` +
       `<p class="lu-lb-note" data-lb-note role="status" hidden></p>` +
       `<footer class="lu-lb-foot" data-lb-foot>` +
@@ -71,7 +71,7 @@
 
     const thumb = $("[data-lb-thumb]");
     const ar = String(m.aspect || "16/10").split("/");
-    thumb.className = `lu-thumb ${m.orientation || "l"}`;
+    thumb.className = `thumb-frame lu-thumb ${m.orientation || "l"}`;
     thumb.style.cssText = `--ar:${ar[0]}/${ar[1]};--arw:${ar[0]};--arh:${ar[1]}`;
     thumb.dataset.gamut = m.gamut || "color";
     thumb.dataset.greyLevels = String(m.greyLevels || 0);

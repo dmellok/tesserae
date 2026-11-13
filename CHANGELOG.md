@@ -33,6 +33,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - Lineups: a display's day bar stays when you fold it; only its lineup rows fold.
 - Lineups: the day picker's calendar icon sits level with the middle of the day bar, at any width.
 - Lineups: reordering a live rotation sends the dashboard now in its slot.
+- Thumbnails fill their frame-shaped box on every page, so no thin light line shows along an edge.
+- Dashboards: a dashboard shared by displays of different shapes shows, under each display, that display's own ratio, picture and size.
 
 ## [0.511.0], 2026-11-13
 

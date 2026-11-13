@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 import tempfile
 import threading
+import urllib.parse
 from pathlib import Path
+from typing import Any
 
 from flask import abort, current_app, request, send_file, url_for
 from PIL import Image, features
@@ -29,11 +32,12 @@ def _paths(kind: str, key: str, dim: int = MAX_DIM) -> tuple[Path, Path]:
     return directory / f"{key}.png", directory / ".thumbs" / f"{key}-lu-v2-{dim}.{_EXT}"
 
 
-def page_compositions(pages: list[Page]) -> dict[str, str]:
-    """Latest successful composition digest per dashboard, one log query."""
+def page_compositions(pages: list[Page], device_id: str | None = None) -> dict[str, str]:
+    """Latest successful composition digest per dashboard, one log query.
+    ``device_id`` keeps only pushes that went to that display."""
     events = current_app.config.get("EVENT_LOG")
     try:
-        latest = events.latest_pushes([p.id for p in pages]) if events else {}
+        latest = events.latest_pushes([p.id for p in pages], device_id) if events else {}
     except Exception:
         logger.debug("lineups: push lookup failed", exc_info=True)
         latest = {}
@@ -57,6 +61,73 @@ def sent_thumb_url(digest: object) -> str:
     return url_for("composer.lineup_thumbnail", kind="sent", key=digest, ext=_EXT)
 
 
+def _draft_thumb(page: Page, dims: tuple[int, int], device_id: str = "") -> str:
+    """The thumbnail URL of ``page`` drawn at ``dims`` (for ``device_id`` when
+    given: the compose route then lays it out as for that display), or ``""``
+    while it is queued to render."""
+    from app import preview_cache
+    from app.composer import PREVIEW_MAX_DIM, _preview_timezone_id, page_preview_token
+
+    token = page_preview_token(page, dims)
+    who = f"-d{hashlib.sha256(device_id.encode()).hexdigest()[:10]}" if device_id else ""
+    key = f"{page.id}{who}__{token}"
+    source, cached = _paths("draft", key)
+    if source.is_file() or cached.is_file():
+        return url_for("composer.lineup_thumbnail", kind="draft", key=key, ext=_EXT)
+    preview_cache.submit(
+        key=str(source),
+        base_url=request.host_url.rstrip("/"),
+        page_id=page.id,
+        width=dims[0],
+        height=dims[1],
+        cache_path=source,
+        thumb_max=PREVIEW_MAX_DIM,
+        pool=current_app.config.get("BROWSER_POOL"),
+        timezone_id=_preview_timezone_id(),
+        query=f"&device_id={urllib.parse.quote(device_id)}" if device_id else "",
+    )
+    return ""
+
+
+def shapes_differ(page: Page, devices: Any) -> bool:
+    """True when the displays a dashboard is bound to are not all of one ratio,
+    so its one shared thumbnail (the largest panel's) is the wrong shape on some."""
+    from app.panel import device_panel
+
+    ratios: list[float] = []
+    for did in dict.fromkeys(page.device_ids):
+        device = devices.devices.get(did) if devices is not None else None
+        panel = device_panel(device) if device is not None else None
+        if panel is not None and panel.w > 0 and panel.h > 0:
+            ratios.append(panel.w / panel.h)
+    return bool(ratios) and (max(ratios) - min(ratios)) > 0.01 * min(ratios)
+
+
+def display_thumbs(
+    device_id: str, dims: tuple[int, int], pages: list[Page]
+) -> dict[str, tuple[str, str | None]]:
+    """Each dashboard as one display shows it: ``{page id: (thumbnail URL,
+    composition digest)}``. The picture last pushed to that display when it is
+    kept, else the dashboard drawn at the display's own panel size (``dims``);
+    the digest is ``None`` for a drawing. A dashboard shared by displays of
+    different shapes thus gets each display's own ratio, not the largest
+    panel's."""
+    compositions = page_compositions(pages, device_id)
+    out: dict[str, tuple[str, str | None]] = {}
+    for page in pages:
+        digest = compositions.get(page.id)
+        url = sent_thumb_url(digest) if digest else ""
+        if url:
+            out[page.id] = (url, digest)
+            continue
+        try:
+            out[page.id] = (_draft_thumb(page, dims, device_id), None)
+        except Exception:
+            logger.debug("lineups: preview unavailable for %s", page.id, exc_info=True)
+            out[page.id] = ("", None)
+    return out
+
+
 def page_thumbs(pages: list[Page], compositions: dict[str, str] | None = None) -> dict[str, str]:
     """One batched log lookup per view, one URL per dashboard across all rows.
 
@@ -66,8 +137,7 @@ def page_thumbs(pages: list[Page], compositions: dict[str, str] | None = None) -
     single-flight render queue publishes a snapshot. No time-based refresh:
     the next push or definition edit supplies a new version instead.
     """
-    from app import preview_cache
-    from app.composer import PREVIEW_MAX_DIM, _preview_timezone_id, page_preview_token, preview_dims
+    from app.composer import preview_dims
 
     if compositions is None:
         compositions = page_compositions(pages)
@@ -88,23 +158,7 @@ def page_thumbs(pages: list[Page], compositions: dict[str, str] | None = None) -
                 current_app.config.get("DEVICE_REGISTRY"),
                 current_app.config.get("SETTINGS_STORE"),
             )
-            token = page_preview_token(page, dims)
-            key = f"{page.id}__{token}"
-            source, cached = _paths("draft", key)
-            if source.is_file() or cached.is_file():
-                out[page.id] = url_for("composer.lineup_thumbnail", kind="draft", key=key, ext=_EXT)
-            else:
-                preview_cache.submit(
-                    key=str(source),
-                    base_url=request.host_url.rstrip("/"),
-                    page_id=page.id,
-                    width=dims[0],
-                    height=dims[1],
-                    cache_path=source,
-                    thumb_max=PREVIEW_MAX_DIM,
-                    pool=current_app.config.get("BROWSER_POOL"),
-                    timezone_id=_preview_timezone_id(),
-                )
+            out[page.id] = _draft_thumb(page, dims)
         except Exception:
             logger.debug("lineups: preview unavailable for %s", page.id, exc_info=True)
     return out

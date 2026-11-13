@@ -209,9 +209,17 @@
      canvas lays out at its authored size, everything else at the resolved
      panel. Using the wrong one distorts the scaled iframe. #}
   {% set _cv = page.canvas if (page.layout_kind == 'canvas' and page.canvas and not page.device_ids) else none %}
-  {% set pv_w = _cv.w if _cv else (d.w if d else 0) %}
-  {% set pv_h = _cv.h if _cv else (d.h if d else 0) %}
-  {% set _png = url_for('composer.compose_preview', page_id=page.id) ~ '?v=' ~ page_preview_tokens.get(page.id, '') %}
+  {# A dashboard shared by displays of different shapes shows, in a display's
+     group, that display's own ratio and picture (g.shots); the size column is
+     that display's panel. Elsewhere (the flat list, the unbound group) it is
+     the dashboard's own panel. #}
+  {% set _shot = g.shots.get(page.id) if g.shots else none %}
+  {% set _dw = g.panel_w if (g.device and g.panel_w) else (d.w if d else 0) %}
+  {% set _dh = g.panel_h if (g.device and g.panel_h) else (d.h if d else 0) %}
+  {% set pv_w = _shot.w if _shot else (_cv.w if _cv else (d.w if d else 0)) %}
+  {% set pv_h = _shot.h if _shot else (_cv.h if _cv else (d.h if d else 0)) %}
+  {% set _png = _shot.url if _shot else (url_for('composer.compose_preview', page_id=page.id) ~ '?v=' ~ page_preview_tokens.get(page.id, '')) %}
+  {% set _cdev = [g.key] if _shot else page.device_ids %}
   {% set _names = page_devices.get(page.id) or [] %}
   {% set _live = page_live.get(page.id) or [] %}
   {% set _lineups = page_lineups.get(page.id) or [] %}
@@ -231,12 +239,12 @@
        data-lf-text="{{ (page.name ~ ' ' ~ _names|join(' ') ~ ' ' ~ page.id)|lower }}"
        data-lf-panels="{{ (page_device_ids.get(page.id) or ['-'])|join(' ') }}"
        data-sort-name="{{ page.name }}"
-       data-sort-size="{{ (d.w * d.h) if d else '' }}"
+       data-sort-size="{{ (_dw * _dh) if _dw and _dh else '' }}"
        data-sort-updates="{{ page.refresh_minutes if page.refresh_minutes else 1000000 }}"
        data-sort-wake="{{ page.sleep_interval_s if page.sleep_interval_s is not none else '' }}"
        data-sort-pushed="{{ page_last_pushed.get(page.id, '') }}"
        data-sort-state="{{ {'live': 0, 'lineup': 1, 'idle': 2, 'nopanel': 3, 'archived': 4}[_state] }}"
-       {% if pv_w and pv_h %}data-preview-src="{{ url_for('composer.compose', page_id=page.id) }}" data-preview-png="{{ _png }}" data-preview-w="{{ pv_w }}" data-preview-h="{{ pv_h }}"{% endif %}>
+       {% if pv_w and pv_h %}data-preview-src="{{ url_for('composer.compose', page_id=page.id, device_id=g.key if _shot else None) }}" data-preview-png="{{ _png }}" data-preview-w="{{ pv_w }}" data-preview-h="{{ pv_h }}"{% endif %}>
     <span class="dx-dc dx-dc-sel">
       <input type="checkbox" class="dx-dash-select" value="{{ page.id }}" data-dash-select
              data-page-name="{{ page.name }}"{% if _lineups %} data-lineups="{{ _lineups|join(', ') }}"{% endif %}
@@ -244,9 +252,9 @@
     </span>
     <span class="dx-dc dx-dc-name">
       <span class="dx-dot dx-dash-dot is-{{ _state }}" aria-hidden="true"></span>
-      <span class="dx-dash-thumb{% if not (pv_w and pv_h) %} is-empty{% elif pv_h > pv_w %} is-portrait{% endif %}"
+      <span class="thumb-frame dx-dash-thumb{% if not (pv_w and pv_h) %} is-empty{% elif pv_h > pv_w %} is-portrait{% endif %}"
             {% if pv_w and pv_h %}style="--thumb-ar: {{ pv_w }} / {{ pv_h }}; --thumb-r: {{ '%.4f'|format(pv_w / pv_h) }}"{% endif %} aria-hidden="true">
-        {% if pv_w and pv_h %}<img src="{{ _png }}" alt="" loading="lazy" decoding="async" {{ color_attrs(page.device_ids) }} data-dash-thumb>{% endif %}
+        {% if pv_w and pv_h and _png %}<img src="{{ _png }}" alt="" loading="lazy" decoding="async" {{ color_attrs(_cdev) }} data-dash-thumb>{% endif %}
         <i class="ph ph-{{ page.icon or 'cube' }}"></i>
       </span>
       <a class="dx-dash-name" href="{{ url_for('pages.edit', page_id=page.id) }}" title="{{ page.name }}">{{ page.name }}</a>
@@ -262,7 +270,7 @@
     {# Phone: these become the row's second line; on wider screens the
        wrapper is display: contents and each one is its own column. #}
     <span class="dx-dc-meta">
-      <span class="dx-dc dx-dc-size dx-dash-mono">{% if d %}{{ d.w }}×{{ d.h }}{% else %}-{% endif %}</span>
+      <span class="dx-dc dx-dc-size dx-dash-mono">{% if _dw and _dh %}{{ _dw }}×{{ _dh }}{% else %}-{% endif %}</span>
       <span class="dx-dc dx-dc-updates">{{ updates_text(page.refresh_minutes) }}</span>
       <span class="dx-dc dx-dc-wake">{{ wake_text(page.sleep_interval_s) }}</span>
       <span class="dx-dc dx-dc-pushed dx-dash-mono dx-dash-muted">{{ page_last_pushed_rel.get(page.id, 'never') }}</span>
@@ -284,8 +292,8 @@
 
   {# OPENED ROW: preview, four figures, then the row's controls. #}
   <div class="dx-devquick dx-dashquick" id="dashq-{{ _rid }}" data-dashquick data-lf-tail{% if not _open %} hidden{% endif %}>
-    <div class="dx-dashquick-preview{% if not (pv_w and pv_h) %} is-empty{% elif pv_h > pv_w %} is-portrait{% endif %}"
-         {% if pv_w and pv_h %}style="aspect-ratio: {{ pv_w }} / {{ pv_h }}"{% endif %} {{ color_attrs(page.device_ids) }} data-dashquick-preview>
+    <div class="thumb-frame dx-dashquick-preview{% if not (pv_w and pv_h) %} is-empty{% elif pv_h > pv_w %} is-portrait{% endif %}"
+         {% if pv_w and pv_h %}style="aspect-ratio: {{ pv_w }} / {{ pv_h }}"{% endif %} {{ color_attrs(_cdev) }} data-dashquick-preview>
       <span class="dx-thumb-empty"><i class="ph ph-image" aria-hidden="true"></i><span>{{ 'Rendering preview' if pv_w and pv_h else 'No preview' }}</span></span>
     </div>
     <div class="dx-devquick-body">
@@ -537,8 +545,8 @@
      to a live, scaled-down /compose/<id> iframe if the image can't render. */
   .dx-dash-preview {
     position: absolute; z-index: 400; pointer-events: none;
-    border: 1px solid var(--t-border); border-radius: 10px; overflow: hidden;
-    background: var(--t-surface); box-shadow: 0 10px 30px rgba(0, 0, 0, .22);
+    --thumb-radius: 10px; --thumb-bg: var(--t-surface);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .22);
     opacity: 0; transform: translateY(4px);
     transition: opacity .12s ease, transform .12s ease;
   }
@@ -558,7 +566,6 @@
   .dx-bulk-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .dx-bulk-actions .form { margin: 0; }
   .dx-dash-preview iframe { border: 0; transform-origin: top left; pointer-events: none; background: #fff; }
-  .dx-dash-preview img { display: block; width: 100%; height: 100%; object-fit: contain; background: #fff; }
   @media (hover: none), (max-width: 720px) { .dx-dash-preview { display: none; } }
 </style>
 <script>
@@ -660,7 +667,7 @@
       const src = row.getAttribute('data-preview-src');
       const w = parseInt(row.getAttribute('data-preview-w') || '0', 10);
       const h = parseInt(row.getAttribute('data-preview-h') || '0', 10);
-      if (!png || !w || !h) return;
+      if ((!png && !src) || !w || !h) return;
       box.setAttribute('data-filled', '1');
       const img = document.createElement('img');
       img.alt = 'Preview of ' + (row.querySelector('.dx-dash-name') || {}).textContent;
@@ -687,6 +694,12 @@
         fit();
         if (window.ResizeObserver) new ResizeObserver(fit).observe(box);
       });
+      // A display never sent to has no picture while its draft is still being
+      // drawn (an empty data-preview-png): go straight to the live iframe.
+      if (!png) {
+        img.dispatchEvent(new Event('error'));
+        return;
+      }
       img.src = png;
       box.appendChild(img);
     }
@@ -823,7 +836,7 @@
     function build() {
       if (pop) return;
       pop = document.createElement('div');
-      pop.className = 'dx-dash-preview';
+      pop.className = 'thumb-frame dx-dash-preview';
       pop.setAttribute('aria-hidden', 'true');
       img = document.createElement('img');
       img.setAttribute('alt', '');

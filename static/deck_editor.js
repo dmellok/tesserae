@@ -183,7 +183,7 @@
     c.dataset.page = id;
 
     const thumb = document.createElement("div");
-    thumb.className = "dxe-thumb";
+    thumb.className = "thumb-frame dxe-thumb";
     const target = deviceSel.options[deviceSel.selectedIndex];
     thumb.dataset.gamut = (target && target.dataset.gamut) || "color";
     thumb.dataset.greyLevels = (target && target.dataset.greyLevels) || "0";

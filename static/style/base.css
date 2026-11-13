@@ -67,6 +67,8 @@
 }
 
 :root {
+  /* The paper sheet or mat a display shows (behind a letterboxed thumbnail). */
+  --thumb-paper: #f2efe7;
   /* Accent, deep teal that reads as both serious and warm. */
   --t-accent: #0d8c7e;
   --t-accent-hover: #0a6f63;
@@ -635,4 +637,73 @@ a:hover {
   margin: 0 var(--t-space-2);
   opacity: 0.5;
   border: 0;
+}
+
+/* ----- Thumbnail frames -----------------------------------------------------
+   Every picture of a display (a dashboard's preview, a render in History, a
+   device's latest picture, a lineup card) sits in one kind of box, class
+   ``thumb-frame``: the display's own ratio, the border drawn over the picture,
+   the picture covering the box.
+
+   The border must not sit on the box. A 1px border takes 2px off both sides of
+   the content, so a picture of the display's exact ratio no longer fits what is
+   left; ``contain`` then left a sub-pixel strip of the box's background beside
+   the border, a thin light line on a dark picture (or a dark one on a light
+   picture) that shows at device scale factor 2. Here the border is an overlay
+   (::before), so the picture's box IS the frame's box, and ``cover`` trims a
+   rounding hair instead of showing one.
+
+   A surface sets only its size (a width and ``aspect-ratio``, or both sides, or
+   a slot: --thumb-slot-w and --thumb-slot-h) and these tokens, never a border,
+   a background or an object-fit on the frame or its picture:
+     --thumb-edge, --thumb-edge-w, --thumb-radius   the border and its corners
+     --thumb-bg      what shows while the picture loads, or behind a placeholder
+   A frame that deliberately shows a picture of another shape whole adds
+   ``thumb-frame--letterbox``; its bars are the frame's paper (--thumb-paper), the
+   sheet or mat the display shows, never a light UI colour. */
+.thumb-frame {
+  --thumb-edge: var(--t-border);
+  --thumb-edge-w: 1px;
+  --thumb-radius: 4px;
+  position: relative;
+  isolation: isolate;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--thumb-radius);
+  background: var(--thumb-bg, var(--t-surface-sunk));
+}
+.thumb-frame::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border: var(--thumb-edge-w) solid var(--thumb-edge);
+  border-radius: inherit;
+  pointer-events: none;
+}
+.thumb-frame > img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  object-fit: cover;
+  background: none;
+}
+/* A frame told the display's shape (--thumb-ar as "w / h", --thumb-r as the same
+   number) takes that shape inside a slot of --thumb-slot-w by --thumb-slot-h: a
+   wide display fills the slot's width, a tall one its height. */
+.thumb-frame[style*="--thumb-r"] {
+  --thumb-w: min(var(--thumb-slot-w), calc(var(--thumb-slot-h) * var(--thumb-r)));
+  width: var(--thumb-w);
+  height: auto;
+  aspect-ratio: var(--thumb-ar);
+}
+.thumb-frame--letterbox {
+  --thumb-bg: var(--thumb-paper);
+}
+.thumb-frame--letterbox > img {
+  object-fit: contain;
 }

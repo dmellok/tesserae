@@ -212,16 +212,8 @@
   display: block;
   width: 58px;
   aspect-ratio: var(--thumb-ar, 4 / 3);
-  border: 1px solid var(--t-border-strong);
-  border-radius: 3px;
-  overflow: hidden;
-  background: var(--t-surface-sunk);
-}
-.dx-dp .dx-next-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
+  --thumb-edge: var(--t-border-strong);
+  --thumb-radius: 3px;
 }
 .dx-dp .dx-next-tag {
   display: inline-flex;
@@ -245,27 +237,18 @@
   margin-top: 2px;
 }
 .dx-dp .dx-now-thumb {
-  position: relative;
   display: block;
   flex: none;
   width: 92px;
   aspect-ratio: var(--thumb-ar, 4 / 3);
-  border: 1px solid var(--t-border-strong);
-  border-radius: 4px;
-  overflow: hidden;
-  background: var(--t-surface-sunk);
+  --thumb-edge: var(--t-border-strong);
+  --thumb-radius: 4px;
 }
 .dx-devpage .dx-dp .dx-now-thumb {
   width: 92px;
   min-width: 0;
   max-width: none;
   height: auto;
-}
-.dx-dp .dx-now-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
 }
 .dx-dp .dx-now-thumb .dx-thumb-empty {
   display: grid;
@@ -284,6 +267,7 @@
 }
 .dx-dp .dx-q-badge {
   position: absolute;
+  z-index: 3;
   left: 4px;
   bottom: 4px;
   display: inline-flex;
@@ -318,7 +302,7 @@
   color: var(--t-fg-soft);
 }
 .dx-dp .dx-now-link:hover .dx-thumb {
-  border-color: var(--t-accent);
+  --thumb-edge: var(--t-accent);
 }
 :root[data-ui="paper"] .dx-dp .dx-now-name:hover {
   color: var(--t-fg);
@@ -1775,7 +1759,7 @@
     overflow: visible;
   }
   .dx-dp .dx-now-thumb img {
-    border-radius: 3px;
+    border-radius: var(--thumb-radius);
   }
   .dx-dp .dx-q-badge {
     left: 50%;

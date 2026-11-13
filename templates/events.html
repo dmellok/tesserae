@@ -215,9 +215,13 @@
         <p class="dx-event-empty-payload">No payload recorded for this event.</p>
         {% endif %}
         {% if ev.type == 'push' and ev.digest %}
-        <a class="dx-event-thumb-link" href="{{ url_for('renders', filename=ev.digest ~ '.png') }}" {{ color_attrs(ev.extra.get("device_ids")) }} data-lightbox>
+        {#- A push to no known display has no shape to take: a 4:3 box with the
+            picture shown whole, as History does, not cropped to it. -#}
+        {% set _known = shapes.get(ev.id) %}
+        {% set _shape = _known or (4, 3) %}
+        <a class="thumb-frame dx-event-thumb-link{% if not _known %} thumb-frame--letterbox{% endif %}" style="--thumb-ar: {{ _shape[0] }} / {{ _shape[1] }}; --thumb-r: {{ '%.4f'|format(_shape[0] / _shape[1]) }}" href="{{ url_for('renders', filename=ev.digest ~ '.png') }}" {{ color_attrs(ev.extra.get("device_ids")) }} data-lightbox>
           <img src="{{ url_for('renders', filename=ev.digest ~ '.png', w=240) }}"
-               alt="" width="120" height="90" loading="lazy" decoding="async">
+               alt="" loading="lazy" decoding="async">
         </a>
         {% endif %}
         </div>

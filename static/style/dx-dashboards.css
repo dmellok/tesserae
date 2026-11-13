@@ -231,30 +231,18 @@
   border: 1.5px solid var(--t-border-strong);
 }
 
-/* 64×40 preview thumbnail; the dashboard's icon shows until the cached
-   image arrives. */
+/* 64×40 preview thumbnail (a ``thumb-frame``, base.css); the dashboard's icon
+   shows until the cached image arrives. */
 .dx-dash-thumb {
-  position: relative;
   flex: none;
   width: 64px;
   height: 40px;
-  box-sizing: border-box;
-  border: 1px solid var(--t-border);
-  border-radius: 4px;
-  background: var(--t-surface-sunk, #f3f2ee);
-  overflow: hidden;
+  --thumb-slot-w: 64px;
+  --thumb-slot-h: 40px;
   display: grid;
   place-items: center;
   color: var(--dx-faint);
   font-size: 16px;
-}
-.dx-dash-thumb img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  background: #fff;
 }
 .dx-dash-thumb.is-empty img {
   display: none;
@@ -263,19 +251,10 @@
    a portrait render into a landscape one. It sits centred in the same 64 px
    slot, so the names stay lined up; a portrait one is a little taller. */
 .dx-dash-thumb[style*="--thumb-r"] {
-  --slot: 64px;
-  --th: 40px;
-  --tw: min(var(--slot), calc(var(--th) * var(--thumb-r)));
-  width: var(--tw);
-  height: auto;
-  aspect-ratio: var(--thumb-ar);
-  margin-inline: calc((var(--slot) - var(--tw)) / 2);
+  margin-inline: calc((var(--thumb-slot-w) - var(--thumb-w)) / 2);
 }
-.dx-dash-thumb.is-portrait[style*="--thumb-r"] {
-  --th: 52px;
-}
-.dx-dash-thumb[style*="--thumb-r"] img {
-  object-fit: contain;
+.dx-dash-thumb.is-portrait {
+  --thumb-slot-h: 52px;
 }
 .dx-dash-name {
   min-width: 0;
@@ -464,16 +443,11 @@
   min-width: 0;
 }
 .dx-dashquick-preview {
-  position: relative;
   flex: none;
   width: 260px;
   max-height: 260px;
   min-height: 120px;
-  box-sizing: border-box;
-  border: 1px solid var(--t-border);
-  border-radius: 8px;
-  background: var(--t-surface-sunk, #f3f2ee);
-  overflow: hidden;
+  --thumb-radius: 8px;
   display: grid;
   place-items: center;
 }
@@ -491,14 +465,6 @@
 }
 .dx-dashquick-preview.is-portrait[style*="aspect-ratio"] {
   height: 260px;
-}
-.dx-dashquick-preview img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  background: #fff;
 }
 .dx-dashquick-preview iframe {
   position: absolute;
@@ -797,14 +763,12 @@
   .dx-dash-thumb {
     width: 48px;
     height: 30px;
+    --thumb-slot-w: 48px;
+    --thumb-slot-h: 30px;
     font-size: 14px;
   }
-  .dx-dash-thumb[style*="--thumb-r"] {
-    --slot: 48px;
-    --th: 30px;
-  }
-  .dx-dash-thumb.is-portrait[style*="--thumb-r"] {
-    --th: 40px;
+  .dx-dash-thumb.is-portrait {
+    --thumb-slot-h: 40px;
   }
   .dx-dc-meta {
     grid-column: 2;
@@ -876,6 +840,5 @@
 }
 :root[data-theme="dark"] .dx-dash-thumb,
 :root[data-theme="dark"] .dx-dashquick-preview {
-  background: var(--t-surface-soft);
-  border-color: var(--t-border);
+  --thumb-bg: var(--t-surface-soft);
 }

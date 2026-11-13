@@ -167,7 +167,7 @@ def test_display_header(page: str) -> None:
     assert _next_line(fd) in hdr and fd["next_line"]["before"] == "AI News next at"
     # The now thumbnail sits in a fixed slot in the display's own shape.
     assert re.search(
-        r'<figure class="lu-now-thumb" title="On screen: Family"><span class="lu-thumb p" style="--ar:1440/2560',
+        r'<figure class="lu-now-thumb" title="On screen: Family"><span class="thumb-frame lu-thumb p" style="--ar:1440/2560',
         hdr,
     )
     # The fold chevron is the header's last control, tied to the body.
@@ -488,7 +488,7 @@ def test_accent_comes_from_the_theme_tokens() -> None:
         r"\.lu \.lu-tag-st\.live \{ background: var\(--lu-acc\); color: var\(--lu-acc-fg\);",
         r"\.lu \.lu-blk\.live \{ background: var\(--lu-acc\); color: var\(--lu-acc-fg\);",
         r"\.lu \.lu-pill\.p-now \{ background: var\(--lu-acc\); color: var\(--lu-acc-fg\);",
-        r"\.lu \.lu-step\.is-now \.lu-thumb \{ border: 2px solid var\(--lu-acc\)",
+        r"\.lu \.lu-step\.is-now \.lu-thumb \{ --thumb-edge: var\(--lu-acc\)",
         r"\.lu \.lu-sdot \{[^}]*background: var\(--lu-acc\)",
     ):
         assert re.search(rule, CSS), rule
@@ -539,8 +539,10 @@ def test_old_lineups_page_code_is_gone() -> None:
     old = (REPO_ROOT / "static" / "style" / "dx-decks.css").read_text()
     assert ".dk-row" not in old and ".dk-group" not in old
     assert ".dxe-thumb" in old  # the lineup editor keeps its styles
-    # Thumbnails fit inside the display's shape instead of cropping.
-    assert re.search(r"\.lu \.lu-thumb img \{[^}]*object-fit: contain", CSS)
+    # Thumbnails are the one frame in the display's shape (base.css): the picture
+    # covers it, so the lineups sheet sets no object-fit on a thumbnail's picture.
+    assert not re.search(r"\.lu \.lu-thumb img \{[^}]*object-fit", CSS)
+    assert re.search(r"\.lu \.lu-thumb \{[^}]*aspect-ratio: var\(--ar\)", CSS)
 
 
 def test_unknown_glass_says_so(app: Flask) -> None:
@@ -795,7 +797,7 @@ def test_thumbnails_carry_a_zoom_icon_in_their_corner(app: Flask) -> None:
     dinner = _row(body, "dinner")
     # Inside the thumb (so it sits in the picture's own top right corner), a real button.
     assert re.search(
-        r'<span class="lu-thumb [^"]*"[^>]*>\s*<img [^>]*>\s*<button type="button" class="lu-zoom" '
+        r'<span class="thumb-frame lu-thumb [^"]*"[^>]*>\s*<img [^>]*>\s*<button type="button" class="lu-zoom" '
         r'data-zoom="step:dinner:0" aria-haspopup="dialog" aria-label="Zoom Newspaper" title="Zoom Newspaper">',
         dinner,
     )

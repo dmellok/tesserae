@@ -236,17 +236,15 @@ a.dx-hist-time[href]:hover {
   place-items: center;
   width: 64px;
   height: 48px;
-  border-radius: 6px;
-  overflow: hidden;
-  border: 1px solid var(--t-border);
-  background: var(--t-inset);
+  --thumb-slot-w: 64px;
+  --thumb-slot-h: 48px;
+  --thumb-radius: 6px;
+  --thumb-bg: var(--t-inset);
   text-decoration: none;
 }
-.dx-hist-thumb img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+/* The display's own shape, centred in the same slot so the columns line up. */
+.dx-hist-thumb[style*="--thumb-r"] {
+  margin-inline: calc((var(--thumb-slot-w) - var(--thumb-w)) / 2);
 }
 .dx-hist-thumb--empty {
   font-family: var(--t-font-mono);
@@ -254,7 +252,7 @@ a.dx-hist-time[href]:hover {
   color: var(--t-muted);
 }
 .dx-hist-thumb--empty.is-bad {
-  border-color: var(--t-pill-danger-border);
+  --thumb-edge: var(--t-pill-danger-border);
 }
 
 .dx-hist-mid {
@@ -491,6 +489,8 @@ a.dx-hist-time[href]:hover {
     order: 5;
     width: 48px;
     height: 36px;
+    --thumb-slot-w: 48px;
+    --thumb-slot-h: 36px;
   }
   .dx-hist-target {
     order: 6;

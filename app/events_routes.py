@@ -84,9 +84,20 @@ def index() -> str:
     page_store = current_app.config.get("PAGE_STORE")
     page_names = {p.id: p.name for p in page_store.list()} if page_store else {}
 
+    # The shape of the display each push went to, so its thumbnail has that ratio.
+    from app.history_routes import preview_shape
+
+    devices = current_app.config.get("DEVICE_REGISTRY")
+    shapes = {
+        ev.id: preview_shape(devices, list(ev.extra.get("device_ids") or []))
+        for ev in rows
+        if ev.type == "push" and ev.digest
+    }
+
     return render_template(
         "events.html",
         rows=rows,
+        shapes=shapes,
         type_filter=type_filter,
         selected=selected,
         counts=counts,

@@ -376,18 +376,30 @@ class EventLog:
             rows = conn.execute(sql, params).fetchall()
         return [_row_to_event(r) for r in rows]
 
-    def latest_pushes(self, targets: Sequence[str]) -> dict[str, EventRow]:
-        """Latest successful push per dashboard in one query, including its digest."""
+    def latest_pushes(
+        self, targets: Sequence[str], device_id: str | None = None
+    ) -> dict[str, EventRow]:
+        """Latest successful push per dashboard in one query, including its digest.
+
+        ``device_id`` keeps only pushes that went to that display (its id is in
+        the push's ``device_ids``), so a dashboard shared by displays of different
+        shapes gives each its own latest picture."""
         if not targets:
             return {}
         placeholders = ",".join("?" * len(targets))
+        params: list[Any] = list(targets)
+        only_device = ""
+        if device_id:
+            # An exact quoted match: LIKE would read "_" in an id as a wildcard.
+            only_device = " AND instr(extra_json, ?) > 0"
+            params.append(json.dumps(device_id))
         sql = (
             "SELECT * FROM events WHERE id IN (SELECT MAX(id) FROM events "
             "WHERE type = 'push' AND status IN ('sent', 'ok') "
-            f"AND target IN ({placeholders}) GROUP BY target)"
+            f"AND target IN ({placeholders}){only_device} GROUP BY target)"
         )
         with self._lock, self._conn() as conn:
-            rows = conn.execute(sql, list(targets)).fetchall()
+            rows = conn.execute(sql, params).fetchall()
         return {str(row["target"]): _row_to_event(row) for row in rows}
 
     def last_event_by_target(

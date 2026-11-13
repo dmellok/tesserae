@@ -942,6 +942,27 @@ def _device_health(device_id: str) -> str:
     return health_for_age(device_id, age)
 
 
+def _display_shots(
+    device: Any, panel: Any, group: list[Page], devices: Any
+) -> dict[str, dict[str, Any]]:
+    """The dashboards in ``device``'s group that are shared by displays of
+    different shapes, as this display shows them: its own ratio and the picture
+    last sent to it (else a preview drawn at its panel size). Lineups use the
+    same per-display pictures (``lineup_thumbs.display_thumbs``)."""
+    if panel is None or panel.w <= 0 or panel.h <= 0:
+        return {}
+    from app.composer import clamp_screenshot_dim
+    from app.lineup_thumbs import display_thumbs, shapes_differ
+
+    mine = [p for p in group if shapes_differ(p, devices)]
+    if not mine:
+        return {}
+    thumbs = display_thumbs(
+        device.id, (clamp_screenshot_dim(panel.w), clamp_screenshot_dim(panel.h)), mine
+    )
+    return {pid: {"url": url, "w": panel.w, "h": panel.h} for pid, (url, _digest) in thumbs.items()}
+
+
 @bp.get("")
 def index() -> Response:
     tab = "archived" if request.args.get("tab") == "archived" else "active"
@@ -1023,6 +1044,9 @@ def index() -> Response:
                 "name": device.display_name,
                 "health": _device_health(device.id),
                 "size": f"{panel.w}×{panel.h}" if panel is not None else "",
+                "panel_w": panel.w if panel is not None else 0,
+                "panel_h": panel.h if panel is not None else 0,
+                "shots": _display_shots(device, panel, group, devices),
                 "showing": names_by_id.get(showing, showing) if showing else "",
                 "url": url_for("auth.device_page", instance_id=device.id),
                 "pages": group,

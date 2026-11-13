@@ -15,13 +15,10 @@
    Flat surface, no checkerboard, no inset glass. The placeholder
    carries the empty state on its own. */
 .preview-frame {
-  position: relative;
   width: 100%;
   max-width: 720px;
-  border: 1px solid var(--t-border);
-  border-radius: var(--t-radius-md);
-  background: var(--t-surface-soft);
-  overflow: hidden;
+  --thumb-radius: var(--t-radius-md);
+  --thumb-bg: var(--t-surface-soft);
   aspect-ratio: 4 / 3; /* fallback; inline style overrides */
 }
 
@@ -42,19 +39,6 @@
    iframe without this explicit override. Same pattern as the placeholder. */
 .preview-frame > iframe[hidden] {
   display: none !important;
-}
-.preview-frame > img.preview-image {
-  /* Raster previews fit the frame with letterboxing; the source is
-     panel-content already so we don't need the iframe's transform
-     trick. The letterbox bars use the themed surface. */
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  border: 0;
-  display: block;
-  background: var(--t-surface-soft);
-  object-fit: contain;
 }
 .preview-frame > .preview-placeholder {
   position: absolute;
@@ -1583,19 +1567,10 @@
   color: var(--t-fg);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
-/* Panel-view raster: reuse the raster-preview box (absolute, letterboxed
-   into the frame via object-fit) so the full-resolution quantised PNG scales
-   to fit instead of overflowing at its natural pixel size. ``pixelated``
-   keeps the e-ink dither crisp rather than smoothed on downscale. */
+/* Panel-view raster: the full-resolution quantised PNG scales to fit the frame
+   instead of overflowing at its natural pixel size. ``pixelated`` keeps the
+   e-ink dither crisp rather than smoothed on downscale. */
 .preview-frame > img.preview-panel-img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  border: 0;
-  display: block;
-  background: var(--t-surface-soft);
-  object-fit: contain;
   image-rendering: pixelated;
 }
 .preview-frame > img.preview-panel-img[hidden] {

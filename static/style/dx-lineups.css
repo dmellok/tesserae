@@ -48,7 +48,7 @@ main.page.lu-page {
   --lu-pz-edge: color-mix(in oklab, var(--t-warn) 35%, var(--t-fg));
   --lu-warn-text: color-mix(in oklab, var(--t-warn) 80%, var(--t-fg));
   --lu-shadow-pop: var(--t-shadow-md);
-  --lu-paper: #f2efe7; /* an e-paper sheet behind a thumbnail */
+  --lu-paper: var(--thumb-paper); /* an e-paper sheet behind a thumbnail */
   font-size: 14px;
   line-height: 1.45;
   color: var(--t-fg);
@@ -539,7 +539,7 @@ main.page.lu-page {
 .lu .lu-now-thumb .lu-thumb {
   max-width: 100%;
   max-height: 100%;
-  border: 1px solid var(--lu-acc);
+  --thumb-edge: var(--lu-acc);
   box-shadow: 0 0 0 3px var(--lu-acc-soft);
 }
 .lu .lu-now-thumb .lu-thumb.p {
@@ -551,10 +551,12 @@ main.page.lu-page {
   height: calc(var(--slot, 132px) * var(--arh) / var(--arw));
 }
 .lu .lu-now-thumb .lu-thumb.empty {
-  border-style: dashed;
-  border-color: var(--t-border-strong);
+  --thumb-edge: var(--t-border-strong);
+  --thumb-bg: transparent;
   box-shadow: none;
-  background: transparent;
+}
+.lu .lu-now-thumb .lu-thumb.empty::before {
+  border-style: dashed;
 }
 /* The dashed box says what is going on instead of a bare glyph. */
 .lu .lu-thumb-note {
@@ -610,7 +612,7 @@ main.page.lu-page {
   display: block;
 }
 .lu .lu-now-thumb .lu-qthumb .lu-thumb {
-  border: 1px solid var(--lu-warn-text);
+  --thumb-edge: var(--lu-warn-text);
   box-shadow:
     0 0 0 2px var(--t-surface),
     0 2px 6px rgb(0 0 0 / 0.35);
@@ -653,7 +655,7 @@ main.page.lu-page {
   }
 }
 :root:not([data-ui="paper"]) .lu .lu-now-thumb .lu-thumb {
-  border-width: 2px;
+  --thumb-edge-w: 2px;
   box-shadow: 0 0 0 4px color-mix(in oklab, var(--lu-acc) 16%, transparent);
 }
 
@@ -2425,10 +2427,12 @@ main.page.lu-page {
 .lu .lu-step .lu-thumb {
   height: var(--th);
   width: calc(var(--th) * var(--arw) / var(--arh));
+}
+.lu .lu-step .lu-thumb::before {
   transition: border-color 150ms ease-out;
 }
 .lu .lu-step:hover .lu-thumb {
-  border-color: var(--t-fg-soft);
+  --thumb-edge: var(--t-fg-soft);
 }
 @container lu-ds (max-width: 700px) {
   .lu .lu-strip {
@@ -2440,22 +2444,15 @@ main.page.lu-page {
   }
 }
 
-/* Thumbnails: the display's real aspect ratio, never cropped. */
+/* Thumbnails: a ``thumb-frame`` (base.css) in the display's real aspect ratio.
+   The border is drawn over the picture, so the picture fills the box exactly. */
 .lu .lu-thumb {
-  position: relative;
   display: block;
   flex: none;
   aspect-ratio: var(--ar);
-  border-radius: var(--lu-r-xs);
-  overflow: hidden;
-  border: 1px solid var(--t-border-strong);
-  background: var(--lu-paper);
-}
-.lu .lu-thumb img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+  --thumb-radius: var(--lu-r-xs);
+  --thumb-edge: var(--t-border-strong);
+  --thumb-bg: var(--lu-paper);
 }
 .lu .lu-thumb-ph {
   display: grid;
@@ -2653,7 +2650,8 @@ main.page.lu-page {
 
 /* Current step: ring; next: quiet dashed outline; queued: amber dash. */
 .lu .lu-step.is-now .lu-thumb {
-  border: 2px solid var(--lu-acc);
+  --thumb-edge: var(--lu-acc);
+  --thumb-edge-w: 2px;
   box-shadow: 0 0 0 4px var(--lu-acc-soft);
 }
 :root[data-theme="dark"] .lu .lu-step.is-now .lu-thumb {
