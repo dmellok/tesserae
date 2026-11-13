@@ -1344,7 +1344,7 @@ def test_multiselect_component_wires_mouse_touch_and_keyboard_reordering() -> No
     assert 'new Event("input", { bubbles: true })' in source
     assert ".multiselect-drag .ph" in styles
     assert "radial-gradient(circle, currentColor 1.5px" in styles
-    assert ".multiselect-opt:has(input:checked) + .multiselect-opt:has(input:checked)" in styles
+    assert ".multiselect-opt.is-selected + .multiselect-opt.is-selected" in styles
     assert "border-top-color: transparent" in styles
     drag_button = styles.split(".multiselect-drag {", 1)[1].split("}", 1)[0]
     assert "border-left" not in drag_button

@@ -2073,10 +2073,10 @@ input[type="range"].slider:focus::-moz-range-thumb {
   cursor: grab;
   touch-action: none;
 }
-.multiselect-opt:has(input:checked) .multiselect-drag {
+.multiselect-opt.is-selected .multiselect-drag {
   display: grid;
 }
-.multiselect-opt:has(input:checked) + .multiselect-opt:has(input:checked) {
+.multiselect-opt.is-selected + .multiselect-opt.is-selected {
   border-top-color: transparent;
 }
 .multiselect.is-filtering .multiselect-drag {
@@ -2121,19 +2121,18 @@ input[type="range"].slider:focus::-moz-range-thumb {
   border-radius: 4px;
   background: var(--t-surface);
   color: var(--t-accent-fg);
-  font-size: 13px;
 }
-.multiselect-tick .ph {
+.multiselect-tick svg {
   opacity: 0;
 }
-.multiselect-opt:has(input:checked) .multiselect-tick {
+.multiselect-opt.is-selected .multiselect-tick {
   background: var(--t-accent);
   border-color: var(--t-accent);
 }
-.multiselect-opt:has(input:checked) .multiselect-tick .ph {
+.multiselect-opt.is-selected .multiselect-tick svg {
   opacity: 1;
 }
-.multiselect-opt:has(input:checked) {
+.multiselect-opt.is-selected {
   background: var(--t-accent-soft);
 }
 .multiselect-label {

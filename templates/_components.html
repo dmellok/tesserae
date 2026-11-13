@@ -527,12 +527,18 @@ macro here instead.
     </div>
     <div class="multiselect-list" data-ms-list>
       {% for opt in real %}
-      <div class="multiselect-opt" data-ms-text="{{ opt.label | lower }}">
+      {% set checked = opt.value | string in sel_str %}
+      <div class="multiselect-opt{% if checked %} is-selected{% endif %}" data-ms-text="{{ opt.label | lower }}">
         <label class="multiselect-choice" for="{{ field_id }}-{{ loop.index0 }}">
           <input type="checkbox" id="{{ field_id }}-{{ loop.index0 }}"
                  name="{{ name }}" value="{{ opt.value }}"
-                 {% if opt.value | string in sel_str %}checked{% endif %}>
-          <span class="multiselect-tick" aria-hidden="true"><i class="ph ph-check"></i></span>
+                 {% if checked %}checked{% endif %}>
+          <span class="multiselect-tick" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m5 12 4 4L19 6"/>
+            </svg>
+          </span>
           <span class="multiselect-label">{{ opt.label }}</span>
         </label>
         <button class="multiselect-drag" type="button" draggable="true" data-ms-drag

@@ -13,6 +13,7 @@ explicit focus restore.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -27,7 +28,10 @@ def _chromium_available() -> bool:
         from playwright.sync_api import sync_playwright
 
         with sync_playwright() as p:
-            return Path(p.chromium.executable_path).exists()
+            executable = os.environ.get(
+                "PLAYWRIGHT_CHROMIUM_EXECUTABLE", p.chromium.executable_path
+            )
+            return Path(executable).exists()
     except Exception:
         return False
 
@@ -89,7 +93,9 @@ def page(page_path: Path, request: pytest.FixtureRequest) -> Iterator[object]:
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:
-        browser = p.chromium.launch()
+        browser = p.chromium.launch(
+            executable_path=os.environ.get("PLAYWRIGHT_CHROMIUM_EXECUTABLE")
+        )
         pg = browser.new_page()
         if request.param == "fallback":
             pg.add_init_script("delete Element.prototype.moveBefore;")
@@ -150,7 +156,13 @@ def test_toggling_a_row_keeps_keyboard_focus_on_it(page) -> None:  # type: ignor
     page.keyboard.press("Space")
     assert page.evaluate(_ORDER_JS) == ["kitchen*", "lounge*", "study*", "bedroom*"]
     assert page.evaluate(_FOCUS_JS) == "INPUT:media_player.bedroom"
+    row = page.locator(".multiselect-opt", has_text="Bedroom")
+    tick = row.locator(".multiselect-tick svg")
+    assert tick.evaluate("el => getComputedStyle(el).opacity") == "1"
+    assert row.get_by_role("button", name="Reorder Bedroom").is_visible()
 
     page.keyboard.press("Space")
     assert page.evaluate(_ORDER_JS) == ["kitchen*", "lounge*", "study*", "bedroom"]
     assert page.evaluate(_FOCUS_JS) == "INPUT:media_player.bedroom"
+    assert tick.evaluate("el => getComputedStyle(el).opacity") == "0"
+    assert not row.locator("[data-ms-drag]").is_visible()

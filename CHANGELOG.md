@@ -9,6 +9,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 ### Changed
 
 - Fix contextual help buttons in the canvas editor.
+- Keep selection marks and reorder handles visible for selected list items.
 
 ### Fixed
 
