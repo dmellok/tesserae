@@ -16,6 +16,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - Keep selection marks and reorder handles visible for selected list items.
 - Samsung The Frame: its Power and Art Mode settings sit in groups of their own, and the Home Assistant switch field shows only when Power control is a Home Assistant switch.
 - Samsung The Frame: the TV's own slideshow setting reads "Managed by Tesserae" or "Managed by the TV".
+- Let gallery widgets preview matches for the current editor options.
 
 ### Fixed
 

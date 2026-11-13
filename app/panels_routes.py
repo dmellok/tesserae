@@ -944,6 +944,9 @@ def source_form() -> Response:
     html = render_template(
         "panels_source_form.html",
         opts=_materialised_options(plugin),
+        plugin=plugin,
+        cell_w=body.get("cell_w", 0),
+        cell_h=body.get("cell_h", 0),
         values=values if isinstance(values, dict) else {},
         sid=str(body.get("sid") or "new"),
     )

@@ -432,6 +432,23 @@ the marketplace, declare all folders in the catalog entry's
 `folders` array so the install lands them as siblings under
 `plugins/`.
 
+### Query previews
+
+Image widgets can set `"query_preview": true` in their manifest and export
+`query_preview(options, settings, *, ctx)` from `server.py`. The grid editor
+and canvas source drawer show **Preview query**, passing the current unsaved
+options through the normal form parser and calling the hook under the widget's
+declared capabilities, with runtime settings, `data_dir`, `cell_w`, `cell_h`,
+`preview=True` and `settled=False`. Preview must not advance a display's cursor
+or repeat history.
+
+Return `{"images": [...], "total": 42}`. Each image has an HTTPS `url`, optional
+HTTPS `thumbnail` and `permalink`, `width`, `height`, optional `username` or
+`prompt`, and `matches` (text badges explaining its eligibility). The host
+shows at most 20 images in a keyboard-accessible popup. `error`, `warning` and
+`stale` can explain incomplete or cached results. The authenticated POST
+endpoint is `/plugins/<id>/query-preview`; it is also callable by agents.
+
 ### Admin pages, `blueprint()`
 
 Any plugin (widget OR `_core`) that exports `server.py:blueprint()`

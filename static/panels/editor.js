@@ -4810,7 +4810,13 @@
     fetch(S.cfg.sourceFormUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key: key, sid: e.id, options: opts }),
+      body: JSON.stringify({
+        key: key,
+        sid: e.id,
+        options: opts,
+        cell_w: Math.round(e.w),
+        cell_h: Math.round(e.h),
+      }),
     })
       .then(function (r) {
         return r.ok ? r.text() : Promise.reject(r.status);
