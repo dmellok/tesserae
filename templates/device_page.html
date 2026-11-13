@@ -326,12 +326,14 @@
 
     {# ---------------- SCHEDULE ---------------- #}
     {% set qh = section.quiet_hours %}
-    {% set _n_lineups = (section.lineup_rows|length) + (section.timetable_entries|length) %}
+    {% set _n_lineups = section.lineup_rows|length %}
+    {% set _n_dash = section.schedule_rows|length %}
     <section class="dx-dsec" id="schedule" data-collapsible>
       {{ dsec_head('schedule', 'calendar-blank', 'Schedule',
           (section.overview.next_wake.sub ~ ' · ' if section.overview.next_wake.sub else '')
           ~ ('own quiet hours' if qh.get('enabled') else 'server quiet hours')
-          ~ ' · ' ~ _n_lineups ~ (' lineup' if _n_lineups == 1 else ' lineups')) }}
+          ~ (' · ' ~ _n_lineups ~ (' lineup' if _n_lineups == 1 else ' lineups') if _n_lineups or not _n_dash else '')
+          ~ (' · ' ~ _n_dash ~ (' dashboard schedule' if _n_dash == 1 else ' dashboard schedules') if _n_dash else '')) }}
       <div class="dx-dsec-body" id="schedule-body" data-collapsible-body>
 
         {% set t_fields = (section.fields or [])|rejectattr('type', 'in', ['string', 'ha_device_picker', 'select'])|list %}
@@ -426,13 +428,16 @@
         </div>
         {% endif %}
 
+        {#- Lineups and dashboard schedules are different things, so each has its own list,
+            shown only when it has rows. With neither, the Lineups group keeps the empty state. -#}
+        {% if section.lineup_rows or not section.schedule_rows %}
         <div class="dx-grp" id="lineups" data-devsub>
           <div class="dx-grp-head">
             <h3 class="dx-grp-title">Lineups</h3>
             <a class="dx-link-btn dx-grp-end" href="{{ url_for('decks.index') }}"><i class="ph ph-arrow-square-out" aria-hidden="true"></i><span>Lineups page</span></a>
           </div>
-          {% if section.lineup_rows or section.timetable_entries %}
-          <ul class="dx-list"{% if section.lineup_rows %} data-device-lineups{% endif %}>
+          {% if section.lineup_rows %}
+          <ul class="dx-list" data-device-lineups>
             {% for lu in section.lineup_rows %}
             <li class="dx-li{% if not lu.enabled %} is-off{% endif %}">
               <i class="ph ph-monitor-play" aria-hidden="true"></i>
@@ -446,26 +451,7 @@
               </div>
             </li>
             {% endfor %}
-            {% for entry in section.timetable_entries %}
-            <li class="dx-li{% if not entry.enabled %} is-off{% endif %}">
-              <i class="ph ph-squares-four" aria-hidden="true"></i>
-              <div class="dx-li-main">
-                <span class="dx-li-name">{{ entry.page_name }}</span>
-                {% if not entry.enabled %}<span class="tg tg--sm">disabled</span>{% endif %}
-                {% if entry.wont_send %}<span class="tg tg--sm tg--warn" title="This dashboard isn't bound to any device, so it won't send. Bind it to a device, or enable legacy unbound broadcast in Settings.">unbound · won't send</span>{% endif %}
-                <span class="dx-li-meta">schedule ·
-                  {% if entry.type == 'daily' %}daily{% elif entry.window_start and entry.window_end %}{{ entry.window_start }} → {{ entry.window_end }}{% elif entry.window_start %}from {{ entry.window_start }}{% else %}always{% endif %}
-                  · {{ entry.days_label }}{% if entry.interval_minutes %} · every {{ entry.interval_minutes }} min{% endif %}</span>
-              </div>
-              <div class="dx-li-end">
-                <a class="dx-btn is-sm is-ghost is-icon" href="{{ url_for('schedules.index') }}#schedule-{{ entry.schedule_id }}" aria-label="Edit {{ entry.page_name }}" title="Edit"><i class="ph ph-pencil-simple" aria-hidden="true"></i></a>
-              </div>
-            </li>
-            {% endfor %}
           </ul>
-          {% if section.timetable_entries %}
-          <p class="dx-help dx-list-note">Schedules show here when their dashboard is bound to this display. Edit them on the <a href="{{ url_for('decks.index') }}">Lineups</a> page.</p>
-          {% endif %}
           {% else %}
           <div class="dx-empty">
             <i class="ph ph-calendar-blank" aria-hidden="true"></i>
@@ -477,6 +463,35 @@
           </div>
           {% endif %}
         </div>
+        {% endif %}
+
+        {% if section.schedule_rows %}
+        {% if not section.lineup_rows %}<span id="lineups"></span>{% endif %}
+        <div class="dx-grp" id="dashboard-schedules" data-devsub>
+          <div class="dx-grp-head">
+            <h3 class="dx-grp-title">Dashboard schedules</h3>
+          </div>
+          <ul class="dx-list">
+            {% for entry in section.schedule_rows %}
+            <li class="dx-li{% if not entry.enabled %} is-off{% endif %}">
+              <i class="ph ph-squares-four" aria-hidden="true"></i>
+              <div class="dx-li-main">
+                <span class="dx-li-name">{{ entry.page_name }}</span>
+                {% if not entry.enabled %}<span class="tg tg--sm">disabled</span>{% endif %}
+                {% if entry.wont_send %}<span class="tg tg--sm tg--warn" title="This dashboard isn't bound to any device, so it won't send. Bind it to a device, or enable legacy unbound broadcast in Settings.">unbound · won't send</span>{% endif %}
+                <span class="dx-li-meta">
+                  {% if entry.type == 'daily' %}daily{% elif entry.window_start and entry.window_end %}{{ entry.window_start }} → {{ entry.window_end }}{% elif entry.window_start %}from {{ entry.window_start }}{% else %}always{% endif %}
+                  · {{ entry.days_label }}{% if entry.interval_minutes %} · every {{ entry.interval_minutes }} min{% endif %}</span>
+              </div>
+              <div class="dx-li-end">
+                <a class="dx-btn is-sm is-ghost is-icon" href="{{ url_for('schedules.index') }}#schedule-{{ entry.schedule_id }}" aria-label="Edit {{ entry.page_name }}" title="Edit"><i class="ph ph-pencil-simple" aria-hidden="true"></i></a>
+              </div>
+            </li>
+            {% endfor %}
+          </ul>
+          <p class="dx-help dx-list-note">Schedules show here when their dashboard is bound to this display. Edit them on the <a href="{{ url_for('decks.index') }}">Lineups</a> page.</p>
+        </div>
+        {% endif %}
       </div>
     </section>
 

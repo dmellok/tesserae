@@ -72,6 +72,7 @@ _DEVICE_PAGE_SECTIONS: frozenset[str] = frozenset(
         "rendering",
         "timing",
         "lineups",
+        "dashboard-schedules",
         "connection",
         "logs",
         "diagnostics",

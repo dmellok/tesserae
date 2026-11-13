@@ -14,6 +14,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 ### Fixed
 
 - Blank pictures on a frame: a render whose images fail to load is retried once, and a scheduled, lineup or refresh send that still has broken images keeps the previous frame. A manual send goes out with a warning in History.
+- Device page: dashboard schedules have their own list instead of sitting in the Lineups list.
 
 ## [0.511.0], 2026-11-13
 
