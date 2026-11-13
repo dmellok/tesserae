@@ -126,6 +126,7 @@ Tesserae treats this as unknown, not empty. It shows no battery indicator, histo
 | Stripes or garbage on screen | Check the frame size. Tesserae must be v0.64.60 or later. Find the version under Settings → Devices → your device → Troubleshooting → Diagnostics. |
 | Flasher won't connect | Use Chrome or Edge; Firefox and Safari don't support Web Serial. Check the USB cable and port support data. |
 | No macOS serial port for a reTerminal | Install and enable [`WCHSoftGroup/ch34xser_macos`](https://github.com/WCHSoftGroup/ch34xser_macos) under **System Settings → General → Login Items & Extensions → Driver Extensions**. |
+| Setup page at `http://192.168.4.1/` won't load on the phone | Try another browser. Brave on Android can fail with `ERR_TOO_MANY_RETRIES` where Chrome on the same phone loads the page. |
 | Stuck in Wi-Fi setup mode | Rejoin the setup network and enter Wi-Fi settings again. Some setup pages need an explicit Save tap. |
 | Image downloads but won't draw | The battery may be too low to power a refresh. Charge over USB for an hour, then retry. |
 
