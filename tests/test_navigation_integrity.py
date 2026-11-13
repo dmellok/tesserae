@@ -313,7 +313,9 @@ def test_a_home_assistant_step_bounds_promote_and_push(tmp_path: Path) -> None:
     from app import ha_hooks
 
     rig = _rig(tmp_path)
-    rig.decks.upsert(_cycle("cycle", ["a", "b"]))
+    # "both": this test needs the link path, which a timer-only lineup skips
+    # (its presses fall through to the rotation step instead).
+    rig.decks.upsert(_cycle("cycle", ["a", "b"], advance="both"))
     rig.nav.set("frame", "cycle", "a")
     app = Flask(__name__)
     device = type("D", (), {"id": "frame", "display_name": "Frame", "kind_of": "x"})()

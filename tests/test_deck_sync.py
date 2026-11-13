@@ -276,6 +276,22 @@ def test_manifest_default_zones_only_on_touch_without_regions(tmp_path: Path) ->
     assert all(link["zone"] is None for link in manifest3["pages"][0]["links"])
 
 
+def test_timer_only_lineup_ships_no_links(tmp_path: Path) -> None:
+    """A timer-only lineup ("Taps also flip" off) doesn't navigate by hand,
+    so a display navigating from its own cache gets neither its explicit
+    links nor the default prev / next ones."""
+    deck = _deck(advance="timer")
+    manifest = deck_sync.build_manifest(
+        deck,
+        "frame01",
+        push_mgr=FakeRenderSource(tmp_path),
+        renders_dir=tmp_path,
+        warm_missing=False,
+        touch=True,
+    )
+    assert [page["links"] for page in manifest["pages"]] == [[], []]
+
+
 def test_single_page_deck_gets_no_default_links(tmp_path: Path) -> None:
     source = FakeRenderSource(tmp_path)
     deck = _linkless_deck(1)

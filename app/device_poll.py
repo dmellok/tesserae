@@ -122,11 +122,18 @@ def _projected_poll_s(device: Device, configured_s: int) -> int | None:
         device.id,
         now=now,
         hours=hours,
-        limit=4,
+        limit=8,
         quiet_window=quiet_window,
     )
     for event in events:
         if event.certainty not in _WAKE_WORTHY_CERTAINTIES:
+            continue
+        # A dashboard's own Updates refresh is on the timeline for the "Next
+        # update" readout, but it is not a reason to cut a sleep short: that
+        # cadence already has its own say in the sleep interval
+        # (``page_cadence``), and waking for every refresh would drain a
+        # battery display that was set to sleep longer.
+        if getattr(event, "cause", None) == "dashboard_refresh":
             continue
         delta = (event.scheduled_at - now).total_seconds()
         # A record whose target has passed but which has not fired yet is

@@ -40,10 +40,11 @@ candidates the operator will never see.
 What this deliberately does NOT do is predict event-driven updates. Manual
 Send, webhooks, Home Assistant events, and the data-change refresh in #176
 have no schedule to project, and inventing one would make ``certainty``
-meaningless for the events that do. Dashboard and widget refresh timings are
-left out for the same reason: the timed subset is projectable and the
-event-driven subset is not, and a timeline that quietly covers half of a
-mechanism is worse than one that says it does not cover it.
+meaningless for the events that do. Widget refresh timings and data-change
+updates are left out for the same reason. A dashboard's own ``Updates``
+cadence (``Page.refresh_minutes``) is wall-clock-slotted and projectable, so
+the next one for the dashboard on the glass is included, as a
+``dashboard_refresh``: it repaints the page between lineup changes.
 
 Pure functions over a snapshot: no stores, no clock, no locks. The caller
 (``Scheduler.upcoming_for_device``) assembles the snapshot under its own
@@ -55,12 +56,12 @@ mypy --strict applies to this module, see pyproject.toml.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, time, timedelta, tzinfo
 
 from app.quiet_hours import QuietHoursWindow, is_in_window, quiet_ends_at
-from app.scheduler import compute_step_window
+from app.scheduler import _refresh_slot, compute_step_window
 from app.state.rotation_model import Rotation
 from app.state.schedule_model import Schedule
 
@@ -166,6 +167,17 @@ class ProjectionInputs:
     # update is reported as a change, which is the safe way to be unsure.
     current_page_id: str | None = None
     quiet_window: QuietHoursWindow | None = None
+    # The scheduler's own step picker (``Scheduler._pick_eligible_step``):
+    # given a record, the clock's step and the moment, which step it will
+    # actually send, or ``None`` to hold. Without one the projection assumes
+    # no conditions are wired: priority mode sends the first step, scheduled
+    # mode the clock's.
+    pick_step: Callable[[Rotation, int, datetime], int | None] | None = None
+    # Dashboards' own ``Updates`` cadence in minutes (page id -> minutes, only
+    # those above zero) and when the scheduler last refreshed each, for the
+    # ``dashboard_refresh`` events.
+    page_refresh_minutes: Mapping[str, int] = field(default_factory=dict)
+    page_last_refresh: Mapping[str, float] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -322,6 +334,11 @@ def _cycle_windows(record: CycleRecord, inputs: ProjectionInputs) -> list[tuple[
     return windows
 
 
+def _default_pick(rotation: Rotation, time_step_index: int, _when: datetime) -> int | None:
+    """``Scheduler._pick_eligible_step`` with no condition evaluator."""
+    return 0 if rotation.mode == "priority" else time_step_index
+
+
 def _project_cycle(record: CycleRecord, inputs: ProjectionInputs) -> list[_Candidate]:
     """Replay ``find_due_rotations``' gates over this record's dwell grid."""
     rotation = record.rotation
@@ -362,10 +379,17 @@ def _project_cycle(record: CycleRecord, inputs: ProjectionInputs) -> list[_Candi
         )
 
     caught_up: set[datetime] = set()
-    for window_start, step_index in _cycle_windows(record, inputs):
+    pick = inputs.pick_step or _default_pick
+    for window_start, clock_step in _cycle_windows(record, inputs):
         fire_at = max(window_start, inputs.now)
         if fire_at > inputs.through:
             break
+        # The step the scheduler sends for this window: the clock's slot run
+        # through its condition / priority picker. None holds the panel.
+        picked = pick(rotation, clock_step, fire_at)
+        if picked is None:
+            continue
+        step_index = picked
         if prev_step == step_index:
             # A record rotating onto itself re-fires once per new dwell
             # window (the single-step "keep this page fresh" shape) and
@@ -600,7 +624,9 @@ def _coalesce(candidates: list[_Candidate], tick_seconds: int) -> list[_Candidat
     E-ink holds the most recent frame, and the tick fires its whole due list
     in ascending ``(priority, kind, id)`` order, so the winner is the maximum
     of that key. Reporting the losers would describe the scheduler's
-    internals rather than the display's behaviour.
+    internals rather than the display's behaviour. One record fires at most
+    once per tick, so a record's own later candidate (the boundary just after
+    the window it is catching up) starts a new bucket instead of being lost.
     """
     if not candidates:
         return []
@@ -609,7 +635,10 @@ def _coalesce(candidates: list[_Candidate], tick_seconds: int) -> list[_Candidat
     out: list[_Candidate] = []
     bucket: list[_Candidate] = [ordered[0]]
     for candidate in ordered[1:]:
-        if candidate.at - bucket[0].at < window:
+        if candidate.at - bucket[0].at < window and all(
+            (candidate.rank, candidate.record_id) != (member.rank, member.record_id)
+            for member in bucket
+        ):
             bucket.append(candidate)
             continue
         out.append(max(bucket, key=lambda c: (c.priority, c.rank, c.record_id)))
@@ -634,8 +663,6 @@ def project_upcoming(
     showing = inputs.current_page_id
     events: list[UpcomingEvent] = []
     for candidate in _coalesce(candidates, inputs.tick_seconds):
-        if len(events) >= limit:
-            break
         # An update onto the dashboard already on the glass repaints it; one
         # onto a different dashboard replaces it. An unknown target is
         # reported as a change: it may well be, and a countdown that promises
@@ -661,4 +688,89 @@ def project_upcoming(
                 ),
             )
         )
-    return events
+    events.extend(_project_page_refreshes(events, inputs))
+    events.sort(key=lambda event: event.scheduled_at)
+    return events[:limit]
+
+
+# -- dashboard refresh ---------------------------------------------------
+
+
+def _next_refresh_slot_start(after: datetime, minutes: int, tz: tzinfo | None) -> datetime:
+    """The first instant after ``after`` that opens a new ``minutes`` slot of
+    the wall clock, as ``Scheduler._maybe_refresh_pages`` counts them."""
+    slot = _refresh_slot(after, minutes, tz)
+    offset = after.astimezone(tz).utcoffset()
+    seconds = (slot + 1) * minutes * 60 - (offset.total_seconds() if offset else 0.0)
+    moment = datetime.fromtimestamp(seconds, UTC)
+    # A DST change between the two instants shifts the offset: step to the
+    # slot's real start.
+    guard = 0
+    while _refresh_slot(moment, minutes, tz) <= slot and guard < 200:
+        moment += timedelta(seconds=60)
+        guard += 1
+    return moment
+
+
+def _project_page_refreshes(
+    events: Sequence[UpcomingEvent], inputs: ProjectionInputs
+) -> list[UpcomingEvent]:
+    """The next ``Updates`` refresh of the dashboard on the glass, for each
+    stretch between lineup changes.
+
+    ``Scheduler._maybe_refresh_pages`` repaints a dashboard on its own
+    wall-clock slots for as long as a display shows it, independent of the
+    lineup's dwell, minimum hold and Smart Sync; a slot that opens in quiet
+    hours is spent without delivering. A new stretch is reported from its
+    next slot boundary only (the immediate catch-up a freshly shown page can
+    get is not predicted), and one refresh per stretch is enough: the later
+    ones repeat the same cadence.
+    """
+    if not inputs.page_refresh_minutes:
+        return []
+    out: list[UpcomingEvent] = []
+    stretches: list[tuple[datetime, str | None, datetime]] = []
+    start, page = inputs.now, inputs.current_page_id
+    for event in events:
+        stretches.append((start, page, event.scheduled_at))
+        start, page = event.scheduled_at, event.dashboard_id
+    stretches.append((start, page, inputs.through))
+    window = timedelta(seconds=max(1, inputs.tick_seconds))
+    for index, (begins, page_id, ends) in enumerate(stretches):
+        minutes = inputs.page_refresh_minutes.get(page_id or "", 0)
+        if page_id is None or minutes <= 0:
+            continue
+        at: datetime | None = None
+        if index == 0:
+            last = inputs.page_last_refresh.get(page_id, 0.0)
+            if _refresh_slot(begins, minutes, inputs.tz) > _refresh_slot(
+                datetime.fromtimestamp(last, UTC), minutes, inputs.tz
+            ):
+                at = begins  # due now: the next tick refreshes it
+        if at is None:
+            at = _next_refresh_slot_start(begins, minutes, inputs.tz)
+        guard = 0
+        while at < ends and _is_quiet(inputs, at) and guard < _MAX_WALK_STEPS:
+            resumed = _quiet_ends_after(inputs, at)
+            if resumed is None:
+                at = ends  # quiet for good: nothing is delivered
+                break
+            at = _next_refresh_slot_start(resumed, minutes, inputs.tz)
+            guard += 1
+        if at >= ends or at > inputs.through:
+            continue
+        if any(abs(event.scheduled_at - at) < window for event in events):
+            continue  # a lineup update lands then and paints it afresh
+        out.append(
+            UpcomingEvent(
+                scheduled_at=at.astimezone(UTC).replace(microsecond=0),
+                cause="dashboard_refresh",
+                effect="refresh_screen",
+                certainty="scheduled",
+                lineup_id=None,
+                lineup_name=None,
+                dashboard_id=page_id,
+                dashboard_name=inputs.page_names.get(page_id),
+            )
+        )
+    return out

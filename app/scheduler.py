@@ -59,6 +59,9 @@ if TYPE_CHECKING:  # pragma: no cover - import cycle: the projection reads us
 logger = logging.getLogger(__name__)
 
 UPDATE_REFRESH_FAILURE_BACKOFF_SECONDS = 5 * 60
+# How many ticks a bound lineup tries a window's send before letting the
+# window go (see ``Scheduler._fire_cycle``).
+_CYCLE_SEND_ATTEMPTS = 3
 
 
 class ScheduleSource(Protocol):
@@ -536,6 +539,9 @@ class Scheduler:
         self._last_reason: dict[str, str | None] = {}
         self._rotation_last_status: dict[str, str] = {}
         self._rotation_last_reason: dict[str, str | None] = {}
+        # Bound lineup -> (window start, failed attempts in that window), so a
+        # send that keeps failing is retried a few times and then let go.
+        self._cycle_retry: dict[str, tuple[float, int]] = {}
         # rotation_id we've warned about for a missing step page; same
         # one-shot semantics as ``_warned_missing_page``.
         self._warned_missing_rotation_page: set[str] = set()
@@ -748,7 +754,10 @@ class Scheduler:
                 # or the schedule has no device bindings, fall back to
                 # interval firing so the page still pushes on time.
                 if s.smart_sync and self._smart_sync_should_wait(
-                    s.page_id, s.smart_sync_lead_s, now
+                    s.page_id,
+                    s.smart_sync_lead_s,
+                    now,
+                    device_ids=self._lineup_target_devices(s.id, cycle=False),
                 ):
                     continue
                 candidates.append(s)
@@ -1863,6 +1872,7 @@ class Scheduler:
             return  # window closed between find and fire; next tick recovers
         held = self._held_device_ids(rotation.id, now)
         on_pause = self._paused_or_read(now, paused) & set(deck.device_ids)
+        failed: set[str] = set()
         fired = self._fire_deck_advance(
             deck,
             rotation,
@@ -1871,14 +1881,42 @@ class Scheduler:
             now,
             held=held,
             paused=on_pause,
+            failed=failed,
         )
+        window_start = state.step_started_at.timestamp()
+        if failed:
+            # A panel's push failed. Leave the window unrecorded so the next
+            # tick finds it due again, as the unbound path does; panels that
+            # already took the frame are skipped by their own per-display
+            # record, so a retry doesn't send twice. Held, paused, quiet and
+            # min-hold skips are deliberate and stay recorded below.
+            #
+            # Only a few times per window, though: a display that is switched
+            # off or a dashboard that won't render fails the same way on every
+            # 30 s tick, and each try costs a render, a warning and a History
+            # row. After the last try the window is recorded as spent and the
+            # next window starts afresh.
+            with self._lock:
+                seen_window, attempts = self._cycle_retry.get(rotation.id, (window_start, 0))
+                attempts = attempts + 1 if seen_window == window_start else 1
+                self._cycle_retry[rotation.id] = (window_start, attempts)
+                self._rotation_last_status[rotation.id] = "failed"
+                self._rotation_last_reason[rotation.id] = (
+                    f"push failed for {', '.join(sorted(failed))}"
+                )
+            if attempts < _CYCLE_SEND_ATTEMPTS:
+                return
         with self._lock:
+            if not failed:
+                self._cycle_retry.pop(rotation.id, None)
             # Arm the same transition / min-hold gates rotations use so the
             # find pass stays one code path for every cycle record.
             self._rotation_last_step[rotation.id] = step_index
             self._rotation_last_pushed_at[rotation.id] = now.timestamp()
-            self._rotation_last_window_start[rotation.id] = state.step_started_at.timestamp()
-            if fired:
+            self._rotation_last_window_start[rotation.id] = window_start
+            if failed:
+                pass  # gave up on this window; the card keeps saying "failed"
+            elif fired:
                 self._rotation_last_status[rotation.id] = "sent"
                 self._rotation_last_reason[rotation.id] = None
             elif (held or on_pause) and all(
@@ -1924,6 +1962,7 @@ class Scheduler:
         held: set[str] | None = None,
         paused: set[str] | None = None,
         only_device: str | None = None,
+        failed: set[str] | None = None,
     ) -> bool:
         """Advance one bound timer deck's panels to the target page. Pushes
         only at a step transition (or a new dwell window, for a keep-fresh
@@ -1933,6 +1972,8 @@ class Scheduler:
         panels (a per-display pause) are skipped too, quietly, since the
         tick comes round every 30 s; the pause's end brings them back.
         ``only_device`` limits the advance to one panel (a pause catch-up).
+        ``failed``, when given, collects the panels whose push failed (not
+        quiet-hours or other deliberate skips).
         Returns whether any panel took the frame."""
         fired_any = False
         for device_id in deck.device_ids:
@@ -1977,23 +2018,33 @@ class Scheduler:
                 elif now.timestamp() < last_at + min_hold_s:
                     self._log_deck_skip(device_id, deck.id, target, "min-hold")
                     continue  # min-hold anti-flap
-            if rot.smart_sync and self._smart_sync_should_wait(target, rot.smart_sync_lead_s, now):
+            if rot.smart_sync and self._smart_sync_should_wait(
+                target, rot.smart_sync_lead_s, now, device_ids=deck.device_ids
+            ):
                 self._log_deck_skip(device_id, deck.id, target, "smart-sync wait")
                 continue
             with navigation_locked(self._deck_nav_store, [device_id]):
                 # Delivery and the nav record happen together under the
                 # display's navigation lock, so a button press or Home
                 # Assistant's Next / Previous can't land in between.
-                if self._advance_device(deck, target, state, now, device_id, key):
+                if self._advance_device(deck, target, state, now, device_id, key, failed):
                     fired_any = True
         return fired_any
 
     def _advance_device(
-        self, deck: Deck, target: str, state: StepState, now: datetime, device_id: str, key: str
+        self,
+        deck: Deck,
+        target: str,
+        state: StepState,
+        now: datetime,
+        device_id: str,
+        key: str,
+        failed: set[str] | None = None,
     ) -> bool:
         """Deliver one lineup advance to one display and record it (see
         :meth:`_fire_deck_advance`); the caller holds its navigation
-        lock. True when the panel took the frame."""
+        lock. True when the panel took the frame; a failed push adds the
+        display to ``failed``."""
         pusher = self._push_factory()
         quiet_check = getattr(pusher, "device_in_quiet_hours", None)
         if callable(quiet_check) and quiet_check(device_id):
@@ -2019,6 +2070,10 @@ class Scheduler:
                 # dashboard" rather than "that dashboard won't render"
                 # (#167).
                 reason = result.error or f"push {result.status}"
+                # ``superseded`` is left out: a newer send already replaced
+                # this one, so there is nothing to try again.
+                if failed is not None and result.status in ("failed", "busy"):
+                    failed.add(device_id)
                 logger.warning(
                     "deck timer advance failed: device=%s deck=%s -> %s (%s)",
                     device_id,
@@ -2478,7 +2533,10 @@ class Scheduler:
             # steps are silent on purpose (the user opted in to "only
             # render around wake").
             if rotation.smart_sync and self._smart_sync_should_wait(
-                step.page_id, rotation.smart_sync_lead_s, now
+                step.page_id,
+                rotation.smart_sync_lead_s,
+                now,
+                device_ids=self._lineup_target_devices(rotation.id, cycle=True),
             ):
                 # Surface the hold on the card. Only reached when a fire
                 # is actually due (same-window self-fires bail earlier),
@@ -2836,7 +2894,27 @@ class Scheduler:
             )
         return result
 
-    def _smart_sync_should_wait(self, page_id: str, lead_s: int, now: datetime) -> bool:
+    def _lineup_target_devices(self, record_id: str, *, cycle: bool) -> list[str] | None:
+        """The displays a bound lineup actually sends to, or None when the
+        record isn't a bound lineup (it then goes to its page's bound
+        displays). Mirrors the bound/unbound split in ``_fire_cycle`` and
+        ``_fire_timed``."""
+        deck = self._deck_store.get(record_id) if self._deck_store is not None else None
+        if deck is None or deck.advance != "timer" or not deck.device_ids:
+            return None
+        if cycle != (deck.advance_trigger == "cycle"):
+            return None
+        if cycle and self._deck_nav_store is None:
+            return None
+        return list(deck.device_ids)
+
+    def _smart_sync_should_wait(
+        self,
+        page_id: str,
+        lead_s: int,
+        now: datetime,
+        device_ids: list[str] | None = None,
+    ) -> bool:
         """Return True when smart-sync wants to *hold* the fire (don't
         push yet), False when it should fire now. Shared between
         schedules and rotations: both consult the same predicted-wake
@@ -2858,9 +2936,13 @@ class Scheduler:
             only delay a frame it could already have collected.
           - At least one trusted device is inside the lead window.
         """
-        if self._device_telemetry is None or self._device_ids_for_page is None:
+        if self._device_telemetry is None:
             return False
-        device_ids = self._device_ids_for_page(page_id)
+        if device_ids is None:
+            # Not a bound lineup: the displays the page is bound to.
+            if self._device_ids_for_page is None:
+                return False
+            device_ids = self._device_ids_for_page(page_id)
         if not device_ids:
             return False
         trusted_predictions: list[float] = []
@@ -3295,6 +3377,13 @@ class Scheduler:
                     )
                 )
 
+        with self._lock:
+            page_last_refresh = dict(self._page_last_refresh)
+        page_refresh_minutes = {
+            p.id: int(p.refresh_minutes)
+            for p in pages
+            if getattr(p, "refresh_minutes", 0) > 0 and not getattr(p, "archived", False)
+        }
         current_page_id: str | None = None
         try:
             for page_id, device_ids in self._devices_showing_pages(now).items():
@@ -3317,6 +3406,9 @@ class Scheduler:
                 page_names=page_names,
                 current_page_id=current_page_id,
                 quiet_window=quiet_window,
+                pick_step=self._pick_eligible_step,
+                page_refresh_minutes=page_refresh_minutes,
+                page_last_refresh=page_last_refresh,
             ),
             limit=limit,
         )

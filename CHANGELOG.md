@@ -36,6 +36,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - Thumbnails fill their frame-shaped box on every page, so no thin light line shows along an edge.
 - Dashboards: a dashboard shared by displays of different shapes shows, under each display, that display's own ratio, picture and size.
 - Lineups: a dashboard bound to displays of different shapes shows each display its own ratio and picture, not the largest panel's.
+- A lineup send that failed is retried on the next tick instead of being counted as done, so a failed 06:00 send no longer misses its whole slot. It is tried three times, then left until the next slot.
+- Smart sync waits for the displays a lineup sends to, not every display its dashboards are bound to.
+- A timer-only lineup ("Taps also flip" off) no longer follows its page links or touch zones, on the server or on a display that navigates from its own cache.
+- The lineup's current step follows its conditions and priority mode, and reads as held when every rule fails, instead of showing the clock's slot.
+- The Lineups Next pill, tick and countdown follow what the scheduler will send: minimum hold, rules, priority mode and a sleeping display's check-in.
+- "Next update" counts a dashboard's own Updates refresh, not only the next lineup change. A battery display still sleeps to its own interval and does not wake early for these.
 
 ## [0.511.0], 2026-11-13
 

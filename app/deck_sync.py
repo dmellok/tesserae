@@ -133,6 +133,11 @@ def manifest_links(
       composition has no markup touch regions: a default zone would
       otherwise swallow taps meant for the page's own tap targets
       (device-local zone hits never reach the server's region map)."""
+    if deck.advance == "timer":
+        # A timer-only lineup ("Taps also flip" off) doesn't navigate by
+        # hand, so a display that navigates from its own cache gets no
+        # links either, matching what the server does with its buttons.
+        return []
     links = _links_view(page)
     neighbours = default_neighbours(deck, page.page_id)
     if neighbours is None:

@@ -610,11 +610,14 @@ def test_trmnl_display_serves_the_saved_rate(app: Flask) -> None:
 
 
 class _StubEvent:
-    def __init__(self, *, in_seconds: float, certainty: str = "scheduled") -> None:
+    def __init__(
+        self, *, in_seconds: float, certainty: str = "scheduled", cause: str = "cycle"
+    ) -> None:
         from datetime import UTC, datetime, timedelta
 
         self.scheduled_at = datetime.now(UTC) + timedelta(seconds=in_seconds)
         self.certainty = certainty
+        self.cause = cause
 
 
 class _StubScheduler:
@@ -643,6 +646,21 @@ def _trmnl_device(app: Flask, device_id: str, *, refresh_rate_s: int) -> str:
 def _display_refresh_rate(app: Flask, token: str) -> int:
     body = app.test_client().get("/api/display", headers={"Access-Token": token}).get_json()
     return int(body["refresh_rate"])
+
+
+def test_trmnl_display_refresh_rate_is_not_pulled_forward_by_a_page_refresh(app: Flask) -> None:
+    """A dashboard's own Updates refresh is on the timeline but is not a
+    reason to wake early; the lineup change behind it still is."""
+    token = _trmnl_device(app, "trmnl_refresh", refresh_rate_s=900)
+    app.config["SCHEDULER"] = _StubScheduler([_StubEvent(in_seconds=60, cause="dashboard_refresh")])
+    assert _display_refresh_rate(app, token) == 900
+    app.config["SCHEDULER"] = _StubScheduler(
+        [
+            _StubEvent(in_seconds=60, cause="dashboard_refresh"),
+            _StubEvent(in_seconds=300),
+        ]
+    )
+    assert 300 <= _display_refresh_rate(app, token) < 900
 
 
 def test_trmnl_display_refresh_rate_pulls_forward_to_a_projected_change(app: Flask) -> None:

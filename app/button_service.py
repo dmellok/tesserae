@@ -937,7 +937,9 @@ class ButtonService:
         device-local navigation agree. None for non-nav buttons (fall
         through to rotation / button map)."""
         deck = self._bound_deck(device_id)
-        if deck is None:
+        if deck is None or deck.advance == "timer":
+            # A timer-only lineup ("Taps also flip" off) ignores links for
+            # navigation; only the cycle moves it.
             return None
         target = self._deck_link_target(deck, self._deck_current_page(deck, device_id), button)
         return (deck, target) if target is not None else None
@@ -1023,8 +1025,8 @@ class ButtonService:
         the device's current deck page, else None (fall through to markup
         touch regions)."""
         deck = self._bound_deck(device_id)
-        if deck is None:
-            return None
+        if deck is None or deck.advance == "timer":
+            return None  # timer-only lineup: zones don't navigate
         dims = self._panel_dims(device_id)
         if dims is None:
             return None

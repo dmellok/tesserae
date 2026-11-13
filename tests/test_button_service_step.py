@@ -386,3 +386,57 @@ def test_failed_push_is_reported_and_keeps_the_position(tmp_path: Path) -> None:
     assert rig.nav.current_page("kitchen", "morning") == "a"
     rig.push.status = "sent"
     assert rig.svc.step(device_id="kitchen", forward=True).pushed_page_id == "b"
+
+
+# ---------- timer-only lineups ignore tap navigation ----------
+
+
+def _linked_deck(advance: str) -> Deck:
+    """A -> (right) -> C by graph link, where the cycle order would be B."""
+    return Deck(
+        id="lu",
+        name="Lu",
+        advance=advance,  # type: ignore[arg-type]
+        advance_trigger="cycle",
+        device_ids=["kitchen"],
+        pages=[
+            DeckPage(page_id="a", links=[DeckLink(target_page_id="c", button="right")]),
+            DeckPage(page_id="b"),
+            DeckPage(page_id="c"),
+        ],
+    )
+
+
+def test_timer_only_lineup_ignores_graph_links_on_buttons(tmp_path: Path) -> None:
+    rig = _rig(tmp_path)
+    rig.decks.upsert(_linked_deck("timer"))
+    rig.nav.set("kitchen", "lu", "a")
+    rig.svc.handle_button(device_id="kitchen", button="right", event_id=1)
+    assert rig.nav.get("kitchen")["page_id"] != "c"
+
+
+def test_both_mode_lineup_follows_graph_links_on_buttons(tmp_path: Path) -> None:
+    rig = _rig(tmp_path)
+    rig.decks.upsert(_linked_deck("both"))
+    rig.nav.set("kitchen", "lu", "a")
+    rig.svc.handle_button(device_id="kitchen", button="right", event_id=1)
+    assert rig.nav.get("kitchen")["page_id"] == "c"
+
+
+def test_timer_only_lineup_touch_zone_does_not_navigate(tmp_path: Path) -> None:
+    from app.button_service import TouchStroke
+    from app.state.deck_model import DeckZone
+
+    rig = _rig(tmp_path)
+    zone = DeckZone(x=0, y=0, w=1, h=1)
+    pages = [
+        DeckPage(page_id="a", links=[DeckLink(target_page_id="b", zone=zone)]),
+        DeckPage(page_id="b"),
+    ]
+    rig.svc._panel_dims = lambda _dev: (100, 100)  # type: ignore[method-assign]
+    for advance, expected in (("timer", None), ("both", "b")):
+        deck = Deck(id="lu", name="Lu", advance=advance, device_ids=["kitchen"], pages=pages)  # type: ignore[arg-type]
+        rig.decks.upsert(deck)
+        rig.nav.set("kitchen", "lu", "a")
+        got = rig.svc._try_deck_touch("kitchen", TouchStroke(50, 50, 50, 50))
+        assert (got[1] if got else None) == expected, advance

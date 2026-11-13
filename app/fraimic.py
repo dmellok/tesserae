@@ -669,10 +669,16 @@ class FraimicPublisher:
                         events = upcoming(
                             device.id,
                             now=datetime.fromtimestamp(now, UTC),
-                            limit=fraimic_wakes.CHAIN_SLOTS,
+                            limit=fraimic_wakes.CHAIN_SLOTS * 2,
                             quiet_window=quiet,
                         )
-                        changes = [e.scheduled_at.timestamp() for e in events]
+                        # A dashboard's own Updates refresh is not a lineup
+                        # change, so it doesn't spend one of the frame's wakes.
+                        changes = [
+                            e.scheduled_at.timestamp()
+                            for e in events
+                            if getattr(e, "cause", None) != "dashboard_refresh"
+                        ][: fraimic_wakes.CHAIN_SLOTS]
                     except Exception:
                         logger.exception("fraimic %s: reading upcoming pushes failed", device.id)
             elif mode == fraimic_wakes.MODE_INTERVAL:
