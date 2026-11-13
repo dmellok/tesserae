@@ -298,11 +298,13 @@
     return s;
   }
 
-  function dayTiles(l) {
+  function dayTiles(l, ui) {
+    const flash = ui && ui.dayFlash ? ui.dayFlash(l.id) : null;
     const tiles = LETTER.map((c, i) => {
       const on = !!l.days[i];
       const edited = l.pending_days && l.pending_days.includes(i);
-      return `<button type="button" class="lu-dt${on ? " on" : ""}${i === l.today_index ? " is-today" : ""}${edited ? " is-edited" : ""}" data-toggle-day="${esc(l.id)}:${i}" aria-pressed="${on ? "true" : "false"}" title="${DAYS[i]}: ${on ? "runs. Click to remove" : "off. Click to add"}">${c}</button>`;
+      const just = flash && flash.day === i ? ` just-${on ? "on" : "off"}` : "";
+      return `<button type="button" class="lu-dt${on ? " on" : ""}${i === l.today_index ? " is-today" : ""}${edited ? " is-edited" : ""}${just}" data-toggle-day="${esc(l.id)}:${i}" aria-pressed="${on ? "true" : "false"}" title="${DAYS[i]}: ${on ? "runs. Click to remove" : "off. Click to add"}">${c}</button>`;
     }).join("");
     return `<span class="lu-days" role="group" aria-label="Days ${esc(l.name)} runs">${tiles}</span>`;
   }
@@ -408,14 +410,14 @@
     const folded = !isNew && (ui && ui.folded ? ui.folded(l) : l.folded);
     const rowErr = ui && ui.rowError ? ui.rowError(l) : "";
     const edot = l.pending ? '<i class="lu-edot" title="Unsaved change"></i>' : "";
-    const meta = `${l.window ? dayTiles(l) : ""}${rowChips(l)}`;
+    const meta = `${l.window ? dayTiles(l, ui) : ""}${rowChips(l)}`;
     return (
       `<li class="lu-row ${STATE_CLS[l.status] || "is-off"}${folded ? " is-folded" : ""}${isNew ? " is-new" : ""}" id="lu-row-${esc(uid)}" data-lineup="${esc(l.id)}" data-display="${esc(d.id)}" data-kind="${esc(l.kind)}" data-status="${esc(l.status)}">` +
       `<div class="lu-row-head"><span class="lu-row-tag"><span class="lu-tag-st ${TAG_CLS[l.status] || "off"}">${l.status === "live" ? '<i class="lu-dot pulse"></i>' : ""}${esc(l.status_label)}</span></span>` +
-      `<div class="lu-row-title"><span class="lu-row-name">${esc(l.name)}${edot}</span><span class="lu-row-meta" title="${esc(l.mode_label)}, ${esc(l.days_text)}">${meta}</span>${(l.warnings || []).map((w) => `<span class="lu-row-warning">${ico("info")}${esc(w)}</span>`).join("")}${l.display_removed ? `<span class="lu-row-warning">${ico("info")}Display removed</span>` : ""}${rowErr ? `<span class="lu-row-err" role="alert">${ico("info")}${esc(rowErr)}</span>` : ""}</div>` +
+      `<div class="lu-row-title"><span class="lu-row-name"><button type="button" class="lu-name" data-name-edit="${esc(l.id)}" title="Rename. Click to edit">${esc(l.name)}</button>${edot}</span><span class="lu-row-meta" title="${esc(l.mode_label)}, ${esc(l.days_text)}">${meta}</span>${(l.warnings || []).map((w) => `<span class="lu-row-warning">${ico("info")}${esc(w)}</span>`).join("")}${l.display_removed ? `<span class="lu-row-warning">${ico("info")}Display removed</span>` : ""}${rowErr ? `<span class="lu-row-err" role="alert">${ico("info")}${esc(rowErr)}</span>` : ""}</div>` +
       `<div class="lu-row-state">${rowState(l)}</div>${rowActions(l, d.id)}` +
       `<button class="lu-fold" type="button" aria-expanded="${folded ? "false" : "true"}" aria-controls="lu-body-${esc(uid)}" aria-label="${esc(l.name)}: show or hide dashboards" data-fold="${esc(l.id)}">${ico("caret")}</button></div>` +
-      `<div class="lu-row-body" id="lu-body-${esc(uid)}"><div class="lu-strip-scroll" tabindex="0" role="region" aria-label="Dashboards in ${esc(l.name)}; scrolls sideways"><ol class="lu-strip${l.status === "live" ? " has-now" : ""} ${d.orientation || "l"}">${l.steps.map((s) => stepHtml(d, l, s, ui)).join("")}</ol></div></div></li>`
+      `<div class="lu-row-body" id="lu-body-${esc(uid)}">${l.off_why ? `<span class="lu-off-why" title="${esc(l.off_why.title)}">${ico("info")}${esc(l.off_why.label)}</span>` : ""}<div class="lu-strip-scroll" tabindex="0" role="region" aria-label="Dashboards in ${esc(l.name)}; scrolls sideways"><ol class="lu-strip${l.status === "live" ? " has-now" : ""} ${d.orientation || "l"}">${l.steps.map((s) => stepHtml(d, l, s, ui)).join("")}</ol></div></div></li>`
     );
   }
 
@@ -477,7 +479,7 @@
     const nl = d.next_line;
     const next = `<p class="lu-nextl" title="${esc(nl.title)}">${esc(nl.before)}${nl.at ? ` <b>${esc(nl.at)}</b>` : ""}${nl.after ? ` ${esc(nl.after)}` : ""}</p>`;
     const collapsed = ui && ui.collapsed ? ui.collapsed(d) : false;
-    const showBar = !collapsed && !(ui && ui.view === "timeline");
+    const showBar = !(ui && ui.view === "timeline");
     const today = showBar
       ? `<div class="lu-today"><div class="lu-today-bar">${dayTrack(d, d.day, editable)}${dayScale(d.day)}</div>${dayPick(d, d.day, vm.now.weekday)}</div>`
       : "";
@@ -485,7 +487,7 @@
       `<header class="lu-ds-hdr"><figure class="lu-now-thumb" title="${esc(delivering ? ph.title : op ? `On screen: ${op.name}` : fr ? fr.title : ph.title)}">${qt ? `<span class="lu-now-wrap">${thumbHtml}<span class="lu-qthumb" role="group" aria-label="${esc(qt.title)}" title="${esc(qt.title)}">${thumb(qt.name, qt.thumb_url, qt.aspect, qt.orientation, "", null, false, d)}<span class="lu-qtag">${ico("clock")}<span>${esc(qt.label)}</span></span></span></span>` : thumbHtml}</figure>` +
       `<div class="lu-ds-name-row"><div class="lu-ds-title"><h2>${esc(d.name)}</h2>${d.settings_url ? `<a class="lu-gear" href="${esc(d.settings_url)}" title="${esc(d.name)} settings" aria-label="${esc(d.name)} settings">${ico("gear")}</a>` : ""}</div><span class="lu-ds-tags">${tags}</span></div>` +
       `<div class="lu-ds-state">${show}${next}</div>${today}` +
-      `<button class="lu-fold lu-ds-fold" type="button" data-collapse="${esc(d.id)}" aria-expanded="${collapsed ? "false" : "true"}" aria-controls="lu-dsb-${esc(d.id)}" aria-label="${esc(d.name)}: collapse or expand">${ico("caret")}</button></header>`
+      `<span class="lu-ds-ctl"><button class="lu-ibtn lu-ds-add" type="button" data-open-timed-wizard data-wizard-display="${esc(d.id)}" aria-haspopup="dialog" aria-label="New lineup for ${esc(d.name)}" title="New lineup for ${esc(d.name)}">${ico("plus")}</button><button class="lu-fold lu-ds-fold" type="button" data-collapse="${esc(d.id)}" aria-expanded="${collapsed ? "false" : "true"}" aria-controls="lu-dsb-${esc(d.id)}" aria-label="${esc(d.name)}: collapse or expand">${ico("caret")}</button></span></header>`
     );
   }
 

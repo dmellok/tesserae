@@ -9,6 +9,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 ### Added
 
 - Device kinds can place a config field in a named group (`group`) and show it only for some values (`show_if`).
+- Lineups: a + beside each display's chevron starts a new lineup for that display.
+- Lineups: a day tile you click shows a check (runs) or an x (off) for a moment, and a small one until the change is saved.
+- Lineups: click a lineup's name to rename it in place; Enter or clicking away saves, Escape cancels.
+- Lineups: a daily push can take an end time ("06:00-18:00"); with several dashboards it then steps through them in that window. Remove the end to go back to a single push.
+- Lineups: drag a lineup's dashboards left or right to reorder them, or press Alt+Left / Alt+Right on one; it saves on drop.
 
 ### Changed
 
@@ -22,6 +27,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 - Blank pictures on a frame: a render whose images fail to load is retried once, and a scheduled, lineup or refresh send that still has broken images keeps the previous frame. A manual send goes out with a warning in History.
 - Device page: dashboard schedules have their own list instead of sitting in the Lineups list.
+- Lineups: a greyed row says why in a small tag (Not today, Done for today, Off, Not playing), so grey pictures aren't mistaken for black and white.
+- Lineups: a long day tag such as "Mon Tue Wed Sat Sun" no longer runs under the lineup's title.
+- Lineups: the time editor shows AM or PM in full.
+- Lineups: a display's day bar stays when you fold it; only its lineup rows fold.
+- Lineups: the day picker's calendar icon sits level with the middle of the day bar, at any width.
+- Lineups: reordering a live rotation sends the dashboard now in its slot.
 
 ## [0.511.0], 2026-11-13
 

@@ -1227,6 +1227,8 @@ def _lineup_input(
             step_item=url_for("decks.step_item", deck_id=deck.id),
             window=url_for("decks.edit_window", deck_id=deck.id),
             days=url_for("decks.edit_days", deck_id=deck.id),
+            name=url_for("decks.edit_name", deck_id=deck.id),
+            order=url_for("decks.edit_order", deck_id=deck.id),
             bind=url_for("decks.bind_pages", deck_id=deck.id),
         )
     return LineupInput(
@@ -1245,6 +1247,7 @@ def _lineup_input(
         priority=deck.advance_priority,
         last_fired=last_fired,
         explicit_display=bool(deck.device_ids),
+        end_hint=deck.advance_end_at if kind == "daily" else None,
     )
 
 
@@ -1446,7 +1449,7 @@ def _build_lineups_view(
 
     rotations = current_app.config["ROTATION_STORE"].all()
     try:
-        current = _current_step_for_each(rotations)
+        current = _current_step_for_each(rotations, now)
     except Exception:
         current = {}
     panel_states = _panel_states(devices)
@@ -1583,7 +1586,7 @@ def _build_lineups_view(
                 pause=_pause_input(d),
                 on_screen=on_screen,
                 hold=hold,
-                upcoming=_upcoming_inputs(d, datetime.now(UTC)),
+                upcoming=_upcoming_inputs(d, now.astimezone(UTC)),
                 published=published,
                 published_known=published_known,
                 settings_url=url_for("auth.device_page", instance_id=d.id),
@@ -1856,12 +1859,59 @@ def _clean_time(raw: Any, what: str, deck_id: str | None = None) -> str:
     return f"{int(h):02d}:{int(m):02d}"
 
 
-def _edited_deck(deck: Deck, *, start: Any = _UNSET, end: Any = _UNSET, days: Any = None) -> Deck:
+def _edited_deck(
+    deck: Deck,
+    *,
+    start: Any = _UNSET,
+    end: Any = _UNSET,
+    days: Any = None,
+    push: bool = False,
+) -> Deck:
     """``deck`` with a new time window and/or weekday set, in the fields its
-    trigger runs on. Raises ``_EditError`` for input the deck can't take."""
+    trigger runs on. Raises ``_EditError`` for input the deck can't take.
+
+    A daily push has no end: the scheduler fires it once, at its time, and
+    never reads ``advance_end_at`` for it. Giving one an ``end`` therefore
+    makes it what "from 6 AM until 6:30 PM" means in the model. One
+    dashboard becomes an interval lineup, shown again every
+    ``advance_interval_minutes`` inside that window; several become a cycle
+    (a rotation) from the push time to the end, stepping through them every
+    ``advance_interval_minutes`` (or each page's own dwell). A daily push
+    only ever sends its first dashboard, so the cycle is also what makes the
+    others show. ``push`` is the way back: a one-dashboard interval lineup,
+    or any cycle, becomes a daily push at its start time."""
     kind = _lineup_kind(deck)
     changes: dict[str, Any] = {}
-    if start is not _UNSET or end is not _UNSET:
+    if push:
+        if kind == "cycle" and deck.advance == "timer":
+            # (A "both" deck also moves on taps; only the cycle trigger runs it.)
+            raw_start = start if start is not _UNSET else deck.advance_anchor
+        elif kind == "interval" and len(deck.pages) == 1:
+            raw_start = start if start is not _UNSET else deck.advance_window_start
+        else:
+            raise _EditError(
+                f"{deck.name} can only go back to a single push when it is a rotation, "
+                "or one dashboard shown through a window.",
+                400,
+                deck.id,
+            )
+        if end is not _UNSET and end not in (None, ""):
+            raise _EditError("A single push has no end time.", 400, deck.id)
+        if raw_start in (None, ""):
+            raise _EditError("A single push needs a start time.", 400, deck.id)
+        s = _clean_time(raw_start, "Start", deck.id)
+        if s == "24:00":
+            raise _EditError("Start must be before 24:00.", 400, deck.id)
+        # A daily push never reads an end; one left behind would only make the
+        # companion app treat the lineup as one it cannot edit.
+        changes.update(
+            advance_trigger="daily",
+            advance_fires_at=s,
+            advance_window_start=None,
+            advance_window_end=None,
+            advance_end_at=None,
+        )
+    elif start is not _UNSET or end is not _UNSET:
         if kind == "manual":
             raise _EditError(f"{deck.name} runs by hand; it has no time window.", 400, deck.id)
         if kind == "daily":
@@ -1870,7 +1920,47 @@ def _edited_deck(deck: Deck, *, start: Any = _UNSET, end: Any = _UNSET, days: An
             )
             if s == "24:00":
                 raise _EditError("Start must be before 24:00.", 400, deck.id)
-            changes["advance_fires_at"] = s
+            raw_end = None if end is _UNSET else end
+            if raw_end in (None, ""):
+                changes["advance_fires_at"] = s
+            else:
+                end_s = _clean_time(raw_end, "End", deck.id)
+                if (parse_hhmm(end_s) or 0) <= (parse_hhmm(s) or 0):
+                    raise _EditError("End must be after start.", 400, deck.id)
+                # A window to midnight is stored as no end (see the interval
+                # and cycle branches).
+                stop = None if end_s == "24:00" else end_s
+                if len(deck.pages) > 1:
+                    # A rotation's whole cycle is capped at a week
+                    # (rotation_model); a cycle saved past that fails to load
+                    # and takes the Lineups page down with it.
+                    if deck.advance_cycle_minutes > 10_080:
+                        raise _EditError(
+                            "These dashboards' times add up to more than a week, "
+                            "so this push can't take an end time.",
+                            400,
+                            deck.id,
+                        )
+                    changes.update(
+                        advance_trigger="cycle",
+                        advance_anchor=s,
+                        advance_end_at=stop,
+                        advance_fires_at=None,
+                        advance_window_start=None,
+                        advance_window_end=None,
+                    )
+                    if deck.legacy_kind == "schedule":
+                        # The scheduler skips a "both"-mode cycle still tagged as a
+                        # migrated schedule; the lineup is a rotation now.
+                        changes["legacy_kind"] = None
+                else:
+                    changes.update(
+                        advance_trigger="interval",
+                        advance_window_start=s,
+                        advance_window_end=stop,
+                        advance_fires_at=None,
+                        advance_end_at=None,
+                    )
         elif kind == "cycle":
             s = _clean_time(start if start is not _UNSET else deck.advance_anchor, "Start", deck.id)
             raw_end = end if end is not _UNSET else deck.advance_end_at
@@ -2035,7 +2125,10 @@ def _check_weekday(value: Any, what: str, deck_id: str | None) -> int:
     return int(value)
 
 
-_EDIT_FIELDS = frozenset({"id", "start", "end", "days", "toggle_day", "on"})
+#: The longest lineup name the inline rename takes.
+_NAME_MAX = 80
+
+_EDIT_FIELDS = frozenset({"id", "start", "end", "days", "toggle_day", "on", "push"})
 
 
 def _validated_edit(raw: Any, *, require_on: bool = False) -> dict[str, Any]:
@@ -2059,6 +2152,8 @@ def _validated_edit(raw: Any, *, require_on: bool = False) -> dict[str, Any]:
             raise _EditError("Days must be a list of weekdays 0 (Mon) to 6 (Sun).", 400, deck_id)
         for d in days:
             _check_weekday(d, "Each day", deck_id)
+    if "push" in raw and not isinstance(raw["push"], bool):
+        raise _EditError("'push' must be true or false.", 400, deck_id)
     if "toggle_day" in raw:
         if raw.get("days") is not None:
             raise _EditError("Send days or a day to toggle, not both.", 400, deck_id)
@@ -2130,6 +2225,7 @@ def _apply_edits(edits: list[Any], day: Any, *, require_on: bool = False) -> Res
                 start=edit.get("start", _UNSET),
                 end=edit.get("end", _UNSET),
                 days=days,
+                push=bool(edit.get("push")),
             )
             if deck_id not in order:
                 order.append(deck_id)
@@ -2154,15 +2250,18 @@ def _apply_edits(edits: list[Any], day: Any, *, require_on: bool = False) -> Res
 def edit_window(deck_id: str) -> Response:
     """Inline edit of a lineup's time window. JSON ``{"start": "HH:MM",
     "end": "HH:MM" | null}`` (``end`` ``24:00`` or null = until midnight
-    for a rotation; ignored for a daily push). Refuses (409) a window that
-    meets another lineup of the same display on a shared day; a window in
-    quiet hours saves with a warning."""
+    for a rotation). A daily push given an ``end`` becomes an interval lineup
+    over that window (one dashboard) or a rotation (several); ``{"push":
+    true}`` turns a one-dashboard window or a rotation back into a push at
+    its start. Refuses (409) a window that meets another
+    lineup of the same display on a shared day; a window in quiet hours
+    saves with a warning."""
     body = _json_body()
     edit: dict[str, Any] = {"id": deck_id}
-    for key in ("start", "end"):
+    for key in ("start", "end", "push"):
         if key in body:
             edit[key] = body[key]
-    if "start" not in edit and "end" not in edit:
+    if "start" not in edit and "end" not in edit and "push" not in edit:
         return _edit_error_json(_EditError("Send a start and/or end time.", 400, deck_id))
     return _apply_edits([edit], _body_view_day(body, day_alias=True))
 
@@ -2185,6 +2284,111 @@ def edit_days(deck_id: str) -> Response:
     else:
         return _edit_error_json(_EditError("Send days or a day to toggle.", 400, deck_id))
     return _apply_edits([edit], _body_view_day(body, day_alias=False))
+
+
+@bp.post("/<deck_id>/name")
+def edit_name(deck_id: str) -> Response:
+    """Inline rename of a lineup. JSON ``{"name": "..."}``: trimmed, never
+    empty, one line, at most ``_NAME_MAX`` characters. Nothing else about the
+    lineup changes (so no warmed frame or nav position is dropped); the reply
+    is the same as the other edits: the touched displays, redrawn."""
+    body = _json_body()
+    raw = body.get("name")
+    if not isinstance(raw, str):
+        return _edit_error_json(_EditError("Name must be text.", 400, deck_id))
+    name = " ".join(raw.split())
+    if not name:
+        return _edit_error_json(_EditError("A lineup needs a name.", 400, deck_id))
+    if len(name) > _NAME_MAX:
+        return _edit_error_json(
+            _EditError(f"Keep the name to {_NAME_MAX} characters or fewer.", 400, deck_id)
+        )
+    try:
+        view_day = _view_day(_body_view_day(body, day_alias=True))
+    except _EditError as exc:
+        return _edit_error_json(exc)
+
+    def plan(decks: dict[str, Deck]) -> tuple[list[Deck], Deck]:
+        current = decks.get(deck_id)
+        if current is None:
+            raise _EditError(f"No lineup with id {deck_id!r}.", 404, deck_id)
+        if current.name == name:
+            return [], current
+        try:
+            renamed = _merged_deck(current, name=name)
+        except ValidationError as exc:
+            raise _EditError(_first_error(exc), 400, deck_id) from exc
+        return [renamed], renamed
+
+    try:
+        saved = _store().transaction(plan)
+    except _EditError as exc:
+        return _edit_error_json(exc)
+    page_devices = {p.id: list(p.device_ids) for p in _pages().list()}
+    return _edit_result([saved], [], page_devices, view_day)
+
+
+@bp.post("/<deck_id>/order")
+def edit_order(deck_id: str) -> Response:
+    """Move one step of a lineup. JSON ``{"from": 2, "to": 0}`` (zero-based
+    step indexes: the step at ``from`` ends up at ``to``), with the
+    dashboard ids as the caller saw them in ``"pages"`` when it has them: a
+    lineup that changed elsewhere since (a step added, removed or moved) is
+    refused with 409 rather than moving the wrong step. Only the order
+    changes: each step keeps its own dwell and conditions, and the warmed
+    frames and nav positions stay valid (they are per dashboard)."""
+    body = _json_body()
+    for key in ("from", "to"):
+        if not _is_int(body.get(key)):
+            return _edit_error_json(_EditError(f"'{key}' must be a step number.", 400, deck_id))
+    pages = body.get("pages")
+    if pages is not None and (
+        not isinstance(pages, list) or not all(isinstance(p, str) for p in pages)
+    ):
+        return _edit_error_json(
+            _EditError("'pages' must be a list of dashboard ids.", 400, deck_id)
+        )
+    src, dst = int(body["from"]), int(body["to"])
+    try:
+        view_day = _view_day(_body_view_day(body, day_alias=True))
+    except _EditError as exc:
+        return _edit_error_json(exc)
+
+    def plan(decks: dict[str, Deck]) -> tuple[list[Deck], Deck]:
+        current = decks.get(deck_id)
+        if current is None:
+            raise _EditError(f"No lineup with id {deck_id!r}.", 404, deck_id)
+        n = len(current.pages)
+        if pages is not None and pages != current.page_ids:
+            raise _EditError(
+                f"{current.name} changed since this page loaded; reload to reorder it.",
+                409,
+                deck_id,
+            )
+        if not (0 <= src < n and 0 <= dst < n):
+            raise _EditError(f"A step number must be 1 to {n}.", 400, deck_id)
+        if src == dst:
+            return [], current
+        moved = list(current.pages)
+        moved.insert(dst, moved.pop(src))
+        try:
+            reordered = _merged_deck(current, pages=moved)
+        except ValidationError as exc:
+            raise _EditError(_first_error(exc), 400, deck_id) from exc
+        return [reordered], reordered
+
+    try:
+        saved = _store().transaction(plan)
+    except _EditError as exc:
+        return _edit_error_json(exc)
+    if saved.advance != "manual" and saved.advance_trigger == "cycle":
+        # A rotation mid-window keeps its step number, which now names another
+        # dashboard: let the next tick send it rather than wait for the boundary.
+        resync = getattr(current_app.config.get("SCHEDULER"), "resync_cycle", None)
+        if callable(resync):
+            resync(saved.id)
+    page_devices = {p.id: list(p.device_ids) for p in _pages().list()}
+    return _edit_result([saved], [], page_devices, view_day)
 
 
 @bp.post("/edits")

@@ -2335,6 +2335,17 @@ class Scheduler:
             self._rotation_last_window_start.pop(rotation.id, None)
         return self.compute_step_state(rotation, now)
 
+    def resync_cycle(self, rotation_id: str) -> None:
+        """Forget which step of ``rotation_id`` was last fired, so the next
+        tick sends whatever dashboard now sits in the current step's place.
+        For a lineup whose steps were reordered mid-window: the slot index is
+        unchanged, so without this the display keeps the old dashboard until
+        the next boundary. A display already on the right dashboard is not
+        repainted (the per-display check in ``_fire_deck_advance``), and the
+        min-hold gate still applies."""
+        with self._lock:
+            self._rotation_last_step.pop(rotation_id, None)
+
     def clear_anchor_override(self, rotation_id: str) -> None:
         """Drop any manual override for ``rotation_id``. Used by tests
         and by the rotation routes when the user disables a rotation

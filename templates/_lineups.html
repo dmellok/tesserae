@@ -229,12 +229,13 @@
 <li class="lu-row {{ state_cls }}{% if l.folded and not is_new %} is-folded{% endif %}{% if is_new %} is-new{% endif %}" id="lu-row-{{ uid }}" data-lineup="{{ l.id }}" data-display="{{ d.id }}" data-kind="{{ l.kind }}" data-status="{{ l.status }}">
 <div class="lu-row-head">
 <span class="lu-row-tag"><span class="lu-tag-st {{ tag_cls }}">{% if l.status == 'live' %}<i class="lu-dot pulse"></i>{% endif %}{{ l.status_label }}</span></span>
-<div class="lu-row-title"><span class="lu-row-name">{{ l.name }}</span><span class="lu-row-meta" title="{{ l.mode_label }}, {{ l.days_text }}">{% if l.window %}{{ day_tiles(l) }}{% endif %}{{ row_chips(l) }}</span>{% for warning in l.warnings %}<span class="lu-row-warning">{{ ico('info') }}{{ warning }}</span>{% endfor %}{% if l.display_removed %}<span class="lu-row-warning">{{ ico('info') }}Display removed</span>{% endif %}</div>
+<div class="lu-row-title"><span class="lu-row-name"><button type="button" class="lu-name" data-name-edit="{{ l.id }}" title="Rename. Click to edit">{{ l.name }}</button></span><span class="lu-row-meta" title="{{ l.mode_label }}, {{ l.days_text }}">{% if l.window %}{{ day_tiles(l) }}{% endif %}{{ row_chips(l) }}</span>{% for warning in l.warnings %}<span class="lu-row-warning">{{ ico('info') }}{{ warning }}</span>{% endfor %}{% if l.display_removed %}<span class="lu-row-warning">{{ ico('info') }}Display removed</span>{% endif %}</div>
 <div class="lu-row-state">{{ row_state(l) }}</div>
 {{ row_actions(l, d.id) }}
 <button class="lu-fold" type="button" aria-expanded="{{ 'false' if l.folded and not is_new else 'true' }}" aria-controls="lu-body-{{ uid }}" aria-label="{{ l.name }}: show or hide dashboards" data-fold="{{ l.id }}">{{ ico('caret') }}</button>
 </div>
 <div class="lu-row-body" id="lu-body-{{ uid }}">
+{%- if l.off_why %}<span class="lu-off-why" title="{{ l.off_why.title }}">{{ ico('info') }}{{ l.off_why.label }}</span>{% endif %}
 <div class="lu-strip-scroll" tabindex="0" role="region" aria-label="Dashboards in {{ l.name }}; scrolls sideways"><ol class="lu-strip{% if l.status == 'live' %} has-now{% endif %} {{ d.orientation or 'l' }}">
 {%- for s in l.steps %}{{ step(d, l, s) }}{% endfor -%}
 </ol></div>
@@ -274,7 +275,7 @@
 <p class="lu-nextl" title="{{ d.next_line.title }}">{{ d.next_line.before }}{% if d.next_line.at %} <b>{{ d.next_line.at }}</b>{% endif %}{% if d.next_line.after %} {{ d.next_line.after }}{% endif %}</p>
 </div>
 <div class="lu-today"><div class="lu-today-bar">{{ day_track(d, d.day, editable_ids) }}{{ day_scale(d.day, vm.time_cycle) }}</div>{{ day_pick(d, d.day, vm.now.weekday) }}</div>
-<button class="lu-fold lu-ds-fold" type="button" data-collapse="{{ d.id }}" aria-expanded="true" aria-controls="lu-dsb-{{ d.id }}" aria-label="{{ d.name }}: collapse or expand">{{ ico('caret') }}</button>
+<span class="lu-ds-ctl"><button class="lu-ibtn lu-ds-add" type="button" data-open-timed-wizard data-wizard-display="{{ d.id }}" aria-haspopup="dialog" aria-label="New lineup for {{ d.name }}" title="New lineup for {{ d.name }}">{{ ico('plus') }}</button><button class="lu-fold lu-ds-fold" type="button" data-collapse="{{ d.id }}" aria-expanded="true" aria-controls="lu-dsb-{{ d.id }}" aria-label="{{ d.name }}: collapse or expand">{{ ico('caret') }}</button></span>
 </header>
 <div class="lu-ds-body" id="lu-dsb-{{ d.id }}">
 <div class="lu-sched">{% if d.lineups %}<ol class="lu-rows">{% for l in d.lineups %}{{ row(d, l, seen) }}{% endfor %}</ol>{% else %}<p class="lu-none">No lineups on this display yet.</p>{% endif %}</div>

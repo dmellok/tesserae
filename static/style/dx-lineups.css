@@ -380,7 +380,7 @@ main.page.lu-page {
 }
 .lu .lu-ds-hdr {
   display: grid;
-  grid-template-columns: auto minmax(0, 0.85fr) minmax(0, 1.15fr) var(--lu-fold-w);
+  grid-template-columns: auto minmax(0, 0.85fr) minmax(0, 1.15fr) auto;
   grid-template-areas: "thumb name bar chev" "thumb state bar chev";
   column-gap: 18px;
   row-gap: 12px;
@@ -400,7 +400,7 @@ main.page.lu-page {
 }
 @container lu-ds (max-width: 1000px) {
   .lu .lu-ds-hdr {
-    grid-template-columns: auto minmax(0, 1fr) var(--lu-fold-w);
+    grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas: "thumb name chev" "thumb state chev" "bar bar bar";
   }
   .lu .lu-ds-hdr .lu-today {
@@ -409,7 +409,7 @@ main.page.lu-page {
 }
 @container lu-ds (max-width: 560px) {
   .lu .lu-ds-hdr {
-    grid-template-columns: auto minmax(0, 1fr) var(--lu-fold-w);
+    grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas: "name name chev" "thumb state state" "bar bar bar";
     padding: 14px 8px 14px 16px;
     column-gap: 12px;
@@ -418,9 +418,20 @@ main.page.lu-page {
     --slot: 92px;
   }
 }
-.lu .lu-ds-hdr .lu-ds-fold {
+/* The display's "+" (a new lineup for it) sits beside its fold chevron. */
+.lu .lu-ds-hdr .lu-ds-ctl {
   grid-area: chev;
+  display: flex;
+  align-items: center;
+  justify-self: end;
+}
+.lu .lu-ds-hdr .lu-ds-fold {
   margin: 0;
+}
+.lu .lu-ds-hdr .lu-ds-add {
+  width: var(--lu-fold-w);
+  height: var(--lu-fold-w);
+  color: var(--t-muted);
 }
 .lu .lu-ds-hdr .lu-now-thumb {
   grid-area: thumb;
@@ -746,20 +757,35 @@ main.page.lu-page {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
-  gap: 6px 14px;
+  gap: 5px 14px;
 }
+/* The bar and its scale are grid cells of .lu-today, so the picker can sit on
+   the track's own row and share its centre line. */
 .lu .lu-today-bar {
+  display: contents;
+}
+.lu .lu-today-bar > .lu-trk {
+  grid-area: 1 / 1;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
+}
+.lu .lu-today-bar > .lu-scale {
+  grid-area: 2 / 1;
+}
+/* The "Update in" flag's headroom is padding on the whole bar, not margin on
+   the track, so it is not part of the track's row. */
+.lu .lu-today:has(> .lu-today-bar > .lu-trk.flagged) {
+  padding-top: 30px;
+}
+.lu .lu-today .lu-trk.flagged {
+  margin-top: 0;
 }
 .lu .lu-dpick {
+  grid-area: 1 / 2;
+  align-self: stretch;
   position: relative;
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-top: 1px;
 }
 .lu .lu-dp-label {
   display: inline-flex;
@@ -845,15 +871,6 @@ main.page.lu-page {
 }
 .lu .lu-dp-today:hover {
   color: var(--t-fg);
-}
-@container lu-ds (max-width: 560px) {
-  .lu .lu-today {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .lu .lu-today .lu-dpick {
-    grid-row: 1;
-    justify-self: end;
-  }
 }
 
 /* The bar: a plain slot with a thin rod; lineup blocks sit on top of it,
@@ -1575,6 +1592,26 @@ main.page.lu-page {
   filter: grayscale(0.9);
   opacity: 0.7;
 }
+/* Why the pictures are grey: a small tag over the strip, not itself greyed. */
+.lu .lu-off-why {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 0 8px;
+  padding: 2px 8px 2px 6px;
+  border-radius: var(--lu-r);
+  background: color-mix(in oklab, var(--t-fg) 7%, transparent);
+  color: var(--t-muted);
+  font: 700 10px/1.4 var(--t-font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: default;
+}
+.lu .lu-off-why .lu-ico {
+  font-size: 13px;
+  stroke-width: 1.5;
+}
 .lu .lu-row.is-off:hover .lu-row-name,
 .lu .lu-row.is-off:not(.is-folded) .lu-row-name {
   color: var(--t-fg-soft);
@@ -1594,10 +1631,14 @@ main.page.lu-page {
   row-gap: 6px;
   padding: 11px 8px 11px 16px;
   cursor: pointer;
-  grid-template-columns: 112px minmax(0, 1fr) minmax(220px, 290px) auto var(--lu-fold-w);
+  /* The tag column is at least 112px but grows to its label: "Mon Tue Wed Sat Sun"
+     is wider than that and must not run under the title. */
+  grid-template-columns: minmax(112px, max-content) minmax(0, 1fr) minmax(220px, 290px) auto var(
+      --lu-fold-w
+    );
   grid-template-areas: "tag title state actions fold";
 }
-.lu .lu-row-head :is(.lu-days, .lu-win, .lu-win-edit, .lu-row-actions) {
+.lu .lu-row-head :is(.lu-days, .lu-win, .lu-win-edit, .lu-name-edit, .lu-row-actions) {
   cursor: auto;
 }
 .lu .lu-fold {
@@ -1673,6 +1714,73 @@ main.page.lu-page {
   font-weight: 700;
   letter-spacing: -0.01em;
   overflow-wrap: anywhere;
+}
+/* The name is a button that turns into a text field; it looks like plain title text. */
+.lu .lu-row-name .lu-name {
+  all: unset;
+  display: inline;
+  box-sizing: border-box;
+  cursor: text;
+  border-radius: 4px;
+  overflow-wrap: anywhere;
+  text-decoration: underline dotted transparent;
+  text-underline-offset: 4px;
+  transition: text-decoration-color 120ms ease-out;
+}
+.lu .lu-row-name .lu-name:hover {
+  text-decoration-color: color-mix(in oklab, currentcolor 55%, transparent);
+}
+.lu .lu-row-name .lu-name:focus-visible {
+  outline: 2px solid var(--lu-acc);
+  outline-offset: 2px;
+}
+.lu .lu-name-edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+/* The field sits where the name was (its text does not move and the row does not
+   grow) and is as wide as the name, up to the title column. */
+.lu .lu-name-edit input {
+  height: 28px !important;
+  min-height: 0 !important;
+  width: min(100%, 26em);
+  margin: -3px 0 -3px -7px;
+  padding: 0 6px;
+  border: 1px solid var(--t-border-strong);
+  border-radius: var(--lu-r);
+  background: var(--t-surface);
+  color: var(--t-fg);
+  font: 700 15.5px var(--t-font) !important;
+  letter-spacing: -0.01em;
+  box-shadow: none;
+}
+@supports (field-sizing: content) {
+  .lu .lu-name-edit input {
+    field-sizing: content;
+    width: auto;
+    min-width: 10em;
+    max-width: calc(100% + 7px);
+  }
+}
+.lu .lu-name-edit input:focus {
+  outline: none;
+  border-color: var(--lu-acc);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--lu-acc) 25%, transparent);
+}
+.lu .lu-name-edit input[aria-invalid="true"] {
+  border-color: var(--t-danger);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--t-danger) 25%, transparent);
+}
+.lu .lu-name-err {
+  color: var(--t-danger);
+  font: 12px var(--t-font);
+}
+.lu .lu-name-err:empty {
+  display: none;
 }
 .lu .lu-row-meta {
   display: flex;
@@ -1799,6 +1907,8 @@ main.page.lu-page {
   color: color-mix(in oklab, var(--t-fg) 30%, transparent);
   cursor: pointer;
   text-align: center;
+  position: relative;
+  --lu-dt-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3E%3Cpath d='M1 4.3 3.1 6.3 7 1.8' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 :root[data-ui="paper"] .lu .lu-days .lu-dt {
   border-radius: 2px;
@@ -1817,6 +1927,78 @@ main.page.lu-page {
 }
 .lu .lu-days .lu-dt.is-edited {
   box-shadow: inset 0 0 0 1px var(--t-warn);
+}
+/* On or off, said with a mark and not only a shade, on the days being changed: the
+   clicked tile shows a check (now runs) or an x (now off) in place of its letter for a
+   moment, and a day left changed keeps a small one at its corner until saved. The days
+   not being changed stay plain: their shade already says which run. */
+.lu .lu-days .lu-dt::before,
+.lu .lu-days .lu-dt::after {
+  content: "";
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease-out;
+}
+.lu .lu-days .lu-dt::before {
+  top: -4px;
+  right: -4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--t-fg);
+}
+.lu .lu-days .lu-dt::after {
+  top: -4px;
+  right: -4px;
+  width: 10px;
+  height: 10px;
+  background: var(--t-surface);
+  -webkit-mask: var(--lu-dt-mark) center / 7px 7px no-repeat;
+  mask: var(--lu-dt-mark) center / 7px 7px no-repeat;
+}
+.lu .lu-days .lu-dt:not(.on) {
+  --lu-dt-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3E%3Cpath d='M1.6 1.6 6.4 6.4M6.4 1.6 1.6 6.4' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.lu .lu-days .lu-dt.is-edited::before,
+.lu .lu-days .lu-dt.is-edited::after {
+  opacity: 1;
+}
+/* A day turned off shows an outlined x, so it never reads as a check. */
+.lu .lu-days .lu-dt:not(.on)::before {
+  background: var(--t-surface);
+  box-shadow: inset 0 0 0 1px var(--t-fg-soft);
+}
+.lu .lu-days .lu-dt:not(.on)::after {
+  background: var(--t-fg);
+}
+/* Just clicked: the mark replaces the letter for a moment, large enough to read. */
+.lu .lu-days .lu-dt.just-on,
+.lu .lu-days .lu-dt.just-off {
+  color: transparent;
+}
+.lu .lu-days .lu-dt.just-on::before,
+.lu .lu-days .lu-dt.just-off::before {
+  inset: 0;
+  width: auto;
+  height: auto;
+  border-radius: 3px;
+  opacity: 1;
+}
+.lu .lu-days .lu-dt.just-on::after,
+.lu .lu-days .lu-dt.just-off::after {
+  inset: 0;
+  width: auto;
+  height: auto;
+  opacity: 1;
+  -webkit-mask-size: 11px 11px;
+  mask-size: 11px 11px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lu .lu-days .lu-dt::before,
+  .lu .lu-days .lu-dt::after {
+    transition: none;
+  }
 }
 @container lu-ds (max-width: 560px) {
   .lu .lu-days {
@@ -1847,7 +2029,9 @@ main.page.lu-page {
 .lu .lu-win-edit input {
   height: 26px !important;
   min-height: 0 !important;
-  width: 96px;
+  /* As wide as the browser draws the time, so "6:00 PM" keeps its AM/PM. */
+  width: auto;
+  min-width: 96px;
   padding: 0 4px;
   border: 1px solid var(--t-border-strong);
   border-radius: var(--lu-r);
@@ -1856,10 +2040,63 @@ main.page.lu-page {
   font: 12px var(--t-font-mono) !important;
   box-shadow: none;
 }
+/* With a mouse the time is typed or stepped with the arrow keys; Chrome's clock button
+   would cost the room "– 6:30 PM ×" needs to stay on one line. */
+@media (hover: hover) and (pointer: fine) {
+  .lu .lu-win-edit input::-webkit-calendar-picker-indicator {
+    display: none;
+  }
+}
 .lu .lu-win-edit input:focus {
   outline: none;
   border-color: var(--lu-acc);
   box-shadow: 0 0 0 2px color-mix(in oklab, var(--lu-acc) 25%, transparent);
+}
+.lu .lu-win-endwrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+/* "+ End time" on a push; on a window, a small x tucked against the end field. */
+.lu .lu-win-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 8px 0 6px;
+  border: 1px dashed var(--t-border-strong);
+  border-radius: var(--lu-r);
+  background: transparent;
+  color: var(--t-fg-soft);
+  font: 12px var(--t-font-mono);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.lu .lu-win-end .lu-ico {
+  font-size: 12px;
+}
+.lu .lu-win-end:hover {
+  border-style: solid;
+  color: var(--t-fg);
+}
+.lu .lu-win-end.is-rm {
+  justify-content: center;
+  width: 22px;
+  margin-left: -2px;
+  padding: 0;
+  border: 0;
+  color: var(--t-muted);
+}
+.lu .lu-win-end.is-rm:hover {
+  color: var(--t-fg);
+  background: color-mix(in oklab, var(--t-fg) 7%, transparent);
+}
+.lu .lu-win-end.is-rm + [data-win-ok] {
+  margin-left: 4px;
+}
+.lu .lu-win-end:focus-visible {
+  outline: 2px solid var(--lu-acc);
+  outline-offset: 1px;
 }
 .lu .lu-win-err {
   color: var(--t-danger);
@@ -2080,6 +2317,86 @@ main.page.lu-page {
   flex: 0 0 auto;
   align-items: flex-start;
   transition: opacity 150ms ease-out;
+}
+/* Reordering: grab a step by its picture or name; a bar shows where it will land. */
+.lu .lu-strip.is-sortable .lu-step {
+  position: relative;
+}
+.lu .lu-strip.is-sortable .lu-step img {
+  -webkit-user-drag: none;
+  user-select: none;
+}
+.lu .lu-strip.is-sortable .lu-step figcaption {
+  cursor: grab;
+}
+/* A grip beside the step's n/N while the pointer is on it says it can be moved. */
+@media (hover: hover) and (pointer: fine) {
+  .lu .lu-strip.is-sortable .lu-step .lu-step-meta::after {
+    content: "";
+    width: 7px;
+    height: 11px;
+    background: radial-gradient(circle, currentcolor 1px, transparent 1.3px) 0 0 / 3.5px 3.7px;
+    opacity: 0;
+    transition: opacity 120ms ease-out;
+  }
+  .lu .lu-strip.is-sortable .lu-step:is(:hover, :focus-within) .lu-step-meta::after {
+    opacity: 0.9;
+  }
+  .lu .lu-strip.is-reordering .lu-step .lu-step-meta::after {
+    opacity: 0;
+  }
+}
+.lu .lu-step.is-dragging {
+  opacity: 0.35;
+}
+.lu .lu-strip.is-reordering .lu-step {
+  transition: none;
+}
+/* The landing bar stands beside the pictures, in the gap between two steps (over the
+   arrow), not on a picture's edge. */
+.lu .lu-strip.is-sortable .lu-step figure {
+  position: relative;
+}
+.lu .lu-step.drop-before > figure::before,
+.lu .lu-step.drop-after > figure::after {
+  content: "";
+  position: absolute;
+  top: calc(var(--slot-h, 27px) - 4px);
+  height: calc(var(--th) + 8px);
+  width: 4px;
+  border-radius: 2px;
+  background: var(--lu-acc);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--lu-acc) 28%, transparent);
+  pointer-events: none;
+  z-index: 4;
+}
+.lu .lu-step.drop-before > figure::before {
+  left: -19px;
+}
+.lu .lu-step.drop-after > figure::after {
+  right: -12px;
+}
+/* Where a dropped step landed, for a moment. */
+.lu .lu-step.just-moved .lu-thumb {
+  animation: lu-step-landed 1s ease-out;
+}
+@keyframes lu-step-landed {
+  from {
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--t-fg) 55%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 3px transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lu .lu-step.just-moved .lu-thumb {
+    animation: none;
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--t-fg) 55%, transparent);
+  }
+}
+/* While one is dragged every other step is shown plainly, whatever now/next dimming applies. */
+.lu .lu-strip.is-reordering .lu-step:not(.is-dragging) {
+  opacity: 1 !important;
 }
 .lu .lu-strip.has-now .lu-step:not(.is-now):not(:hover):not(:focus-within) {
   opacity: 0.55;
@@ -2993,12 +3310,17 @@ main.page.lu-page {
   .lu input,
   .lu select,
   .lu .lu-tb-search input,
-  .lu .lu-win-edit input {
+  .lu .lu-win-edit input,
+  .lu .lu-name-edit input {
     font-size: 16px !important;
   }
   .lu .lu-win-edit input {
     height: 44px !important;
-    width: 116px;
+    min-width: 116px;
+  }
+  .lu .lu-name-edit input {
+    height: 44px !important;
+    margin: 0;
   }
   .lu .lu-fold,
   .lu .lu-ibtn,
@@ -3015,6 +3337,19 @@ main.page.lu-page {
   .lu .lu-win {
     min-height: 44px;
     padding: 0 6px;
+  }
+  .lu .lu-win-end {
+    min-height: 44px;
+    padding: 0 12px;
+  }
+  .lu .lu-win-end.is-rm {
+    min-width: 44px;
+  }
+  .lu .lu-row-name .lu-name {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    min-width: 44px;
   }
   .lu .lu-dp-label {
     height: 44px;
@@ -3273,7 +3608,7 @@ main.page.lu-page {
     column-gap: 6px;
   }
   .lu .lu-ds-hdr {
-    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.25fr) var(--lu-fold-w);
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.25fr) auto;
     column-gap: 12px;
   }
   .lu .lu-ds-tags {

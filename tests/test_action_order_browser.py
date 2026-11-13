@@ -102,7 +102,9 @@ _SWEEP_JS = r"""
   // states, not an action), menus of items, and the toast region.
   const SKIP_ANC = 'nav, [role=tablist], [role=menu], [role=listbox], .topbar, .sidebar, .tabs, '
     + '.seg, .lu-seg, .dx-segmented, .cat-seg, .preview-modes, .info-pop-wrap, .flash, '
-    + '[class*="-more-menu"], .cat-sort-menu';
+    + '[class*="-more-menu"], .cat-sort-menu, '
+    // a day bar's lineup blocks are draggable segments of a timeline, not an action row
+    + '.lu-trk';
   const vis = (el) => {
     const r = el.getBoundingClientRect();
     if (r.width < 2 || r.height < 2) return false;
