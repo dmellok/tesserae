@@ -702,3 +702,33 @@ def test_next_wake_in_status(app: Flask) -> None:
     frame.next_wakes = [T0 + timedelta(hours=1).total_seconds()]
     _publisher(app, frame, clock).tick()
     assert app.config["DEVICE_STATUS"]["hall"]["parsed"]["next_wake"].startswith("2026-11-10T06:59")
+
+
+def test_catalog_models_are_fraimic_frames_with_their_own_panel(app: Flask) -> None:
+    """A frame added as a catalog model (hardware/fraimic/*.json) is driven
+    like one added as the generic kind, and starts on its own panel size."""
+    with app.app_context():
+        result = device_service.create_instance(
+            devices=app.config["DEVICE_REGISTRY"],
+            renderers=app.config["RENDERER_REGISTRY"],
+            data_root=app.config["DATA_ROOT"],
+            instance_id="study",
+            kind_id="fraimic_standard_canvas",
+            name="Study Fraimic",
+        )
+    assert result.ok, result.error
+    device = result.device
+    assert fraimic.is_fraimic_device(device)
+    assert (device.panel["w"], device.panel["h"]) == (1200, 1600)
+    clock = Clock()
+    frame = FakeFrame(clock)
+    pub = _publisher(app, frame, clock)
+    assert [d.id for d in pub._frames()] == ["study"]
+    kinds = [d.id for d in fraimic.fraimic_kinds(app.config["DEVICE_REGISTRY"])]
+    assert kinds == ["fraimic", "fraimic_large_canvas", "fraimic_standard_canvas"]
+    client = app.test_client()
+    with client.session_transaction() as session:
+        session["authed"] = True
+    page = client.get("/settings/devices")
+    if page.status_code == 200:
+        assert b"fraimic_standard_canvas" in page.data

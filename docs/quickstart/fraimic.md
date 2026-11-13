@@ -2,6 +2,9 @@
 
 A Fraimic is a framed colour e-paper canvas (Spectra 6) with a local REST API. Tesserae drives it directly over your network: no Fraimic account, app, cloud or firmware change. It works with the 31.5" Large Canvas and the 13.3" frame, on firmware 0.2.31 or later.
 
+!!! info "10% off with TESSERAE10"
+    The code **TESSERAE10** takes 10% off the [Standard Canvas](https://fraimic.com/products/standard-canvas) (13.3") or the [Large Canvas](https://fraimic.com/products/large-canvas) (31.5") at fraimic.com. Fraimic supplied the Large Canvas this guide was written on free of charge, and Tesserae earns a commission on sales made with the code. What is written here is my own experience with the frame.
+
 On battery the frame spends most of its time in deep sleep, where nothing can reach it. It wakes on a tap, while charging, with **Keep Device Awake** on, or at the times in its own wake schedule. Tesserae sets that schedule for you, and at each wake it uploads the latest picture and puts the frame back to sleep.
 
 ## 01 — Give the frame a fixed address
@@ -13,8 +16,8 @@ To check the firmware, open `http://FRAME_IP/api/info` while the frame is awake:
 ## 02 — Add the frame in Tesserae
 
 1. **Settings → Devices → Add device → Fraimic**.
-2. Enter the frame's address, a device id and a name, and add it.
-3. The panel defaults to the 31.5" Large Canvas, 1440×2560 hung upright. For the 13.3", set the panel to 1200×1600 on the device card. Hung on its side, pick landscape; if the picture then comes out upside down, turn on the panel's flip.
+2. Pick the **Model**: the 31.5" Large Canvas (1440×2560 hung upright) or the 13.3" Standard Canvas (1200×1600). Hung on its side, pick landscape on the device card; if the picture then comes out upside down, turn on the panel's flip.
+3. Enter the frame's address, a device id and a name, and add it.
 4. **Tap the frame** so it is awake. Within a minute Tesserae writes its wake schedule to it and sends the current picture.
 
 ## 03 — Choose when it wakes
