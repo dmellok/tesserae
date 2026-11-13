@@ -258,6 +258,20 @@ class UpcomingInput:
 
 
 @dataclass(frozen=True)
+class DisplayShot:
+    """A dashboard as one display shows it. A dashboard bound to several
+    displays has one thumbnail and one shape (the largest panel's), which is
+    wrong on a display of another ratio; this is that display's own picture,
+    at its own panel size. ``composition_digest`` is the push to this display
+    that the thumbnail is, ``None`` when it is a fresh preview."""
+
+    thumb_url: str
+    width: int
+    height: int
+    composition_digest: str | None = None
+
+
+@dataclass(frozen=True)
 class DisplayInput:
     id: str
     name: str
@@ -302,6 +316,9 @@ class DisplayInput:
     #: own thumbnail is its newest render, which for a dashboard that changes on
     #: every render (an album) may be the one still waiting.
     glass_thumb_url: str = ""
+    #: dashboard id -> the dashboard as this display shows it, for a dashboard whose
+    #: shape here is not the one it has on the other displays it is bound to
+    shots: Mapping[str, DisplayShot] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -1730,11 +1747,15 @@ def _screen(
 ) -> ScreenView:
     w = dash.width if dash and dash.width > 0 else d.width
     h = dash.height if dash and dash.height > 0 else d.height
+    thumb_url = dash.thumb_url if dash else ""
+    shot = d.shots.get(dashboard_id)
+    if shot is not None and shot.width > 0 and shot.height > 0:
+        w, h, thumb_url = shot.width, shot.height, shot.thumb_url
     aspect, orient = _aspect(w, h)
     return ScreenView(
         dashboard_id=dashboard_id,
         name=MISSING_NAME if dash and dash.missing else dash.name if dash else dashboard_id,
-        thumb_url=dash.thumb_url if dash else "",
+        thumb_url=thumb_url,
         width=w,
         height=h,
         aspect=aspect,
@@ -2630,6 +2651,7 @@ def _lineup_view(
             )
         if i == nxt:
             pill = PillView("next", f"Next {next_at}", f"Next advance {next_at}")
+        shot = d.shots.get(st.dashboard_id)
         items = list(dash.items) if dash else []
         count = max(dash.item_count if dash else 1, len(items), 1)
         off_display = bool(
@@ -2646,7 +2668,9 @@ def _lineup_view(
                 dashboard_id=st.dashboard_id,
                 name=scr.name,
                 thumb_url="" if off_display else scr.thumb_url,
-                composition_digest=dash.composition_digest if dash else None,
+                composition_digest=(
+                    shot.composition_digest if shot else (dash.composition_digest if dash else None)
+                ),
                 width=scr.width,
                 height=scr.height,
                 aspect=scr.aspect,
