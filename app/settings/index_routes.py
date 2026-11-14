@@ -312,6 +312,7 @@ def settings_area(area: str) -> str | Response:
         # Assistant Core plugin configured) gets the push (opendisplay_ha)
         # form, otherwise the bridge instructions.
         opendisplay_via_ha=is_ha_addon() or _ha_core_configured(),
+        opendisplay_add=_opendisplay_add_view() if area == "devices" else {},
         in_ha=is_ha_addon(),
         kind_default_rows=kind_default_rows,
         # When set (via ?calibrating=<id>), the matching device card shows
@@ -1192,6 +1193,7 @@ def _build_device_section(store: Any, device: Device) -> dict[str, Any] | None:
         # The palette choice, for the kinds whose palette is the
         # operator's to pick (see ``_palette_view``); None hides it.
         "palette": _palette_view(device) if is_instance else None,
+        "opendisplay_delivery": _opendisplay_delivery(device) if is_instance else None,
         "delete_endpoint": (
             url_for("auth.devices_delete", instance_id=device.id) if is_instance else None
         ),
@@ -1259,7 +1261,9 @@ def _build_device_section(store: Any, device: Device) -> dict[str, Any] | None:
         # Panel edit (orientation + dims) is only offered on
         # instances, kinds aren't shown here at all.
         "panel": device.panel if is_instance else None,
-        "panel_rotation_options": (_rotation_options(device.panel) if is_instance else None),
+        "panel_rotation_options": (
+            _rotation_options(_panel_with_tag_surface(device)) if is_instance else None
+        ),
         "panel_endpoint": (
             url_for("auth.devices_update_panel", instance_id=device.id) if is_instance else None
         ),
@@ -2026,6 +2030,7 @@ def _retired_and_unset(field: dict[str, Any], stored: dict[str, Any]) -> bool:
 _PALETTE_LABELS: dict[str, str] = {
     "mono": "Black and white",
     "bwr_3": "Black, white and red",
+    "bwy_3": "Black, white and yellow",
     "bwry_4": "Black, white, red and yellow",
     "waveshare_e6": "Six colours (Spectra 6)",
     "inky_7colour": "Seven colours (adds orange)",
@@ -2036,6 +2041,65 @@ _PALETTE_LABELS: dict[str, str] = {
     "rgb24": "Full colour",
     "kaleido3": "Kaleido 3 colour",
 }
+
+
+def palette_label(gamut: str) -> str:
+    """Operator-facing name for a panel gamut."""
+    return _PALETTE_LABELS.get(gamut, gamut)
+
+
+def _opendisplay_add_view() -> dict[str, Any]:
+    """What the add form's OpenDisplay branch offers: the palettes and the
+    named models the Home Assistant kind lists."""
+    from app.quantizer import canonicalise_gamut
+
+    kind = devices().get("opendisplay_ha")
+    manifest = kind.manifest if kind is not None else {}
+    palettes: list[dict[str, str]] = []
+    for item in manifest.get("palettes") or []:
+        gamut = canonicalise_gamut(str(item))
+        if all(p["value"] != gamut for p in palettes):
+            palettes.append({"value": gamut, "label": palette_label(gamut)})
+    default = canonicalise_gamut(str((manifest.get("panel") or {}).get("gamut") or ""))
+    models = [
+        {
+            "label": str(m["label"]),
+            "w": int(m["w"]),
+            "h": int(m["h"]),
+            "gamut": canonicalise_gamut(str(m.get("gamut") or default)),
+        }
+        for m in manifest.get("models") or []
+        if isinstance(m, dict) and m.get("label") and m.get("w") and m.get("h")
+    ]
+    return {"palettes": palettes, "default_palette": default, "models": models}
+
+
+def _opendisplay_delivery(device: Device) -> dict[str, Any] | None:
+    """The tag's last delivery, worded for its page. None for other kinds
+    and before anything has been tried."""
+    if (device.kind_of or device.id) != "opendisplay_ha":
+        return None
+    publisher = current_app.config.get("OPENDISPLAY_HA_PUBLISHER")
+    status = publisher.delivery_status(device.id) if publisher is not None else None
+    view: dict[str, Any] = {
+        "resend_endpoint": url_for("auth.devices_opendisplay_resend", instance_id=device.id),
+        "state": "",
+    }
+    if not status:
+        return view
+    view["state"] = str(status.get("state") or "")
+    at = status.get("at")
+    if isinstance(at, int | float):
+        when = datetime.fromtimestamp(at)
+        view["at"] = f"{when.day} {when:%b %H:%M}"
+    if view["state"] == "failed":
+        view["error"] = str(status.get("error") or "The picture did not reach the tag.")
+        view["attempts"] = int(status.get("attempts") or 1)
+        retry_at = status.get("retry_at")
+        if isinstance(retry_at, int | float):
+            view["retry_in_min"] = max(1, math.ceil((retry_at - time.time()) / 60))
+    return view
+
 
 # The .bin Pi path packs server-side to one of two fixed palettes.
 _PI_BIN_PALETTE_VIEW: dict[str, Any] = {
@@ -2319,6 +2383,22 @@ _OPENDISPLAY_INTEGRATION = {
     "label": "OpenDisplay integration for Home Assistant",
     "url": "https://opendisplay.org/",
 }
+
+
+def _panel_with_tag_surface(device: Device) -> dict[str, Any] | None:
+    """The device's panel block, with an OpenDisplay tag's surface (as Home
+    Assistant reports it) standing in for the native size it does not
+    declare. Only the rotation labels read it: a tag that is taller than
+    wide then shows 0 degrees when it is hung the way it was built."""
+    panel = device.panel
+    if panel is None or (device.kind_of or device.id) != "opendisplay_ha":
+        return panel
+    if "native_w" in panel and "native_h" in panel:
+        return panel
+    stored = (settings_store().get_section("devices") or {}).get(device.id)
+    if not isinstance(stored, dict) or not stored.get("tag_w") or not stored.get("tag_h"):
+        return panel
+    return {**panel, "native_w": stored["tag_w"], "native_h": stored["tag_h"]}
 
 
 def _rotation_options(panel: dict[str, Any] | None) -> list[dict[str, str]]:

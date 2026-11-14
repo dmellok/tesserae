@@ -794,22 +794,118 @@
       hint.hidden = !text;
     }
 
+    // Works from both the device card (config field) and the Add-device
+    // card (OpenDisplay branch), whichever holds this picker + panel inputs.
+    const card = root.closest(
+      "[data-device-body], [data-device-card], [data-device-page], [data-add-device-card]"
+    );
+    const inAddCard = !!root.closest("[data-add-device-card]");
+
     function fillPanel(dev) {
-      if (!dev || !dev.w || !dev.h) return;
-      // Works from both the device card (config field) and the Add-device
-      // card (OpenDisplay branch), whichever holds this picker + panel inputs.
-      const card = root.closest(
-        "[data-device-body], [data-device-card], [data-device-page], [data-add-device-card]"
-      );
-      if (!card) return;
+      if (!dev || !card) return;
       const w = card.querySelector('input[name="panel_w"]');
       const h = card.querySelector('input[name="panel_h"]');
-      if (w && h) {
+      if (dev.w && dev.h && w && h) {
         w.value = dev.w;
         h.value = dev.h;
         w.dispatchEvent(new Event("change", { bubbles: true }));
         h.dispatchEvent(new Event("change", { bubbles: true }));
       }
+      // The add form also takes the palette and a name / id to start from.
+      // An existing device's palette is its own setting, so it is left alone.
+      if (!inAddCard) return;
+      const gamut = card.querySelector('select[name="panel_gamut"]');
+      if (dev.gamut && gamut) setSelect(gamut, dev.gamut);
+      const orient = card.querySelector('select[name="panel_orientation"]');
+      if (dev.w && dev.h && orient) setSelect(orient, dev.h > dev.w ? "portrait" : "landscape");
+      const form = root.closest("form");
+      const name = form && form.querySelector('input[name="name"]');
+      const id = form && form.querySelector('input[name="id"]');
+      if (name && !name.value && dev.name) name.value = dev.name;
+      if (id && !id.value && dev.suggested_id) id.value = dev.suggested_id;
+    }
+
+    function setSelect(select, value) {
+      const has = Array.prototype.some.call(select.options, function (o) {
+        return o.value === value;
+      });
+      if (!has) return;
+      select.value = value;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    // "Found in Home Assistant": one row per tag no device drives yet. Each
+    // Add is a plain form post to the add-device route, carrying what the
+    // tag reports, so it needs nothing the manual form does not.
+    function listFound(devices) {
+      const box = card && card.querySelector("[data-od-found]");
+      const list = box && box.querySelector("[data-od-found-list]");
+      if (!inAddCard || !box || !list) return;
+      const fresh = devices.filter(function (d) {
+        return !d.registered && d.suggested_id;
+      });
+      list.textContent = "";
+      fresh.forEach(function (dev) {
+        const tall = dev.w && dev.h && dev.h > dev.w;
+        const li = document.createElement("li");
+        const name = document.createElement("span");
+        name.className = "dx-od-found-name";
+        name.textContent = dev.name;
+        const facts = document.createElement("span");
+        facts.className = "dx-od-found-facts";
+        facts.textContent = [
+          dev.model,
+          dev.w && dev.h ? dev.w + " × " + dev.h : "",
+          dev.palette || "",
+        ]
+          .filter(Boolean)
+          .join(" · ");
+        const form = document.createElement("form");
+        form.method = "post";
+        form.action = box.getAttribute("data-add-url") || "";
+        const fields = {
+          kind: "opendisplay_ha",
+          ha_device_id: dev.device_id,
+          id: dev.suggested_id,
+          name: dev.name,
+          panel_w: dev.w || 800,
+          panel_h: dev.h || 480,
+          panel_orientation: tall ? "portrait" : "landscape",
+        };
+        if (dev.gamut) fields.panel_gamut = dev.gamut;
+        Object.keys(fields).forEach(function (key) {
+          const input = document.createElement("input");
+          input.type = "hidden";
+          input.name = key;
+          input.value = fields[key];
+          form.appendChild(input);
+        });
+        const button = document.createElement("button");
+        button.type = "submit";
+        button.className = "dx-btn-primary";
+        button.textContent = "Add";
+        button.setAttribute("aria-label", "Add " + dev.name);
+        form.appendChild(button);
+        li.appendChild(name);
+        li.appendChild(facts);
+        li.appendChild(form);
+        list.appendChild(li);
+      });
+      box.hidden = !fresh.length;
+    }
+
+    // Model choice (add form): fills size and palette for named hardware.
+    const model = card && inAddCard ? card.querySelector("[data-od-model]") : null;
+    if (model) {
+      model.addEventListener("change", function () {
+        const opt = model.options[model.selectedIndex];
+        if (!opt || !opt.value) return;
+        fillPanel({
+          w: Number(opt.getAttribute("data-w")),
+          h: Number(opt.getAttribute("data-h")),
+          gamut: opt.getAttribute("data-gamut") || "",
+        });
+      });
     }
 
     // Keep the <select> visible (so the field always reads as a picker)
@@ -842,6 +938,7 @@
           );
           return;
         }
+        listFound(devices);
         // Rebuild options: prompt, one per device, then a manual escape.
         select.textContent = "";
         const byId = {};

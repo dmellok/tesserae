@@ -275,15 +275,22 @@
           <strong>Via Home Assistant.</strong>
           {% if in_ha %}Tesserae writes each frame to <code>/media</code>{% else %}Tesserae uploads each frame to Home Assistant's media folder (the Home Assistant Core plugin's token must belong to an administrator){% endif %}
           and calls HA's <code>opendisplay.upload_image</code> action; HA drives the tag over
-          Bluetooth LE. Pick your tag below; its panel size fills in when Home Assistant reports
-          one. Prefer the standalone bridge? Use the <strong>REST API</strong> tab instead.
+          Bluetooth LE. Add a tag Home Assistant already knows in one click, or fill in the form;
+          its size and colour palette come from the tag. Prefer the standalone bridge? Use the <strong>REST API</strong> tab instead.
         </p>
+      </div>
+      {# Tags Home Assistant knows that no Tesserae device drives yet, each
+         with a one-click Add (size and palette as the tag reports them).
+         Filled by settings.js from the same list the picker below uses. #}
+      <div class="dx-od-found" data-od-found data-add-url="{{ url_for('auth.devices_add') }}" hidden>
+        <p class="dx-od-found-title">Found in Home Assistant</p>
+        <ul class="dx-od-found-list" data-od-found-list></ul>
       </div>
       <form method="post" action="{{ url_for('auth.devices_add') }}" class="form">
         <input type="hidden" name="kind" value="opendisplay_ha">
         {{ ha_device_picker_field('add-od-hadev', 'ha_device_id', 'HA device', value='',
                                   integration='opendisplay',
-                                  help='Pick your tag from Home Assistant. Its device id is stored and its panel size fills in when the model reports one. Falls back to manual entry if HA is unreachable.') }}
+                                  help='Pick your tag from Home Assistant. Its device id is stored, and its size and colour palette fill in as the tag reports them. Falls back to manual entry if HA is unreachable.') }}
         {{ text_input('add-od-id', 'id', 'Device id', value='', placeholder='kitchen_tag', required=True,
                       help='Lowercase, no spaces. Names the frame file Tesserae writes for this tag.') }}
         {{ text_input('add-od-name', 'name', 'Display name', value='', placeholder='Kitchen tag') }}
@@ -292,6 +299,23 @@
           {{ number_input('add-od-h', 'panel_h', 'Logical panel height (px)', value='480', min=1, step=1) }}
         </div>
         <p class="field-help">Composition orientation, the canvas dashboards are rendered at. Not the physical size the device reports.</p>
+        {% if opendisplay_add.models %}
+        <div class="field">
+          <label for="add-od-model">Model</label>
+          <select id="add-od-model" data-od-model>
+            <option value="">Not listed, or picked from Home Assistant above</option>
+            {% for m in opendisplay_add.models %}
+            <option value="{{ loop.index0 }}" data-w="{{ m.w }}" data-h="{{ m.h }}" data-gamut="{{ m.gamut }}">{{ m.label }} ({{ m.w }} × {{ m.h }})</option>
+            {% endfor %}
+          </select>
+          <p class="field-help">Fills in the size and colour palette for known hardware. A tag picked from Home Assistant fills them in itself.</p>
+        </div>
+        {% endif %}
+        {% if opendisplay_add.palettes %}
+        {{ select_field('add-od-gamut', 'panel_gamut', 'Colour palette', value=opendisplay_add.default_palette,
+                        options=opendisplay_add.palettes,
+                        help='The colours the tag can show. Filled in from Home Assistant when the tag reports it.') }}
+        {% endif %}
         {{ select_field('add-od-orientation', 'panel_orientation', 'Rotation', value='landscape',
                         options=[{'value':'landscape','label':'0°'},
                                  {'value':'portrait','label':'90°'},

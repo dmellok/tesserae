@@ -406,6 +406,300 @@ def test_older_ha_rotation_keeps_the_upright_composition(app: Flask, tmp_path: P
     assert calls[0][2]["rotation"] == 270
 
 
+def _stateful_publisher(app: Flask, tmp_path: Path, calls: list) -> OpenDisplayHaPublisher:
+    """A publisher that keeps its sent state on disk, as register() builds."""
+    core = app.config["PLUGIN_REGISTRY"].get("ha_core").server_module
+
+    def fake_call_service(domain, service, *, data=None, timeout=10):
+        calls.append((domain, service, data))
+        return []
+
+    core.call_service = fake_call_service  # type: ignore[attr-defined]
+    return OpenDisplayHaPublisher(
+        app=app,
+        devices=app.config["DEVICE_REGISTRY"],
+        settings=app.config["SETTINGS_STORE"],
+        renders_dir=app.config["RENDERS_DIR"],
+        latest_render_fn=app.config["PUSH_MANAGER"].latest_render_for,
+        media_root=tmp_path / "media",
+        state_path=tmp_path / "sent.json",
+        run_async=False,
+    )
+
+
+def test_rebuilt_publisher_does_not_repaint_tags_it_already_served(
+    app: Flask, tmp_path: Path
+) -> None:
+    """The publisher is rebuilt on every transport rebuild and restart. It
+    must remember what each tag shows, or a push to one tag makes every
+    other tag repaint its old frame first."""
+    _make_tag(app, "kitchen_tag", "ha-kitchen")
+    _make_tag(app, "hall_tag", "ha-hall")
+    _plant_render(app, "kitchen_tag", "aaa111")
+    _plant_render(app, "hall_tag", "bbb222")
+    calls: list[Any] = []
+    _stateful_publisher(app, tmp_path, calls).on_push()
+    assert len(calls) == 2
+
+    # Rebuild (a settings save, a restart), then send the hall tag a new frame.
+    calls.clear()
+    rebuilt = _stateful_publisher(app, tmp_path, calls)
+    _plant_render(app, "hall_tag", "ccc333")
+    rebuilt.on_push()
+    assert [c[2]["device_id"] for c in calls] == ["ha-hall"]
+
+
+def test_most_recently_rendered_tag_is_sent_first(app: Flask, tmp_path: Path) -> None:
+    """Uploads are serial and slow, so when several tags are due the one
+    that was just rendered goes first."""
+    _make_tag(app, "a_tag", "ha-a")
+    _make_tag(app, "b_tag", "ha-b")
+    _make_tag(app, "c_tag", "ha-c")
+    renders = app.config["PUSH_MANAGER"]._latest_renders
+    for device_id, digest, stamp in (
+        ("a_tag", "d1", 100.0),
+        ("b_tag", "d2", 300.0),
+        ("c_tag", "d3", 200.0),
+    ):
+        _plant_render(app, device_id, digest)
+        renders[device_id]["timestamp"] = stamp
+    calls: list[Any] = []
+    _stateful_publisher(app, tmp_path, calls).on_push()
+    assert [c[2]["device_id"] for c in calls] == ["ha-b", "ha-c", "ha-a"]
+
+
+def test_removed_tag_is_forgotten_in_the_saved_state(app: Flask, tmp_path: Path) -> None:
+    _make_tag(app)
+    _plant_render(app, "kitchen_tag")
+    calls: list[Any] = []
+    pub = _stateful_publisher(app, tmp_path, calls)
+    pub.on_push()
+    saved = json.loads((tmp_path / "sent.json").read_text())
+    assert "kitchen_tag" in saved["sent"]
+    assert saved["status"]["kitchen_tag"]["state"] == "sent"
+    pub.cleanup_device("kitchen_tag")
+    assert json.loads((tmp_path / "sent.json").read_text()) == {"sent": {}, "status": {}}
+
+
+def test_unreadable_sent_state_starts_empty(app: Flask, tmp_path: Path) -> None:
+    (tmp_path / "sent.json").write_text("{not json")
+    _make_tag(app)
+    _plant_render(app, "kitchen_tag")
+    calls: list[Any] = []
+    _stateful_publisher(app, tmp_path, calls).on_push()
+    assert len(calls) == 1
+
+
+def _patch_cfg(app: Flask, device_id: str, **values: Any) -> None:
+    section = app.config["SETTINGS_STORE"].get_section("devices") or {}
+    entry = dict(section.get(device_id) or {})
+    entry.update(values)
+    app.config["SETTINGS_STORE"].patch_section("devices", {device_id: entry})
+
+
+def test_tall_tag_gets_an_upright_portrait_frame(app: Flask, tmp_path: Path) -> None:
+    """A Solum 3.5" is 184x384: taller than wide. Hung upright with a
+    portrait dashboard, the frame must go out as it is. Assuming every tag
+    is landscape turned it sideways and Home Assistant letterboxed it."""
+    _make_tag(app)
+    _set_panel(app, "kitchen_tag", 184, 384, "portrait")
+    _patch_cfg(app, "kitchen_tag", tag_w=184, tag_h=384)
+    _plant_real_render(app, "kitchen_tag", 184, 384)
+    calls: list[Any] = []
+    media = tmp_path / "media"
+    _publisher(app, media, calls).on_push()
+
+    frame = _sent_frame(media)
+    assert frame.size == (184, 384)
+    assert frame.getpixel((0, 0)) == (255, 0, 0)
+    assert "rotation" not in calls[0][2]
+
+
+def test_landscape_dashboard_is_turned_onto_a_tall_tag(app: Flask, tmp_path: Path) -> None:
+    _make_tag(app)
+    _set_panel(app, "kitchen_tag", 384, 184, "landscape")
+    _patch_cfg(app, "kitchen_tag", tag_w=184, tag_h=384)
+    _plant_real_render(app, "kitchen_tag", 384, 184)
+    media = tmp_path / "media"
+    _publisher(app, media, []).on_push()
+    assert _sent_frame(media).size == (184, 384)
+
+
+def test_home_assistant_converts_colour_by_default(app: Flask, tmp_path: Path) -> None:
+    """Out of the box the frame leaves in full colour and HA dithers it, as
+    before: no dither or refresh option is sent."""
+    _make_tag(app)
+    _plant_render(app, "kitchen_tag")
+    calls: list[Any] = []
+    _publisher(app, tmp_path / "media", calls).on_push()
+    assert "dither_mode" not in calls[0][2]
+    assert "refresh_mode" not in calls[0][2]
+
+
+def test_tesserae_conversion_sends_the_tags_own_inks(app: Flask, tmp_path: Path) -> None:
+    """With colour conversion set to Tesserae the frame is reduced to the
+    device's palette here, by the call that draws the previews, and HA is
+    told not to dither it again."""
+    import io
+
+    from PIL import Image
+
+    _make_tag(app)
+    _set_panel(app, "kitchen_tag", 80, 40, "landscape", gamut="bwr_3")
+    _patch_cfg(app, "kitchen_tag", colour_conversion="tesserae")
+    img = Image.new("RGB", (80, 40))
+    for x in range(80):
+        for y in range(40):
+            img.putpixel((x, y), (x * 3, 120, 200 - y * 4))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    (app.config["RENDERS_DIR"] / "grad01.png").write_bytes(buf.getvalue())
+    app.config["PUSH_MANAGER"]._latest_renders["kitchen_tag"] = {"composition_digest": "grad01"}
+    calls: list[Any] = []
+    media = tmp_path / "media"
+    _publisher(app, media, calls).on_push()
+
+    colours = {c for _n, c in _sent_frame(media).getcolors(maxcolors=100000)}
+    assert colours <= {(0, 0, 0), (255, 255, 255), (255, 0, 0)}
+    assert len(colours) > 1
+    assert calls[0][2]["dither_mode"] == "none"
+
+
+def test_changing_colour_conversion_resends_the_frame(app: Flask, tmp_path: Path) -> None:
+    _make_tag(app)
+    _set_panel(app, "kitchen_tag", 80, 40, "landscape", gamut="mono")
+    _plant_real_render(app, "kitchen_tag", 80, 40)
+    calls: list[Any] = []
+    pub = _publisher(app, tmp_path / "media", calls)
+    pub.on_push()
+    _patch_cfg(app, "kitchen_tag", colour_conversion="tesserae")
+    pub.on_push()
+    assert len(calls) == 2
+
+
+def test_fast_refresh_is_passed_to_home_assistant(app: Flask, tmp_path: Path) -> None:
+    _make_tag(app)
+    _patch_cfg(app, "kitchen_tag", refresh_mode="fast")
+    _plant_render(app, "kitchen_tag")
+    calls: list[Any] = []
+    _publisher(app, tmp_path / "media", calls).on_push()
+    assert calls[0][2]["refresh_mode"] == "fast"
+
+
+def test_failed_bluetooth_upload_is_recorded_with_home_assistants_reason(
+    app: Flask, tmp_path: Path
+) -> None:
+    """The tag never reports back, so a failed upload has to be visible
+    somewhere other than the log, with the reason HA gave."""
+    _make_tag(app)
+    _plant_render(app, "kitchen_tag")
+    core = app.config["PLUGIN_REGISTRY"].get("ha_core").server_module
+    pub = _publisher(app, tmp_path / "media", [])
+
+    def out_of_range(domain, service, *, data=None, timeout=10):
+        err = RuntimeError("HTTP Error 500: Internal Server Error")
+        err.tesserae_detail = '{"message": "Device AA:BB is not reachable over Bluetooth"}'  # type: ignore[attr-defined]
+        raise err
+
+    core.call_service = out_of_range  # type: ignore[attr-defined]
+    pub.on_push()
+    status = pub.delivery_status("kitchen_tag")
+    assert status is not None
+    assert status["state"] == "failed"
+    assert status["error"] == "Device AA:BB is not reachable over Bluetooth"
+    assert status["attempts"] == 1
+
+    # The second failure of the same frame waits longer than the first.
+    first_wait = status["retry_at"] - status["at"]
+    pub._status["kitchen_tag"]["retry_at"] = 0
+    pub.on_push()
+    again = pub.delivery_status("kitchen_tag")
+    assert again is not None and again["attempts"] == 2
+    assert again["retry_at"] - again["at"] > first_wait
+
+
+def test_send_again_bypasses_the_sent_record_and_the_backoff(app: Flask, tmp_path: Path) -> None:
+    _make_tag(app)
+    _plant_render(app, "kitchen_tag")
+    calls: list[Any] = []
+    pub = _publisher(app, tmp_path / "media", calls)
+    pub.on_push()
+    pub.on_push()
+    assert len(calls) == 1
+    pub.resend("kitchen_tag")
+    assert len(calls) == 2
+
+
+def test_stopped_publisher_sends_nothing(app: Flask, tmp_path: Path) -> None:
+    """A publisher replaced by a transport rebuild must not deliver from its
+    stale view when a leftover retry fires."""
+    _make_tag(app)
+    _plant_render(app, "kitchen_tag")
+    calls: list[Any] = []
+    pub = _publisher(app, tmp_path / "media", calls)
+    pub.stop()
+    pub.on_push()
+    assert calls == []
+
+
+def test_removing_a_tag_takes_its_uploaded_frame_out_of_home_assistant(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("TESSERAE_HA_INGRESS", raising=False)
+    monkeypatch.delenv("SUPERVISOR_TOKEN", raising=False)
+    _make_tag(app)
+    _plant_render(app, "kitchen_tag")
+    removed: list[str] = []
+    pub = _upload_publisher(app, [], [])
+    core = app.config["PLUGIN_REGISTRY"].get("ha_core").server_module
+    core.remove_media = lambda media_id, **_kw: removed.append(media_id) or True  # type: ignore[attr-defined]
+    pub.on_push()
+    pub.cleanup_device("kitchen_tag")
+    assert removed == ["media-source://media_source/local/tesserae/kitchen_tag.png"]
+
+    # A failure to remove it is not a failure to remove the device.
+    def boom(media_id: str, **_kw: Any) -> bool:
+        raise RuntimeError("Home Assistant refused the access token")
+
+    core.remove_media = boom  # type: ignore[attr-defined]
+    _plant_render(app, "kitchen_tag", "feed02")
+    pub.on_push()
+    pub.cleanup_device("kitchen_tag")  # no raise
+
+
+def test_tag_facts_set_the_surface_and_follow_the_palette_once(app: Flask) -> None:
+    """What HA reports is stored on the device. The palette follows the tag
+    when the detection changes, and a palette the operator picks afterwards
+    is theirs to keep."""
+    from app.opendisplay_ha import apply_tag_facts
+
+    _make_tag(app)
+    registry = app.config["DEVICE_REGISTRY"]
+    facts = {"w": 184, "h": 384, "gamut": "bwry_4"}
+    assert apply_tag_facts(app, registry.get("kitchen_tag"), facts) is True
+    stored = app.config["SETTINGS_STORE"].get_section("devices")["kitchen_tag"]
+    assert (stored["tag_w"], stored["tag_h"], stored["tag_gamut"]) == (184, 384, "bwry_4")
+    assert stored["ha_device_id"] == "ha-abc"  # other settings untouched
+    assert registry.get("kitchen_tag").panel["gamut"] == "bwry_4"
+    # Render size is the operator's: detection never resizes a device.
+    assert (registry.get("kitchen_tag").panel["w"], registry.get("kitchen_tag").panel["h"]) == (
+        800,
+        480,
+    )
+
+    # Same facts again: nothing to do.
+    assert apply_tag_facts(app, registry.get("kitchen_tag"), facts) is False
+
+    # The operator picks another palette; an unchanged detection leaves it.
+    _set_panel(app, "kitchen_tag", 800, 480, "landscape", gamut="mono")
+    assert apply_tag_facts(app, registry.get("kitchen_tag"), facts) is False
+    assert registry.get("kitchen_tag").panel["gamut"] == "mono"
+
+    # The tag is reconfigured: the detection changed, so the palette follows.
+    assert apply_tag_facts(app, registry.get("kitchen_tag"), {**facts, "gamut": "bwr_3"}) is True
+    assert registry.get("kitchen_tag").panel["gamut"] == "bwr_3"
+
+
 def _upload_publisher(
     app: Flask, calls: list, uploads: list, *, upload_error: Exception | None = None
 ) -> OpenDisplayHaPublisher:
@@ -494,12 +788,23 @@ def test_failed_upload_is_soft_and_retried(app: Flask, monkeypatch: pytest.Monke
     assert pub._media_warned is True
     assert "kitchen_tag" not in pub._last_sent
 
-    # Token fixed: the same frame goes out on the next push.
+    status = pub.delivery_status("kitchen_tag")
+    assert status is not None and status["state"] == "failed"
+    assert "administrator" in status["error"]
+    assert status["attempts"] == 1 and status["retry_at"] > status["at"]
+
+    # Token fixed. A push for something else does not hammer the tag while
+    # the failed frame waits out its backoff...
     core = app.config["PLUGIN_REGISTRY"].get("ha_core").server_module
     core.upload_media = lambda folder_id, filename, content, **_kw: f"{folder_id}/{filename}"  # type: ignore[attr-defined]
     pub.on_push()
+    assert calls == []
+    # ...and once the backoff has passed, the same frame goes out.
+    pub._status["kitchen_tag"]["retry_at"] = 0
+    pub.on_push()
     assert len(calls) == 1
     assert pub._media_warned is False
+    assert pub.delivery_status("kitchen_tag")["state"] == "sent"  # type: ignore[index]
 
 
 def test_unwritable_shared_folder_falls_back_to_upload(app: Flask, tmp_path: Path) -> None:

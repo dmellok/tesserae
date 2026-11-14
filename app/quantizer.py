@@ -154,6 +154,16 @@ BWR_3_PALETTE: tuple[tuple[int, int, int], ...] = (
     (255, 0, 0),  # red
 )
 
+# Black / white / yellow tri-colour e-ink, the yellow twin of ``bwr_3``
+# (OpenDisplay's ``BWY`` scheme). Metadata and previews only: nothing packs
+# a .bin for it, the client that paints it (an OpenDisplay tag, through its
+# SDK) does its own encoding.
+BWY_3_PALETTE: tuple[tuple[int, int, int], ...] = (
+    (0, 0, 0),  # black
+    (255, 255, 255),  # white
+    (255, 255, 0),  # yellow
+)
+
 # Four-level greyscale ramp (2-bit, no highlight): the grayscale e-ink
 # class CircuitPython's display stack drives as a 2-bit indexed buffer
 # (Waveshare 4.2" grayscale, some GDEW panels). Distinct from ``mono``
@@ -306,6 +316,7 @@ ACCEPTED_GAMUTS: frozenset[str] = frozenset(
         "rgb16",
         "bwry_4",
         "bwr_3",
+        "bwy_3",
         "gray_4",
         "gray_8",
         "gray_16",
@@ -426,6 +437,8 @@ def palette_for_gamut(gamut: str) -> tuple[tuple[int, int, int], ...]:
         return GRAY_8_PALETTE
     if g == "gray_4":
         return GRAY_4_PALETTE
+    if g == "bwy_3":
+        return BWY_3_PALETTE
     if g == "mono":
         return _MONO_PALETTE
     return WAVESHARE_E6_PALETTE

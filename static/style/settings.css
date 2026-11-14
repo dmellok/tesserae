@@ -3307,6 +3307,49 @@ form[data-dirty] .dx-inline-save {
   font-weight: 600;
 }
 
+/* Add device -> OpenDisplay: tags Home Assistant knows that are not added
+   yet, one row each with a one-click Add. */
+.dx-od-found {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  background: var(--t-inset);
+  border: 1px solid var(--t-border);
+  border-radius: 9px;
+}
+.dx-od-found-title {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t-fg);
+}
+.dx-od-found-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dx-od-found-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.dx-od-found-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t-fg);
+}
+.dx-od-found-facts {
+  flex: 1 1 auto;
+  font-size: 12px;
+  color: var(--t-fg-soft);
+}
+.dx-od-found-list form {
+  margin: 0;
+}
+
 .dx-warn-band {
   display: flex;
   align-items: flex-start;
