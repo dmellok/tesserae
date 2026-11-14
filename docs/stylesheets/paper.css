@@ -1,0 +1,540 @@
+/*
+ * Paper for the docs site: the same palette and type as the Tesserae admin
+ * UI (static/style/paper-tokens.css) and tesserae.ink, mapped onto Material
+ * for MkDocs' variables. Warm paper, ink text, red ink for links and marks,
+ * hairlines instead of shadows, 2 px corners.
+ *
+ * mkdocs.yml sets `primary: custom` / `accent: custom` so Material applies no
+ * palette of its own, and `font: false` so nothing is fetched from Google
+ * Fonts; the two families below are the app's own (Archivo and Martian Mono,
+ * OFL), copied from plugins/fonts_core.
+ */
+
+@font-face {
+  font-family: "Tesserae UI Archivo";
+  font-style: normal;
+  font-weight: 400 500;
+  font-display: swap;
+  src: url("../assets/fonts/archivo-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Tesserae UI Archivo";
+  font-style: normal;
+  font-weight: 600 700;
+  font-display: swap;
+  src: url("../assets/fonts/archivo-700.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Tesserae UI Archivo";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("../assets/fonts/archivo-800.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Tesserae UI Martian Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../assets/fonts/martian-mono-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Tesserae UI Martian Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../assets/fonts/martian-mono-700.woff2") format("woff2");
+}
+
+/* ----- Tokens -------------------------------------------------------- */
+
+:root {
+  --md-text-font: "Tesserae UI Archivo", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --md-code-font: "Tesserae UI Martian Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --md-text-font-family: var(--md-text-font);
+  --md-code-font-family: var(--md-code-font);
+}
+
+[data-md-color-scheme="default"] {
+  --p-paper: #eeeae1;
+  --p-sheet: #fffdf8;
+  --p-sheet-edge: #e2dccf;
+  --p-sunk: #f1ece1;
+  --p-hover: #f7f3ea;
+  --p-selected: #e6e0d2;
+  --p-hairline: #e0dacd;
+  --p-hairline-strong: #cfc8b8;
+  --p-ink: #1c1b19;
+  --p-ink-2: #55524b;
+  --p-ink-3: #7a766c;
+  --p-red: #b8352a;
+  --p-red-hover: #9e2c22;
+  --p-red-soft: #f3dcd6;
+  --p-blue: #2b4e9b;
+  --p-blue-soft: #dfe5f1;
+  --p-green: #3d7a3a;
+  --p-green-soft: #e3ebdd;
+  --p-yellow: #9a6f0c;
+  --p-yellow-soft: #f2e7cc;
+}
+
+[data-md-color-scheme="slate"] {
+  --p-paper: #151412;
+  --p-sheet: #22211e;
+  --p-sheet-edge: #35332e;
+  --p-sunk: #1e1d1b;
+  --p-hover: #262421;
+  --p-selected: #2f2d29;
+  --p-hairline: #35332e;
+  --p-hairline-strong: #45423c;
+  --p-ink: #ede9df;
+  --p-ink-2: #a8a397;
+  --p-ink-3: #8a857a;
+  --p-red: #e06a5c;
+  --p-red-hover: #f0a497;
+  --p-red-soft: #3b211d;
+  --p-blue: #7c9be0;
+  --p-blue-soft: #1f2940;
+  --p-green: #8dbf7f;
+  --p-green-soft: #24301f;
+  --p-yellow: #d9b45a;
+  --p-yellow-soft: #3a311b;
+}
+
+[data-md-color-scheme="default"],
+[data-md-color-scheme="slate"] {
+  --md-default-bg-color: var(--p-paper);
+  --md-default-bg-color--light: var(--p-paper);
+  --md-default-bg-color--lighter: var(--p-paper);
+  --md-default-bg-color--lightest: var(--p-paper);
+  --md-default-fg-color: var(--p-ink);
+  --md-default-fg-color--light: var(--p-ink-2);
+  --md-default-fg-color--lighter: var(--p-ink-3);
+  --md-default-fg-color--lightest: var(--p-hairline);
+
+  /* The header and tabs are a sheet with ink on it, not a colour bar. */
+  --md-primary-fg-color: var(--p-sheet);
+  --md-primary-fg-color--light: var(--p-sheet);
+  --md-primary-fg-color--dark: var(--p-sheet);
+  --md-primary-bg-color: var(--p-ink);
+  --md-primary-bg-color--light: var(--p-ink-2);
+
+  --md-accent-fg-color: var(--p-red-hover);
+  --md-accent-fg-color--transparent: color-mix(in srgb, var(--p-red) 10%, transparent);
+  --md-accent-bg-color: var(--p-sheet);
+  --md-accent-bg-color--light: var(--p-sheet);
+
+  --md-typeset-color: var(--p-ink);
+  --md-typeset-a-color: var(--p-red);
+  --md-typeset-mark-color: var(--p-yellow-soft);
+  --md-typeset-kbd-color: var(--p-sheet);
+  --md-typeset-kbd-accent-color: var(--p-sheet);
+  --md-typeset-kbd-border-color: var(--p-hairline-strong);
+  --md-typeset-table-color: var(--p-hairline);
+  --md-typeset-table-color--light: var(--p-hover);
+
+  --md-code-bg-color: var(--p-sunk);
+  --md-code-fg-color: var(--p-ink);
+  --md-code-hl-color: var(--p-yellow);
+  --md-code-hl-color--light: var(--p-yellow-soft);
+  --md-code-hl-keyword-color: var(--p-blue);
+  --md-code-hl-function-color: var(--p-red);
+  --md-code-hl-string-color: var(--p-green);
+  --md-code-hl-number-color: var(--p-red);
+  --md-code-hl-constant-color: var(--p-blue);
+  --md-code-hl-special-color: var(--p-red);
+  --md-code-hl-name-color: var(--p-ink);
+  --md-code-hl-operator-color: var(--p-ink-2);
+  --md-code-hl-punctuation-color: var(--p-ink-2);
+  --md-code-hl-comment-color: var(--p-ink-3);
+  --md-code-hl-generic-color: var(--p-ink-2);
+  --md-code-hl-variable-color: var(--p-ink-2);
+
+  --md-admonition-fg-color: var(--p-ink);
+  --md-admonition-bg-color: var(--p-sheet);
+
+  --md-footer-fg-color: var(--p-ink);
+  --md-footer-fg-color--light: var(--p-ink-2);
+  --md-footer-fg-color--lighter: var(--p-ink-3);
+  --md-footer-bg-color: var(--p-sheet);
+  --md-footer-bg-color--dark: var(--p-sheet);
+
+  --md-shadow-z1: none;
+  --md-shadow-z2: none;
+  --md-shadow-z3: none;
+}
+
+/* ----- Type ---------------------------------------------------------- */
+
+body,
+input {
+  font-family: var(--md-text-font);
+}
+code,
+kbd,
+pre {
+  font-family: var(--md-code-font);
+}
+.md-typeset {
+  font-size: 0.8rem;
+  line-height: 1.65;
+}
+.md-typeset code {
+  font-size: 0.78em;
+}
+.md-typeset h1 {
+  color: var(--p-ink);
+  font-weight: 800;
+  letter-spacing: -0.015em;
+}
+.md-typeset h2 {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--p-hairline);
+}
+.md-typeset h3,
+.md-typeset h4 {
+  font-weight: 700;
+  letter-spacing: 0;
+}
+.md-typeset h5,
+.md-typeset h6 {
+  color: var(--p-ink-3);
+  font-family: var(--md-code-font);
+  font-size: 0.62rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+}
+.md-typeset a {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--p-red) 35%, transparent);
+  text-underline-offset: 0.18em;
+}
+.md-typeset a:hover,
+.md-typeset a:focus {
+  text-decoration-color: currentcolor;
+}
+.md-typeset .headerlink,
+.md-typeset .md-button,
+.md-typeset .md-content__button,
+.md-typeset .tabbed-labels a {
+  text-decoration: none;
+}
+
+/* ----- Header, tabs, search ------------------------------------------ */
+
+.md-header,
+.md-header--shadow {
+  border-bottom: 1px solid var(--p-sheet-edge);
+  box-shadow: none;
+}
+.md-header__title {
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.md-tabs {
+  border-bottom: 1px solid var(--p-sheet-edge);
+}
+/* 60em is where Material moves the search box into the header bar; below it
+   the box is a full-screen sheet that already takes the page colours. */
+@media screen and (min-width: 60em) {
+  .md-search__form {
+    background-color: var(--p-sunk);
+    border: 1px solid var(--p-hairline);
+    border-radius: 2px;
+  }
+  .md-search__form:hover {
+    background-color: var(--p-hover);
+  }
+  [data-md-toggle="search"]:checked ~ .md-header .md-search__form {
+    background-color: var(--p-sheet);
+    border-color: var(--p-hairline-strong);
+    border-radius: 2px 2px 0 0;
+  }
+  .md-search__input,
+  .md-search__input::placeholder,
+  .md-search__input + .md-search__icon {
+    color: var(--p-ink-2);
+  }
+  .md-search__output {
+    border: 1px solid var(--p-hairline-strong);
+    border-top: 0;
+    border-radius: 0 0 2px 2px;
+  }
+  .md-search__scrollwrap {
+    background-color: var(--p-sheet);
+  }
+}
+.md-search-result__meta {
+  background-color: var(--p-sunk);
+  color: var(--p-ink-3);
+}
+.md-search-result mark {
+  color: var(--p-red);
+}
+
+/* ----- Navigation ---------------------------------------------------- */
+
+.md-nav {
+  font-size: 0.7rem;
+}
+.md-nav__title {
+  color: var(--p-ink-3);
+  font-family: var(--md-code-font);
+  font-size: 0.6rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.md-nav__item--section > .md-nav__link,
+.md-nav__item--section > .md-nav__link[for] {
+  color: var(--p-ink-3);
+  font-family: var(--md-code-font);
+  font-size: 0.6rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.md-nav__link--active,
+.md-nav__item .md-nav__link--active {
+  color: var(--p-red);
+  font-weight: 700;
+}
+.md-nav__link:hover,
+.md-nav__link:focus {
+  color: var(--p-red-hover);
+}
+@media screen and (min-width: 76.25em) {
+  .md-nav--primary .md-nav__title,
+  .md-nav--secondary .md-nav__title {
+    /* Material's own soft edge stays, in the page colour, so links
+       scrolling under the sticky title fade out instead of butting into it. */
+    background: var(--p-paper);
+    box-shadow: 0 0 0.4rem 0.4rem var(--p-paper);
+  }
+}
+/* The drawer on a phone is a sheet. */
+@media screen and (max-width: 76.2344em) {
+  .md-nav--primary,
+  .md-nav--primary .md-nav {
+    background-color: var(--p-sheet);
+  }
+  .md-nav--primary .md-nav__title {
+    background-color: var(--p-sunk);
+    color: var(--p-ink-2);
+  }
+  .md-nav--primary .md-nav__title[for="__drawer"] {
+    background-color: var(--p-sheet);
+    border-bottom: 1px solid var(--p-sheet-edge);
+    color: var(--p-ink);
+    font-family: var(--md-text-font);
+    font-size: 0.9rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    text-transform: none;
+  }
+  .md-nav--primary .md-nav__item {
+    border-top-color: var(--p-hairline);
+  }
+}
+
+/* ----- Content blocks ------------------------------------------------ */
+
+.md-typeset pre > code,
+.md-typeset code,
+.md-typeset kbd,
+.md-typeset .highlight,
+.md-typeset .highlighttable,
+.md-typeset img,
+.md-typeset .md-button,
+.md-typeset .admonition,
+.md-typeset details,
+.md-typeset .tabbed-set,
+.md-typeset table:not([class]) {
+  border-radius: 2px;
+}
+.md-typeset pre > code {
+  border: 1px solid var(--p-hairline);
+}
+.md-typeset :not(pre) > code {
+  border: 1px solid var(--p-hairline);
+  padding: 0.05em 0.35em;
+}
+.md-typeset a > code {
+  color: inherit;
+}
+.md-clipboard {
+  color: var(--p-ink-3);
+}
+.md-clipboard:hover,
+.md-clipboard:focus {
+  color: var(--p-red);
+}
+
+.md-typeset table:not([class]) {
+  background-color: var(--p-sheet);
+  border: 1px solid var(--p-hairline);
+  box-shadow: none;
+  font-size: 0.7rem;
+}
+.md-typeset table:not([class]) th {
+  background-color: var(--p-sunk);
+  color: var(--p-ink-2);
+  font-family: var(--md-code-font);
+  font-size: 0.58rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.md-typeset table:not([class]) td {
+  border-top-color: var(--p-hairline);
+}
+
+.md-typeset hr {
+  border-bottom-color: var(--p-hairline-strong);
+}
+.md-typeset blockquote {
+  border-left: 2px solid var(--p-red);
+  color: var(--p-ink-2);
+}
+
+.md-typeset .md-button {
+  border-width: 1px;
+  border-color: var(--p-hairline-strong);
+  color: var(--p-ink);
+  font-weight: 700;
+}
+.md-typeset .md-button:hover,
+.md-typeset .md-button:focus {
+  background-color: var(--p-hover);
+  border-color: var(--p-ink-3);
+  color: var(--p-ink);
+}
+.md-typeset .md-button--primary {
+  background-color: var(--p-red);
+  border-color: var(--p-red);
+  color: #fffdf8;
+}
+.md-typeset .md-button--primary:hover,
+.md-typeset .md-button--primary:focus {
+  background-color: var(--p-red-hover);
+  border-color: var(--p-red-hover);
+  color: #fffdf8;
+}
+[data-md-color-scheme="slate"] .md-typeset .md-button--primary,
+[data-md-color-scheme="slate"] .md-typeset .md-button--primary:hover,
+[data-md-color-scheme="slate"] .md-typeset .md-button--primary:focus {
+  color: #151412;
+}
+
+/* Tabs */
+.md-typeset .tabbed-labels > label {
+  font-weight: 700;
+}
+.md-typeset .tabbed-labels > label:hover {
+  color: var(--p-red);
+}
+
+/* ----- Admonitions ---------------------------------------------------
+   One shape for every kind: a sheet with a hairline and a 3 px rule in the
+   kind's ink. Kinds without a rule of their own take the blue. */
+
+.md-typeset .admonition,
+.md-typeset details {
+  --p-kind: var(--p-blue);
+  --p-kind-soft: var(--p-blue-soft);
+  background-color: var(--p-sheet);
+  /* !important: Material sets a border colour per kind with a selector this
+     one cannot outrank without naming every kind. */
+  border: 1px solid var(--p-hairline) !important;
+  border-left: 3px solid var(--p-kind) !important;
+  box-shadow: none;
+  font-size: 0.72rem;
+}
+.md-typeset :is(.tip, .hint, .success, .check, .done):is(.admonition, details) {
+  --p-kind: var(--p-green);
+  --p-kind-soft: var(--p-green-soft);
+}
+.md-typeset :is(.warning, .caution, .attention, .question, .help, .faq):is(.admonition, details) {
+  --p-kind: var(--p-yellow);
+  --p-kind-soft: var(--p-yellow-soft);
+}
+.md-typeset :is(.danger, .error, .failure, .fail, .missing, .bug):is(.admonition, details) {
+  --p-kind: var(--p-red);
+  --p-kind-soft: var(--p-red-soft);
+}
+.md-typeset :is(.quote, .cite, .example):is(.admonition, details) {
+  --p-kind: var(--p-ink-3);
+  --p-kind-soft: var(--p-sunk);
+}
+.md-typeset .admonition > .admonition-title,
+.md-typeset details > summary {
+  background-color: var(--p-kind-soft);
+  font-weight: 700;
+}
+.md-typeset .admonition > .admonition-title::before,
+.md-typeset details > summary::before {
+  background-color: var(--p-kind);
+}
+.md-typeset details > summary::after {
+  color: var(--p-ink-2);
+}
+.md-typeset .admonition:focus-within,
+.md-typeset details:focus-within {
+  box-shadow: none;
+}
+
+/* ----- Footer -------------------------------------------------------- */
+
+.md-footer {
+  border-top: 1px solid var(--p-sheet-edge);
+}
+.md-footer-meta {
+  border-top: 1px solid var(--p-hairline);
+}
+.md-footer__link:hover .md-footer__title,
+.md-footer__link:focus .md-footer__title {
+  color: var(--p-red);
+}
+.md-footer-meta.md-typeset a {
+  color: var(--p-ink-2);
+}
+.md-footer-meta.md-typeset a:hover,
+.md-footer-meta.md-typeset a:focus {
+  color: var(--p-red);
+}
+
+/* ----- Odds and ends ------------------------------------------------- */
+
+.md-top {
+  background-color: var(--p-sheet);
+  border: 1px solid var(--p-hairline-strong);
+  border-radius: 2px;
+  box-shadow: none;
+  color: var(--p-ink-2);
+}
+.md-top:hover,
+.md-top:focus {
+  background-color: var(--p-red);
+  border-color: var(--p-red);
+  color: #fffdf8;
+}
+.md-source {
+  font-size: 0.62rem;
+}
+.md-source:hover {
+  opacity: 1;
+  color: var(--p-red);
+}
+:focus-visible {
+  outline-color: var(--p-blue);
+}
+::selection {
+  background-color: var(--p-red-soft);
+  color: var(--p-ink);
+}
+.md-typeset .glightbox img,
+.md-typeset figure img {
+  border: 1px solid var(--p-hairline);
+}
