@@ -8,6 +8,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- OpenDisplay via Home Assistant works from any install, not only the HA add-on. With the Home Assistant Core plugin configured, **Add device → OpenDisplay** shows the tag form, and Tesserae uploads each frame to HA's media folder through its API. The token must belong to an HA administrator. The add-on still writes to the shared `/media`, and now uploads instead when that folder is not writable.
 - Fraimic: the Large Canvas (31.5") and the Standard Canvas (13.3") are in the hardware catalog, so **Add device → Fraimic** has a **Model** choice that sets the panel size, and both are listed on the compatibility page. A frame added before this keeps working as it is.
 - Device kinds can place a config field in a named group (`group`) and show it only for some values (`show_if`).
 - Lineups: a + beside each display's chevron starts a new lineup for that display.

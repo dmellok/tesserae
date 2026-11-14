@@ -11,25 +11,37 @@ You can use both routes with the same Tesserae server.
 ## Through Home Assistant
 
 Choose the **OpenDisplay tag (via Home Assistant)** device kind.
-Tesserae saves each picture in HA's media folder and calls `opendisplay.upload_image`.
+Tesserae puts each picture in HA's media folder and calls `opendisplay.upload_image`.
 HA converts the colours for the tag and sends the picture over Bluetooth.
 
 Tesserae needs no Bluetooth hardware or extra process.
+It works from any install that can reach Home Assistant: the add-on, Docker, a Proxmox guest, or bare metal.
 
 ### Requirements
 
 1. Home Assistant with the OpenDisplay integration installed and at least one tag paired.
    This provides the `opendisplay.upload_image` action and a tag to target.
-2. Tesserae running as the Home Assistant add-on.
-   The add-on's `media:rw` permission shares `/media` with HA.
-   The upload action needs a media source, not a URL.
-3. The Home Assistant Core plugin enabled in Tesserae.
+2. The Home Assistant Core plugin enabled in Tesserae, with HA's URL and a long-lived access token.
+3. Outside the add-on, that token must belong to an HA administrator.
+   HA only accepts media uploads from an administrator.
+
+### How the picture reaches HA
+
+The upload action needs a media source, not a URL, so the picture has to be in HA's media folder.
+
+- **As the Home Assistant add-on**, Tesserae writes it there directly.
+  The add-on's `media:rw` permission shares `/media` with HA.
+  If that folder is not writable, Tesserae uploads the picture instead.
+- **On any other install**, Tesserae uploads it through HA's API, the same way HA's media browser does.
+  Nothing needs mounting.
+- **With a mount of HA's media folder**, set `app.opendisplay_media_root` to the mount and Tesserae writes there instead of uploading.
 
 ### Set it up
 
 1. Open **Settings → Devices → Add device** and set **Transport** to **OpenDisplay**.
    Fill in the tag form.
-   The HA add-on shows this form automatically; other installs show bridge instructions.
+   The form appears on the HA add-on, and on any install with the Home Assistant Core plugin configured.
+   Other installs show bridge instructions.
 
 2. Choose the tag from **HA device**. The dropdown needs the Home Assistant Core plugin configured.
 
@@ -39,12 +51,15 @@ Tesserae needs no Bluetooth hardware or extra process.
    If HA is unreachable or the tag is missing, enter its internal hex device id by hand.
    The tag's name and serial number won't work.
 
-3. Assign a dashboard and send it. Each changed picture is written to `media/tesserae/<device-id>.png` and sent to the tag with
+3. Assign a dashboard and send it. Each changed picture is stored as `media/tesserae/<device-id>.png` and sent to the tag with
 `opendisplay.upload_image`.
 
 Add one Tesserae device per tag, up to however many HA can drive.
 Each uses one file that is overwritten on updates, so files don't accumulate.
-Removing a device cleans up its file automatically.
+Removing a device cleans up its file automatically when Tesserae writes to the folder itself.
+An uploaded picture stays in HA, because HA's API cannot delete media; remove it from HA's media browser if you want it gone.
+
+If pictures never arrive and the log says the upload failed with `401`, the token is not an administrator's.
 
 ### Telemetry
 
@@ -107,4 +122,5 @@ Full options are in the [bridge README](https://github.com/dmellok/tesserae-open
 ## Which path?
 
 - Use HA if you already run it. Its integration handles Bluetooth and colour conversion, with nothing extra to install or run.
+  Tesserae does not have to be the add-on.
 - Use the bridge without HA, or when you want a dedicated Bluetooth host near your tags.
