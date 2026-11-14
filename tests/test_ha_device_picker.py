@@ -193,3 +193,80 @@ def test_add_form_offers_ha_push_outside_the_addon_once_ha_core_is_set(
     html = _devices_page(app)
     assert 'name="kind" value="opendisplay_ha"' in html
     assert "uploads each frame to Home Assistant" in html
+
+
+def _add_tag(client, kind: str = "opendisplay_ha", device_id: str = "kitchen_tag") -> None:
+    resp = client.post(
+        "/settings/devices/add",
+        data={
+            "kind": kind,
+            "id": device_id,
+            "name": "Kitchen tag",
+            "panel_w": "296",
+            "panel_h": "128",
+            "panel_orientation": "landscape",
+        },
+    )
+    assert resp.status_code in (302, 303)
+
+
+def test_tag_page_offers_one_rotation_and_a_palette(app: Flask) -> None:
+    """An OpenDisplay tag cannot report its colours, so the operator picks
+    the palette. The page shows one Rotation: not the pi_png client options
+    HA never sees, and not the older HA turn on a tag that never set it."""
+    client = app.test_client()
+    _sign_in(client)
+    _add_tag(client)
+    html = client.get("/settings/devices/kitchen_tag").get_data(as_text=True)
+
+    assert 'name="panel_gamut"' in html
+    assert "Colour palette" in html
+    for label in ("Black and white", "Black, white and red", "Six colours (Spectra 6)"):
+        assert label in html
+    # The kind's spectra_6 default shows as the selected six-colour choice.
+    assert "Unavailable" not in html
+    assert 'name="panel_orientation"' in html
+    assert "Client rotation" not in html
+    assert "Letterbox colour" not in html
+    assert 'name="rotate"' not in html
+
+
+def test_tag_page_keeps_the_older_ha_turn_while_it_is_set(app: Flask) -> None:
+    """A tag that still relies on HA's rotation shows the setting, so it can
+    be seen and cleared."""
+    client = app.test_client()
+    _sign_in(client)
+    _add_tag(client)
+    app.config["SETTINGS_STORE"].patch_section("devices", {"kitchen_tag": {"rotate": "90"}})
+    html = client.get("/settings/devices/kitchen_tag").get_data(as_text=True)
+    assert 'name="rotate"' in html
+    assert "Turn in Home Assistant (older setup)" in html
+
+
+def test_bridge_tag_page_offers_a_palette(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    _add_tag(client, kind="opendisplay", device_id="bridge_tag")
+    html = client.get("/settings/devices/bridge_tag").get_data(as_text=True)
+    assert 'name="panel_gamut"' in html
+    assert "Colour palette" in html
+
+
+def test_picked_palette_is_saved_on_the_panel(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    _add_tag(client)
+    resp = client.post(
+        "/settings/devices/kitchen_tag/panel",
+        data={
+            "panel_w": "296",
+            "panel_h": "128",
+            "panel_orientation": "landscape",
+            "panel_gamut": "bwr_3",
+        },
+    )
+    assert resp.status_code in (302, 303)
+    device = app.config["DEVICE_REGISTRY"].get("kitchen_tag")
+    assert device.panel["gamut"] == "bwr_3"
+    html = client.get("/settings/devices/kitchen_tag").get_data(as_text=True)
+    assert 'value="bwr_3" selected' in html

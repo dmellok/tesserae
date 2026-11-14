@@ -27,6 +27,14 @@ there one of two ways:
 Either way the filename is stable per device and overwritten in place, so
 the folder never grows beyond one small PNG per device.
 
+The frame is turned to the tag's own (landscape) buffer before it leaves,
+from the device's Panel rotation, and inset by its underscan: the same
+mapping the ``pi_png`` renderer gives a polled client, so one Rotation
+control means the same thing on every kind. A device saved with the older
+``rotate`` option (a turn applied by HA's upload action) keeps that
+behaviour until the option is cleared: its upright composition is sent as
+it was and HA does the turning.
+
 Registered as a PushManager listener, so it reacts to every push and acts
 only on the ``opendisplay_ha`` devices whose frame actually changed. mypy
 --strict applies to this module (see pyproject.toml).
@@ -38,7 +46,6 @@ import contextlib
 import json
 import logging
 import os
-import shutil
 import threading
 import urllib.error
 from collections.abc import Callable
@@ -50,6 +57,8 @@ from flask import Flask
 from app import background_loops, ha_telemetry
 from app.device_loader import Device, DeviceRegistry
 from app.ha_options import is_ha_addon
+from app.panel import device_panel
+from app.quantizer import apply_underscan, rotate_png
 
 logger = logging.getLogger(__name__)
 
@@ -184,10 +193,15 @@ class OpenDisplayHaPublisher:
         digest = str(latest.get("composition_digest") or "")
         if not digest:
             return
-        with self._lock:
-            if self._last_sent.get(device.id) == digest:
-                return
         cfg = self._device_cfg(device.id)
+        rotate = self._parse_rotate(cfg.get("rotate"))
+        quarters, underscan = (0, 0) if rotate else self._tag_mapping(device)
+        # The same composition is a different frame once the mount changes,
+        # so the turn and inset are part of what "already sent" means.
+        sent_key = f"{digest}:{quarters}:{underscan}:{rotate}"
+        with self._lock:
+            if self._last_sent.get(device.id) == sent_key:
+                return
         ha_device_id = str(cfg.get("ha_device_id") or "").strip()
         if not ha_device_id:
             logger.warning(
@@ -198,14 +212,32 @@ class OpenDisplayHaPublisher:
         if not src.exists():
             logger.warning("opendisplay_ha %s: composition %s missing on disk", device.id, digest)
             return
-        media_id = self._stage_frame(device.id, src)
+        frame = src.read_bytes()
+        if quarters:
+            frame = rotate_png(frame, quarters=quarters)
+        if underscan:
+            frame = apply_underscan(frame, underscan=underscan)
+        media_id = self._stage_frame(device.id, frame)
         if media_id is None:
             return
-        rotate = self._parse_rotate(cfg.get("rotate"))
         if self._call_upload(ha_device_id, media_id, rotate):
             with self._lock:
-                self._last_sent[device.id] = digest
+                self._last_sent[device.id] = sent_key
             logger.info("opendisplay_ha %s: pushed frame to HA device %s", device.id, ha_device_id)
+
+    @staticmethod
+    def _tag_mapping(device: Device) -> tuple[int, int]:
+        """Clockwise quarter-turns and underscan that put the upright
+        composition onto the tag's landscape buffer, from the device's Panel
+        settings. Mirrors ``pi_png``'s transform: a portrait panel is turned
+        onto the landscape buffer, and a flipped mount adds a half turn."""
+        panel = device_panel(device)
+        if panel is None:
+            return 0, 0
+        quarters = 3 if panel.w < panel.h else 0
+        if panel.flip:
+            quarters = (quarters + 2) % 4
+        return quarters, max(0, int(panel.underscan))
 
     @staticmethod
     def _parse_rotate(raw: Any) -> int:
@@ -217,7 +249,7 @@ class OpenDisplayHaPublisher:
 
     # -- media file -------------------------------------------------------
 
-    def _stage_frame(self, device_id: str, src: Path) -> str | None:
+    def _stage_frame(self, device_id: str, frame: bytes) -> str | None:
         """Get the frame into HA's media folder and return its media-source
         id, or None when it could not be delivered.
 
@@ -228,7 +260,7 @@ class OpenDisplayHaPublisher:
         write_error: OSError | None = None
         if self._shared_folder:
             try:
-                media_id = self._write_media(device_id, src)
+                media_id = self._write_media(device_id, frame)
             except OSError as exc:
                 # Most likely the add-on's media folder isn't writable: it
                 # needs the media:rw mapping and a writable /media (the
@@ -239,7 +271,7 @@ class OpenDisplayHaPublisher:
                 self._media_warned = False
                 return media_id
         try:
-            media_id = self._upload_media(device_id, src)
+            media_id = self._upload_media(device_id, frame)
         except Exception as exc:
             if not self._media_warned:
                 self._media_warned = True
@@ -279,9 +311,9 @@ class OpenDisplayHaPublisher:
             hint,
         )
 
-    def _upload_media(self, device_id: str, src: Path) -> str:
-        """Send the composition PNG to HA's media folder through its upload
-        API and return the media-source id HA stored it under."""
+    def _upload_media(self, device_id: str, frame: bytes) -> str:
+        """Send the frame to HA's media folder through its upload API and
+        return the media-source id HA stored it under."""
         mod = _ha_core_module(self._app)
         if mod is None or not hasattr(mod, "upload_media"):
             raise RuntimeError("ha_core plugin unavailable")
@@ -289,19 +321,19 @@ class OpenDisplayHaPublisher:
             media_id = mod.upload_media(
                 f"{MEDIA_SOURCE_LOCAL}/{MEDIA_SUBDIR}",
                 f"{device_id}.png",
-                src.read_bytes(),
+                frame,
                 content_type="image/png",
                 timeout=MEDIA_UPLOAD_TIMEOUT_S,
             )
         return str(media_id)
 
-    def _write_media(self, device_id: str, src: Path) -> str:
-        """Atomically copy the composition PNG to the device's stable media
-        file and return its media-source id."""
+    def _write_media(self, device_id: str, frame: bytes) -> str:
+        """Atomically write the frame to the device's stable media file and
+        return its media-source id."""
         self._media_dir.mkdir(parents=True, exist_ok=True)
         dst = self._media_dir / f"{device_id}.png"
         tmp = dst.with_name(dst.name + ".tmp")
-        shutil.copyfile(src, tmp)
+        tmp.write_bytes(frame)
         tmp.replace(dst)
         return f"{MEDIA_SOURCE_LOCAL}/{MEDIA_SUBDIR}/{device_id}.png"
 

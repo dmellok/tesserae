@@ -193,11 +193,10 @@
               <button type="submit" form="{{ section.id }}-calibrate" class="dx-btn is-icon" aria-label="Send orientation card" title="Send orientation card"><i class="ph ph-compass" aria-hidden="true"></i></button>
               {% endif %}
             {% endcall %}
-            {% if section.gamut_capable %}
-            {% call fld(section.id ~ '-gamut', 'Colour gamut', help='The palette the .bin frame is packed to on the server.', w='lg') %}
-              {{ dx_select(section.id ~ '-gamut', 'panel_gamut', section.panel.get('gamut', 'waveshare_e6'),
-                  [{'value':'waveshare_e6','label':'Waveshare E6 / Spectra 6 (6-colour)'},
-                   {'value':'inky_7colour','label':'Inky Impression 7-colour (adds orange)'}], form=_form) }}
+            {% if section.palette %}
+            {% call fld(section.id ~ '-gamut', section.palette.label, help=section.palette.help, w='lg') %}
+              {{ dx_select(section.id ~ '-gamut', 'panel_gamut', section.palette.value,
+                  section.palette.choices, form=_form) }}
             {% endcall %}
             {% endif %}
           </div>
