@@ -307,8 +307,11 @@ def settings_area(area: str) -> str | Response:
         visionect_listener=visionect_listener,
         default_transport=default_transport,
         broker_configured=broker_configured,
-        # Drives the OpenDisplay transport branch: HA add-on gets the
-        # push (opendisplay_ha) form, otherwise the bridge instructions.
+        # Drives the OpenDisplay transport branch: a Tesserae that can
+        # reach Home Assistant (the add-on, or any install with the Home
+        # Assistant Core plugin configured) gets the push (opendisplay_ha)
+        # form, otherwise the bridge instructions.
+        opendisplay_via_ha=is_ha_addon() or _ha_core_configured(),
         in_ha=is_ha_addon(),
         kind_default_rows=kind_default_rows,
         # When set (via ?calibrating=<id>), the matching device card shows
@@ -2267,12 +2270,26 @@ def _rotation_options(panel: dict[str, Any] | None) -> list[dict[str, str]]:
     ]
 
 
+def _ha_core_configured() -> bool:
+    """True when the Home Assistant Core plugin has a URL and a token, so
+    this Tesserae can call HA's API wherever it runs."""
+    registry = current_app.config.get("PLUGIN_REGISTRY")
+    plugin = registry.get("ha_core") if registry is not None else None
+    mod = getattr(plugin, "server_module", None) if plugin is not None else None
+    if mod is None or not hasattr(mod, "is_configured"):
+        return False
+    try:
+        return bool(mod.is_configured())
+    except Exception:
+        return False
+
+
 def _opendisplay_setup(device: Device) -> dict[str, Any] | None:
-    """Setup guidance for OpenDisplay device cards. Detects whether this
-    Tesserae is the Home Assistant add-on and points the user at the
-    right delivery path: HA's OpenDisplay integration (the HA kind) or
-    the standalone bridge (the REST kind). Returns None for every other
-    kind so the card only grows the section for OpenDisplay devices."""
+    """Setup guidance for OpenDisplay device cards. Detects how this
+    Tesserae can reach Home Assistant and points the user at the right
+    delivery path: HA's OpenDisplay integration (the HA kind) or the
+    standalone bridge (the REST kind). Returns None for every other kind
+    so the card only grows the section for OpenDisplay devices."""
     kind = device.kind_of or device.id
     if kind not in ("opendisplay", "opendisplay_ha"):
         return None
@@ -2292,16 +2309,32 @@ def _opendisplay_setup(device: Device) -> dict[str, Any] | None:
                 ),
                 "link": _OPENDISPLAY_INTEGRATION,
             }
+        if _ha_core_configured():
+            return {
+                "title": "OpenDisplay via Home Assistant",
+                "in_ha": False,
+                "ok": True,
+                "body": (
+                    "Connected to Home Assistant through the Home Assistant Core "
+                    "plugin. Install the OpenDisplay integration in HA and pair your "
+                    "tag, then set its HA device id above. On each render Tesserae "
+                    "uploads the frame to HA's media folder and calls "
+                    "opendisplay.upload_image; HA pushes it to the tag over Bluetooth "
+                    "LE. The plugin's token must belong to an HA administrator."
+                ),
+                "link": _OPENDISPLAY_INTEGRATION,
+            }
         return {
             "title": "OpenDisplay via Home Assistant",
             "in_ha": False,
             "ok": False,
             "body": (
                 "This kind delivers frames through Home Assistant's "
-                "opendisplay.upload_image action, but this Tesserae is not running "
-                "as the HA add-on (no shared /media, no Supervisor). Run the HA "
-                "add-on, or use the OpenDisplay tag (bridge) kind with the "
-                "standalone bridge instead."
+                "opendisplay.upload_image action, but this Tesserae has no Home "
+                "Assistant connection. Set the URL and an administrator's "
+                "long-lived token in Settings, Plugins, Home Assistant Core, or use "
+                "the OpenDisplay tag (bridge) kind with the standalone bridge "
+                "instead."
             ),
             "link": _OPENDISPLAY_BRIDGE,
         }

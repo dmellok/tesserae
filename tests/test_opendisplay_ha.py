@@ -285,6 +285,160 @@ def test_unwritable_media_dir_is_soft(app: Flask, tmp_path: Path) -> None:
     assert pub._media_warned is True
 
 
+def _upload_publisher(
+    app: Flask, calls: list, uploads: list, *, upload_error: Exception | None = None
+) -> OpenDisplayHaPublisher:
+    """A publisher with no shared media folder, as on Docker / Proxmox /
+    bare metal: frames go through ha_core's upload API."""
+    core = app.config["PLUGIN_REGISTRY"].get("ha_core").server_module
+
+    def fake_call_service(domain, service, *, data=None, timeout=10):
+        calls.append((domain, service, data))
+        return []
+
+    def fake_upload_media(folder_id, filename, content, *, content_type="image/png", timeout=30):
+        if upload_error is not None:
+            raise upload_error
+        uploads.append((folder_id, filename, content, content_type))
+        return f"{folder_id}/{filename}"
+
+    core.call_service = fake_call_service  # type: ignore[attr-defined]
+    core.upload_media = fake_upload_media  # type: ignore[attr-defined]
+    return OpenDisplayHaPublisher(
+        app=app,
+        devices=app.config["DEVICE_REGISTRY"],
+        settings=app.config["SETTINGS_STORE"],
+        renders_dir=app.config["RENDERS_DIR"],
+        latest_render_fn=app.config["PUSH_MANAGER"].latest_render_for,
+        run_async=False,
+    )
+
+
+def test_uploads_frame_when_there_is_no_shared_media_folder(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Outside the HA add-on Tesserae shares no filesystem with HA, so the
+    frame goes through HA's media upload API and the action is pointed at
+    the id HA stored it under. Nothing is written to a local /media."""
+    monkeypatch.delenv("TESSERAE_HA_INGRESS", raising=False)
+    monkeypatch.delenv("SUPERVISOR_TOKEN", raising=False)
+    _make_tag(app, "kitchen_tag", "ha-abc")
+    _plant_render(app, "kitchen_tag", "deadbeef")
+    calls: list[Any] = []
+    uploads: list[Any] = []
+    pub = _upload_publisher(app, calls, uploads)
+    assert pub._shared_folder is False
+
+    def no_local_write(_device_id: str, _src: Path) -> str:
+        raise AssertionError("must not write a local media file")
+
+    pub._write_media = no_local_write  # type: ignore[method-assign]
+    pub.on_push()
+
+    assert uploads == [
+        (
+            "media-source://media_source/local/tesserae",
+            "kitchen_tag.png",
+            b"\x89PNG\r\n\x1a\nfake",
+            "image/png",
+        )
+    ]
+    assert len(calls) == 1
+    assert calls[0][2]["image"] == {
+        "media_content_id": "media-source://media_source/local/tesserae/kitchen_tag.png",
+        "media_content_type": "image/png",
+    }
+    # Unchanged frame: neither uploaded nor sent again.
+    pub.on_push()
+    assert len(uploads) == 1
+    assert len(calls) == 1
+
+
+def test_failed_upload_is_soft_and_retried(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    """HA refusing the upload (a non-admin token answers 401) must not crash
+    the push loop or call the action; it warns once and tries again on the
+    next push."""
+    import urllib.error
+
+    monkeypatch.delenv("TESSERAE_HA_INGRESS", raising=False)
+    monkeypatch.delenv("SUPERVISOR_TOKEN", raising=False)
+    _make_tag(app)
+    _plant_render(app, "kitchen_tag")
+    calls: list[Any] = []
+    uploads: list[Any] = []
+    denied = urllib.error.HTTPError("http://ha/upload", 401, "Unauthorized", None, None)  # type: ignore[arg-type]
+    pub = _upload_publisher(app, calls, uploads, upload_error=denied)
+    pub.on_push()  # no crash
+    assert calls == []
+    assert pub._media_warned is True
+    assert "kitchen_tag" not in pub._last_sent
+
+    # Token fixed: the same frame goes out on the next push.
+    core = app.config["PLUGIN_REGISTRY"].get("ha_core").server_module
+    core.upload_media = lambda folder_id, filename, content, **_kw: f"{folder_id}/{filename}"  # type: ignore[attr-defined]
+    pub.on_push()
+    assert len(calls) == 1
+    assert pub._media_warned is False
+
+
+def test_unwritable_shared_folder_falls_back_to_upload(app: Flask, tmp_path: Path) -> None:
+    """The add-on's media folder being read-only no longer strands the tag:
+    the frame is uploaded through HA's API instead."""
+    _make_tag(app)
+    _plant_render(app, "kitchen_tag")
+    calls: list[Any] = []
+    uploads: list[Any] = []
+    pub = _upload_publisher(app, calls, uploads)
+    pub._shared_folder = True
+
+    def boom(_device_id: str, _src: Path) -> str:
+        raise PermissionError("[Errno 13] Permission denied: '/media/tesserae'")
+
+    pub._write_media = boom  # type: ignore[method-assign]
+    pub.on_push()
+    assert len(uploads) == 1
+    assert len(calls) == 1
+    assert pub._media_warned is False
+
+
+def test_no_shared_folder_leaves_local_media_alone(
+    app: Flask, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Without a shared folder the default /media is not Tesserae's, so the
+    orphan sweep and device cleanup must not delete files under it."""
+    monkeypatch.delenv("TESSERAE_HA_INGRESS", raising=False)
+    monkeypatch.delenv("SUPERVISOR_TOKEN", raising=False)
+    pub = _upload_publisher(app, [], [])
+    pub._media_dir = tmp_path / "media" / "tesserae"
+    pub._media_dir.mkdir(parents=True)
+    stray = pub._media_dir / "someone_elses.png"
+    stray.write_bytes(b"x")
+    assert pub.prune_orphans() == 0
+    pub.cleanup_device("someone_elses")
+    assert stray.exists()
+
+
+def test_configured_media_root_keeps_the_shared_folder_path(
+    app: Flask, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``app.opendisplay_media_root`` set to a mount of HA's media folder
+    means write there, add-on or not."""
+    monkeypatch.delenv("TESSERAE_HA_INGRESS", raising=False)
+    monkeypatch.delenv("SUPERVISOR_TOKEN", raising=False)
+    root = tmp_path / "ha-media"
+    app.config["SETTINGS_STORE"].patch_section("app", {"opendisplay_media_root": str(root)})
+    _make_tag(app)
+    _plant_render(app, "kitchen_tag")
+    calls: list[Any] = []
+    uploads: list[Any] = []
+    pub = _upload_publisher(app, calls, uploads)
+    assert pub._shared_folder is True
+    pub.on_push()
+    assert (root / "tesserae" / "kitchen_tag.png").exists()
+    assert uploads == []
+    assert len(calls) == 1
+
+
 def test_telemetry_poll_records_heartbeat(app: Flask) -> None:
     """The telemetry poller pulls the tag's battery/signal/firmware from HA
     and feeds it through record_status_heartbeat, so the device's status

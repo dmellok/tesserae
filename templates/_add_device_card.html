@@ -263,15 +263,17 @@
     </div>
 
     {# OpenDisplay branch: BLE tags via Home Assistant (push) or the
-       standalone bridge (REST). HA-detection picks which to lead with. #}
+       standalone bridge (REST). A reachable Home Assistant (the add-on, or
+       the Home Assistant Core plugin configured) picks which to lead with. #}
     <div class="dx-add-branch dx-add-branch--opendisplay"
          data-transport-branch="opendisplay"
          hidden>
-      {% if in_ha %}
+      {% if opendisplay_via_ha %}
       <div class="dx-hint-band">
         <i class="ph ph-info" aria-hidden="true"></i>
         <p>
-          <strong>Via Home Assistant.</strong> Tesserae writes each frame to <code>/media</code>
+          <strong>Via Home Assistant.</strong>
+          {% if in_ha %}Tesserae writes each frame to <code>/media</code>{% else %}Tesserae uploads each frame to Home Assistant's media folder (the Home Assistant Core plugin's token must belong to an administrator){% endif %}
           and calls HA's <code>opendisplay.upload_image</code> action; HA drives the tag over
           Bluetooth LE. Pick your tag below; its panel size fills in when Home Assistant reports
           one. Prefer the standalone bridge? Use the <strong>REST API</strong> tab instead.
@@ -304,13 +306,14 @@
       <div class="dx-hint-band">
         <i class="ph ph-info" aria-hidden="true"></i>
         <p>
-          <strong>OpenDisplay tags run over Bluetooth LE.</strong> This Tesserae is not the Home
-          Assistant add-on, so drive them with the standalone
+          <strong>OpenDisplay tags run over Bluetooth LE.</strong> This Tesserae has no Home
+          Assistant connection, so drive them with the standalone
           <a href="https://github.com/dmellok/tesserae-opendisplay" target="_blank" rel="noopener noreferrer">tesserae-opendisplay bridge</a>:
           switch to the <strong>REST API</strong> tab, issue a pairing code, then run the bridge on a
           machine near your tags (<code>pip install tesserae-opendisplay</code>). One bridge drives
-          many tags. Running Home Assistant instead? Install Tesserae as the HA add-on to push through
-          <code>opendisplay.upload_image</code> with no extra hardware.
+          many tags. Running Home Assistant instead? Set its URL and an administrator's long-lived
+          token in <strong>Settings → Plugins → Home Assistant Core</strong>, then come back here to
+          push through <code>opendisplay.upload_image</code> with no extra hardware.
         </p>
       </div>
       {% endif %}

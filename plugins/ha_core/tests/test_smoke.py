@@ -158,6 +158,56 @@ def test_render_template_posts_to_template_endpoint(app: Flask, monkeypatch) -> 
     assert b"integration_entities" in seen["body"]
 
 
+def test_upload_media_posts_multipart_to_the_media_upload_endpoint(app: Flask, monkeypatch) -> None:
+    """upload_media sends the file as multipart form data, with the target
+    folder as ``media_content_id``, and returns the id HA stored it under
+    (how a Tesserae outside the add-on hands HA an OpenDisplay frame)."""
+    core = _core(app)
+    seen: dict[str, object] = {}
+
+    def fake_urlopen(req, timeout=0, context=None):
+        seen["url"] = req.full_url
+        seen["method"] = req.get_method()
+        seen["body"] = req.data
+        seen["content_type"] = req.get_header("Content-type")
+        seen["auth"] = req.get_header("Authorization")
+        return _FakeResp(
+            b'{"media_content_id": "media-source://media_source/local/tesserae/tag.png"}'
+        )
+
+    png = b"\x89PNG\r\n\x1a\nfake"
+    with app.app_context():
+        _configure(app)
+        monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+        out = core.upload_media("media-source://media_source/local/tesserae", "tag.png", png)
+
+    assert out == "media-source://media_source/local/tesserae/tag.png"
+    assert seen["method"] == "POST"
+    assert seen["url"] == "http://ha/api/media_source/local_source/upload"
+    assert seen["auth"] == "Bearer t"
+    content_type = str(seen["content_type"])
+    assert content_type.startswith("multipart/form-data; boundary=")
+    boundary = content_type.split("boundary=", 1)[1].encode()
+    body = seen["body"]
+    assert isinstance(body, bytes)
+    assert body.startswith(b"--" + boundary + b"\r\n")
+    assert body.endswith(b"\r\n--" + boundary + b"--\r\n")
+    assert b'name="media_content_id"\r\n\r\nmedia-source://media_source/local/tesserae\r\n' in body
+    assert b'name="file"; filename="tag.png"\r\nContent-Type: image/png\r\n\r\n' + png in body
+
+
+def test_upload_media_falls_back_to_the_expected_id(app: Flask, monkeypatch) -> None:
+    """An HA that answers without a body still yields a usable media id."""
+    core = _core(app)
+    with app.app_context():
+        _configure(app)
+        monkeypatch.setattr(
+            "urllib.request.urlopen", lambda req, timeout=0, context=None: _FakeResp(b"")
+        )
+        out = core.upload_media("media-source://media_source/local/tesserae/", "tag.png", b"x")
+    assert out == "media-source://media_source/local/tesserae/tag.png"
+
+
 class _TrackedBody(io.BytesIO):
     """Stands in for the socket-backed body of an HTTP error response."""
 

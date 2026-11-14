@@ -19,6 +19,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import quote
@@ -231,6 +232,61 @@ def call_service(
     except json.JSONDecodeError:
         return []
     return parsed if isinstance(parsed, list) else []
+
+
+def upload_media(
+    folder_id: str,
+    filename: str,
+    content: bytes,
+    *,
+    content_type: str = "image/png",
+    timeout: int = 30,
+) -> str:
+    """POST a file to ``/api/media_source/local_source/upload`` and return
+    the media-source id HA stored it under.
+
+    ``folder_id`` is the target folder as a media-source id, for example
+    ``media-source://media_source/local/tesserae``. HA creates the folder
+    when it is missing and replaces a file of the same name, so a stable
+    filename never accumulates. This is the endpoint HA's own media browser
+    uploads through. It lets a Tesserae that does not share a filesystem
+    with HA (Docker, Proxmox, bare metal) hand HA a frame.
+
+    HA only accepts image / video / audio content types, caps an upload at
+    20 MB, and answers 401 unless the token belongs to an administrator.
+    Raises on missing config or HTTP errors so the caller can surface them."""
+    if not is_configured():
+        raise _not_configured()
+    boundary = f"tesserae-{uuid.uuid4().hex}"
+    safe_name = filename.replace('"', "")
+    body = b"".join(
+        [
+            f"--{boundary}\r\n".encode(),
+            b'Content-Disposition: form-data; name="media_content_id"\r\n\r\n',
+            folder_id.encode("utf-8"),
+            f"\r\n--{boundary}\r\n".encode(),
+            f'Content-Disposition: form-data; name="file"; filename="{safe_name}"\r\n'.encode(),
+            f"Content-Type: {content_type}\r\n\r\n".encode(),
+            content,
+            f"\r\n--{boundary}--\r\n".encode(),
+        ]
+    )
+    headers = _headers()
+    headers["Content-Type"] = f"multipart/form-data; boundary={boundary}"
+    req = urllib.request.Request(
+        base_url() + "/api/media_source/local_source/upload",
+        data=body,
+        headers=headers,
+        method="POST",
+    )
+    with _urlopen(req, timeout=timeout) as resp:
+        raw = decode_body(resp).decode("utf-8")
+    try:
+        payload = json.loads(raw) if raw.strip() else {}
+    except json.JSONDecodeError:
+        payload = {}
+    media_id = payload.get("media_content_id") if isinstance(payload, dict) else None
+    return str(media_id) if media_id else f"{folder_id.rstrip('/')}/{filename}"
 
 
 def render_template(template: str, *, timeout: int = 10) -> str:

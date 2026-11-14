@@ -157,3 +157,39 @@ def test_add_form_persists_picked_ha_device_id(app: Flask) -> None:
     assert resp.status_code in (302, 303)
     section = app.config["SETTINGS_STORE"].get_section("devices") or {}
     assert section.get("kitchen_tag", {}).get("ha_device_id") == "4ab9c7f0e2"
+
+
+def _devices_page(app: Flask) -> str:
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.get("/settings/devices")
+    assert resp.status_code == 200
+    return resp.get_data(as_text=True)
+
+
+def test_add_form_points_at_the_bridge_without_a_ha_connection(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No add-on and no Home Assistant Core connection: there is nothing to
+    push through, so the OpenDisplay tab explains the bridge instead."""
+    monkeypatch.delenv("TESSERAE_HA_INGRESS", raising=False)
+    monkeypatch.delenv("SUPERVISOR_TOKEN", raising=False)
+    html = _devices_page(app)
+    assert 'name="kind" value="opendisplay_ha"' not in html
+    assert "has no Home\n          Assistant connection" in html
+
+
+def test_add_form_offers_ha_push_outside_the_addon_once_ha_core_is_set(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A Tesserae on Docker / Proxmox with the Home Assistant Core plugin
+    configured can push through HA (frames are uploaded over its API), so
+    the form is no longer reserved for the add-on."""
+    monkeypatch.delenv("TESSERAE_HA_INGRESS", raising=False)
+    monkeypatch.delenv("SUPERVISOR_TOKEN", raising=False)
+    app.config["SETTINGS_STORE"].update_section(
+        "plugins", {"ha_core": {"base_url": "http://ha", "token_secret": "t"}}
+    )
+    html = _devices_page(app)
+    assert 'name="kind" value="opendisplay_ha"' in html
+    assert "uploads each frame to Home Assistant" in html
