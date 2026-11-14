@@ -17,6 +17,7 @@
   "cell_options": [
     {
       "name": "subreddit",
+      "placeholder": "programming",
       "type": "string",
       "label": "Subreddit",
       "default": "programming",

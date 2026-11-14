@@ -57,6 +57,7 @@
     },
     {
       "name": "dashboardName",
+      "placeholder": "Kitchen",
       "type": "string",
       "label": "Title",
       "default": "",

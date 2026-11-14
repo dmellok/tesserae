@@ -1420,11 +1420,13 @@ def create_app(
         return status if status["update_available"] else None
 
     app.jinja_env.globals["server_colour_presets"] = server_identity.presets_for_picker
+    from app.option_conditions import option_layout as _option_layout
     from app.option_conditions import option_sections as _option_sections
     from app.option_conditions import option_visible as _option_visible
 
     app.jinja_env.globals["option_visible"] = _option_visible
     app.jinja_env.globals["option_sections"] = _option_sections
+    app.jinja_env.globals["option_layout"] = _option_layout
 
     def _choice_image(src: Any) -> str:
         """A select choice's picture (``choices[].image``) as the browser

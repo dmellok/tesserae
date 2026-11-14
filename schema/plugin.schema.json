@@ -25,6 +25,11 @@
     "description": {
       "type": "string"
     },
+    "overrides_look": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Describe a widget whose appearance is independent of the dashboard look. The editor always shows this warning; it never changes widget options when resetting cell look overrides."
+    },
     "icon": {
       "type": "string",
       "description": "Phosphor icon class (e.g. 'ph-list-checks').",
@@ -81,7 +86,13 @@
           "name": { "type": "string" },
           "type": { "enum": ["string", "textarea", "variables_textarea", "entity_overrides", "location_search", "number", "slider", "select", "multiselect", "boolean", "color"] },
           "label": { "type": "string" },
+          "placeholder": { "type": "string", "description": "An example value shown while the field is empty; never saved as its value." },
           "default": {},
+          "overrides_look": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Describe how this option overrides the dashboard look, e.g. 'uses its own dark mode'. The editor warns only when the visible option differs from its default, and links to the option without resetting it."
+          },
           "secret": {
             "type": "boolean",
             "description": "The value is sensitive: it is stripped from the render context handed to the browser and redacted (with an installer question suggested in its place) when the dashboard is shared to the catalog."
@@ -175,6 +186,7 @@
           "name": { "type": "string" },
           "type": { "type": "string" },
           "label": { "type": "string" },
+          "placeholder": { "type": "string", "description": "As on cell_options: an example value shown while the field is empty." },
           "secret": {
             "type": "boolean",
             "description": "When true, this field is saved to settings.json as '<name>_secret' so disk-grepping reveals which values are sensitive."

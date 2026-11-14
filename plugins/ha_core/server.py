@@ -72,12 +72,12 @@ def _not_configured() -> RuntimeError:
     if "token_secret" in unreadable:
         return RuntimeError(
             "Home Assistant token can no longer be decrypted (the encryption key "
-            "changed); re-enter it in Settings -> Plugins -> Home Assistant Core"
+            "changed); re-enter it in Settings → Widgets → Home Assistant Core"
         )
     if have_url:
         return RuntimeError(
-            "Home Assistant access token is missing; add it in Settings -> Plugins "
-            "-> Home Assistant Core"
+            "Home Assistant access token is missing; add it in Settings → Widgets "
+            "→ Home Assistant Core"
         )
     return RuntimeError("Home Assistant is not configured")
 

@@ -319,7 +319,7 @@ def render_frame(
     if landed.startswith("/auth/"):
         raise RuntimeError(
             "Home Assistant showed the login page instead of the dashboard; "
-            "check the access token in Settings -> Plugins -> Home Assistant Core"
+            "check the access token in Settings → Widgets → Home Assistant Core"
         )
     return crop_header(png, params)
 
@@ -381,7 +381,7 @@ def fetch(
         return {"error": "Install the Home Assistant Core plugin to use this widget."}
     if not core.is_configured():
         return {
-            "error": "Set the Home Assistant URL and token in Settings -> Plugins -> Home Assistant Core."
+            "error": "Set the Home Assistant URL and token in Settings → Widgets → Home Assistant Core."
         }
 
     params = _params(options, ctx)

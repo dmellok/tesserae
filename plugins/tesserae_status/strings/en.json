@@ -10,5 +10,6 @@
   "degrees": "degrees",
   "rh": "RH",
   "humidity": "Humidity",
-  "percent": "percent"
+  "percent": "percent",
+  "cell_options.dashboardName.placeholder": "Kitchen"
 }

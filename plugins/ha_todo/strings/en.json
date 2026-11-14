@@ -12,5 +12,6 @@
   "priority": "priority",
   "overdue": "OVERDUE",
   "to_do": "TO DO",
-  "done": "DONE"
+  "done": "DONE",
+  "cell_options.title.placeholder": "Shopping list"
 }

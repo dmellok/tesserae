@@ -14,5 +14,6 @@
   "cond_showers": "Averses",
   "cond_snow": "Neige",
   "cond_thunderstorm": "Orage",
-  "cond_fog": "Brouillard"
+  "cond_fog": "Brouillard",
+  "cell_options.label.placeholder": "Maison"
 }

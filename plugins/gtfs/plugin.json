@@ -67,6 +67,7 @@
     },
     {
       "name": "gtfs_url",
+      "placeholder": "https://rrgtfsfeeds.s3.amazonaws.com/gtfs_subway.zip",
       "type": "string",
       "label": "GTFS feed URL",
       "default": "",
@@ -91,6 +92,7 @@
     },
     {
       "name": "rt_url",
+      "placeholder": "https://api.bart.gov/gtfsrt/tripupdate.aspx",
       "type": "string",
       "label": "TripUpdates URL",
       "default": "",
@@ -115,6 +117,7 @@
     },
     {
       "name": "alerts_url",
+      "placeholder": "https://api.bart.gov/gtfsrt/alerts.aspx",
       "type": "string",
       "label": "ServiceAlerts URL",
       "default": "",
@@ -139,6 +142,7 @@
     },
     {
       "name": "vehicles_url",
+      "placeholder": "https://api.bart.gov/gtfsrt/vehicleposition.aspx",
       "type": "string",
       "label": "VehiclePositions URL",
       "default": "",
@@ -171,6 +175,7 @@
     },
     {
       "name": "stop_id",
+      "placeholder": "A34N,A34S",
       "type": "string",
       "label": "Stop ID",
       "default": "",
@@ -223,6 +228,7 @@
     {
       "name": "horizon",
       "type": "number",
+      "unit": "min",
       "label": "Within",
       "default": 90,
       "help": "Minutes ahead. Arrivals further out than this are left off."
@@ -301,6 +307,7 @@
     },
     {
       "name": "routes",
+      "placeholder": "A,C",
       "type": "string",
       "label": "Routes",
       "default": "",
@@ -310,6 +317,7 @@
     {
       "name": "walk_minutes",
       "type": "number",
+      "unit": "min",
       "label": "Walk time",
       "default": 0,
       "advanced": true,
@@ -372,6 +380,7 @@
     },
     {
       "name": "title",
+      "placeholder": "Home stop",
       "type": "string",
       "label": "Title",
       "default": "",

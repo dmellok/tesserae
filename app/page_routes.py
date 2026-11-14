@@ -32,6 +32,7 @@ import re
 import time
 import uuid
 from typing import Any, Final
+from urllib.parse import urlsplit
 
 from flask import (
     Blueprint,
@@ -50,9 +51,14 @@ from werkzeug.wrappers import Response
 
 from app.composer import _hydrate_page
 from app.layouts import LAYOUTS, LAYOUTS_BY_SLUG, detect_layout, to_panel_pixels
-from app.lineup_cascade import CascadeResult, emptied_by, remove_page_from_lineups
+from app.lineup_cascade import (
+    CascadeResult,
+    deck_without_page,
+    emptied_by,
+    remove_page_from_lineups,
+)
 from app.location_time import is_iana_zone
-from app.option_conditions import canonical_value
+from app.option_conditions import canonical_value, carried_value
 from app.panel import (
     DESIGN_SIZES,
     device_panel,
@@ -61,10 +67,15 @@ from app.panel import (
     preview_groups_for_page,
     resolve_panel_for_page,
     resolve_settings_panel,
+    resolve_test_display,
 )
 from app.plugin_loader import Plugin, PluginRegistry
+from app.redirects import local_return_path
+from app.state.deck_model import Deck, DeckPage
+from app.state.legacy_projections import is_timed_view_deck
 from app.state.page_store import Cell, Page, PageStore, Panel, clean_custom_css
 from app.state.settings_store import SettingsStore
+from app.widget_look import editor_look_context
 from app.widget_picker import CATEGORIES as WIDGET_CATEGORIES
 from app.widget_picker import display_name as widget_display_name
 from app.widget_picker import picker_entries as widget_picker_entries
@@ -467,7 +478,7 @@ def _apply_layout_to_cells(layout_slug: str, page: Page) -> list[Cell]:
     slots get unassigned cells; surplus existing cells are dropped.
 
     When ``page.status_bar_enabled`` is true, the auto-managed status
-    bar cell is preserved (kept at (0, 0, panel.w, STATUS_BAR_HEIGHT_PX))
+    bar cell keeps its stored height at the top left, at full panel width,
     and the preset's cells are rescaled to fit into the space below it
     so switching layouts doesn't drop the status bar or shove it into
     a random slot."""
@@ -483,8 +494,8 @@ def _apply_layout_to_cells(layout_slug: str, page: Page) -> list[Cell]:
             reusable = [c for c in reusable if c.id != bar_cell.id]
     positions = to_panel_pixels(layout, panel.w, panel.h)
     if bar_cell is not None:
-        # Rescale the preset's positions into (STATUS_BAR_HEIGHT_PX, panel.h).
-        bar_h = STATUS_BAR_HEIGHT_PX
+        # Use the actual strip height, including its gap-derived padding.
+        bar_h = bar_cell.h
         remaining = max(1, panel.h - bar_h)
         scale = remaining / panel.h
         positions = [
@@ -498,11 +509,9 @@ def _apply_layout_to_cells(layout_slug: str, page: Page) -> list[Cell]:
         else:
             out.append(_new_cell(x=x, y=y, w=w, h=h))
     if bar_cell is not None:
-        # Re-anchor the bar to full-width + fixed height in case the panel
-        # size changed since it was last positioned.
-        anchored = bar_cell.model_copy(
-            update={"x": 0, "y": 0, "w": panel.w, "h": STATUS_BAR_HEIGHT_PX}
-        )
+        # Re-anchor the bar to full width if the panel changed, preserving
+        # the gap-derived padding in its stored height.
+        anchored = bar_cell.model_copy(update={"x": 0, "y": 0, "w": panel.w})
         out.insert(0, anchored)
     return out
 
@@ -522,11 +531,12 @@ def _materialize_cell_options(plugins: list[Any]) -> dict[str, list[dict[str, An
     empty-list fallback silently rendered an empty picker which was
     impossible to diagnose from the UI, see issue #29."""
     from app.secret_box import SecretBoxError
-    from app.widget_choices import choice_rows
+    from app.widget_choices import choice_rows, guidance_note
+    from app.widget_options import localized_option_specs
 
     out: dict[str, list[dict[str, Any]]] = {}
     for plugin in plugins:
-        options = list(plugin.manifest.get("cell_options", []))
+        options = localized_option_specs(plugin, "cell_options")
         resolver = getattr(plugin.server_module, "choices", None) if plugin.server_module else None
         materialized: list[dict[str, Any]] = []
         plugin_label = str(plugin.manifest.get("name") or plugin.id)
@@ -559,6 +569,12 @@ def _materialize_cell_options(plugins: list[Any]) -> dict[str, list[dict[str, An
                         "plugin %s: choices(%r) raised; rendering as empty", plugin.id, source
                     )
                     spec["choices"] = []
+            # One blank row with a label is the provider saying why it can't
+            # list anything (Home Assistant not set up, a secret to re-enter).
+            # The v2 editor shows that once above the options.
+            note = guidance_note(spec.get("choices")) if source else None
+            if note:
+                spec["choices_note"] = note
             materialized.append(spec)
         out[plugin.id] = materialized
     return out
@@ -615,9 +631,17 @@ def _editor_context(page: Page) -> dict[str, Any]:
     """Shared context for the editor."""
     panel = resolve_panel_for_page(page, _devices(), _settings_store())
     page = _ensure_cells_fit_panel(page, panel)
-    panel_cells = [(c.x, c.y, c.w, c.h) for c in page.cells]
-    active_layout = detect_layout(panel_cells, panel.w, panel.h)
+    bar_index = _status_bar_cell_index(page)
+    strip_h = page.cells[bar_index].h if bar_index is not None else 0
+    panel_cells = [
+        (c.x, c.y - strip_h, c.w, c.h) for i, c in enumerate(page.cells) if i != bar_index
+    ]
+    active_layout = (
+        detect_layout(panel_cells, panel.w, panel.h - strip_h) if panel.h > strip_h else None
+    )
     widgets = sorted(_plugins().widgets(), key=lambda p: p.name.lower())
+    picker_widgets = widget_picker_entries(widgets)
+    test_display = resolve_test_display(page, _settings_store())
     plugins = _plugins()
 
     # Cells in a JSON-safe shape for the interactive layout editor JS.
@@ -727,8 +751,29 @@ def _editor_context(page: Page) -> dict[str, Any]:
         else []
     )
 
+    is_new = request.args.get("new") == "1"
+    real_ids = {d["id"] for d in device_options}
+    first_display = next((did for did in page.device_ids if did in real_ids), None)
+    lineup_return = url_for(
+        "pages.edit",
+        page_id=page.id,
+        new="1" if is_new else None,
+        _anchor="lineup" if is_new else "schedules",
+    )
+    lineup_args: dict[str, Any] = {"return": lineup_return}
+
     return {
         "page": page,
+        **editor_look_context(page, widgets),
+        "editor_version": _editor_version(),
+        "is_new": is_new,
+        "lineups_return_url": lineup_return,
+        "new_lineup_url": url_for(
+            "decks.editor", display=first_display, page_id=page.id, **lineup_args
+        ),
+        "test_display": {"w": test_display.w, "h": test_display.h},
+        "test_display_presets": [[800, 480], [480, 800], [1200, 825], [1920, 1080]],
+        "lineups": _editor_lineups(page),
         # The delete button names the lineups it would leave, in one confirm.
         "page_lineups": lineups_using(page.id),
         "page_emptied_lineups": would_delete_lineups([page.id]),
@@ -736,7 +781,28 @@ def _editor_context(page: Page) -> dict[str, Any]:
         "plugins": widgets,
         "widget_picker": {
             "categories": [{"id": c, "label": label} for c, label in WIDGET_CATEGORIES],
-            "widgets": widget_picker_entries(widgets),
+            "widgets": picker_widgets,
+        },
+        "widget_catalog": {
+            "categories": [
+                {
+                    "key": c,
+                    "label": label,
+                    "count": sum(w["category"] == c for w in picker_widgets),
+                }
+                for c, label in WIDGET_CATEGORIES
+            ],
+            "widgets": [
+                {
+                    "key": w["id"],
+                    "name": w["item"],
+                    "family": w["family"],
+                    "icon": w["icon"],
+                    "description": w["desc"],
+                    "category": w["category"],
+                }
+                for w in picker_widgets
+            ],
         },
         "widget_names": {w.id: widget_display_name(w.name, w.id) for w in widgets},
         "plugin_cell_options": _materialize_cell_options(widgets),
@@ -761,6 +827,55 @@ def _preview_scale(panel_w: int, panel_h: int = 0) -> float:
     sw = target / panel_w if panel_w > target else 1.0
     sh = target / panel_h if panel_h and panel_h > target else 1.0
     return min(sw, sh)
+
+
+def _lineup_displays(deck: Deck) -> list[str]:
+    from app.deck_routes import _deck_displays
+
+    return _deck_displays(deck, {p.id: list(p.device_ids) for p in _store().list()})
+
+
+def _editor_lineups(page: Page) -> list[dict[str, Any]]:
+    """Joined and available lineups, including this dashboard's schedules."""
+    from app.deck_routes import _lineup_input, _time_cycle
+    from app.lineup_binding import display_label
+    from app.lineups_view import days_label, dur_short, using_time_cycle, window_label
+
+    store = current_app.config.get("DECK_STORE")
+    if store is None:
+        return []
+    rows = []
+    for deck in store.all():
+        device_ids = _lineup_displays(deck)
+        schedule = is_timed_view_deck(deck) and len(deck.pages) == 1
+        with using_time_cycle(_time_cycle()):
+            when = window_label(_lineup_input(deck, with_urls=False))
+            if deck.advance != "manual":
+                cadence = (
+                    f"every {dur_short(deck.advance_interval_minutes)} · "
+                    if deck.advance_trigger == "interval"
+                    else ""
+                )
+                when = f"{days_label(deck.advance_days_of_week)} {cadence}{when}"
+        rows.append(
+            {
+                "id": deck.id,
+                "name": deck.name,
+                "device_ids": device_ids,
+                "device_names": [display_label(did) for did in device_ids],
+                "same_display": set(device_ids) <= set(page.device_ids),
+                "joined": page.id in deck.page_ids,
+                "is_schedule": schedule,
+                "when": when,
+                "enabled": deck.enabled,
+                "edit_url": url_for("decks.editor", deck_id=deck.id),
+                "schedule_dialog": (
+                    f"schedule-dialog-{deck.id}" if schedule and page.id in deck.page_ids else ""
+                ),
+                "deletes_on_leave": set(deck.page_ids) == {page.id},
+            }
+        )
+    return rows
 
 
 # -- page-level routes --------------------------------------------
@@ -1185,6 +1300,8 @@ def create() -> Response:
             # time so changing the panel in settings updates every page;
             # set only when a size was chosen for this dashboard.
             panel=own_panel,
+            test_display_w=design[0] if design else None,
+            test_display_h=design[1] if design else None,
             cells=initial_cells,
             font=(form.get("font") or None),
             theme=(form.get("theme") or "light"),
@@ -1199,7 +1316,35 @@ def create() -> Response:
         return redirect(url_for("pages.index"))
 
     _store().save(page)
-    return redirect(url_for("pages.edit", page_id=page.id))
+    return redirect(url_for("pages.edit", page_id=page.id, new=1))
+
+
+def _editor_version() -> str:
+    return (
+        "classic"
+        if _settings_store().get_section("ui").get("dashboard_editor") == "classic"
+        else "new"
+    )
+
+
+@bp.post("/editor-version")
+def editor_version() -> Response:
+    version = request.form.get("version")
+    if version not in {"new", "classic"}:
+        abort(400)
+    _settings_store().update_section("ui", {"dashboard_editor": version})
+    target = local_return_path(request.form.get("next"))
+    if target is None and request.referrer:
+        try:
+            referrer = urlsplit(request.referrer)
+            origin = urlsplit(request.host_url)
+            if (referrer.scheme, referrer.netloc) == (origin.scheme, origin.netloc):
+                target = local_return_path(
+                    referrer.path + (f"?{referrer.query}" if referrer.query else "")
+                )
+        except ValueError:
+            pass
+    return redirect(target or url_for("pages.index"))
 
 
 @bp.get("/<page_id>")
@@ -1214,10 +1359,61 @@ def edit(page_id: str) -> Response | str:
     return render_template("page_editor.html", **_editor_context(page))
 
 
+@bp.post("/<page_id>/lineups/<deck_id>/join")
+def join_lineup(page_id: str, deck_id: str) -> Response:
+    """Append a dashboard once, adding the lineup's displays when approved."""
+    from app.deck_routes import _invalidate, _merged_deck
+
+    page = _store().get(page_id)
+    deck_store = current_app.config["DECK_STORE"]
+    deck = deck_store.get(deck_id)
+    if page is None or deck is None or (is_timed_view_deck(deck) and len(deck.pages) == 1):
+        abort(404)
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict) or not isinstance(body.get("add_device", False), bool):
+        abort(400)
+    device_ids = _lineup_displays(deck)
+    missing = [did for did in device_ids if did not in page.device_ids]
+    if missing and not body.get("add_device", False):
+        response = jsonify({"ok": False, "message": "Add the lineup's displays before joining."})
+        response.status_code = 409
+        return response
+    if missing:
+        page = page.model_copy(update={"device_ids": [*page.device_ids, *missing]})
+        _store().save(page)
+        current_app.config.get("PREVIEW_CACHE", {}).pop(page_id, None)
+    if page_id not in deck.page_ids:
+        deck = _merged_deck(deck, pages=[*deck.pages, DeckPage(page_id=page_id)])
+        deck_store.upsert(deck)
+        _invalidate(deck)
+    elif missing:
+        _invalidate(deck)
+    return jsonify({"ok": True, "lineups": _editor_lineups(page), "device_ids": page.device_ids})
+
+
+@bp.post("/<page_id>/lineups/<deck_id>/leave")
+def leave_lineup(page_id: str, deck_id: str) -> Response:
+    """Remove only this membership; an empty lineup is deleted as in the cascade."""
+    from app.deck_routes import _invalidate
+
+    page = _store().get(page_id)
+    deck_store = current_app.config["DECK_STORE"]
+    deck = deck_store.get(deck_id)
+    if page is None or deck is None:
+        abort(404)
+    if page_id in deck.page_ids:
+        updated = deck_without_page(deck, page_id)
+        if updated is None:
+            deck_store.delete(deck_id)
+        else:
+            deck_store.upsert(updated)
+        _invalidate(deck)
+    return jsonify({"ok": True, "lineups": _editor_lineups(page), "device_ids": page.device_ids})
+
+
 @bp.post("/<page_id>")
 def update(page_id: str) -> Response:
-    """Update page metadata. Panel dims come from settings, not from
-    the form, the editor no longer exposes them.
+    """Update page metadata, including its optional test-display size.
 
     Merge, don't replace: only fields actually present in the POST are
     updated; absent fields keep their stored value. The editor posts two
@@ -1231,6 +1427,20 @@ def update(page_id: str) -> Response:
         abort(404)
     form = request.form
     updates: dict[str, Any] = {}
+    for field in ("test_display_w", "test_display_h"):
+        if field not in form:
+            continue
+        try:
+            size = int(form[field])
+        except (ValueError, TypeError):
+            return _flash_save(
+                False, "Test display dimensions must be whole pixels from 100 to 4000."
+            )
+        if not 100 <= size <= 4000:
+            return _flash_save(
+                False, "Test display dimensions must be whole pixels from 100 to 4000."
+            )
+        updates[field] = size
     if "name" in form:
         updates["name"] = (form.get("name") or page.name).strip() or page.name
     if "theme" in form:
@@ -1726,9 +1936,20 @@ def _apply_cell_form(cell: Cell, form: Any, panel: Any) -> Cell:
             new_option_names = {
                 str(opt["name"]) for opt in plugin.manifest.get("cell_options", []) if "name" in opt
             }
-            preserved = {
-                name: value for name, value in cell.options.items() if name in new_option_names
+            # Same name is not same choices: a value the new widget's
+            # select doesn't list falls back to its default.
+            specs_by_name = {
+                str(opt["name"]): opt
+                for opt in plugin.manifest.get("cell_options", [])
+                if "name" in opt
             }
+            preserved = {}
+            for name, value in cell.options.items():
+                if name not in new_option_names:
+                    continue
+                keep, carried = carried_value(specs_by_name[name], value)
+                if keep:
+                    preserved[name] = carried
             options = {**plugin.cell_option_defaults(), **preserved}
     elif plugin is not None:
         options = _cell_options_from_form(plugin, form)
@@ -2187,12 +2408,13 @@ def refit_cells(page_id: str) -> Response:
     coords = [(c.x, c.y, c.w, c.h) for c in page.cells]
     top_strip_index = _status_bar_cell_index(page)
     fitted = fit_cells_to_panel(coords, panel.w, panel.h, top_strip_index=top_strip_index)
-    if fitted == coords:
-        return _flash_save(True, "Cells already fit the current panel.")
     new_cells = [
         cell.model_copy(update={"x": nx, "y": ny, "w": nw, "h": nh})
         for cell, (nx, ny, nw, nh) in zip(page.cells, fitted, strict=True)
     ]
+    new_cells.sort(key=lambda cell: (cell.y, cell.x))
+    if new_cells == page.cells:
+        return _flash_save(True, "Cells already fit the current panel.")
     _store().save(page.model_copy(update={"cells": new_cells}))
     current_app.config.get("PREVIEW_CACHE", {}).pop(page_id, None)
     return _flash_save(True, f"Refitted {len(new_cells)} cell(s) to {panel.w}×{panel.h}.")
