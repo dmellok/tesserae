@@ -37,21 +37,28 @@ theme:
     - search.suggest
     - search.highlight
     - toc.follow
+  # The Paper design the app and tesserae.ink use: colours and type come
+  # from docs/stylesheets/paper.css, and the fonts are served from the site
+  # itself, so no page asks Google Fonts for anything.
+  font: false
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: teal
-      accent: teal
+      primary: custom
+      accent: custom
       toggle:
         icon: material/weather-night
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: teal
-      accent: teal
+      primary: custom
+      accent: custom
       toggle:
         icon: material/weather-sunny
         name: Switch to light mode
+
+extra_css:
+  - stylesheets/paper.css
 
 plugins:
   # Declaring plugins disables the implicit default, so re-add search.
