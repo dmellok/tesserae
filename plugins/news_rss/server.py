@@ -220,15 +220,22 @@ def _parse_feed(body: bytes, content_type: str = "") -> ET.Element:
 
 
 def _fetch_via_urllib(url: str) -> ET.Element:
-    req = urllib.request.Request(url, headers=URLLIB_HEADERS)
-    with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT_S) as resp:
-        body = resp.read()
-        content_type = resp.headers.get("Content-Type", "")
-        content_encoding = str(resp.headers.get("Content-Encoding", ""))
-    # Some CDNs compress regardless of what we asked for. Decoding here is
-    # what separates "this feed is compressed" from "this feed is broken":
-    # the parser can't tell the difference and blames the feed (#212).
-    body = decode_content_encoding(body, content_encoding)
+    # Fetch through the SSRF guard: scheme allowlist (http/https only, so no
+    # file:// / ftp://), per-address host classification, per-redirect
+    # re-validation and a pinned connection, plus a size cap. A feed URL is
+    # user/agent-chosen, exactly what app.net_guard exists to protect, and the
+    # sibling rest_service widget already fetches this way. A raw urllib.urlopen
+    # here would let a feed URL reach the server's own loopback API, a LAN
+    # service, or cloud metadata.
+    from app.net_guard import fetch_bytes
+
+    body, content_type = fetch_bytes(url, headers=URLLIB_HEADERS, timeout=HTTP_TIMEOUT_S)
+    # Some CDNs gzip regardless of the ``identity`` request in URLLIB_HEADERS,
+    # and the guard (like urllib) does not transparently decompress; decode
+    # defensively or the XML parser blames the feed (#212). fetch_bytes does
+    # not surface the Content-Encoding, so sniff the gzip magic number.
+    if body[:2] == b"\x1f\x8b":
+        body = decode_content_encoding(body, "gzip")
     return _parse_feed(body, content_type)
 
 
@@ -271,8 +278,24 @@ def _fetch_feed(url: str, *, allow_pool: bool) -> ET.Element | str:
     screenshot that's hydrating this very widget, so submitting a fetch
     would deadlock. There urllib is the only option, and on failure the
     composer's last-good fallback serves the prior payload."""
+    from app.net_guard import BlockedURLError, assert_public_url
+
+    # Reject loopback / LAN / link-local / reserved / cloud-metadata hosts and
+    # non-http(s) schemes before any fetch, so neither the urllib path nor the
+    # Chromium pool fallback (whose FetchRequest path does not run the renderer
+    # request guard) can be aimed at an internal target. fetch_bytes
+    # re-validates redirect hops on the urllib path.
+    try:
+        assert_public_url(url)
+    except BlockedURLError as err:
+        return f"This feed URL is not allowed ({err})."
+
     try:
         return _fetch_via_urllib(url)
+    except BlockedURLError as err:
+        # A redirect to a private host (caught by fetch_bytes). Do not retry
+        # through the unguarded pool fetch.
+        return f"This feed URL is not allowed ({err})."
     except FeedNotXML as err:
         # Already phrased for the operator; don't bury it behind a type name.
         urllib_error = str(err)
