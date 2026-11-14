@@ -14,6 +14,7 @@ import json
 import re
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 import pytest
 from flask import Flask, render_template
@@ -98,6 +99,7 @@ def app(tmp_path: Path) -> Flask:
     )
     a = create_app(testing=False, data_root=tmp_path / "data", plugins_dir=plugins_dir)
     a.config["TESTING"] = True
+    a.config["SETTINGS_STORE"].update_section("ui", {"dashboard_editor": "classic"})
     return a
 
 
@@ -108,7 +110,7 @@ def _sign_in(client: Any) -> None:
 def _new_page(client: Any) -> str:
     resp = client.post("/pages/new", data={"name": "Home", "layout": "1_cell"})
     assert resp.status_code in (302, 303)
-    return str(resp.headers["Location"].rstrip("/").rsplit("/", 1)[-1])
+    return urlsplit(resp.headers["Location"]).path.rstrip("/").rsplit("/", 1)[-1]
 
 
 # -- option_sections ------------------------------------------------------

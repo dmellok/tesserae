@@ -6,6 +6,7 @@ import json
 import re
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 import pytest
 from flask import Flask
@@ -76,6 +77,9 @@ def app(tmp_path: Path) -> Flask:
         plugins_dir=plugins_dir,
     )
     a.config["TESTING"] = True
+    # These assertions describe the classic editor's markup. The v2 backend
+    # contract has separate render-agnostic coverage.
+    a.config["SETTINGS_STORE"].update_section("ui", {"dashboard_editor": "classic"})
     return a
 
 
@@ -93,7 +97,7 @@ def _new(client, **data: Any) -> str:
     create redirect instead of guessing a slug."""
     resp = client.post("/pages/new", data=data or None, follow_redirects=False)
     assert resp.status_code in (302, 303), resp.status_code
-    return resp.headers["Location"].rstrip("/").rsplit("/", 1)[-1]
+    return urlsplit(resp.headers["Location"]).path.rstrip("/").rsplit("/", 1)[-1]
 
 
 # -- /pages list + new -----------------------------------------------

@@ -59,7 +59,8 @@ PAGES = [
     "/decks/new",
     "/pages",
     "/pages/new",
-    "/pages/clock",
+    ("/pages/clock", "new"),
+    ("/pages/clock", "classic"),
     "/schedules",
     "/rotations",
     "/history",
@@ -347,12 +348,17 @@ def test_every_page_puts_links_left_of_buttons(
                 color_scheme=scheme,
             )
             page = ctx.new_page()
-            for path in PAGES:
+            for entry in PAGES:
+                path, editor_version = entry if isinstance(entry, tuple) else (entry, "new")
+                app.config["SETTINGS_STORE"].patch_section(
+                    "ui", {"dashboard_editor": editor_version}
+                )
                 page.goto(f"{base}{path}", wait_until="load")
                 page.wait_for_timeout(150)
-                found += _clusters(page, path, reveal=False)
+                label = f"{path} ({editor_version} editor)" if isinstance(entry, tuple) else path
+                found += _clusters(page, label, reveal=False)
                 page.evaluate(_REVEAL_JS)
-                found += _clusters(page, path, reveal=True)
+                found += _clusters(page, label, reveal=True)
             ctx.close()
         finally:
             browser.close()

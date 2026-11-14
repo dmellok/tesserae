@@ -1,6 +1,7 @@
 """Authenticated, opt-in widget query previews use unsaved editor options."""
 
 import json
+from urllib.parse import urlsplit
 
 import pytest
 
@@ -102,10 +103,11 @@ def test_standalone_canvas_editor_loads_query_preview_assets(app):
 
 
 def test_grid_options_include_query_preview(app):
+    app.config["SETTINGS_STORE"].update_section("ui", {"dashboard_editor": "classic"})
     client = app.test_client()
     sign_in(client)
     created = client.post("/pages/new", data={"name": "Art", "layout": "1_cell"})
-    page_id = created.location.rstrip("/").rsplit("/", 1)[-1]
+    page_id = urlsplit(created.location).path.rstrip("/").rsplit("/", 1)[-1]
     page = app.config["PAGE_STORE"].get(page_id)
     cell = page.cells[0]
     client.post(f"/pages/{page_id}/cells/{cell.id}", data={"plugin": "picture_search"})

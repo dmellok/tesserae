@@ -6,6 +6,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+- Add a dashboard editor with guided steps, live preview and widget option examples. Switch back to classic from its help menu.
+
 ### Added
 
 - Fraimic: the Large Canvas (31.5") and the Standard Canvas (13.3") are in the hardware catalog, so **Add device → Fraimic** has a **Model** choice that sets the panel size, and both are listed on the compatibility page. A frame added before this keeps working as it is.
