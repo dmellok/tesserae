@@ -1189,11 +1189,9 @@ def _build_device_section(store: Any, device: Device) -> dict[str, Any] | None:
         "transport_badge": _transport_badge(device),
         "mode_observation": _mode_observation_view(device.id),
         "status": _status_view(device),
-        # The colour-gamut control only matters for the .bin Pi path
-        # (pi_bin packs server-side to a fixed palette). PNG clients
-        # project their own gamut on-device; the ESP32 firmware is
-        # always E6. Gate on the device's base renderer being pi_bin.
-        "gamut_capable": any(rid.split("__", 1)[0] == "pi_bin" for rid in device.renderer_ids),
+        # The palette choice, for the kinds whose palette is the
+        # operator's to pick (see ``_palette_view``); None hides it.
+        "palette": _palette_view(device) if is_instance else None,
         "delete_endpoint": (
             url_for("auth.devices_delete", instance_id=device.id) if is_instance else None
         ),
@@ -2001,9 +1999,94 @@ def _visible_config_fields(device: Any) -> list[dict[str, Any]]:
     than holding a setting its firmware no longer honours.
     """
     fields = note_refresh_floor(config_fields_from_schema(device.config_schema), device)
+    if any(f.get("retired") is True for f in fields):
+        stored = (settings_store().get_section("devices") or {}).get(device.id)
+        stored = stored if isinstance(stored, dict) else {}
+        fields = [f for f in fields if not _retired_and_unset(f, stored)]
     if _can_stay_awake(device.id):
         return fields
     return [f for f in fields if f.get("name") not in _ALWAYS_ON_FIELDS]
+
+
+def _retired_and_unset(field: dict[str, Any], stored: dict[str, Any]) -> bool:
+    """A ``"retired": true`` field the device no longer holds a value for.
+
+    Such a field belongs to behaviour that has since been replaced. It shows
+    only while a device still carries a non-default value, so that value can
+    be seen and cleared; a new device never sees it."""
+    if field.get("retired") is not True:
+        return False
+    default = field.get("default")
+    value = stored.get(str(field.get("name") or ""), default)
+    return str("" if value is None else value) == str("" if default is None else default)
+
+
+# Operator-facing names for the panel gamuts a kind may offer under
+# ``palettes``. Keyed by canonical gamut (see ``canonicalise_gamut``).
+_PALETTE_LABELS: dict[str, str] = {
+    "mono": "Black and white",
+    "bwr_3": "Black, white and red",
+    "bwry_4": "Black, white, red and yellow",
+    "waveshare_e6": "Six colours (Spectra 6)",
+    "inky_7colour": "Seven colours (adds orange)",
+    "gray_4": "4 greys",
+    "gray_8": "8 greys",
+    "gray_16": "16 greys",
+    "rgb16": "Full colour",
+    "rgb24": "Full colour",
+    "kaleido3": "Kaleido 3 colour",
+}
+
+# The .bin Pi path packs server-side to one of two fixed palettes.
+_PI_BIN_PALETTE_VIEW: dict[str, Any] = {
+    "label": "Colour gamut",
+    "help": (
+        "Match the physical panel. The .bin frame is packed to this palette on the "
+        "server; pick 7-colour for the older ACeP Inky Impression so orange renders."
+    ),
+    "choices": [
+        {"value": "waveshare_e6", "label": "Waveshare E6 / Spectra 6 (6-colour)"},
+        {"value": "inky_7colour", "label": "Inky Impression 7-colour (adds orange)"},
+    ],
+}
+
+
+def _palette_view(device: Device) -> dict[str, Any] | None:
+    """The Panel section's palette choice for a device, or None when its
+    palette is not the operator's to pick.
+
+    Two cases offer one. A kind that lists ``palettes`` is hardware sold in
+    several colour sets that cannot say which it has (an OpenDisplay tag).
+    The .bin Pi path packs server-side to a fixed palette. Everything else
+    either reports its gamut or has only one."""
+    from app.quantizer import canonicalise_gamut
+
+    kind = devices().get(str(device.kind_of)) if device.kind_of else None
+    raw = (kind.manifest if kind is not None else device.manifest).get("palettes")
+    offered: list[str] = []
+    if isinstance(raw, list):
+        for item in raw:
+            gamut = canonicalise_gamut(str(item))
+            if gamut not in offered:
+                offered.append(gamut)
+    if len(offered) >= 2:
+        current = canonicalise_gamut(str((device.panel or {}).get("gamut") or offered[0]))
+        if current not in offered:
+            offered.append(current)
+        return {
+            "value": current,
+            "label": "Colour palette",
+            "help": (
+                "The colours this panel can show. The display does not report it, so "
+                "pick the one that matches the hardware; previews are drawn in these "
+                "colours."
+            ),
+            "choices": [{"value": g, "label": _PALETTE_LABELS.get(g, g)} for g in offered],
+        }
+    if any(rid.split("__", 1)[0] == "pi_bin" for rid in device.renderer_ids):
+        stored = str((device.panel or {}).get("gamut") or "waveshare_e6")
+        return {**_PI_BIN_PALETTE_VIEW, "value": canonicalise_gamut(stored)}
+    return None
 
 
 def _wake_align_view(store: Any, device_id: str) -> dict[str, str]:

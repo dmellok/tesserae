@@ -47,6 +47,7 @@ The upload action needs a media source, not a URL, so the picture has to be in H
 
    Tesserae saves its id and fills in **panel size** if the tag reports a resolution.
    Set **Rotation** to match its mounting.
+   Not sure which way round it is? On the tag's page, send the numbered orientation card and click the number that reads upright.
 
    If HA is unreachable or the tag is missing, enter its internal hex device id by hand.
    The tag's name and serial number won't work.
@@ -60,6 +61,31 @@ Removing a device cleans up its file automatically when Tesserae writes to the f
 An uploaded picture stays in HA, because HA's API cannot delete media; remove it from HA's media browser if you want it gone.
 
 If pictures never arrive and the log says the upload failed with `401`, the token is not an administrator's.
+
+### Rotation
+
+**Panel → Rotation** on the tag's page is the only rotation setting.
+Tesserae turns the picture before it sends it, so 90°, 180° and 270° all work, and **Underscan** applies too.
+
+A tag added before this had a second **Rotation** setting that asked Home Assistant to do the turning.
+That tag keeps working as it was, and its page shows the old setting as **Turn in Home Assistant (older setup)**.
+Set it to **None** to move the tag onto Panel → Rotation, then send the orientation card to check the result.
+
+## Colour palette
+
+An OpenDisplay tag does not tell Tesserae which colours its panel has.
+Pick it under **Panel → Colour palette** on the tag's page, for both the Home Assistant and the bridge kind:
+
+- Black and white
+- Black, white and red
+- Black, white, red and yellow
+- Six colours (Spectra 6), the default
+- 4 greys
+- 16 greys
+
+Previews are then drawn in the tag's colours.
+The picture is still sent in full colour, and Home Assistant or the bridge converts it for the panel.
+There is no black, white and yellow choice yet; use black, white, red and yellow for such a tag.
 
 ### Telemetry
 

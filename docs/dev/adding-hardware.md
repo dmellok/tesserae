@@ -58,6 +58,8 @@ Key fields:
 | `buttons` | no | `false` when the SKU has no physical buttons (or its protocol forwards none): its device page shows no Controls button map and Home Assistant gets no Input event entity for it, unless it also has `touch`. Absent means it may have buttons. |
 | `battery` | no | `false` for a mains-powered display (a TV): its device page shows no Power section. Absent means it may run on a battery. |
 | `renderer_settings` | no | `false` when the kind sends the composition itself rather than its renderer's output (a push publisher that uploads the page image): its device page leaves out the renderer's client rotation, scale and letterbox settings. |
+| `palettes` | no | Panel gamuts the operator may pick for a device of this kind, for hardware sold in several colour sets that cannot report which it has (an OpenDisplay tag). Its device page shows a Colour palette choice in Panel, stored as `panel.gamut`. Absent means the kind's `panel.gamut` is fixed. |
+| `config_schema` field `retired` | no | `true` for a setting that newer behaviour replaced. The device page shows it only while a device still holds a non-default value, so it can be cleared; new devices never see it. The stored value is still honoured. |
 | `config_schema` field `group` | no | Device page group for the field (e.g. `"Power"`). Fields with the same group name sit together in that group, after Rendering. Without it, the field goes in Identity, Rendering or Timing by type. |
 | `config_schema` field `show_if` | no | Show the field only while other fields hold given values, e.g. `{"power_control": "switch"}`. It hides and shows live, and its value is still saved. |
 | `image_format` | no | Wire format hint: `png` / `bin` / `webp`. |

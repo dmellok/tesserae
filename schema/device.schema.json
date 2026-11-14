@@ -65,6 +65,7 @@
             }
           },
           "help": { "type": "string" },
+          "retired": { "type": "boolean", "description": "A setting that newer behaviour replaced. The device page shows the field only while a device still holds a value other than its default, so the operator can clear it; once cleared it is gone, and new devices never see it. The stored value is still honoured." },
           "group": { "type": "string", "description": "Name of a group on the device page to put this field in (e.g. 'Power'); fields sharing a name sit together under it, after Rendering. Absent: the field stays in Identity, Rendering or Timing by its type. 'sign' and 'sign_net' are reserved for Visionect's frame settings." },
           "show_if": { "type": "object", "description": "Show this field only while other fields of the kind hold these values, e.g. {\"power_control\": \"switch\"}. Same grammar as a widget option's show_if (a value, a list of values, or {\"not\": ...}). The field is hidden, not removed, so its value is still saved." }
         }
@@ -96,6 +97,13 @@
     "battery": {
       "type": "boolean",
       "description": "Whether this kind runs on a battery. Set false for a mains-powered display (a TV, say): its device page shows no Power section. Absent → it may have one."
+    },
+    "palettes": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+      "minItems": 2,
+      "uniqueItems": true,
+      "description": "Colour palettes (panel gamuts) the operator may pick for a device of this kind, for hardware that comes in several and cannot report which it has (an OpenDisplay tag is sold as black and white, red, red and yellow, six-colour or grey). The device page then shows a Colour palette choice in Panel, stored as panel.gamut. Absent → the kind's own panel.gamut is fixed."
     },
     "renderer_settings": {
       "type": "boolean",

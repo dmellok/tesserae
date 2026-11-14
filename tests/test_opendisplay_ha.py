@@ -285,6 +285,127 @@ def test_unwritable_media_dir_is_soft(app: Flask, tmp_path: Path) -> None:
     assert pub._media_warned is True
 
 
+def _set_panel(app: Flask, device_id: str, w: int, h: int, orientation: str, **extra: Any) -> None:
+    with app.app_context():
+        result = device_service.update_instance_panel(
+            devices=app.config["DEVICE_REGISTRY"],
+            renderers=app.config["RENDERER_REGISTRY"],
+            data_root=app.config["DATA_ROOT"],
+            instance_id=device_id,
+            w=w,
+            h=h,
+            orientation=orientation,
+            **extra,
+        )
+    assert result.ok, result.error
+
+
+def _plant_real_render(app: Flask, device_id: str, w: int, h: int, digest: str = "cafe01") -> None:
+    """A decodable composition with one red pixel in its top-left corner,
+    so a test can see where that corner ends up."""
+    import io
+
+    from PIL import Image
+
+    img = Image.new("RGB", (w, h), "white")
+    img.putpixel((0, 0), (255, 0, 0))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    (app.config["RENDERS_DIR"] / f"{digest}.png").write_bytes(buf.getvalue())
+    app.config["PUSH_MANAGER"]._latest_renders[device_id] = {"composition_digest": digest}
+
+
+def _sent_frame(media: Path, device_id: str = "kitchen_tag") -> Any:
+    from PIL import Image
+
+    return Image.open(media / "tesserae" / f"{device_id}.png").convert("RGB")
+
+
+def test_portrait_panel_is_turned_onto_the_tags_landscape_buffer(
+    app: Flask, tmp_path: Path
+) -> None:
+    """Panel rotation is the one rotation control: a portrait composition is
+    turned onto the tag's landscape buffer before it leaves, the mapping
+    pi_png gives a polled client, and HA is asked for no turn of its own."""
+    _make_tag(app)
+    _set_panel(app, "kitchen_tag", 480, 800, "portrait")
+    _plant_real_render(app, "kitchen_tag", 480, 800)
+    calls: list[Any] = []
+    media = tmp_path / "media"
+    _publisher(app, media, calls).on_push()
+
+    frame = _sent_frame(media)
+    assert frame.size == (800, 480)
+    # Three clockwise quarter-turns put the composition's top-left corner at
+    # the buffer's bottom-left.
+    assert frame.getpixel((0, 479)) == (255, 0, 0)
+    assert "rotation" not in calls[0][2]
+
+
+def test_flipped_mount_turns_the_frame_half_way(app: Flask, tmp_path: Path) -> None:
+    """180° used to do nothing for these tags: the upright composition was
+    sent whatever the mount. Now the half turn is applied."""
+    _make_tag(app)
+    _set_panel(app, "kitchen_tag", 800, 480, "landscape_flipped")
+    _plant_real_render(app, "kitchen_tag", 800, 480)
+    calls: list[Any] = []
+    media = tmp_path / "media"
+    _publisher(app, media, calls).on_push()
+
+    frame = _sent_frame(media)
+    assert frame.size == (800, 480)
+    assert frame.getpixel((799, 479)) == (255, 0, 0)
+
+
+def test_underscan_insets_the_frame(app: Flask, tmp_path: Path) -> None:
+    _make_tag(app)
+    _set_panel(app, "kitchen_tag", 800, 480, "landscape", underscan=20)
+    _plant_real_render(app, "kitchen_tag", 800, 480)
+    media = tmp_path / "media"
+    _publisher(app, media, []).on_push()
+
+    frame = _sent_frame(media)
+    assert frame.size == (800, 480)
+    # The corner pixel is now mat, not content.
+    assert frame.getpixel((0, 0)) == (255, 255, 255)
+
+
+def test_changed_mount_resends_an_unchanged_composition(app: Flask, tmp_path: Path) -> None:
+    """Turning the panel does not change the composition, but it does change
+    the frame the tag needs, so it must go out again."""
+    _make_tag(app)
+    _set_panel(app, "kitchen_tag", 800, 480, "landscape")
+    _plant_real_render(app, "kitchen_tag", 800, 480)
+    calls: list[Any] = []
+    pub = _publisher(app, tmp_path / "media", calls)
+    pub.on_push()
+    pub.on_push()
+    assert len(calls) == 1
+    _set_panel(app, "kitchen_tag", 800, 480, "landscape_flipped")
+    pub.on_push()
+    assert len(calls) == 2
+
+
+def test_older_ha_rotation_keeps_the_upright_composition(app: Flask, tmp_path: Path) -> None:
+    """A tag set up when HA did the turning keeps working unchanged: its
+    composition goes out upright and HA is told the stored rotation."""
+    _make_tag(app)
+    _set_panel(app, "kitchen_tag", 480, 800, "portrait")
+    section = app.config["SETTINGS_STORE"].get_section("devices")
+    entry = dict(section["kitchen_tag"])
+    entry["rotate"] = "270"
+    app.config["SETTINGS_STORE"].patch_section("devices", {"kitchen_tag": entry})
+    _plant_real_render(app, "kitchen_tag", 480, 800)
+    calls: list[Any] = []
+    media = tmp_path / "media"
+    _publisher(app, media, calls).on_push()
+
+    frame = _sent_frame(media)
+    assert frame.size == (480, 800)
+    assert frame.getpixel((0, 0)) == (255, 0, 0)
+    assert calls[0][2]["rotation"] == 270
+
+
 def _upload_publisher(
     app: Flask, calls: list, uploads: list, *, upload_error: Exception | None = None
 ) -> OpenDisplayHaPublisher:

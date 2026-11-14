@@ -8,6 +8,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- OpenDisplay tags: **Panel → Colour palette** on the tag's page sets which colours the panel has (black and white, red, red and yellow, six colours, or greys), since the tag does not report it. Previews are drawn in those colours. Applies to the Home Assistant and bridge kinds.
+- Device kinds can list the palettes an operator may pick (`palettes`) and mark a replaced config field (`retired`) so it shows only on devices that still use it.
 - OpenDisplay via Home Assistant works from any install, not only the HA add-on. With the Home Assistant Core plugin configured, **Add device → OpenDisplay** shows the tag form, and Tesserae uploads each frame to HA's media folder through its API. The token must belong to an HA administrator. The add-on still writes to the shared `/media`, and now uploads instead when that folder is not writable.
 - Fraimic: the Large Canvas (31.5") and the Standard Canvas (13.3") are in the hardware catalog, so **Add device → Fraimic** has a **Model** choice that sets the panel size, and both are listed on the compatibility page. A frame added before this keeps working as it is.
 - Device kinds can place a config field in a named group (`group`) and show it only for some values (`show_if`).
@@ -28,6 +30,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Changed
 
+- OpenDisplay via Home Assistant: **Panel → Rotation** now turns the frame, so it is the only rotation setting and 180° and 270° work; **Underscan** applies too. The tag's page no longer shows the client rotation, scale and letterbox options, which never reached Home Assistant. A tag that used the old Home Assistant rotation keeps working as it was and shows it as **Turn in Home Assistant (older setup)** until it is set to None.
+- Devices: the messages for the numbered orientation card now call it that, not a calibration card, so it is not mistaken for colour calibration.
 - Docs: the Fraimic quickstart and the compatibility page carry Fraimic's discount code for Tesserae readers (TESSERAE10, 10% off at fraimic.com), with a disclosure that Fraimic supplied the Large Canvas free and that sales made with the code pay the project a commission.
 - Docs: plainer wording across the wiki, and corrected facts that no longer matched the app.
 - Docs: docs.tesserae.ink takes the Paper design of the app and tesserae.ink (warm paper, red ink, Archivo and Martian Mono) in place of the teal Material theme, in light and dark. The fonts are served from the docs site, so its pages no longer load anything from Google Fonts.

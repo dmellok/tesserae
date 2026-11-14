@@ -2014,10 +2014,10 @@ def devices_calibrate(instance_id: str) -> Response:
         card, source_label=f"calibration:{instance_id}", device_id=instance_id
     )
     if result.status == "sent":
-        flash("Calibration card sent, look at your panel, then answer below.", "ok")
+        flash("Orientation card sent. Look at your panel, then answer below.", "ok")
         flash_delivery([instance_id])
     else:
-        flash(f"Calibration push {result.status}: {result.error or '(no detail)'}", "error")
+        flash(f"Orientation card {result.status}: {result.error or '(no detail)'}", "error")
     # ?calibrating=<id> makes the device page render the answer form
     # inside the Display section's orientation band.
     return redirect(
@@ -2066,7 +2066,7 @@ def devices_calibrate_apply(instance_id: str) -> Response:
         orientation=target,
     )
     if not result.ok or result.device is None:
-        flash(result.error or "Calibration failed.", "error")
+        flash(result.error or "Could not set the rotation.", "error")
         return _device_page_redirect(instance_id, anchor)
     rebuild_transport_fn()()
     # Confirm re-push at the new orientation.

@@ -3,9 +3,11 @@
   "name": "OpenDisplay tag (via Home Assistant)",
   "icon": "devices",
   "version": "0.1.0",
-  "description": "An OpenDisplay BLE e-paper tag driven through Home Assistant. Tesserae renders a full-colour PNG, puts it in HA's media folder, and calls the opendisplay.upload_image action; HA's OpenDisplay integration pushes it to the tag over Bluetooth LE and dithers for the panel. No separate bridge or BLE hardware on the Tesserae host. Set the tag's HA device id below. The Home Assistant add-on writes the frame to the shared /media; any other install uploads it through HA's API, which needs an administrator's token. Requires the Home Assistant Core plugin.",
+  "description": "An OpenDisplay BLE e-paper tag driven through Home Assistant. Tesserae renders a full-colour PNG, puts it in HA's media folder, and calls the opendisplay.upload_image action; HA's OpenDisplay integration pushes it to the tag over Bluetooth LE and dithers for the panel. No separate bridge or BLE hardware on the Tesserae host. Set the tag's HA device id and its colour palette below. The Home Assistant add-on writes the frame to the shared /media; any other install uploads it through HA's API, which needs an administrator's token. Requires the Home Assistant Core plugin.",
   "renderers": ["pi_png"],
   "transport": "push",
+  "renderer_settings": false,
+  "palettes": ["mono", "bwr_3", "bwry_4", "spectra_6", "gray_4", "gray_16"],
   "panel": { "w": 800, "h": 480, "orientation": "landscape", "name": "OpenDisplay tag (set your panel size)", "gamut": "spectra_6" },
   "config_schema": {
     "ha_device_id": {
@@ -17,15 +19,16 @@
     },
     "rotate": {
       "type": "select",
-      "label": "Rotation",
+      "label": "Turn in Home Assistant (older setup)",
       "default": "0",
+      "retired": true,
       "choices": [
         {"value": "0", "label": "None"},
         {"value": "90", "label": "90°"},
         {"value": "180", "label": "180°"},
         {"value": "270", "label": "270°"}
       ],
-      "help": "Rotation applied by the HA upload action, if the tag's mounting needs it."
+      "help": "This tag was set up when Home Assistant did the turning. While a turn is set here, Home Assistant rotates the frame and Panel, Rotation only picks portrait or landscape. Set it to None to let Panel, Rotation turn the frame, as on every other display, then send the orientation card to check."
     }
   }
 }

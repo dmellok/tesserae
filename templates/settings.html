@@ -348,12 +348,11 @@
       {% set us_max = [section.panel.w, section.panel.h]|min // 4 %}
       {{ slider(section.id ~ '-panel-underscan', 'panel_underscan', 'Underscan', value=section.panel.get('underscan', 0), min=0, max=us_max, step=1, unit='px',
           help='Inset content by this many pixels on every edge so it clears a mat or bezel covering the screen edge. 0 = full bleed.') }}
-      {% if section.gamut_capable %}
-      {{ select_field(section.id ~ '-gamut', 'panel_gamut', 'Colour gamut',
-          value=section.panel.get('gamut', 'waveshare_e6'),
-          options=[{'value':'waveshare_e6','label':'Waveshare E6 / Spectra 6 (6-colour)'},
-                   {'value':'inky_7colour','label':'Inky Impression 7-colour (adds orange)'}],
-          help='Match the physical panel. The .bin frame quantises to this palette; pick 7-colour for the older ACeP Inky Impression (e.g. 5.7") so orange renders and colours map correctly.') }}
+      {% if section.palette %}
+      {{ select_field(section.id ~ '-gamut', 'panel_gamut', section.palette.label,
+          value=section.palette.value,
+          options=section.palette.choices,
+          help=section.palette.help) }}
       {% endif %}
     </div>
     {% endif %}
