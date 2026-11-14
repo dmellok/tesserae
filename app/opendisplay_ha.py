@@ -563,6 +563,14 @@ class OpenDisplayHaPublisher:
         if dithered:
             # Already in the tag's own inks: HA must map, not dither again.
             data["dither_mode"] = "none"
+            # And must not tone-map either. Left out, HA asks the SDK for
+            # "auto" tone compression, which rewrites every pixel before the
+            # match. A pure ink colour is then no longer exactly itself, so
+            # it is matched by nearness to the panel's measured inks instead
+            # of being passed through: on a Spectra 6, whose green ink is
+            # dark, pure green lands on yellow. Zero turns the step off and
+            # exact ink colours go through untouched.
+            data["tone_compression"] = 0
         if refresh_mode != "full":
             data["refresh_mode"] = refresh_mode
         try:
