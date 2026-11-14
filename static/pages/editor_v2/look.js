@@ -29,7 +29,9 @@
   const color = form.querySelector("[data-ev2-matc]");
   function paintSwatches() {
     const v = (color.value || "").toLowerCase();
-    form.querySelectorAll("[data-ev2-mat]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.ev2Mat === v ? "true" : "false"));
+    form
+      .querySelectorAll("[data-ev2-mat]")
+      .forEach((b) => b.setAttribute("aria-pressed", b.dataset.ev2Mat === v ? "true" : "false"));
   }
   form.addEventListener("click", (ev) => {
     const b = ev.target.closest("[data-ev2-mat]");
@@ -64,11 +66,15 @@
               if (!field || field.closest("[data-show-if][hidden]")) return;
               let value = field.value;
               if (rule.type === "boolean") value = field.checked;
-              else if (rule.type === "number" || rule.type === "slider") value = value === "" ? "" : Number(value);
+              else if (rule.type === "number" || rule.type === "slider")
+                value = value === "" ? "" : Number(value);
               else if (rule.type === "multiselect") {
                 value = field.multiple
                   ? [...field.selectedOptions].map((o) => o.value).sort()
-                  : fields.filter((f) => f.checked).map((f) => f.value).sort();
+                  : fields
+                      .filter((f) => f.checked)
+                      .map((f) => f.value)
+                      .sort();
               }
               if (JSON.stringify(value) !== JSON.stringify(rule.default)) {
                 own.push({ label: rule.message, field: "opt_" + rule.name, resettable: false });
@@ -110,7 +116,10 @@
     i.setAttribute("aria-hidden", "true");
     const wrap = document.createElement("div");
     const b = document.createElement("b");
-    b.textContent = o.length === 1 ? "1 widget has its own look settings." : `${o.length} widgets have their own look settings.`;
+    b.textContent =
+      o.length === 1
+        ? "1 widget has its own look settings."
+        : `${o.length} widgets have their own look settings.`;
     wrap.append(b, " Review these settings if the dashboard look has no effect.");
     const ul = document.createElement("ul");
     o.forEach(({ li, own }) => {
@@ -137,7 +146,8 @@
     wrap.append(ul);
     if (o.some(({ own }) => own.some((r) => !r.resettable))) {
       const note = document.createElement("p");
-      note.textContent = "Review widget options using their links. Resetting cell overrides leaves those options unchanged.";
+      note.textContent =
+        "Review widget options using their links. Resetting cell overrides leaves those options unchanged.";
       wrap.append(note);
     }
     if (o.some(({ own }) => own.some((r) => r.resettable))) {
@@ -161,11 +171,18 @@
       EV2.widgets.openRow(id, { scroll: true, block: "center" });
       const li = EV2.widgets.rowFor(id);
       const name = show.dataset.ev2Setting;
-      const field = name === "padding_override"
-        ? li.querySelector("[data-ev2-pad-choice]")
-        : name ? li.querySelector(`[name="${CSS.escape(name)}"]`) : null;
+      const field =
+        name === "padding_override"
+          ? li.querySelector("[data-ev2-pad-choice]")
+          : name
+            ? li.querySelector(`[name="${CSS.escape(name)}"]`)
+            : null;
       if (field) {
-        for (let parent = field.parentElement; parent && parent !== li; parent = parent.parentElement) {
+        for (
+          let parent = field.parentElement;
+          parent && parent !== li;
+          parent = parent.parentElement
+        ) {
           if (parent.tagName === "DETAILS") parent.open = true;
         }
       }
@@ -173,18 +190,20 @@
       return;
     }
     if (ev.target.closest("[data-ev2-resetov]")) {
-      const saves = overriders().filter(({ own }) => own.some((r) => r.resettable)).map(({ li }) => {
-        li.querySelectorAll("[data-ev2-ov]").forEach((s) => (s.value = ""));
-        const padding = li.querySelector("[data-ev2-pad-on]");
-        if (padding) {
-          padding.checked = false;
-          li.querySelector("[data-ev2-pad-choice]").value = "";
-          li.querySelector("[data-ev2-pad-custom]").hidden = true;
-        }
-        const f = li.querySelector("[data-ev2-cell-form]");
-        EV2.widgets.refreshSums && EV2.widgets.refreshSums(f);
-        return EV2.saveForm(f, 0);
-      });
+      const saves = overriders()
+        .filter(({ own }) => own.some((r) => r.resettable))
+        .map(({ li }) => {
+          li.querySelectorAll("[data-ev2-ov]").forEach((s) => (s.value = ""));
+          const padding = li.querySelector("[data-ev2-pad-on]");
+          if (padding) {
+            padding.checked = false;
+            li.querySelector("[data-ev2-pad-choice]").value = "";
+            li.querySelector("[data-ev2-pad-custom]").hidden = true;
+          }
+          const f = li.querySelector("[data-ev2-cell-form]");
+          EV2.widgets.refreshSums && EV2.widgets.refreshSums(f);
+          return EV2.saveForm(f, 0);
+        });
       refreshOverrides();
       try {
         await Promise.all(saves);

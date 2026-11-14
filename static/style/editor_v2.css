@@ -194,7 +194,16 @@
   :where(
     .ev2-select,
     .ev2-input,
-    .field input:is([type="text"], [type="password"], [type="number"], [type="time"], [type="url"], [type="email"], :not([type])),
+    .field
+      input:is(
+        [type="text"],
+        [type="password"],
+        [type="number"],
+        [type="time"],
+        [type="url"],
+        [type="email"],
+        :not([type])
+      ),
     .field select:not([multiple]),
     .ti-root .psel,
     .ti-root input.dinput
@@ -1650,7 +1659,14 @@
   min-width: 0;
   margin: 0;
 }
-.ev2 :is(.ev2-of > label, .ev2-of > .ev2-lbl, .field > label, .field-label, .field--slider .slider-header > label) {
+.ev2
+  :is(
+    .ev2-of > label,
+    .ev2-of > .ev2-lbl,
+    .field > label,
+    .field-label,
+    .field--slider .slider-header > label
+  ) {
   color: var(--t-fg);
   font-size: var(--ev2-fs-label);
   font-weight: 600;
@@ -1899,11 +1915,18 @@ details.ev2-adv[open] > summary .ev2-caret {
 .ev2 .ti-root:not(:has(> .prow:not(:first-child) > .plab)) > .prow:first-child > .plab {
   display: none;
 }
-#ev2 .ti-root:not(:has(> .prow:not(:first-child) > .plab)) > .prow:first-child:has(.psel + span:empty) .psel {
+#ev2
+  .ti-root:not(:has(> .prow:not(:first-child) > .plab))
+  > .prow:first-child:has(.psel + span:empty)
+  .psel {
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
 }
-#ev2 .ti-root:not(:has(> .prow:not(:first-child) > .plab)) > .prow:first-child:has(.psel + span:empty) + .prow > .psel:only-child {
+#ev2
+  .ti-root:not(:has(> .prow:not(:first-child) > .plab))
+  > .prow:first-child:has(.psel + span:empty)
+  + .prow
+  > .psel:only-child {
   margin-top: calc(-1 * var(--ev2-gap-tight) - 1px);
   border-top-left-radius: 0;
   border-top-right-radius: 0;

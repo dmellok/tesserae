@@ -24,13 +24,14 @@
   if (EV2.isNew) {
     try {
       progress = Math.max(1, Number(sessionStorage.getItem(STEP_KEY)) || 1);
-    } catch (e) {
+    } catch {
       progress = 1;
     }
   }
   const restored = EV2.restored || {};
   const hashStep = KEYS.includes(location.hash.slice(1)) ? location.hash.slice(1) : null;
-  const initialStep = hashStep || (EV2.isNew ? KEYS[Math.min(progress, KEYS.length) - 1] : "widgets");
+  const initialStep =
+    hashStep || (EV2.isNew ? KEYS[Math.min(progress, KEYS.length) - 1] : "widgets");
   let open = restored.open !== undefined ? restored.open : initialStep;
   if (EV2.isNew && hashStep) setProgress(KEYS.indexOf(hashStep) + 1);
 
@@ -83,7 +84,9 @@
   // screen-sized placeholder instead of the panel-pixel render.
   function syncPlaceholder() {
     const on =
-      EV2.isNew && progress < 2 && !root.querySelector(".ev2-cl[data-widget]:not([data-widget=''])");
+      EV2.isNew &&
+      progress < 2 &&
+      !root.querySelector(".ev2-cl[data-widget]:not([data-widget=''])");
     if (EV2.placeholder === on) return;
     EV2.placeholder = on;
     EV2.emit("ev2:placeholder", { on });
@@ -125,7 +128,7 @@
     progress = Math.max(progress, n);
     try {
       sessionStorage.setItem(STEP_KEY, String(progress));
-    } catch (e) {
+    } catch {
       /* ignore */
     }
   }
@@ -142,7 +145,9 @@
     if (o.scroll && key) {
       // "start" with the step's scroll-margin: its title lands below the
       // sticky app header instead of under it.
-      document.getElementById("ev2-step-" + key)?.scrollIntoView({ block: o.block || "nearest", behavior: "smooth" });
+      document
+        .getElementById("ev2-step-" + key)
+        ?.scrollIntoView({ block: o.block || "nearest", behavior: "smooth" });
     }
     if (o.focus && key) focusStep(key);
   }
@@ -218,7 +223,9 @@
     const b = ev.target.closest("[data-ev2-size]");
     if (!b || b.getAttribute("aria-pressed") === "true") return;
     const [w, h] = b.dataset.ev2Size.split("x").map(Number);
-    b.parentElement.querySelectorAll("[data-ev2-size]").forEach((x) => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
+    b.parentElement
+      .querySelectorAll("[data-ev2-size]")
+      .forEach((x) => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
     saveTestSize(w, h);
   });
   root.querySelectorAll("[data-ev2-custom-size]").forEach((inp) => {
@@ -285,7 +292,9 @@
     // Stacked layout: the preview sits above the steps, out of sight from
     // this switch. Take the user to it.
     if (on && !restoring && stacked()) {
-      document.getElementById("ev2-preview")?.scrollIntoView({ block: "start", behavior: "smooth" });
+      document
+        .getElementById("ev2-preview")
+        ?.scrollIntoView({ block: "start", behavior: "smooth" });
     }
   }
   let restoring = false;
@@ -316,7 +325,11 @@
       const v = parseInt(root.querySelector(sel)?.value, 10);
       return v >= 2 && v <= 48 ? v : d;
     };
-    return { on: Boolean(snap && snap.checked), cols: n("[data-ev2-snap-cols]", 12), rows: n("[data-ev2-snap-rows]", 8) };
+    return {
+      on: Boolean(snap && snap.checked),
+      cols: n("[data-ev2-snap-cols]", 12),
+      rows: n("[data-ev2-snap-rows]", 8),
+    };
   }
   function publishSnap() {
     EV2.snap = snapState();
@@ -324,7 +337,9 @@
     EV2.emit("ev2:snap", EV2.snap);
   }
   snap?.addEventListener("change", publishSnap);
-  root.querySelectorAll("[data-ev2-snap-cols], [data-ev2-snap-rows]").forEach((i) => i.addEventListener("change", publishSnap));
+  root
+    .querySelectorAll("[data-ev2-snap-cols], [data-ev2-snap-rows]")
+    .forEach((i) => i.addEventListener("change", publishSnap));
   EV2.snap = snapState();
 
   root.querySelector("[data-ev2-refit]")?.addEventListener("click", () => {
@@ -376,7 +391,9 @@
   }
   EV2.on("ev2:layout-changed", (d) => {
     const cells = Array.isArray(d.cells) ? d.cells : [];
-    const have = [...root.querySelectorAll(".ev2-cl[data-cell-id]")].map((li) => li.dataset.cellId).sort();
+    const have = [...root.querySelectorAll(".ev2-cl[data-cell-id]")]
+      .map((li) => li.dataset.cellId)
+      .sort();
     const got = cells.map((c) => c.id).sort();
     // A split or remove changed the set of cells: re-render from the server.
     if (have.join() !== got.join()) {
@@ -388,7 +405,8 @@
     const sum = root.querySelector('[data-ev2-sum="layout"]');
     if (sum) {
       const n = content.length;
-      sum.textContent = `Your own layout · ${n} cell${n === 1 ? "" : "s"}` + (barId ? " · status bar" : "");
+      sum.textContent =
+        `Your own layout · ${n} cell${n === 1 ? "" : "s"}` + (barId ? " · status bar" : "");
     }
     const vis = root.querySelector('[data-ev2-vis="layout"]');
     if (vis) vis.replaceChildren(miniLayout(content));

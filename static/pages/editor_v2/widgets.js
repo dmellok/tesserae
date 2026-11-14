@@ -134,7 +134,9 @@
       const v = dith.dataset.ev2DitherSet;
       box.querySelector("[data-ev2-dither-on]").checked = Boolean(v);
       if (v) box.querySelector("[data-ev2-dither-mode]").value = v;
-      box.querySelectorAll("[data-ev2-dither-set]").forEach((b) => b.setAttribute("aria-pressed", b === dith ? "true" : "false"));
+      box
+        .querySelectorAll("[data-ev2-dither-set]")
+        .forEach((b) => b.setAttribute("aria-pressed", b === dith ? "true" : "false"));
       EV2.saveForm(dith.form, 0).catch(() => {});
     }
   });
@@ -199,16 +201,25 @@
     const own = fields.filter((f) => f.type !== "hidden");
     const f = own[0] || fields[0];
     if (f.type === "checkbox" && own.length === 1) return f.checked;
-    if (f.type === "checkbox") return own.filter((x) => x.checked).map((x) => x.value).sort();
+    if (f.type === "checkbox")
+      return own
+        .filter((x) => x.checked)
+        .map((x) => x.value)
+        .sort();
     if (f.type === "radio") return (own.find((x) => x.checked) || {}).value || "";
-    if (f.tagName === "SELECT" && f.multiple) return [...f.selectedOptions].map((o) => o.value).sort();
+    if (f.tagName === "SELECT" && f.multiple)
+      return [...f.selectedOptions].map((o) => o.value).sort();
     return f.value;
   }
   function differs(fields, def) {
     const v = readValue(fields);
     if (typeof v === "boolean") return v !== (def === true || def === "true" || def === 1);
     if (Array.isArray(v)) {
-      const d = Array.isArray(def) ? def : def === null || def === undefined || def === "" ? [] : [def];
+      const d = Array.isArray(def)
+        ? def
+        : def === null || def === undefined || def === ""
+          ? []
+          : [def];
       return JSON.stringify(v) !== JSON.stringify(d.map(String).sort());
     }
     if (typeof def === "number") {
@@ -239,7 +250,7 @@
         let defs = {};
         try {
           defs = JSON.parse(d.dataset.ev2Defaults || "{}") || {};
-        } catch (e) {
+        } catch {
           defs = {};
         }
         Object.keys(defs).forEach((name) => {
@@ -257,7 +268,7 @@
         let touch = {};
         try {
           touch = JSON.parse(d.querySelector("[data-touch-input]")?.value || "{}") || {};
-        } catch (e) {
+        } catch {
           touch = {};
         }
         const pad = on("[data-ev2-pad-on]");
@@ -291,7 +302,7 @@
       let value = {};
       try {
         value = JSON.parse(mount.dataset.touchValue || "{}") || {};
-      } catch (e) {
+      } catch {
         value = {};
       }
       mount.appendChild(
@@ -332,7 +343,8 @@
       ev.dataTransfer.setDragImage(li, 24, 20);
     }
   });
-  const clearDrop = () => list.querySelectorAll(".ev2-cl.drop").forEach((x) => x.classList.remove("drop"));
+  const clearDrop = () =>
+    list.querySelectorAll(".ev2-cl.drop").forEach((x) => x.classList.remove("drop"));
   list.addEventListener("dragover", (ev) => {
     const li = ev.target.closest && ev.target.closest(".ev2-cl[data-swap-url]");
     if (!dragFrom || !li || li === dragFrom) return;

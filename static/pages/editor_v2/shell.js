@@ -130,21 +130,15 @@
     return new Promise((resolve, reject) => {
       timers.set(
         form,
-        setTimeout(
-          () => {
-            timers.delete(form);
-            postForm(form).then(
-              (out) => {
-                formSaved.set(form, Date.now());
-                (form.__ev2after || []).forEach((fn) => fn(out));
-                emit("ev2:saved", {});
-                resolve(out);
-              },
-              reject
-            );
-          },
-          delay || 0
-        )
+        setTimeout(() => {
+          timers.delete(form);
+          postForm(form).then((out) => {
+            formSaved.set(form, Date.now());
+            (form.__ev2after || []).forEach((fn) => fn(out));
+            emit("ev2:saved", {});
+            resolve(out);
+          }, reject);
+        }, delay || 0)
       );
     });
   }
@@ -211,7 +205,7 @@
   try {
     restored = JSON.parse(sessionStorage.getItem(UI_KEY) || "null");
     sessionStorage.removeItem(UI_KEY);
-  } catch (e) {
+  } catch {
     restored = null;
   }
   const uiState = { open: undefined, cell: null };
@@ -221,7 +215,7 @@
         UI_KEY,
         JSON.stringify(Object.assign({}, uiState, { y: window.scrollY }, extra || {}))
       );
-    } catch (e) {
+    } catch {
       /* private mode: the reload just starts fresh */
     }
   }
@@ -234,7 +228,7 @@
     // error state is already showing) so the user can retry.
     try {
       await flush();
-    } catch (e) {
+    } catch {
       return false;
     }
     // Past this point nothing may queue a save the reload would drop.
@@ -299,14 +293,19 @@
     if (!ruler) {
       ruler = document.createElement("span");
       ruler.setAttribute("aria-hidden", "true");
-      ruler.style.cssText = "position:absolute;visibility:hidden;white-space:pre;left:-9999px;top:0";
+      ruler.style.cssText =
+        "position:absolute;visibility:hidden;white-space:pre;left:-9999px;top:0";
       document.body.append(ruler);
     }
     const cs = getComputedStyle(nameInput);
     ruler.style.font = cs.font;
     ruler.style.letterSpacing = cs.letterSpacing;
     ruler.textContent = nameInput.value || nameInput.placeholder;
-    const pad = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth);
+    const pad =
+      parseFloat(cs.paddingLeft) +
+      parseFloat(cs.paddingRight) +
+      parseFloat(cs.borderLeftWidth) +
+      parseFloat(cs.borderRightWidth);
     let w = Math.ceil(ruler.getBoundingClientRect().width + pad + 2);
     nameInput.style.width = w + "px";
     // The field's own text shaping can run a little wider than the ruler.
@@ -390,7 +389,7 @@
       let ok = true;
       try {
         await flush();
-      } catch (e) {
+      } catch {
         ok = false;
       }
       if (btn) btn.disabled = false;
@@ -416,7 +415,7 @@
       failedForms.clear();
       try {
         sessionStorage.removeItem("ev2-step:" + pageId);
-      } catch (e) {
+      } catch {
         /* ignore */
       }
     });
@@ -427,12 +426,12 @@
     const href = ev.currentTarget.href;
     try {
       await flush();
-    } catch (e) {
+    } catch {
       return; // stay: the error state is showing and the edits are still in their forms
     }
     try {
       sessionStorage.removeItem("ev2-step:" + pageId);
-    } catch (e) {
+    } catch {
       /* ignore */
     }
     location.href = href;

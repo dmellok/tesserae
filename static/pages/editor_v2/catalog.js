@@ -20,7 +20,7 @@
   let raw = {};
   try {
     raw = JSON.parse(document.getElementById("ev2-catalog-data")?.textContent || "{}") || {};
-  } catch (e) {
+  } catch {
     raw = {};
   }
   const WIDGETS = (raw.widgets || []).map((w) => ({
@@ -67,7 +67,9 @@
   function renderList() {
     const query = S.query.trim().toLowerCase();
     const shown = query
-      ? WIDGETS.filter((w) => (w.family + " " + w.name + " " + w.desc + " " + w.key).toLowerCase().includes(query))
+      ? WIDGETS.filter((w) =>
+          (w.family + " " + w.name + " " + w.desc + " " + w.key).toLowerCase().includes(query)
+        )
       : WIDGETS.filter((w) => S.cat === "all" || w.cat === S.cat);
     listEl.replaceChildren();
     if (!shown.length) {
@@ -88,7 +90,11 @@
       }
       txt.append(name);
       if (w.desc) txt.append(el("small", "", w.desc));
-      const fit = el("span", "fit", w.key === S.current ? "In this cell" : query ? catLabel(w.cat) : "");
+      const fit = el(
+        "span",
+        "fit",
+        w.key === S.current ? "In this cell" : query ? catLabel(w.cat) : ""
+      );
       b.append(icon(w.icon), txt, fit);
       if (w.key === S.current) b.setAttribute("aria-current", "true");
       li.append(b);
@@ -127,7 +133,9 @@
     EV2.emit("ev2:cell-focus", { cellId });
     q.focus();
     // Scroll the chosen category / current widget into view.
-    pop.querySelector(".ev2-pk-cats [aria-pressed=true]")?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    pop
+      .querySelector(".ev2-pk-cats [aria-pressed=true]")
+      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
     pop.querySelector(".ev2-pk-row.on")?.scrollIntoView({ block: "nearest" });
   }
 
@@ -217,9 +225,9 @@
   // Keep Tab inside the dialog.
   pop.addEventListener("keydown", (ev) => {
     if (ev.key !== "Tab") return;
-    const f = [...pop.querySelectorAll("button:not([disabled]), input, [tabindex]:not([tabindex='-1'])")].filter(
-      (x) => x.offsetParent !== null
-    );
+    const f = [
+      ...pop.querySelectorAll("button:not([disabled]), input, [tabindex]:not([tabindex='-1'])"),
+    ].filter((x) => x.offsetParent !== null);
     if (!f.length) return;
     const first = f[0];
     const last = f[f.length - 1];

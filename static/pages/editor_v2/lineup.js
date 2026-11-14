@@ -13,7 +13,7 @@
   let emptied = [];
   try {
     emptied = JSON.parse(root.dataset.emptiedLineups || "[]");
-  } catch (e) {
+  } catch {
     emptied = [];
   }
 
@@ -36,8 +36,10 @@
       if (addRow) addRow.hidden = true;
       if (!row) return;
       const where = row.dataset.where;
-      conf.querySelector("[data-ev2-lc-title]").textContent = `“${row.dataset.name}” runs on ${where}.`;
-      conf.querySelector("[data-ev2-lc-sub]").textContent = `This dashboard isn't set up for ${where} yet.`;
+      conf.querySelector("[data-ev2-lc-title]").textContent =
+        `“${row.dataset.name}” runs on ${where}.`;
+      conf.querySelector("[data-ev2-lc-sub]").textContent =
+        `This dashboard isn't set up for ${where} yet.`;
       conf.querySelector("[data-ev2-lc-body]").textContent =
         `Joining adds ${where} to its displays (step 1)` +
         (usingTest ? ", in place of the test display" : "") +
@@ -49,11 +51,15 @@
     function join(id, addDevice) {
       return EV2.flush()
         .then(() =>
-          EV2.post(`${base}/${encodeURIComponent(id)}/join`, { add_device: addDevice }, {
-            json: true,
-            // 409: the lineup's display isn't on this dashboard yet; ask.
-            quiet: (err) => err.status === 409,
-          })
+          EV2.post(
+            `${base}/${encodeURIComponent(id)}/join`,
+            { add_device: addDevice },
+            {
+              json: true,
+              // 409: the lineup's display isn't on this dashboard yet; ask.
+              quiet: (err) => err.status === 409,
+            }
+          )
         )
         .then(() => EV2.reload())
         .catch((err) => {
@@ -95,13 +101,20 @@
       if (rm) {
         const name = rm.closest("li")?.querySelector("b")?.textContent || "this lineup";
         if (rm.dataset.deletes === "1" || emptied.includes(name)) {
-          const message = rm.dataset.schedule === "1"
-            ? `Remove ${name}? This deletes this dashboard's schedule.`
-            : `${name} has no other dashboard, so leaving it deletes the lineup too. Leave and delete it?`;
+          const message =
+            rm.dataset.schedule === "1"
+              ? `Remove ${name}? This deletes this dashboard's schedule.`
+              : `${name} has no other dashboard, so leaving it deletes the lineup too. Leave and delete it?`;
           if (!window.confirm(message)) return;
         }
         EV2.flush()
-          .then(() => EV2.post(`${base}/${encodeURIComponent(rm.dataset.ev2Lremove)}/leave`, {}, { json: true }))
+          .then(() =>
+            EV2.post(
+              `${base}/${encodeURIComponent(rm.dataset.ev2Lremove)}/leave`,
+              {},
+              { json: true }
+            )
+          )
           .then(() => EV2.reload())
           .catch(() => {});
       }
@@ -136,7 +149,9 @@
     });
   });
   dialogs.forEach((dialog) => {
-    dialog.querySelectorAll("[data-schedule-dialog-close]").forEach((btn) => btn.addEventListener("click", () => dialog.close()));
+    dialog
+      .querySelectorAll("[data-schedule-dialog-close]")
+      .forEach((btn) => btn.addEventListener("click", () => dialog.close()));
     dialog.addEventListener("click", (ev) => {
       if (ev.target === dialog) dialog.close();
     });
@@ -149,7 +164,11 @@
       noteFor(dialog, "Saving the dashboard first...");
       window.tesseraeEditor.saveAll().then((ok) => {
         if (!ok) {
-          noteFor(dialog, "The dashboard could not be saved. Fix that first, then save the schedule.", true);
+          noteFor(
+            dialog,
+            "The dashboard could not be saved. Fix that first, then save the schedule.",
+            true
+          );
           return;
         }
         cleared = true;
@@ -161,11 +180,17 @@
   // A failed submit comes back with ?schedule_error=1&schedule_edit=<id>.
   const params = new URLSearchParams(location.search);
   if (params.get("schedule_error")) {
-    const dialog = document.getElementById("schedule-dialog-" + (params.get("schedule_edit") || "new"));
+    const dialog = document.getElementById(
+      "schedule-dialog-" + (params.get("schedule_edit") || "new")
+    );
     if (dialog) openDialog(dialog);
     params.delete("schedule_error");
     params.delete("schedule_edit");
     const rest = params.toString();
-    history.replaceState(null, "", location.pathname + (rest ? "?" + rest : "") + (EV2.isNew ? "#lineup" : "#schedules"));
+    history.replaceState(
+      null,
+      "",
+      location.pathname + (rest ? "?" + rest : "") + (EV2.isNew ? "#lineup" : "#schedules")
+    );
   }
 })();
