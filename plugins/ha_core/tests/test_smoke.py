@@ -4,6 +4,7 @@ no network (get_states is monkeypatched)."""
 from __future__ import annotations
 
 import io
+import json
 import urllib.error
 
 from flask import Flask
@@ -206,6 +207,115 @@ def test_upload_media_falls_back_to_the_expected_id(app: Flask, monkeypatch) -> 
         )
         out = core.upload_media("media-source://media_source/local/tesserae/", "tag.png", b"x")
     assert out == "media-source://media_source/local/tesserae/tag.png"
+
+
+def test_error_detail_reads_the_reason_home_assistant_gave(app: Flask, monkeypatch) -> None:
+    """A failed service call answers 500 with ``{"message": ...}``. The
+    request helper keeps that before closing the response, so a caller can
+    say why (an OpenDisplay tag out of Bluetooth range) instead of "500"."""
+    core = _core(app)
+    body = io.BytesIO(b'{"message": "Device AA:BB is not reachable"}')
+
+    def fake_urlopen(req, timeout=0, context=None):
+        raise urllib.error.HTTPError(req.full_url, 500, "Internal Server Error", {}, body)  # type: ignore[arg-type]
+
+    with app.app_context():
+        _configure(app)
+        monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+        try:
+            core.call_service("opendisplay", "upload_image", data={})
+        except urllib.error.HTTPError as err:
+            assert core.error_detail(err) == "Device AA:BB is not reachable"
+        else:
+            raise AssertionError("expected an HTTPError")
+    assert body.closed
+    assert core.error_detail(RuntimeError("no detail")) == ""
+
+
+class _FakeSocket:
+    """A Home Assistant WebSocket that scripts its replies."""
+
+    def __init__(self, replies: list[dict]) -> None:
+        self.replies = [json.dumps(r) for r in replies]
+        self.sent: list[dict] = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def recv(self, timeout=None):
+        return self.replies.pop(0)
+
+    def send(self, text: str) -> None:
+        self.sent.append(json.loads(text))
+
+
+def _fake_connect(monkeypatch, socket: _FakeSocket) -> dict:
+    seen: dict = {}
+
+    def connect(url, **kwargs):
+        seen["url"] = url
+        return socket
+
+    monkeypatch.setattr("websockets.sync.client.connect", connect)
+    return seen
+
+
+def test_remove_media_deletes_over_the_websocket_api(app: Flask, monkeypatch) -> None:
+    """HA only deletes local media over its WebSocket API: authenticate,
+    send the one command, read its result."""
+    core = _core(app)
+    socket = _FakeSocket(
+        [
+            {"type": "auth_required"},
+            {"type": "auth_ok"},
+            {"id": 7, "type": "event"},  # unrelated traffic is skipped
+            {"id": 1, "type": "result", "success": True},
+        ]
+    )
+    seen = _fake_connect(monkeypatch, socket)
+    media = "media-source://media_source/local/tesserae/tag.png"
+    with app.app_context():
+        _configure(app)
+        assert core.remove_media(media) is True
+    assert seen["url"] == "ws://ha/api/websocket"
+    assert socket.sent[0] == {"type": "auth", "access_token": "t"}
+    assert socket.sent[1] == {
+        "id": 1,
+        "type": "media_source/local_source/remove",
+        "media_content_id": media,
+    }
+
+
+def test_remove_media_treats_an_already_missing_file_as_removed(app: Flask, monkeypatch) -> None:
+    core = _core(app)
+    socket = _FakeSocket(
+        [
+            {"type": "auth_required"},
+            {"type": "auth_ok"},
+            {"id": 1, "type": "result", "success": False, "error": {"code": "not_found"}},
+        ]
+    )
+    _fake_connect(monkeypatch, socket)
+    with app.app_context():
+        _configure(app)
+        assert core.remove_media("media-source://media_source/local/tesserae/x.png") is True
+
+
+def test_remove_media_raises_when_the_token_is_refused(app: Flask, monkeypatch) -> None:
+    core = _core(app)
+    socket = _FakeSocket([{"type": "auth_required"}, {"type": "auth_invalid"}])
+    _fake_connect(monkeypatch, socket)
+    with app.app_context():
+        _configure(app)
+        try:
+            core.remove_media("media-source://media_source/local/tesserae/x.png")
+        except RuntimeError as err:
+            assert "refused" in str(err)
+        else:
+            raise AssertionError("expected a refusal")
 
 
 class _TrackedBody(io.BytesIO):

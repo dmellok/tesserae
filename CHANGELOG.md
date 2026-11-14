@@ -8,6 +8,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- OpenDisplay via Home Assistant: **Add device → OpenDisplay** lists the tags Home Assistant knows under **Found in Home Assistant**, each with a one-click **Add** that takes the tag's size and colour palette from the tag itself.
+- OpenDisplay via Home Assistant: the tag's page shows whether the last picture arrived, with Home Assistant's reason when it did not, and a **Send again** button. A failed picture is tried again after 1, 5, 15 and then 30 minutes.
+- OpenDisplay via Home Assistant: **Colour conversion** can be set to Tesserae, which reduces the picture to the tag's palette the way previews are drawn and has Home Assistant send it unchanged. Home Assistant converting it stays the default.
+- OpenDisplay via Home Assistant: **Refresh** can be set to Fast, for less flashing on panels that support it.
+- OpenDisplay tags: a **Model** choice on the add form for known hardware, and two more palettes, black, white and yellow and seven colours.
+- Device kinds can list named hardware (`models`) for the add form.
 - OpenDisplay tags: **Panel → Colour palette** on the tag's page sets which colours the panel has (black and white, red, red and yellow, six colours, or greys), since the tag does not report it. Previews are drawn in those colours. Applies to the Home Assistant and bridge kinds.
 - Device kinds can list the palettes an operator may pick (`palettes`) and mark a replaced config field (`retired`) so it shows only on devices that still use it.
 - OpenDisplay via Home Assistant works from any install, not only the HA add-on. With the Home Assistant Core plugin configured, **Add device → OpenDisplay** shows the tag form, and Tesserae uploads each frame to HA's media folder through its API. The token must belong to an HA administrator. The add-on still writes to the shared `/media`, and now uploads instead when that folder is not writable.
@@ -30,6 +36,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Changed
 
+- OpenDisplay via Home Assistant: the palette is set from what the tag reports, and follows the tag if it is reconfigured. A palette you pick afterwards is kept.
+- OpenDisplay via Home Assistant: removing a tag deletes its uploaded picture from Home Assistant's media folder.
 - OpenDisplay via Home Assistant: **Panel → Rotation** now turns the frame, so it is the only rotation setting and 180° and 270° work; **Underscan** applies too. The tag's page no longer shows the client rotation, scale and letterbox options, which never reached Home Assistant. A tag that used the old Home Assistant rotation keeps working as it was and shows it as **Turn in Home Assistant (older setup)** until it is set to None.
 - Devices: the messages for the numbered orientation card now call it that, not a calibration card, so it is not mistaken for colour calibration.
 - Docs: the Fraimic quickstart and the compatibility page carry Fraimic's discount code for Tesserae readers (TESSERAE10, 10% off at fraimic.com), with a disclosure that Fraimic supplied the Large Canvas free and that sales made with the code pay the project a commission.
@@ -43,6 +51,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- OpenDisplay via Home Assistant: a tag that is taller than wide, such as a Solum 3.5", gets its picture the right way round. Tesserae assumed every tag was wider than tall and turned a portrait dashboard sideways, which Home Assistant then shrank to fit. It now reads each tag's size and rotation from Home Assistant.
+- OpenDisplay via Home Assistant: sending to one display no longer makes other OpenDisplay tags repaint the frame they already show first. Tesserae forgot what each tag had been sent after a restart or any device settings save, so the next send re-uploaded every tag in turn. It now remembers, and when several tags are due the one just rendered goes first.
 - Calendar: events with a floating time (no `TZID` and no `Z`, e.g. `DTSTART:20261116T090000`) show at their local time. They were read as UTC, so a 9:00 event showed at 04:00 in New York. To-do due times get the same fix.
 - Blank pictures on a frame: a render whose images fail to load is retried once, and a scheduled, lineup or refresh send that still has broken images keeps the previous frame. A manual send goes out with a warning in History.
 - Device page: dashboard schedules have their own list instead of sitting in the Lineups list.

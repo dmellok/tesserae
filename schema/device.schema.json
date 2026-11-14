@@ -105,6 +105,20 @@
       "uniqueItems": true,
       "description": "Colour palettes (panel gamuts) the operator may pick for a device of this kind, for hardware that comes in several and cannot report which it has (an OpenDisplay tag is sold as black and white, red, red and yellow, six-colour or grey). The device page then shows a Colour palette choice in Panel, stored as panel.gamut. Absent → the kind's own panel.gamut is fixed."
     },
+    "models": {
+      "type": "array",
+      "description": "Named hardware this kind is known to run on, offered as a Model choice on the add form: picking one fills the render size and, with palettes, the colour palette. For a kind that covers many boards behind one protocol and has no catalog entry per board (an OpenDisplay tag).",
+      "items": {
+        "type": "object",
+        "required": ["label", "w", "h"],
+        "properties": {
+          "label": { "type": "string", "minLength": 1 },
+          "w": { "type": "integer", "minimum": 1 },
+          "h": { "type": "integer", "minimum": 1 },
+          "gamut": { "type": "string" }
+        }
+      }
+    },
     "renderer_settings": {
       "type": "boolean",
       "description": "Whether the per-device settings of this kind's renderer (client rotation, scale, letterbox colour) apply. Set false for a kind whose publisher sends the composition itself rather than the renderer's output: its device page leaves them out. Absent → they apply."

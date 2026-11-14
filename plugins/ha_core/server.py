@@ -12,6 +12,7 @@ a Long-Lived Access Token (HA → profile → Long-Lived Access Tokens).
 
 from __future__ import annotations
 
+import contextlib
 import http.client
 import json
 import ssl
@@ -29,6 +30,7 @@ from flask import current_app
 from app.plugin_http import decode_body
 
 USER_AGENT = "tesserae/0.1 (+ha_core)"
+_ERROR_DETAIL_BYTES = 2048
 
 
 def _settings() -> dict[str, Any]:
@@ -149,11 +151,36 @@ def _urlopen(req: urllib.request.Request, *, timeout: float) -> http.client.HTTP
         )
         return resp
     except urllib.error.HTTPError as err:
+        # Keep the start of the body before closing it: HA puts the reason a
+        # service call failed there ("the tag is out of range"), and the bare
+        # status line ("HTTP Error 500") says nothing an operator can act on.
+        detail = ""
+        with contextlib.suppress(Exception):
+            detail = err.read(_ERROR_DETAIL_BYTES).decode("utf-8", "replace")
         err.close()
+        err.tesserae_detail = detail  # type: ignore[attr-defined]
         if err.code == 401:
             with _auth_lock:
                 _auth_failure = (key, time.monotonic(), req.full_url, str(err.reason))
         raise
+
+
+def error_detail(exc: BaseException) -> str:
+    """The reason HA gave for a failed request, or "".
+
+    HA answers a failed service call with ``{"message": "..."}``; anything
+    else is returned as the trimmed text it sent."""
+    raw = getattr(exc, "tesserae_detail", "")
+    if not isinstance(raw, str) or not raw.strip():
+        return ""
+    text = raw.strip()
+    try:
+        parsed = json.loads(text)
+    except ValueError:
+        return text[:300]
+    if isinstance(parsed, dict) and isinstance(parsed.get("message"), str):
+        return str(parsed["message"]).strip()[:300]
+    return text[:300]
 
 
 def request_json(path: str, *, timeout: int = 10) -> Any:
@@ -287,6 +314,65 @@ def upload_media(
         payload = {}
     media_id = payload.get("media_content_id") if isinstance(payload, dict) else None
     return str(media_id) if media_id else f"{folder_id.rstrip('/')}/{filename}"
+
+
+def remove_media(media_id: str, *, timeout: float = 15.0) -> bool:
+    """Delete one file from HA's local media folder. True when HA removed it
+    or it was already gone.
+
+    HA only offers this over its WebSocket API (``media_source/local_source/
+    remove``, administrators only), so this opens a short-lived socket:
+    authenticate, send the one command, close. Used to take an uploaded
+    OpenDisplay frame back out when its device is removed. Raises on missing
+    config, a refused login or a transport error."""
+    if not is_configured():
+        raise _not_configured()
+    from websockets.sync.client import connect
+
+    url = base_url()
+    ws_url = "wss://" + url[8:] if url.startswith("https://") else "ws://" + url.split("://", 1)[-1]
+    ws_url = ws_url.rstrip("/") + "/api/websocket"
+    ssl_context = _ssl_context() if ws_url.startswith("wss://") else None
+    extra: dict[str, Any] = {"ssl": ssl_context} if ssl_context is not None else {}
+    with connect(
+        ws_url,
+        open_timeout=timeout,
+        close_timeout=2,
+        user_agent_header=USER_AGENT,
+        max_size=1 << 20,
+        **extra,
+    ) as ws:
+        hello = json.loads(ws.recv(timeout=timeout))
+        if hello.get("type") != "auth_required":
+            raise RuntimeError(f"unexpected Home Assistant greeting: {hello.get('type')}")
+        ws.send(json.dumps({"type": "auth", "access_token": token()}))
+        answer = json.loads(ws.recv(timeout=timeout))
+        if answer.get("type") != "auth_ok":
+            raise RuntimeError("Home Assistant refused the access token")
+        ws.send(
+            json.dumps(
+                {
+                    "id": 1,
+                    "type": "media_source/local_source/remove",
+                    "media_content_id": media_id,
+                }
+            )
+        )
+        deadline = time.monotonic() + timeout
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError("Home Assistant did not answer the remove request")
+            result = json.loads(ws.recv(timeout=remaining))
+            if result.get("id") != 1 or result.get("type") != "result":
+                continue
+            if result.get("success"):
+                return True
+            code = (result.get("error") or {}).get("code")
+            if code == "not_found":
+                return True
+            message = (result.get("error") or {}).get("message") or code or "refused"
+            raise RuntimeError(f"Home Assistant would not remove the file: {message}")
 
 
 def render_template(template: str, *, timeout: int = 10) -> str:
