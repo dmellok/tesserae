@@ -1,0 +1,2651 @@
+/*
+ * Dashboard editor v2: the steps column, header, bottom bar and widget
+ * catalog (templates/page_editor_v2.html). The preview column is styled by
+ * editor_v2_preview.css. Paper/Classic tokens only, so light and dark both
+ * follow the shell. Design: docs/design/dashboard-editor-2026-11-12/mockup.html.
+ */
+
+/* ----- tokens ---------------------------------------------------------- */
+/* One scale for the whole editor, on the shared --t-space-* and --t-size-*
+   steps. Three spacing roles, six type roles, two control heights; the
+   rules below use these instead of numbers of their own. The editor has
+   three roots: the page (.ev2), the bottom bar and the widget catalog. */
+.ev2,
+.ev2-bar,
+.ev2-pk-pop {
+  /* Spacing. */
+  --ev2-gap-tight: var(--t-space-2, 8px); /* label to control, help under a control */
+  --ev2-gap: var(--t-space-4, 16px); /* field to field, block to block */
+  --ev2-gap-section: var(--t-space-6, 24px); /* step dividers, before a footer or a "More" group */
+  --ev2-gutter: var(--t-space-7, 32px); /* page sides */
+  /* Where step text and a widget row's icon start: the step number (24px)
+     plus its gap. Step bodies, row icons and open-row bodies share it. */
+  --ev2-indent: calc(24px + var(--t-space-3, 12px));
+
+  /* Type: page title, step title, body/lead, label/summary, help/meta/status, tag. */
+  --ev2-fs-title: var(--t-size-3xl, 28px);
+  --ev2-fs-step: var(--t-size-xl, 18px);
+  --ev2-fs-body: var(--t-size-base, 14px);
+  --ev2-fs-label: var(--t-size-md, 13px);
+  --ev2-fs-help: var(--t-size-sm, 12px);
+  --ev2-fs-tag: var(--t-size-xs, 11px);
+  --ev2-lh: 1.5;
+  --ev2-input-fs: var(--ev2-fs-body);
+
+  /* Controls: fields and main buttons, then the compact ones (small
+     buttons, icon buttons, segmented controls). Icons are 16px. */
+  --ev2-control: 40px;
+  --ev2-control-sm: 32px;
+  --ev2-icon: 16px;
+
+  /* Lines: field borders reach 3:1 on the surface in light and dark;
+     dividers are the quiet hairline. */
+  --ev2-field-border: color-mix(in oklab, var(--t-border-strong) 40%, var(--t-fg-soft));
+  --ev2-divider: var(--t-border);
+
+  --ev2-r: var(--t-radius-sm, 6px);
+  --ev2-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Focus ring: solid 2px, 3:1 or better on every surface in light and
+     dark (Paper's --p-focus is #2b4e9b / #7c9be0). */
+  --ev2-focus: var(--p-focus, var(--t-accent));
+  --ev2-ring: 0 0 0 2px var(--ev2-focus);
+  --ev2-acc: var(--t-accent);
+  --ev2-acc-hover: var(--t-accent-hover);
+}
+.ev2 {
+  --ev2-bezel: #dedad2;
+  --ev2-paper: #e9e7e1;
+  font-size: var(--ev2-fs-body);
+  line-height: var(--ev2-lh);
+  color: var(--t-fg);
+  /* The editor grid answers its own width (two columns or stacked). */
+  container: ev2 / inline-size;
+}
+:root[data-ui="paper"] :is(.ev2, .ev2-bar, .ev2-pk-pop) {
+  --ev2-r: 2px;
+}
+:root[data-theme="dark"] .ev2 {
+  --ev2-bezel: #4a4741;
+  --ev2-paper: #d9d6cf;
+}
+/* Touch widths (where Paper makes its fields 44px): fields are 44px and
+   type 16px in them, so iOS doesn't zoom the page on focus. */
+@media (max-width: 900px), (pointer: coarse) {
+  .ev2,
+  .ev2-bar,
+  .ev2-pk-pop {
+    --ev2-control: 44px;
+    --ev2-input-fs: 16px;
+  }
+}
+@media (max-width: 900px) {
+  .ev2,
+  .ev2-bar,
+  .ev2-pk-pop {
+    --ev2-gutter: var(--t-space-4, 16px);
+    /* The sticky app header a scrolled-to step must clear. */
+    --ev2-app-header: 56px;
+  }
+}
+/* Phones and touch: every compact control is a 44px target too. */
+@media (max-width: 640px), (pointer: coarse) {
+  .ev2,
+  .ev2-bar,
+  .ev2-pk-pop {
+    --ev2-control-sm: 44px;
+  }
+}
+@media (max-width: 640px) {
+  .ev2 {
+    /* No drag grip on a phone: a row's icon sits at the gutter. */
+    --ev2-indent: var(--t-space-3, 12px);
+  }
+}
+
+/* Editor-scoped text colours that clear 4.5:1 (the shared Paper tokens
+   stay as they are). */
+:root[data-ui="paper"]:not([data-theme="dark"]) :is(.ev2, .ev2-bar, .ev2-pk-pop) {
+  --t-muted: #6b675f;
+  --t-ok: #2f6a2c;
+  --t-warn: #7a560a;
+}
+:root[data-ui="paper"][data-theme="dark"] :is(.ev2, .ev2-bar, .ev2-pk-pop) {
+  --t-muted: #9b968b;
+  --t-danger: #e46a5b;
+  --ev2-acc: #e46a5b;
+  --ev2-acc-hover: #f08272;
+}
+/* Text on the amber boxes reads in the ink colours. */
+.ev2 :is(.ev2-ovbox, .ev2-confirm) {
+  --t-muted: var(--t-fg-soft);
+}
+.ev2 :is(.ev2-ovbox, .ev2-confirm) .ev2-link {
+  color: var(--t-fg);
+}
+.ev2 :is(.ev2-ovbox, .ev2-confirm) .ev2-link:hover {
+  color: var(--t-fg-soft);
+}
+
+/* The page takes the full width next to the sidebar. (The page is the
+   editor's parent, so it uses the shared steps the tokens are built on:
+   the section gap on top, the gutter at the sides.) */
+.page.ev2-page {
+  max-width: none;
+  padding: var(--t-space-6, 24px) var(--t-space-7, 32px) 120px;
+}
+@media (max-width: 900px) {
+  .page.ev2-page {
+    padding: var(--t-space-4, 16px) var(--t-space-4, 16px) 110px;
+  }
+}
+
+/* ----- resets: the shell styles every <button>; these are ours ----------- */
+:is(.ev2, .ev2-bar, .ev2-pk-pop) button {
+  font: inherit;
+  color: inherit;
+  box-shadow: none;
+  transform: none;
+  transition: none;
+  white-space: normal;
+  user-select: auto;
+  line-height: inherit;
+}
+:is(.ev2, .ev2-bar, .ev2-pk-pop) button:hover {
+  transform: none;
+  box-shadow: none;
+}
+/* The editor draws its own ring; Paper's outline would make it double. */
+:is(#ev2, #ev2-bar, #ev2-pk) :focus-visible {
+  outline: none;
+}
+:is(.ev2, .ev2-bar, .ev2-pk-pop) :focus-visible {
+  box-shadow: var(--ev2-ring);
+}
+.ev2 [hidden],
+.ev2-bar [hidden],
+.ev2-pk-pop[hidden],
+.ev2-pk-scrim[hidden] {
+  display: none !important;
+}
+:is(.ev2, .ev2-bar, .ev2-pk-pop) .sp {
+  flex: 1;
+}
+.ev2 .muted {
+  color: var(--t-muted);
+}
+:is(.ev2, .ev2-bar, .ev2-pk-pop) .ph {
+  font-size: var(--ev2-icon);
+  line-height: 1;
+}
+.ev2 small {
+  font-size: var(--ev2-fs-help);
+}
+.ev2 code {
+  font-size: var(--ev2-fs-tag);
+}
+
+/* ----- fields: one look for every text field, select and box ---------- */
+/* The editor's own controls and the shared form macros (templates/
+   _components.html auto_field: .field, .slider-value-wrap,
+   .field-unit-wrap, the place search, the touch editor) share one border,
+   one height, one focus ring. The id outranks Paper's shell-wide control
+   rule, which would otherwise set 14px type and its own heights. */
+#ev2
+  :where(
+    .ev2-select,
+    .ev2-input,
+    .field input:is([type="text"], [type="password"], [type="number"], [type="time"], [type="url"], [type="email"], :not([type])),
+    .field select:not([multiple]),
+    .ti-root .psel,
+    .ti-root input.dinput
+  ),
+#ev2-pk .ev2-input {
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--ev2-control);
+  min-height: 0;
+  min-width: 0;
+  padding: 0 var(--t-space-3);
+  border: 1px solid var(--ev2-field-border);
+  border-radius: var(--ev2-r);
+  background-color: var(--t-surface);
+  color: var(--t-fg);
+  font-family: inherit;
+  font-size: var(--ev2-input-fs);
+  font-weight: 400;
+  line-height: var(--ev2-lh);
+  box-shadow: none;
+}
+#ev2 :where(textarea.ev2-input, .field textarea, .ti-root textarea.dinput) {
+  box-sizing: border-box;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  padding: var(--ev2-gap-tight) var(--t-space-3);
+  border: 1px solid var(--ev2-field-border);
+  border-radius: var(--ev2-r);
+  background-color: var(--t-surface);
+  color: var(--t-fg);
+  font-size: var(--ev2-input-fs);
+  line-height: var(--ev2-lh);
+  resize: vertical;
+}
+#ev2 textarea.ev2-css {
+  font-family: var(--t-font-mono);
+  font-size: max(var(--ev2-fs-help), var(--ev2-input-fs) - 2px);
+}
+/* Selects: the editor's chevron, centred at any height. */
+#ev2 :where(.ev2-select, .field select:not([multiple]), .ti-root .psel) {
+  padding-right: 32px;
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position:
+    calc(100% - 17px) 50%,
+    calc(100% - 12px) 50%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+#ev2
+  :where(
+    .ev2-select,
+    .ev2-input,
+    .field input,
+    .field select,
+    .field textarea,
+    .ti-root .psel,
+    .ti-root .dinput
+  ):focus,
+#ev2-pk .ev2-input:focus {
+  outline: none;
+  border-color: var(--t-fg-soft);
+  box-shadow: var(--ev2-ring);
+}
+
+/* Boxes that hold a bare input (number with its unit, the place search):
+   the box is the field, the input inside has no frame of its own. */
+#ev2 :is(.ev2-numu, .slider-value-wrap, .field-unit-wrap, .location-search-input) {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--t-space-1);
+  height: var(--ev2-control);
+  min-height: 0;
+  padding: 0 var(--t-space-3) 0 0;
+  border: 1px solid var(--ev2-field-border);
+  border-radius: var(--ev2-r);
+  background: var(--t-surface);
+  justify-self: start;
+  flex: none;
+}
+#ev2 .location-search-input {
+  display: flex;
+  gap: var(--ev2-gap-tight);
+  padding: 0 var(--t-space-3);
+  justify-self: stretch;
+}
+#ev2 :is(.ev2-numu, .slider-value-wrap, .field-unit-wrap, .location-search-input):focus-within {
+  border-color: var(--t-fg-soft);
+  box-shadow: var(--ev2-ring);
+}
+#ev2 :is(.ev2-numu, .slider-value-wrap, .field-unit-wrap) input,
+#ev2 .location-search-input input {
+  box-sizing: border-box;
+  width: 56px;
+  /* As tall as the box around it (over its border), so the target is too. */
+  height: calc(100% + 2px);
+  min-height: 0;
+  margin: -1px 0;
+  padding: 0 var(--t-space-1) 0 var(--t-space-3);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--t-fg);
+  font-family: inherit;
+  font-size: var(--ev2-input-fs);
+  font-weight: 400;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+#ev2 .location-search-input input {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+}
+#ev2 :is(.ev2-numu, .slider-value-wrap, .field-unit-wrap, .location-search-input) input:focus {
+  outline: none;
+  box-shadow: none;
+}
+.ev2 :is(.ev2-numu span, .slider-unit, .field-unit) {
+  color: var(--t-muted);
+  font-size: var(--ev2-fs-help);
+}
+/* A plain number is sized for a number, like the ones with a unit. */
+#ev2 .field > input[type="number"] {
+  width: 96px;
+  text-align: right;
+}
+.ev2-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Sliders: one track and thumb for every range in the editor; the value
+   box sits right of the track (the shared slider macro is rearranged to
+   match the editor's own .ev2-rng). */
+#ev2 input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 20px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  cursor: pointer;
+}
+#ev2 input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ev2-field-border);
+}
+#ev2 input[type="range"]::-moz-range-track {
+  height: 4px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ev2-field-border);
+}
+#ev2 input[type="range"]::-moz-range-progress {
+  height: 4px;
+  background: transparent;
+}
+#ev2 input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border: 2px solid var(--t-surface);
+  border-radius: 50%;
+  background: var(--t-fg);
+  box-shadow: 0 0 0 1px var(--t-fg);
+  transform: none;
+}
+#ev2 input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--t-surface);
+  border-radius: 50%;
+  background: var(--t-fg);
+  box-shadow: 0 0 0 1px var(--t-fg);
+}
+#ev2 input[type="range"]:focus-visible {
+  box-shadow: none;
+}
+#ev2 input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow:
+    0 0 0 1px var(--t-fg),
+    0 0 0 4px var(--ev2-focus);
+}
+#ev2 input[type="range"]:focus-visible::-moz-range-thumb {
+  box-shadow:
+    0 0 0 1px var(--t-fg),
+    0 0 0 4px var(--ev2-focus);
+}
+.ev2-rng {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-3);
+  min-width: 0;
+}
+.ev2-rng input[type="range"] {
+  flex: 1;
+  min-width: 0;
+}
+.ev2-rng-out {
+  min-width: 3.5em;
+  color: var(--t-muted);
+  font-variant-numeric: tabular-nums;
+}
+.ev2 .field--slider {
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--t-space-3);
+  align-items: center;
+}
+.ev2 .field--slider .slider-header {
+  display: contents;
+}
+.ev2 .field--slider .slider-header > label {
+  grid-column: 1 / -1;
+}
+.ev2 .field--slider input[type="range"] {
+  grid-column: 1;
+  grid-row: 2;
+  width: 100%;
+}
+.ev2 .field--slider .slider-value-wrap {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+/* ----- buttons, links, switches, segmented ------------------------------ */
+:is(.ev2, .ev2-bar, .ev2-pk-pop) .ev2-btn {
+  box-sizing: border-box;
+  height: var(--ev2-control);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ev2-gap-tight);
+  padding: 0 var(--ev2-gap);
+  border: 1px solid var(--t-border-strong);
+  border-radius: var(--ev2-r);
+  background: var(--t-surface);
+  color: var(--t-fg);
+  font-weight: 500;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+}
+:is(.ev2, .ev2-bar) .ev2-btn:hover:not(:disabled) {
+  background: var(--p-hover, var(--t-surface-soft));
+  border-color: var(--t-border-strong);
+}
+:is(.ev2, .ev2-bar) :is(.ev2-btn--primary, .ev2-btn[aria-pressed="true"]) {
+  background: var(--t-fg);
+  border-color: var(--t-fg);
+  color: var(--t-surface);
+  font-weight: 600;
+}
+:is(.ev2, .ev2-bar) .ev2-btn--primary:hover:not(:disabled) {
+  background: var(--t-fg);
+  border-color: var(--t-fg);
+  opacity: 0.88;
+}
+:is(.ev2, .ev2-bar) :is(.ev2-btn:disabled, .ev2-btn[aria-disabled="true"]) {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.ev2 .ev2-btn--sm {
+  height: var(--ev2-control-sm);
+  padding: 0 var(--t-space-3);
+  font-size: var(--ev2-fs-label);
+}
+
+:is(.ev2, .ev2-bar, .ev2-pk-pop) .ev2-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  height: auto;
+  color: var(--ev2-acc);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  cursor: pointer;
+}
+:is(.ev2, .ev2-bar, .ev2-pk-pop) .ev2-link:hover {
+  background: none;
+  color: var(--ev2-acc-hover);
+}
+:is(.ev2, .ev2-pk-pop) .ev2-link--quiet {
+  color: var(--t-muted);
+  font-weight: 500;
+}
+:is(.ev2, .ev2-pk-pop) .ev2-link--quiet:hover {
+  color: var(--t-fg);
+}
+.ev2-bar .ev2-link--danger {
+  color: var(--ev2-acc);
+  font-weight: 500;
+  text-decoration: none;
+  padding: 0 var(--ev2-gap-tight);
+}
+.ev2-bar .ev2-link--danger:hover {
+  text-decoration: underline;
+}
+
+:is(.ev2, .ev2-bar, .ev2-pk-pop) .ev2-iconbtn {
+  width: var(--ev2-control-sm);
+  height: var(--ev2-control-sm);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--t-muted);
+  border-radius: var(--ev2-r);
+  cursor: pointer;
+}
+/* The bar's icon buttons stand next to Push: the same height. */
+.ev2-bar .ev2-iconbtn {
+  width: var(--ev2-control);
+  height: var(--ev2-control);
+}
+:is(.ev2, .ev2-bar, .ev2-pk-pop) .ev2-iconbtn:hover:not(:disabled) {
+  background: var(--p-hover, var(--t-surface-soft));
+  color: var(--t-fg);
+}
+
+/* A real checkbox drawn as a switch (keeps form semantics). */
+.ev2-switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  flex: none;
+}
+.ev2-switch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+.ev2 .ev2-switch > span {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--ev2-field-border);
+  transition: background 0.18s var(--ev2-ease);
+}
+.ev2-switch > span::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--t-surface);
+  transition: transform 0.18s var(--ev2-ease);
+}
+.ev2-switch input:checked + span {
+  background: var(--t-accent);
+}
+.ev2-switch input:checked + span::after {
+  transform: translateX(16px);
+}
+.ev2-switch input:focus-visible + span {
+  box-shadow: var(--ev2-ring);
+}
+.ev2-switch-l {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ev2-gap-tight);
+  cursor: pointer;
+}
+
+/* Switch fields from the shared form macro: label (with its info button)
+   on the left, the switch on the right, like the hand-built rows. */
+.ev2 .ev2-opts .field.field--switch {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-1);
+  min-width: 0;
+  margin: 0;
+}
+.ev2-opts .field--switch label.switch {
+  display: contents;
+}
+.ev2-opts .field--switch .switch-label {
+  order: 1;
+  flex: 0 1 auto;
+  font-size: var(--ev2-fs-label);
+  font-weight: 600;
+}
+.ev2-opts .field--switch .info-pop-wrap {
+  order: 2;
+  margin-left: 0;
+  line-height: 1;
+}
+.ev2-opts .field--switch .switch-track {
+  order: 3;
+  margin-left: auto;
+  width: 36px;
+  height: 20px;
+  background: var(--ev2-field-border);
+}
+.ev2-opts .field--switch .switch-thumb {
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  box-shadow: none;
+}
+.ev2-opts .field--switch input:checked ~ .switch-track {
+  background: var(--t-accent);
+}
+.ev2-opts .field--switch input:checked ~ .switch-track .switch-thumb {
+  transform: translateX(16px);
+}
+.ev2-opts .field--switch input:focus-visible ~ .switch-track {
+  box-shadow: var(--ev2-ring);
+}
+
+/* The shared macro's "i" (info) button: a 24px target on desktop, 44px on
+   touch; the glyph stays 16px and the label line keeps its height. */
+#ev2 .info-pop {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  min-height: 0;
+  margin: -4px -4px -4px 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--t-muted);
+  font-size: var(--ev2-icon);
+  line-height: 1;
+  vertical-align: middle;
+}
+#ev2 .info-pop:hover,
+#ev2 .info-pop[aria-expanded="true"] {
+  background: var(--p-hover, var(--t-surface-soft));
+  color: var(--t-fg);
+}
+#ev2 .info-pop:focus-visible {
+  box-shadow: var(--ev2-ring);
+}
+@media (max-width: 640px), (pointer: coarse) {
+  #ev2 .info-pop {
+    width: 44px;
+    height: 44px;
+    margin: -14px -14px -14px -6px;
+  }
+}
+
+.ev2-seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  border: 1px solid var(--ev2-field-border);
+  border-radius: var(--ev2-r);
+  overflow: hidden;
+  justify-self: start;
+}
+/* Segmented controls are secondary everywhere: the compact height
+   (the track's border included; on touch each segment is a full target). */
+.ev2 .ev2-seg button {
+  height: calc(var(--ev2-control-sm) - 2px);
+  padding: 0 var(--t-space-3);
+  border: 0;
+  border-radius: 0;
+  background: var(--t-surface);
+  color: var(--t-fg-soft);
+  font-size: var(--ev2-fs-label);
+  cursor: pointer;
+}
+@media (max-width: 640px), (pointer: coarse) {
+  .ev2 .ev2-seg button {
+    height: var(--ev2-control-sm);
+  }
+}
+.ev2 .ev2-seg button + button {
+  border-left: 1px solid var(--ev2-field-border);
+}
+.ev2 .ev2-seg button:hover {
+  background: var(--p-hover, var(--t-surface-soft));
+}
+.ev2 .ev2-seg button[aria-pressed="true"] {
+  background: var(--t-fg);
+  color: var(--t-surface);
+  font-weight: 600;
+}
+
+/* Announcements for screen readers (keyboard swap, reset). */
+.ev2-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+/* A step body takes focus after "Next"; it is a landing spot, not a control. */
+.ev2 .ev2-st-body:focus,
+.ev2 .ev2-st-body:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+/* Copy that names the gesture: "Click" with a mouse, "Tap" on touch. */
+.ev2-tap {
+  display: none;
+}
+@media (hover: none) {
+  .ev2-click {
+    display: none;
+  }
+  .ev2-tap {
+    display: inline;
+  }
+}
+
+/* ----- head ----------------------------------------------------------- */
+.ev2-crumbs {
+  display: flex;
+  align-items: center;
+  gap: var(--ev2-gap-tight);
+  min-height: var(--ev2-control-sm);
+  margin-bottom: var(--ev2-gap);
+  color: var(--t-muted);
+  font-size: var(--ev2-fs-label);
+}
+.ev2-crumbs a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--ev2-control-sm);
+  color: inherit;
+}
+.ev2-crumbs > span:nth-child(3) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ev2-saved {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--t-space-1);
+  color: var(--t-ok);
+  white-space: nowrap;
+}
+.ev2-saved[data-state="saving"] {
+  color: var(--t-muted);
+}
+.ev2-saved[data-state="error"] {
+  color: var(--t-danger, var(--t-accent));
+  font-weight: 600;
+}
+.ev2-info {
+  position: relative;
+  display: inline-flex;
+}
+.ev2 .ev2-info .ev2-info-btn {
+  width: var(--ev2-control-sm);
+  height: var(--ev2-control-sm);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--t-muted);
+  cursor: pointer;
+}
+.ev2 .ev2-info-btn:hover,
+.ev2 .ev2-info-btn[aria-expanded="true"] {
+  background: var(--p-hover, var(--t-surface-soft));
+  color: var(--t-fg);
+}
+.ev2-info-pop {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + var(--t-space-1));
+  right: 0;
+  display: grid;
+  gap: var(--ev2-gap-tight);
+  width: max-content;
+  max-width: min(280px, 80vw);
+  padding: var(--t-space-3) var(--ev2-gap);
+  background: var(--t-surface);
+  border: 1px solid var(--t-border-strong);
+  border-radius: var(--ev2-r);
+  box-shadow: 0 14px 32px -16px rgba(0, 0, 0, 0.45);
+  color: var(--t-fg);
+  font-size: var(--ev2-fs-label);
+}
+.ev2-info-pop form {
+  margin: 0;
+}
+
+.ev2-titlerow {
+  display: flex;
+  align-items: center;
+  gap: var(--ev2-gap-tight);
+  min-width: 0;
+}
+.ev2-title-form {
+  min-width: 0;
+  margin: 0;
+}
+#ev2 .ev2-title {
+  display: block;
+  box-sizing: border-box;
+  width: 12ch;
+  min-width: 3ch;
+  max-width: 100%;
+  height: auto;
+  min-height: 0;
+  /* The text lines up with the crumbs; the frame shows on hover. */
+  margin-left: -7px;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: var(--ev2-r);
+  background: transparent;
+  color: var(--t-fg);
+  font: 700 var(--ev2-fs-title) / 1.15 var(--t-font);
+  letter-spacing: -0.012em;
+}
+#ev2 .ev2-title:hover {
+  border-color: var(--t-border);
+}
+#ev2 .ev2-title:focus {
+  outline: none;
+  border-color: var(--ev2-field-border);
+  background: var(--t-surface);
+  box-shadow: var(--ev2-ring);
+}
+.ev2 .ev2-title::placeholder {
+  color: var(--t-muted);
+  font-weight: 500;
+}
+.ev2-icon-form {
+  margin: 0;
+  flex: none;
+}
+.ev2-icon-picker {
+  position: relative;
+}
+.ev2 .ev2-iconpick {
+  height: var(--ev2-control-sm);
+  min-width: var(--ev2-control-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--t-space-1);
+  padding: 0 var(--ev2-gap-tight);
+  border: 1px dashed var(--t-border-strong);
+  border-radius: var(--ev2-r);
+  background: transparent;
+  color: var(--t-muted);
+  font-size: var(--ev2-fs-help);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ev2 .ev2-iconpick .icon-picker-current {
+  width: auto;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--t-space-1);
+}
+.ev2 .ev2-iconpick.set {
+  border-style: solid;
+  background: var(--t-surface);
+  color: var(--t-fg);
+}
+.ev2 .ev2-iconpick:hover {
+  border-color: var(--t-fg);
+  color: var(--t-fg);
+}
+.ev2-icon-picker .icon-picker-popover {
+  z-index: 40;
+  min-width: min(340px, calc(100vw - 32px));
+}
+#ev2 .icon-picker-search input {
+  font-size: var(--ev2-input-fs);
+}
+.ev2-sub {
+  margin: var(--t-space-1) 0 0;
+  max-width: 64ch;
+  color: var(--t-fg-soft);
+}
+
+/* ----- editor grid: steps left, preview right -------------------------- */
+.ev2-ed {
+  display: grid;
+  grid-template-columns: minmax(380px, 35%) minmax(0, 1fr);
+  gap: var(--t-space-7, 32px);
+  align-items: start;
+  margin-top: var(--ev2-gap-tight);
+}
+.ev2-ed > * {
+  min-width: 0;
+}
+.ev2-pv {
+  position: sticky;
+  top: var(--ev2-gap-section);
+}
+/* Stacked when the two columns don't fit beside the sidebar: on the
+   editor's own width, so an iPad in landscape keeps both. */
+@container ev2 (max-width: 820px) {
+  .ev2-ed {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--ev2-gap-tight);
+  }
+  .ev2-pv {
+    position: static;
+    order: -1;
+    margin-top: var(--ev2-gap);
+  }
+}
+
+/* ----- steps ---------------------------------------------------------- */
+.ev2-step {
+  margin-top: var(--ev2-gap-section);
+  scroll-margin-top: calc(var(--ev2-app-header, 0px) + var(--ev2-gap));
+}
+.ev2-steps > .ev2-step + .ev2-step {
+  padding-top: var(--ev2-gap-section);
+  border-top: 1px solid var(--ev2-divider);
+}
+.ev2-anchor {
+  position: relative;
+  top: calc(-1 * var(--ev2-gap-section));
+}
+.ev2-st-hd {
+  margin: 0;
+  font: inherit;
+  letter-spacing: normal;
+}
+.ev2 .ev2-st-h {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-3);
+  width: 100%;
+  min-height: var(--ev2-control-sm);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--t-fg);
+  text-align: left;
+  cursor: pointer;
+}
+.ev2 .ev2-st-h:disabled {
+  cursor: default;
+  opacity: 1;
+}
+/* One size in every state: opening a step doesn't move its title. */
+.ev2-st-t {
+  font-size: var(--ev2-fs-step);
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+}
+.ev2-opt {
+  margin-left: var(--t-space-1);
+  color: var(--t-muted);
+  font-size: var(--ev2-fs-tag);
+  font-weight: 500;
+  letter-spacing: normal;
+}
+.ev2 .ev2-st-h .ev2-sn {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--t-fg);
+  border-radius: 50%;
+  font: 700 var(--ev2-fs-tag) / 1 var(--t-font-mono);
+}
+/* The step number's check is the one icon drawn smaller than 16px. */
+.ev2-sn .ph {
+  font-size: 13px;
+}
+.ev2-sn-ok {
+  display: none;
+}
+.ev2-st-sum {
+  min-width: 0;
+  /* Two lines at most, then an ellipsis: a phrase doesn't get cut in half. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  color: var(--t-fg-soft);
+}
+.ev2-st-sum[data-ev2-sum="widgets"] {
+  flex-shrink: 0;
+}
+.ev2-st-vis[data-ev2-vis="widgets"] {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.ev2-st-sum.warn {
+  color: var(--t-warn);
+}
+.ev2-st-sum .ph {
+  vertical-align: -3px;
+}
+.ev2-st-vis {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--t-space-1);
+  margin-right: var(--t-space-3);
+}
+.ev2-chg {
+  color: var(--ev2-acc);
+  font-size: var(--ev2-fs-label);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  white-space: nowrap;
+}
+.ev2-st-wait {
+  display: none;
+  margin: var(--t-space-1) 0 0 var(--ev2-indent);
+  color: var(--t-muted);
+  font-size: var(--ev2-fs-help);
+}
+
+/* open */
+.ev2-step[data-state="open"] :is(.ev2-st-sum, .ev2-st-vis, .ev2-chg) {
+  display: none;
+}
+/* done: collapsed to one summary line, a check when the step is complete */
+.ev2-step[data-state="done"]:not([data-complete="no"]) .ev2-sn {
+  background: var(--t-fg);
+  color: var(--t-surface);
+}
+.ev2-step[data-state="done"]:not([data-complete="no"]) .ev2-sn-n {
+  display: none;
+}
+.ev2-step[data-state="done"]:not([data-complete="no"]) .ev2-sn-ok {
+  display: contents;
+}
+/* done but not complete (empty cells): the number in amber */
+.ev2 .ev2-step[data-attn] .ev2-st-h .ev2-sn {
+  border-color: var(--t-warn);
+  color: var(--t-warn);
+}
+.ev2-step[data-state="done"] .ev2-st-h:hover .ev2-st-t {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+/* wait: greyed until the step before it is done */
+.ev2 .ev2-step[data-state="wait"] .ev2-st-h .ev2-sn {
+  border-color: var(--t-border-strong);
+  color: var(--t-muted);
+}
+.ev2-step[data-state="wait"] .ev2-st-t {
+  color: var(--t-muted);
+}
+.ev2-step[data-state="wait"] :is(.ev2-st-sum, .ev2-st-vis, .ev2-chg) {
+  display: none;
+}
+.ev2-step[data-state="wait"] .ev2-st-wait {
+  display: block;
+}
+
+.ev2-st-body {
+  animation: ev2-in 0.2s var(--ev2-ease);
+}
+.ev2-st-b {
+  margin-left: var(--ev2-indent);
+}
+.ev2-lead {
+  margin: var(--ev2-gap-tight) 0 var(--ev2-gap) var(--ev2-indent);
+  max-width: 64ch;
+  color: var(--t-fg-soft);
+}
+.ev2-lead b {
+  color: var(--t-fg);
+  font-weight: 600;
+}
+.ev2-st-next {
+  margin-top: var(--ev2-gap-section);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--t-space-3);
+}
+.ev2-help {
+  margin: var(--ev2-gap-tight) 0 0;
+  max-width: 64ch;
+  color: var(--t-fg-soft);
+  font-size: var(--ev2-fs-help);
+}
+.ev2-help.muted {
+  color: var(--t-muted);
+}
+.ev2-help a {
+  color: inherit;
+}
+.ev2-lbl {
+  font-size: var(--ev2-fs-label);
+  font-weight: 600;
+}
+
+/* tiny visuals in a collapsed summary */
+.ev2-mshape {
+  display: inline-block;
+  border: 1.5px solid var(--t-fg-soft);
+  border-radius: 1px;
+}
+.ev2-mshape.test {
+  border-style: dashed;
+}
+.ev2-mlay {
+  position: relative;
+  display: inline-block;
+}
+.ev2-mlay span {
+  position: absolute;
+  box-shadow: inset 0 0 0 1px var(--t-muted);
+}
+.ev2-wico {
+  width: 20px;
+  height: 20px;
+  display: inline-grid;
+  place-items: center;
+  color: var(--t-fg-soft);
+}
+.ev2-wico.empty {
+  width: 14px;
+  height: 14px;
+  margin: 0 3px;
+  border: 1.5px dashed var(--t-muted);
+  border-radius: 2px;
+}
+.ev2-wmore {
+  color: var(--t-muted);
+  font-size: var(--ev2-fs-help);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ----- 1 · display cards ----------------------------------------------- */
+.ev2-pick {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr));
+  gap: var(--ev2-gap-tight);
+}
+.ev2 .ev2-pcard {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 78px auto;
+  justify-content: stretch;
+  align-content: start;
+  gap: var(--ev2-gap-tight);
+  padding: var(--t-space-3);
+  border: 1px solid var(--t-border-strong);
+  border-radius: var(--ev2-r);
+  background: var(--t-surface);
+  color: var(--t-fg);
+  text-align: left;
+  cursor: pointer;
+}
+.ev2 .ev2-pcard:hover {
+  border-color: var(--t-fg);
+  background: var(--t-surface);
+}
+.ev2 .ev2-pcard.on {
+  border-color: var(--t-fg);
+  box-shadow: inset 0 0 0 1.5px var(--t-fg);
+}
+.ev2 .ev2-pcard.on:focus-visible {
+  box-shadow:
+    inset 0 0 0 1.5px var(--t-fg),
+    var(--ev2-ring);
+}
+.ev2-pc-pic {
+  display: grid;
+  place-items: center;
+  background: var(--t-surface-sunk);
+}
+.ev2-shape {
+  display: block;
+  background: var(--ev2-paper);
+  border: 3px solid var(--ev2-bezel);
+}
+.ev2-shape.test {
+  border: 1.5px dashed var(--t-fg-soft);
+  background: transparent;
+}
+.ev2-pc-t {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.ev2-pc-t b {
+  font-size: var(--ev2-fs-label);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.ev2-pc-t small {
+  color: var(--t-fg-soft);
+}
+.ev2 .ev2-pcard .ev2-tick {
+  position: absolute;
+  top: var(--ev2-gap-tight);
+  right: var(--ev2-gap-tight);
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--t-border-strong);
+  border-radius: 50%;
+  background: var(--t-surface);
+}
+/* A mark inside an 18px circle, like the step number's check. */
+.ev2-tick .ph {
+  font-size: 11px;
+}
+.ev2-pcard.on .ev2-tick {
+  background: var(--t-fg);
+  border-color: var(--t-fg);
+  color: var(--t-surface);
+}
+.ev2-sizes {
+  margin-top: var(--ev2-gap);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ev2-gap-tight);
+}
+.ev2-sizes .ev2-lbl {
+  color: var(--t-fg-soft);
+  font-weight: 400;
+}
+.ev2-sizeseg {
+  display: flex;
+  flex-wrap: nowrap;
+  width: 100%;
+  max-width: 440px;
+}
+.ev2 .ev2-sizeseg button {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0 var(--t-space-1);
+  font-size: var(--ev2-fs-help);
+  font-variant-numeric: tabular-nums;
+}
+.ev2-cust {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 var(--t-space-1);
+  border-left: 1px solid var(--ev2-field-border);
+  background: var(--t-surface);
+  color: var(--t-muted);
+  font-size: var(--ev2-fs-help);
+}
+#ev2 .ev2-cust input {
+  width: 36px;
+  height: 24px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px dashed var(--ev2-field-border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--t-fg-soft);
+  font: inherit;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+#ev2 .ev2-cust input:focus {
+  outline: none;
+  border-bottom: 1px solid var(--t-fg);
+  color: var(--t-fg);
+  box-shadow: none;
+}
+.ev2-cust i {
+  font-style: normal;
+}
+.ev2-cust[data-on="true"] {
+  background: var(--t-fg);
+  color: var(--t-surface);
+}
+#ev2 .ev2-cust[data-on="true"] input {
+  color: var(--t-surface);
+  border-bottom-color: color-mix(in oklab, var(--t-surface) 50%, transparent);
+  font-weight: 600;
+}
+
+/* ----- 2 · layout presets --------------------------------------------- */
+.ev2-lgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: var(--ev2-gap-tight);
+}
+.ev2 .ev2-lt {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: var(--t-space-1);
+  padding: var(--ev2-gap-tight) var(--t-space-1);
+  border: 1px solid transparent;
+  border-radius: var(--ev2-r);
+  background: transparent;
+  color: var(--t-fg-soft);
+  font-size: var(--ev2-fs-help);
+  cursor: pointer;
+}
+.ev2 .ev2-lt:hover {
+  background: var(--p-hover, var(--t-surface-soft));
+  border-color: transparent;
+}
+.ev2 .ev2-lt.on {
+  color: var(--t-fg);
+  font-weight: 600;
+}
+.ev2-lt-pic {
+  position: relative;
+  box-sizing: content-box;
+  background: var(--t-surface);
+  border: 1px solid var(--t-muted);
+  border-radius: 1px;
+}
+.ev2-lt-pic span {
+  position: absolute;
+  box-sizing: border-box;
+}
+.ev2-lt-pic span.r {
+  border-right: 1px solid var(--t-muted);
+}
+.ev2-lt-pic span.b {
+  border-bottom: 1px solid var(--t-muted);
+}
+.ev2-lt:hover .ev2-lt-pic {
+  border-color: var(--t-fg-soft);
+}
+.ev2-lt.on .ev2-lt-pic {
+  border-color: var(--t-fg);
+  background: color-mix(in oklab, var(--t-accent) 10%, var(--t-surface));
+}
+.ev2-lt.on .ev2-lt-pic span.r,
+.ev2-lt.on .ev2-lt-pic span.b {
+  border-color: var(--t-fg);
+}
+.ev2-lt-pic .sbar {
+  background: var(--t-fg-soft);
+}
+.ev2-lrows {
+  margin-top: var(--ev2-gap);
+  border-top: 1px solid var(--ev2-divider);
+}
+.ev2-lrow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--t-space-1) var(--ev2-gap);
+  align-items: center;
+  padding: var(--t-space-3) 0;
+  border-bottom: 1px solid var(--ev2-divider);
+}
+.ev2-lrow .t {
+  font-size: var(--ev2-fs-label);
+  font-weight: 600;
+}
+.ev2-lrow .d {
+  grid-column: 1;
+  color: var(--t-fg-soft);
+  font-size: var(--ev2-fs-help);
+}
+.ev2-lrow .c {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--ev2-gap-tight);
+}
+.ev2-drawbar {
+  padding: var(--t-space-3) 0;
+  border-bottom: 1px solid var(--ev2-divider);
+  color: var(--t-fg-soft);
+  font-size: var(--ev2-fs-label);
+}
+.ev2-drawhint {
+  display: flex;
+  align-items: center;
+  gap: var(--ev2-gap-tight);
+  margin: 0 0 var(--ev2-gap-tight);
+}
+.ev2-drawrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ev2-gap);
+}
+.ev2-snapdims {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ev2-gap-tight);
+}
+#ev2 .ev2-snapdims .ev2-num {
+  width: 56px;
+  height: var(--ev2-control-sm);
+  padding: 0 var(--ev2-gap-tight);
+}
+
+/* ----- 3 · widgets: one row per cell, settings open in place ----------- */
+.ev2-cells {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--ev2-divider);
+}
+.ev2-cl {
+  border-bottom: 1px solid var(--ev2-divider);
+  transition: background 0.15s var(--ev2-ease);
+}
+.ev2-cl.drop {
+  box-shadow: inset 0 2px 0 var(--t-accent);
+}
+.ev2-cl.dragging {
+  opacity: 0.55;
+}
+.ev2-cl-head {
+  display: flex;
+  align-items: center;
+  gap: var(--ev2-gap-tight);
+  padding-right: var(--ev2-gap-tight);
+}
+.ev2-cl:not(.open) .ev2-cl-head:hover {
+  background: var(--p-hover, var(--t-surface-soft));
+}
+/* The grip and its gap end where the indent does, so the widget's icon
+   lines up with the step text above and the open row's settings below. */
+.ev2 .ev2-cl-row {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: var(--ev2-icon) minmax(0, 1fr);
+  gap: var(--t-space-3);
+  align-items: center;
+  padding: var(--t-space-3) var(--t-space-1) var(--t-space-3)
+    calc(var(--ev2-indent) - var(--ev2-icon) - var(--t-space-3));
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--t-fg);
+  text-align: left;
+  cursor: pointer;
+}
+.ev2 .ev2-cl-row:hover {
+  background: none;
+}
+.ev2-grip {
+  display: grid;
+  place-items: center;
+  color: var(--t-muted);
+  cursor: grab;
+}
+.ev2-grip.none {
+  visibility: hidden;
+}
+.ev2-cl-n {
+  min-width: 0;
+}
+.ev2-cl-n b {
+  display: flex;
+  align-items: center;
+  gap: var(--ev2-gap-tight);
+  font-weight: 600;
+}
+.ev2-cl-n b .ph {
+  color: var(--t-fg-soft);
+}
+.ev2-cl-n .nm {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* A long name ends in an ellipsis; its family tag stays whole after it. */
+.ev2-cl-n b > .ev2-tag {
+  flex: none;
+  margin-left: 0;
+}
+.ev2-cl-n small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--t-muted);
+}
+.ev2-cl.empty .ev2-cl-n b {
+  color: var(--t-muted);
+  font-weight: 500;
+}
+.ev2-tag {
+  display: inline-block;
+  margin-left: var(--t-space-1);
+  padding: 0 var(--t-space-1);
+  border: 1px solid var(--t-border-strong);
+  border-radius: 2px;
+  background: var(--t-surface);
+  color: var(--t-fg-soft);
+  font-size: var(--ev2-fs-tag);
+  font-weight: 500;
+  line-height: var(--ev2-lh);
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+.ev2 .ev2-cl-go {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--t-space-1);
+  padding: var(--t-space-1);
+  border: 0;
+  border-radius: var(--ev2-r);
+  background: none;
+  color: var(--t-muted);
+  font-size: var(--ev2-fs-label);
+  cursor: pointer;
+}
+.ev2 .ev2-cl-go:hover {
+  background: none;
+  color: var(--t-fg);
+}
+.ev2 .ev2-cl-go .ph {
+  transition: transform 0.18s var(--ev2-ease);
+}
+.ev2 .ev2-cl-go--pick {
+  color: var(--ev2-acc);
+  font-weight: 600;
+}
+.ev2 .ev2-cl-go--pick:hover {
+  color: var(--ev2-acc-hover);
+}
+.ev2-cl.open {
+  background: var(--t-surface-soft);
+  box-shadow: inset 0 1px 0 var(--t-border-strong);
+}
+.ev2-cl.open .ev2-cl-go .ph {
+  transform: rotate(90deg);
+}
+.ev2-cl-b {
+  padding: 0 var(--ev2-gap) var(--ev2-gap-section) var(--ev2-indent);
+  animation: ev2-in 0.2s var(--ev2-ease);
+}
+.ev2-cell-form {
+  margin: 0;
+}
+.ev2-wsub {
+  margin: 0;
+  color: var(--t-fg-soft);
+  font-size: var(--ev2-fs-help);
+}
+
+/* Options: label above the control, help in its "i". A widget row's
+   options sit on a two-column grid sized by the row itself (the steps
+   column is ~310px wide at 1440 and on a phone), not the viewport: short
+   fields (numbers, short selects, colours; .ev2-oi--short, picked by
+   app/option_conditions.py option_layout) take half a row, everything else
+   the whole row. Below ~300px it is one column. */
+.ev2-cell-form {
+  container: ev2-cell / inline-size;
+}
+.ev2-opts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--ev2-gap);
+  margin-top: var(--ev2-gap);
+}
+@container ev2-cell (min-width: 296px) {
+  .ev2-opts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ev2-opts > :not(.ev2-oi--short) {
+    grid-column: 1 / -1;
+  }
+  /* Side by side, the controls line up even when one label wraps. */
+  .ev2-opts > .ev2-oi--short {
+    align-self: end;
+  }
+}
+/* A field show_if hides takes no grid cell. */
+.ev2-opts > .ev2-oi:has(> .opt-cond[hidden]) {
+  display: none;
+}
+/* Half-width controls fill their column (and no wider: a number box's
+   own default width must not push the column out). */
+.ev2-oi--short :is(.field, .ev2-of) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.ev2-oi--short .field-unit-wrap {
+  display: flex;
+  width: 100%;
+}
+#ev2 .ev2-oi--short .field-unit-wrap input {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+#ev2 .ev2-oi--short .field > input[type="number"] {
+  width: 100%;
+}
+/* A choice longer than a half-width select ends in an ellipsis; widgets.js
+   puts the whole name in its title. */
+#ev2 .ev2-oi--short select {
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Padding with its own value needs the row for the slider. */
+@container ev2-cell (min-width: 296px) {
+  .ev2-opts > .ev2-oi--short:has([data-ev2-pad-custom]:not([hidden])) {
+    grid-column: 1 / -1;
+  }
+}
+#ev2 .ev2-oi--short input[type="color"] {
+  width: 100%;
+  height: var(--ev2-control);
+}
+.ev2 :is(.ev2-of, .field) {
+  display: grid;
+  gap: var(--ev2-gap-tight);
+  min-width: 0;
+  margin: 0;
+}
+.ev2 :is(.ev2-of > label, .ev2-of > .ev2-lbl, .field > label, .field-label, .field--slider .slider-header > label) {
+  color: var(--t-fg);
+  font-size: var(--ev2-fs-label);
+  font-weight: 600;
+}
+.ev2 :is(.ev2-of > p, .field-help) {
+  margin: 0;
+  color: var(--t-muted);
+  font-size: var(--ev2-fs-help);
+}
+.ev2 .opt-cond[hidden] {
+  display: none;
+}
+
+/* A section's switches: one list, one control-height row each (label and
+   its "i" left, the switch right), hairlines between rows. Two switches
+   with short labels share a row (.ev2-swr--pair, option_layout); if one
+   of them is hidden the other takes the row. */
+.ev2-swg {
+  display: grid;
+  padding: 0 var(--t-space-3);
+  border: 1px solid var(--ev2-divider);
+  border-radius: var(--ev2-r);
+}
+.ev2-swg:not(:has(> .ev2-swr > :is(.field--switch, .ev2-swi, .opt-cond:not([hidden])))) {
+  display: none;
+}
+.ev2-swr {
+  display: flex;
+  gap: var(--t-space-3);
+}
+.ev2-swr:not(:has(> :is(.field--switch, .ev2-swi, .opt-cond:not([hidden])))) {
+  display: none;
+}
+.ev2-swr:has(> :is(.field--switch, .ev2-swi, .opt-cond:not([hidden]))) ~ .ev2-swr {
+  border-top: 1px solid var(--ev2-divider);
+}
+.ev2-swr > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+/* A hairline between the pair, so each switch reads with its own label. */
+.ev2-swr--pair > :not(.opt-cond[hidden]) ~ :not(.opt-cond[hidden]) {
+  padding-left: var(--t-space-3);
+  border-left: 1px solid var(--ev2-divider);
+}
+/* One column (a very narrow row): the pair stacks, with its own hairline. */
+@container ev2-cell (max-width: 295.98px) {
+  .ev2-swr--pair {
+    flex-direction: column;
+    gap: 0;
+  }
+  .ev2-swr--pair > :not(.opt-cond[hidden]) ~ :not(.opt-cond[hidden]) {
+    padding-left: 0;
+    border-left: 0;
+    border-top: 1px solid var(--ev2-divider);
+  }
+}
+.ev2 .ev2-swg .field.field--switch,
+.ev2-swi {
+  min-height: var(--ev2-control);
+}
+.ev2-swi {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-1);
+  min-width: 0;
+}
+.ev2-swi > label {
+  min-width: 0;
+  font-size: var(--ev2-fs-label);
+  font-weight: 600;
+  cursor: pointer;
+}
+.ev2-swi > .info-pop-wrap {
+  line-height: 1;
+}
+.ev2-swi > .ev2-switch {
+  margin-left: auto;
+}
+
+/* Sliders on one line: label, track, value box. The label column is the
+   same for every slider (and Zoom), so the tracks start on one edge. */
+@container ev2-cell (min-width: 296px) {
+  .ev2-cell-form .field--slider,
+  .ev2-cell-form .ev2-of--rng {
+    grid-template-columns: 38% minmax(0, 1fr) auto;
+    column-gap: var(--t-space-3);
+    align-items: center;
+  }
+  .ev2-cell-form .field--slider .slider-header > label,
+  .ev2-cell-form .ev2-of--rng > label {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .ev2-cell-form .field--slider input[type="range"] {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .ev2-cell-form .field--slider .slider-value-wrap {
+    grid-column: 3;
+    grid-row: 1;
+    width: 76px;
+  }
+  #ev2 .ev2-cell-form .field--slider .slider-value-wrap input {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+  }
+  .ev2-cell-form .ev2-of--rng > .ev2-rng {
+    grid-column: 2 / -1;
+  }
+}
+/* The "i" button's 44px touch target reaches past its glyph: keep it off
+   the track. */
+@media (max-width: 640px), (pointer: coarse) {
+  .ev2-cell-form :is(.field--slider, .ev2-of--rng) {
+    column-gap: var(--ev2-gap);
+  }
+}
+.ev2-of--act {
+  justify-items: start;
+}
+.ev2-radio {
+  display: flex;
+  align-items: center;
+  gap: var(--ev2-gap-tight);
+  min-height: var(--ev2-control-sm);
+}
+#ev2 .ev2-time {
+  width: auto;
+}
+
+/* A choices provider that can't list anything, said once above the
+   options (page_editor_v2.html, choices_note). */
+.ev2-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ev2-gap-tight);
+  margin: var(--ev2-gap) 0 0;
+  padding: var(--ev2-gap-tight) var(--t-space-3);
+  background: var(--t-warn-bg);
+  border-radius: var(--ev2-r);
+  font-size: var(--ev2-fs-label);
+}
+.ev2-note-ico {
+  flex: none;
+  margin-top: 2px;
+  color: var(--t-warn);
+}
+
+/* "More" groups: a divider, then the fields at the same left edge as the
+   rest of the row. */
+details.ev2-adv {
+  margin-top: 0;
+  border-top: 1px solid var(--ev2-divider);
+}
+:is(.ev2-cell-form, .ev2-look-form) > details.ev2-adv:first-of-type {
+  margin-top: var(--ev2-gap-section);
+}
+details.ev2-adv > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: var(--ev2-gap-tight);
+  min-height: var(--ev2-control);
+  padding: var(--t-space-1) 0;
+  font-size: var(--ev2-fs-label);
+  cursor: pointer;
+}
+details.ev2-adv > summary::-webkit-details-marker {
+  display: none;
+}
+details.ev2-adv > summary b {
+  font-weight: 600;
+}
+details.ev2-adv > summary span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--t-muted);
+  font-size: var(--ev2-fs-help);
+}
+/* Amber only for a real override of the dashboard look. */
+details.ev2-adv > summary span.ovw {
+  color: var(--t-warn);
+}
+.ev2-caret {
+  flex: none;
+  color: var(--t-muted);
+  transition: transform 0.18s var(--ev2-ease);
+}
+details.ev2-adv[open] > summary .ev2-caret {
+  transform: rotate(90deg);
+}
+.ev2-adv-in {
+  padding: 0 0 var(--ev2-gap);
+}
+.ev2-adv-in > .ev2-opts {
+  margin: 0;
+}
+.ev2-cv-foot {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ev2-gap-tight) var(--ev2-gap);
+  margin-top: var(--ev2-gap-section);
+  padding-top: var(--ev2-gap);
+  border-top: 1px solid var(--ev2-divider);
+}
+/* The row's one status line (status.js): a full line above the actions.
+   Empty, it stays in the accessibility tree (a live region must exist
+   before its first message) but takes no room. */
+.ev2-cv-status {
+  flex: 1 0 100%;
+  margin: 0;
+  color: var(--t-muted);
+  font-size: var(--ev2-fs-help);
+  overflow-wrap: anywhere;
+}
+.ev2-cv-status:empty {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.ev2-cv-status[data-tone="error"] {
+  color: var(--t-danger, var(--t-accent));
+}
+
+/* The touch editor (touch_interaction.js, shared with the classic editor)
+   in the same controls as the rest of the row. "When tapped" is its label,
+   so the tap row's own "On tap" goes while it is the only action; the tap
+   select and "+ Add swipe action" read as one stacked pair; "Make this a
+   slider" is a quiet link-style action. */
+.ev2 .ti-root {
+  gap: var(--ev2-gap-tight);
+}
+.ev2 .ti-root .plab {
+  padding-top: calc((var(--ev2-control) - 1.5em) / 2);
+  font-size: var(--ev2-fs-label);
+}
+.ev2 .ti-root:not(:has(> .prow:not(:first-child) > .plab)) > .prow:first-child > .plab {
+  display: none;
+}
+#ev2 .ti-root:not(:has(> .prow:not(:first-child) > .plab)) > .prow:first-child:has(.psel + span:empty) .psel {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+#ev2 .ti-root:not(:has(> .prow:not(:first-child) > .plab)) > .prow:first-child:has(.psel + span:empty) + .prow > .psel:only-child {
+  margin-top: calc(-1 * var(--ev2-gap-tight) - 1px);
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  color: var(--t-fg-soft);
+}
+.ev2 .ti-root .minibtn {
+  min-height: var(--ev2-control);
+  border-color: var(--t-border-strong);
+  border-radius: var(--ev2-r);
+  background: var(--t-surface);
+  font-size: var(--ev2-fs-label);
+}
+.ev2 .ti-root .prow > .minibtn:only-child {
+  width: auto !important;
+  min-height: var(--ev2-control-sm);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--t-fg-soft);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ev2 .ti-root .prow > .minibtn:only-child:hover {
+  background: none;
+  color: var(--t-fg);
+}
+@media (max-width: 640px), (pointer: coarse) {
+  .ev2 .ti-root .prow > .minibtn:only-child {
+    min-height: 44px;
+  }
+}
+
+/* Move up / down: touch has no drag to swap, so it gets two buttons. */
+.ev2-mv,
+.ev2-t {
+  display: none;
+}
+@media (pointer: coarse), (max-width: 640px) {
+  .ev2-mv {
+    display: inline-flex;
+  }
+  .ev2-grip:not(.none) {
+    visibility: hidden;
+  }
+  .ev2-nt {
+    display: none;
+  }
+  .ev2-t {
+    display: inline;
+  }
+}
+
+/* ----- 4 · look -------------------------------------------------------- */
+.ev2-look-form {
+  margin: 0;
+}
+.ev2-lk {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ev2-gap);
+}
+.ev2-lk > .ev2-of.wide {
+  grid-column: 1 / -1;
+}
+.ev2-sw {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ev2-gap-tight);
+  min-height: var(--ev2-control);
+}
+/* Every swatch has a 3:1 edge, so black shows on a dark surface. */
+.ev2 .ev2-sw button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--ev2-field-border);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.ev2 .ev2-sw button[aria-pressed="true"] {
+  box-shadow:
+    0 0 0 2px var(--t-surface),
+    0 0 0 3.5px var(--t-fg);
+}
+.ev2 .ev2-sw button[aria-pressed="true"]:focus-visible {
+  box-shadow:
+    0 0 0 2px var(--t-surface),
+    0 0 0 3.5px var(--t-fg),
+    0 0 0 5.5px var(--ev2-focus);
+}
+/* The custom colour: round and set apart from the four presets. */
+#ev2 .ev2-sw input[type="color"] {
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  min-height: 0;
+  margin-left: var(--ev2-gap-tight);
+  padding: 2px;
+  border: 1px dashed var(--ev2-field-border);
+  border-radius: 50%;
+  background: var(--t-surface);
+  cursor: pointer;
+}
+#ev2 .ev2-sw input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+#ev2 .ev2-sw input[type="color"]::-webkit-color-swatch {
+  border: 0;
+  border-radius: 50%;
+}
+#ev2 .ev2-sw input[type="color"]::-moz-color-swatch {
+  border: 0;
+  border-radius: 50%;
+}
+.ev2-sw:not(:has(button[aria-pressed="true"])) input[type="color"] {
+  border-style: solid;
+  box-shadow:
+    0 0 0 2px var(--t-surface),
+    0 0 0 3.5px var(--t-fg);
+}
+.ev2-lk-help {
+  margin: var(--ev2-gap) 0 0;
+}
+.ev2-ovbox {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ev2-gap-tight);
+  margin: 0 0 var(--ev2-gap);
+  padding: var(--t-space-3);
+  background: var(--t-warn-bg);
+  border-radius: var(--ev2-r);
+  font-size: var(--ev2-fs-label);
+}
+.ev2-ovbox > .ph {
+  margin-top: 2px;
+  color: var(--t-warn);
+}
+.ev2-ovbox ul {
+  list-style: none;
+  margin: var(--ev2-gap-tight) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--t-space-1);
+}
+.ev2-ovbox li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--t-space-1) var(--ev2-gap-tight);
+}
+.ev2-ovbox li span {
+  color: var(--t-fg-soft);
+  font-size: var(--ev2-fs-help);
+}
+.ev2 .ev2-ovbox .ev2-link--quiet {
+  color: var(--t-fg);
+}
+.ev2-ovbox .ev2-row-btns {
+  justify-content: flex-start;
+  margin-top: var(--ev2-gap-tight);
+}
+
+/* ----- 5 · lineups ----------------------------------------------------- */
+.ev2-none {
+  margin: var(--t-space-1) 0 0;
+  color: var(--t-muted);
+}
+.ev2-lineups .ev2-lineups-joined {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--ev2-divider);
+}
+.ev2-lineups .ev2-lineups-joined > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--t-space-3);
+  align-items: center;
+  padding: var(--t-space-3) 0;
+  border-bottom: 1px solid var(--ev2-divider);
+}
+.ev2-lineups .ev2-lineups-joined b {
+  overflow-wrap: anywhere;
+}
+.ev2-lineups .ev2-lineups-joined small {
+  display: block;
+  margin-top: 2px;
+  color: var(--t-muted);
+}
+.ev2-lineups .ev2-lineups-joined .is-off {
+  opacity: 0.65;
+}
+.ev2-lineups .ev2-lineups-row-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ev2-gap);
+}
+/* All lineups (a link) left; Add, then New (primary, last) right. When
+   they don't fit, the buttons wrap together and keep that order. */
+.ev2-lineups .ev2-lineups-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ev2-gap-tight);
+  margin-top: var(--ev2-gap);
+}
+.ev2-lineups .ev2-lineups-actions > a {
+  margin-right: auto;
+}
+.ev2-lpick {
+  margin-top: var(--ev2-gap);
+  max-width: 520px;
+  padding: 0 var(--ev2-gap) var(--t-space-3);
+  border: 1px solid var(--t-border-strong);
+  border-radius: var(--ev2-r);
+  background: var(--t-surface);
+}
+.ev2 .ev2-lp-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--t-space-3);
+  width: 100%;
+  padding: var(--t-space-3) 0;
+  border: 0;
+  border-bottom: 1px solid var(--ev2-divider);
+  border-radius: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+.ev2 .ev2-lp-row:hover {
+  background: none;
+}
+.ev2-lp-row:hover b {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ev2-lp-row b {
+  font-weight: 600;
+}
+.ev2-lp-row small {
+  display: block;
+  color: var(--t-muted);
+}
+.ev2-lp-tag {
+  color: var(--t-ok);
+  font-size: var(--ev2-fs-help);
+  white-space: nowrap;
+}
+.ev2-lp-tag.warn {
+  color: var(--t-warn);
+}
+.ev2-row-btns {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ev2-gap);
+  margin-top: var(--t-space-3);
+}
+/* The picker's "Make a new lineup" is a way out to another page: left. */
+.ev2-lpick .ev2-row-btns > a {
+  margin-right: auto;
+}
+.ev2-confirm {
+  margin-top: var(--ev2-gap);
+  max-width: 520px;
+  padding: var(--t-space-3) var(--ev2-gap);
+  background: var(--t-warn-bg);
+  border-radius: var(--ev2-r);
+}
+.ev2-confirm p {
+  margin: 0 0 var(--t-space-1);
+}
+.ev2-confirm .muted {
+  color: var(--t-fg-soft);
+}
+
+/* ----- bottom bar ----------------------------------------------------- */
+.ev2-bar {
+  position: fixed;
+  left: var(--p-sidebar-w, 0px);
+  right: 0;
+  bottom: var(--dx-save-bar-offset, 0px);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: var(--ev2-gap-tight);
+  padding: var(--ev2-gap-tight) var(--ev2-gutter);
+  background: color-mix(in oklab, var(--t-surface) 95%, transparent);
+  border-top: 1px solid var(--ev2-divider);
+  font-size: var(--ev2-fs-body);
+}
+:root:not([data-ui="paper"]) .ev2-bar {
+  left: 0;
+}
+.ev2-bar-st {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--t-muted);
+  font-size: var(--ev2-fs-help);
+}
+.ev2-bar-st b {
+  color: var(--t-fg-soft);
+  font-weight: 600;
+}
+.ev2-short {
+  display: none;
+}
+.ev2-inline {
+  display: inline-flex;
+  margin: 0;
+}
+/* Toasts and the job tray sit above the bar, not on Push. */
+body:has(#ev2-bar) :is(#job-tray, #agent-follow) {
+  bottom: calc(var(--dx-save-bar-offset, 0px) + 72px + env(safe-area-inset-bottom, 0px));
+}
+
+/* ----- widget catalog (modal) ----------------------------------------- */
+.ev2-pk-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 600;
+  background: rgba(20, 19, 17, 0.45);
+  animation: ev2-fade 0.15s var(--ev2-ease);
+}
+.ev2-pk-pop {
+  position: fixed;
+  z-index: 601;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(820px, calc(100vw - 32px));
+  height: min(720px, calc(100dvh - 64px));
+  display: flex;
+  flex-direction: column;
+  padding: var(--ev2-gap);
+  background: var(--t-surface);
+  border: 1px solid var(--t-border-strong);
+  border-radius: var(--ev2-r);
+  box-shadow: 0 22px 48px -20px rgba(0, 0, 0, 0.5);
+  color: var(--t-fg);
+  font-size: var(--ev2-fs-body);
+  line-height: var(--ev2-lh);
+  animation: ev2-fade 0.18s var(--ev2-ease);
+}
+.ev2-pk-head {
+  display: flex;
+  align-items: center;
+  gap: var(--ev2-gap);
+}
+.ev2-pk-head h3 {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--ev2-fs-step);
+  font-weight: 700;
+  letter-spacing: -0.005em;
+}
+.ev2-pk-head .ev2-link {
+  white-space: nowrap;
+}
+.ev2-pk-sub {
+  margin: var(--t-space-1) 0 var(--t-space-3);
+  color: var(--t-fg-soft);
+}
+.ev2-wp-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.ev2-wp-search > .ph {
+  position: absolute;
+  left: var(--t-space-3);
+  color: var(--t-muted);
+}
+#ev2-pk .ev2-wp-search .ev2-input {
+  padding-left: 36px;
+}
+.ev2-pk {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: var(--ev2-gap);
+  margin-top: var(--ev2-gap);
+}
+.ev2-pk-cats {
+  display: grid;
+  align-content: start;
+  gap: 1px;
+  min-height: 0;
+  overflow: auto;
+}
+.ev2-pk-pop .ev2-pk-cats button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ev2-gap-tight);
+  min-height: var(--ev2-control-sm);
+  padding: 0 var(--ev2-gap-tight);
+  border: 0;
+  border-radius: var(--ev2-r);
+  background: none;
+  color: var(--t-fg-soft);
+  font-size: var(--ev2-fs-label);
+  text-align: left;
+  cursor: pointer;
+}
+.ev2-pk-pop .ev2-pk-cats button:hover {
+  background: var(--p-hover, var(--t-surface-soft));
+  color: var(--t-fg);
+}
+.ev2-pk-pop .ev2-pk-cats button[aria-pressed="true"] {
+  background: var(--p-selected, var(--t-surface-sunk));
+  color: var(--t-fg);
+  font-weight: 600;
+}
+.ev2-pk-cats small {
+  color: var(--t-fg-soft);
+  font-size: var(--ev2-fs-help);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.ev2-pk-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-height: 0;
+  overflow: auto;
+  border-top: 1px solid var(--ev2-divider);
+}
+.ev2-pk-pop .ev2-pk-row {
+  display: grid;
+  grid-template-columns: var(--ev2-icon) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--t-space-3);
+  width: 100%;
+  padding: var(--t-space-3) var(--ev2-gap-tight);
+  border: 0;
+  border-bottom: 1px solid var(--ev2-divider);
+  border-radius: 0;
+  background: none;
+  color: var(--t-fg);
+  text-align: left;
+  cursor: pointer;
+}
+.ev2-pk-pop .ev2-pk-row:hover,
+.ev2-pk-pop .ev2-pk-row:focus-visible {
+  background: var(--p-hover, var(--t-surface-soft));
+}
+.ev2-pk-pop .ev2-pk-row.on {
+  background: var(--p-selected, var(--t-surface-sunk));
+}
+.ev2-pk-row > .ph {
+  color: var(--t-fg-soft);
+}
+.ev2-pk-row b {
+  font-weight: 600;
+}
+.ev2-pk-row b .fam {
+  color: var(--t-muted);
+  font-weight: 500;
+}
+.ev2-pk-row small {
+  display: block;
+  color: var(--t-fg-soft);
+  font-size: var(--ev2-fs-help);
+}
+.ev2-pk-row .fit {
+  color: var(--t-muted);
+  font-size: var(--ev2-fs-help);
+  white-space: nowrap;
+}
+.ev2-pk-row.on .fit {
+  color: var(--t-fg);
+  font-weight: 600;
+}
+.ev2-pk-empty {
+  padding: var(--ev2-gap) var(--ev2-gap-tight);
+  color: var(--t-muted);
+}
+
+@keyframes ev2-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@keyframes ev2-fade {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ev2 *,
+  .ev2-pk-pop,
+  .ev2-pk-scrim {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Paper squares every corner to 2px; round things stay round here. */
+.ev2 .ev2-switch > span {
+  border-radius: 999px;
+}
+
+/* ----- touch widths (≤900px): the sidebar is a tab bar ----------------- */
+@media (max-width: 900px) {
+  .ev2-bar {
+    left: 0;
+  }
+}
+
+/* ----- phones (≤640px) ------------------------------------------------- */
+/* Every control is a 44px target (the tokens above), text fields are 16px,
+   the bottom bar clears the home indicator and steps aside while a field
+   has the on-screen keyboard. Hit areas only: icons and drawn shapes keep
+   their size. */
+@media (max-width: 640px) {
+  .ev2-crumbs {
+    margin-bottom: var(--t-space-1);
+  }
+  .ev2-crumbs a {
+    min-height: 44px;
+  }
+  #ev2 .ev2-titlerow .ev2-title {
+    min-height: 44px;
+  }
+  .ev2-st-b,
+  .ev2-lead,
+  .ev2-st-wait {
+    margin-left: 0;
+  }
+  .ev2 .ev2-st-h {
+    min-height: 48px;
+  }
+  .ev2-st-vis {
+    display: none;
+  }
+  .ev2-long {
+    display: none;
+  }
+  .ev2-short {
+    display: inline;
+  }
+
+  /* Widget rows: no grip column, equal gutters on both sides. */
+  .ev2 .ev2-cl-row {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 48px;
+    padding-left: var(--ev2-indent);
+  }
+  .ev2 .ev2-cl-row .ev2-grip {
+    display: none;
+  }
+  .ev2-cl-b {
+    padding: 0 var(--ev2-indent) var(--ev2-gap);
+  }
+  .ev2 .ev2-cl-go {
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
+  }
+  details.ev2-adv > summary {
+    min-height: 44px;
+  }
+
+  :is(.ev2, .ev2-bar, .ev2-pk-pop) .ev2-btn {
+    height: auto;
+    min-height: 44px;
+  }
+  :is(.ev2, .ev2-bar, .ev2-pk-pop) .ev2-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+  /* Replace sits in the open row's header: give the 44px button room so
+     it doesn't touch the row's top edge. */
+  .ev2 .ev2-cl.open .ev2-cl-head {
+    padding-block: var(--t-space-2);
+  }
+  .ev2-lineups-row-actions .ev2-link {
+    min-width: 44px;
+    justify-content: center;
+  }
+  .ev2-bar .ev2-link--danger {
+    padding: 0 var(--t-space-3);
+  }
+  .ev2 .ev2-info .ev2-info-btn {
+    margin: -6px -6px -6px 0;
+  }
+  .ev2 .ev2-info-btn + .ev2-info-pop {
+    top: calc(100% - 2px);
+  }
+  .ev2 .ev2-switch input {
+    inset: -12px -4px;
+    width: calc(100% + 8px);
+    height: calc(100% + 24px);
+  }
+  .ev2-lrow .c .ev2-switch,
+  .ev2-opts .field--switch {
+    min-height: 44px;
+  }
+  #ev2 .ev2-numu .ev2-num {
+    width: 56px;
+  }
+  .ev2-rng input[type="range"],
+  .ev2 .field--slider input[type="range"] {
+    min-height: 44px;
+  }
+  .ev2-lk {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ev2 .ev2-sw button,
+  #ev2 .ev2-sw input[type="color"] {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* Test sizes: a tidy two-column grid with hairlines, then the custom size. */
+  .ev2-sizeseg {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px;
+    max-width: none;
+    background: var(--ev2-field-border);
+  }
+  .ev2 .ev2-sizeseg button,
+  .ev2 .ev2-sizeseg button + button {
+    flex: none;
+    border: 0;
+    font-size: var(--ev2-fs-body);
+  }
+  .ev2-sizeseg .ev2-cust {
+    grid-column: 1 / -1;
+    justify-content: center;
+    gap: var(--ev2-gap-tight);
+    border: 0;
+    font-size: 16px;
+  }
+  #ev2 .ev2-cust input {
+    width: 84px;
+    height: 44px;
+    font-size: 16px;
+  }
+  .ev2-lgrid {
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  }
+  .ev2 .ev2-lt {
+    min-height: 44px;
+  }
+  .ev2 .ev2-lp-row {
+    min-height: 48px;
+  }
+
+  /* Bottom bar: compact (the status line only when it says something new),
+     clear of the home indicator, and out of the way of the on-screen
+     keyboard while a field is being typed in. */
+  .ev2-bar {
+    justify-content: flex-end;
+    padding-bottom: calc(var(--ev2-gap-tight) + env(safe-area-inset-bottom, 0px));
+    /* The content scrolling behind the bar must not show through its text. */
+    background: var(--t-surface);
+  }
+  .ev2-bar-st:not(:has(.ev2-short:not(:empty))) {
+    display: none;
+  }
+  body:has(
+      .ev2 input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"]):focus,
+      .ev2 textarea:focus,
+      .ev2-pk-pop input:focus
+    )
+    .ev2-bar {
+    display: none;
+  }
+
+  /* The widget catalog fills the phone: header, search, a row of category
+     chips, then the list. */
+  .ev2-pk-pop {
+    left: 0;
+    top: 0;
+    transform: none;
+    width: 100vw;
+    height: 100dvh;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    padding: calc(var(--t-space-3) + env(safe-area-inset-top, 0px)) var(--ev2-gutter)
+      calc(var(--ev2-gap-tight) + env(safe-area-inset-bottom, 0px));
+  }
+  .ev2-pk {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: var(--ev2-gap-tight);
+  }
+  .ev2-pk-cats {
+    display: flex;
+    gap: var(--t-space-1);
+    overflow-x: auto;
+    padding-bottom: var(--t-space-1);
+  }
+  .ev2-pk-pop .ev2-pk-cats button {
+    flex: none;
+    min-height: 44px;
+    white-space: nowrap;
+    border: 1px solid var(--t-border-strong);
+  }
+  .ev2-pk-row .fit {
+    display: none;
+  }
+  .ev2-pk-pop .ev2-pk-row {
+    min-height: 56px;
+  }
+
+  /* The icon picker opens as a sheet under the header, inside the screen. */
+  .ev2-icon-picker .icon-picker-popover {
+    position: fixed;
+    top: 72px;
+    left: 12px;
+    right: 12px;
+    min-width: 0;
+    max-height: calc(100dvh - 72px - 150px);
+    overflow-y: auto;
+    z-index: 70;
+  }
+  #ev2 .ev2-icon-picker .icon-picker-search input {
+    min-height: 44px;
+  }
+  .ev2-icon-picker .icon-picker-grid button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

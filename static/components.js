@@ -315,6 +315,13 @@
         return !wrap || !more.contains(wrap) || !wrap.hidden;
       });
       more.hidden = !visible;
+      // A count in its summary (the v2 editor) says how many show now.
+      const count = more.querySelector("[data-opt-more-count]");
+      const list = more.querySelector("[data-opt-more-list]");
+      if (count && list)
+        count.textContent = String(
+          Array.from(list.children).filter((el) => !el.hidden && el.type !== "hidden").length
+        );
     });
   }
 

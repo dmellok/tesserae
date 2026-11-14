@@ -1356,7 +1356,8 @@ def edit(page_id: str) -> Response | str:
     # /pages/<id> link (list card, deep link) reaches the right editor.
     if page.layout_kind == "canvas":
         return redirect(url_for("panels.editor", canvas_id=page.id))
-    return render_template("page_editor.html", **_editor_context(page))
+    template = "page_editor.html" if _editor_version() == "classic" else "page_editor_v2.html"
+    return render_template(template, **_editor_context(page))
 
 
 @bp.post("/<page_id>/lineups/<deck_id>/join")
