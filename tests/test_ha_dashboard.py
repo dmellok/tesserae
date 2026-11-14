@@ -151,6 +151,55 @@ def test_init_script_seeds_the_frontend_session(widget: Any) -> None:
     assert "const zoom = 1.5;" in script
 
 
+def _selected_theme(script: str) -> dict[str, Any]:
+    """The ``selectedTheme`` record the init script writes to localStorage."""
+    literal = script.split("const entries = ", 1)[1].split(";\n", 1)[0]
+    return json.loads(json.loads(literal)["selectedTheme"])
+
+
+def test_init_script_names_no_theme_by_default(widget: Any) -> None:
+    p = widget.Params("/lovelace/0", 800, 480, 1.0, False, True, 2.0)
+    assert _selected_theme(widget.init_script(BASE, TOKEN, p)) == {"dark": False}
+
+
+def test_init_script_selects_the_named_theme(widget: Any) -> None:
+    p = widget.Params("/lovelace/0", 800, 480, 1.0, True, True, 2.0, 'E-ink "paper"')
+    assert _selected_theme(widget.init_script(BASE, TOKEN, p)) == {
+        "dark": True,
+        "theme": 'E-ink "paper"',
+    }
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [(None, ""), ("", ""), ("  Graphite  ", "Graphite"), ("default", ""), ("Default", "")],
+)
+def test_theme_option_is_trimmed_and_default_means_none(
+    widget: Any, raw: Any, expected: str
+) -> None:
+    assert widget._params({"theme": raw}, _ctx()).theme == expected
+
+
+def test_theme_choices_come_from_ha_core(widget: Any, app: Flask) -> None:
+    rows = [{"value": "", "label": "Home Assistant default"}, {"value": "Ink", "label": "Ink"}]
+    app.config["PLUGIN_REGISTRY"]["ha_core"].server_module.theme_choices = lambda: rows
+    with app.app_context():
+        assert widget.choices("theme") == rows
+        assert widget.choices("something_else") == []
+        app.config["PLUGIN_REGISTRY"] = {}
+        assert widget.choices("theme") == []
+
+
+def test_theme_change_renders_a_new_frame(widget: Any, browser: _FakeBrowser, app: Flask) -> None:
+    with app.app_context():
+        widget.fetch({}, {}, ctx=_ctx())
+        widget.fetch({}, {}, ctx=_ctx())
+        assert len(browser.requests) == 1
+        widget.fetch({"theme": "Graphite"}, {}, ctx=_ctx())
+    assert len(browser.requests) == 2
+    assert _selected_theme(browser.requests[1].init_script)["theme"] == "Graphite"
+
+
 # -- the render -------------------------------------------------------------
 
 

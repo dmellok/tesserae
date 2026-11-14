@@ -19,7 +19,7 @@ the frontend expects to be driven.
 Timing is the constraint that shapes the rest. A widget ``fetch()`` runs
 inside the composer's 6 s hydrate budget and a cold Chromium plus a
 dashboard load does not fit, so the render runs on its own thread and the
-result is cached per (path, size, zoom, theme). ``fetch()`` returns the
+result is cached per (path, size, zoom, theme, light or dark). ``fetch()`` returns the
 cached frame when it is younger than ``refresh_seconds``, otherwise it
 starts a render and returns the previous frame while that runs. Only the
 very first render for a cell is waited for, and only up to ``FIRST_WAIT_S``,
@@ -77,6 +77,9 @@ DEFAULT_PATH = "lovelace/0"
 DEFAULT_REFRESH_S = 300
 DEFAULT_SETTLE_S = 2.0
 THREAD_NAME = "ha-dashboard-render"
+# Home Assistant puts no limit on a theme name; this only stops a pasted
+# essay from ending up in the cache key and the init script.
+THEME_MAX_LEN = 100
 
 # Polled after networkidle until the frontend reports its panel resolved
 # and loaded. Lifted from Puppet's wait, which tracks the frontend's own
@@ -111,6 +114,7 @@ class Params(NamedTuple):
     dark: bool
     kiosk: bool
     settle_s: float
+    theme: str = ""
 
     @property
     def header_px(self) -> int:
@@ -158,6 +162,14 @@ def _core() -> Any:
 # -- option shaping ---------------------------------------------------------
 
 
+def choices(name: str) -> list[dict[str, str]]:
+    """Theme picker for the editor: the themes Home Assistant has installed."""
+    core = _core()
+    if name == "theme" and core is not None:
+        return list(core.theme_choices())
+    return []
+
+
 def normalise_path(raw: Any) -> str:
     """Turn what the operator typed into a site-relative path.
 
@@ -175,6 +187,14 @@ def normalise_path(raw: Any) -> str:
     if not text.startswith("/"):
         text = "/" + text
     return text
+
+
+def normalise_theme(raw: Any) -> str:
+    """The chosen theme name, trimmed. Blank, or Home Assistant's own name
+    for its built-in theme, means "whatever the frontend defaults to", so
+    those two spellings share one cache entry."""
+    text = str(raw or "").strip()[:THEME_MAX_LEN]
+    return "" if text.lower() == "default" else text
 
 
 def _float_option(
@@ -198,6 +218,7 @@ def _params(options: dict[str, Any], ctx: dict[str, Any]) -> Params:
         dark=options.get("dark_mode") is True,
         kiosk=options.get("kiosk", True) is not False,
         settle_s=_float_option(options, "settle_seconds", DEFAULT_SETTLE_S, 0.0, 12.0),
+        theme=normalise_theme(options.get("theme")),
     )
 
 
@@ -217,7 +238,11 @@ def init_script(base_url: str, token: str, params: Params) -> str:
     site root, which is what the frontend compares against ``hassUrl``.
     ``dockedSidebar: always_hidden`` is the user preference that keeps the
     sidebar closed; ``selectedTheme`` pins light or dark so the capture does
-    not depend on the browser's colour scheme.
+    not depend on the browser's colour scheme, and names the theme when the
+    cell asks for one. That is the same record the profile page's theme
+    picker writes, so it overrides the theme for this capture only and
+    leaves what people see in their own browsers alone. A name Home
+    Assistant does not have falls back to its default theme.
 
     The zoom is applied on ``<body>`` once it exists, matching Puppet, so
     the header stays ``HEADER_PX * zoom`` tall and the crop below lines up."""
@@ -231,10 +256,13 @@ def init_script(base_url: str, token: str, params: Params) -> str:
         "expires": 9999999999999,
         "refresh_token": "",
     }
+    selected_theme: dict[str, Any] = {"dark": params.dark}
+    if params.theme:
+        selected_theme["theme"] = params.theme
     entries = {
         "hassTokens": json.dumps(tokens),
         "dockedSidebar": json.dumps("always_hidden"),
-        "selectedTheme": json.dumps({"dark": params.dark}),
+        "selectedTheme": json.dumps(selected_theme),
     }
     return (
         "(() => {\n"

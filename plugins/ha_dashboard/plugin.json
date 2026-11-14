@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Home Assistant, Dashboard",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "kind": "widget",
   "locales": ["en", "cs", "de", "es", "fr", "it", "lt", "nb", "nl", "pl", "pt", "sk", "sv", "zh-CN", "zh-TW"],
   "description": "Shows one of your existing Home Assistant dashboards as-is, no rebuilding in Tesserae. The server opens the dashboard in headless Chromium, signed in with the Home Assistant Core token, hides the sidebar and header, and captures the view at the cell's size. Point it at any dashboard path (lovelace/0, dashboard-kitchen/overview). Frames are re-rendered on the interval you set and the last good frame is kept between renders.",
@@ -46,11 +46,19 @@
       ]
     },
     {
+      "name": "theme",
+      "type": "select",
+      "label": "Theme",
+      "help": "The Home Assistant theme to capture with, from the themes installed there. Only the capture uses it; your own browsers keep their theme.",
+      "default": "",
+      "choices_from": "theme"
+    },
+    {
       "name": "dark_mode",
       "type": "boolean",
       "label": "Dark theme",
       "default": false,
-      "help": "Render with Home Assistant's dark mode. Light is usually the better fit for a panel."
+      "help": "Render with Home Assistant's dark mode, or the dark variant of the theme above if it has one. Light is usually the better fit for a panel."
     },
     {
       "name": "kiosk",

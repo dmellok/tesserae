@@ -442,6 +442,9 @@
         "2"
       ]
     },
+    "theme": {
+      "default": ""
+    },
     "dark_mode": {
       "default": false
     },

@@ -316,15 +316,13 @@ def upload_media(
     return str(media_id) if media_id else f"{folder_id.rstrip('/')}/{filename}"
 
 
-def remove_media(media_id: str, *, timeout: float = 15.0) -> bool:
-    """Delete one file from HA's local media folder. True when HA removed it
-    or it was already gone.
+def ws_command(command: dict[str, Any], *, timeout: float = 15.0) -> dict[str, Any]:
+    """Send one command over HA's WebSocket API and return its ``result``
+    message, successful or not; the caller reads ``success`` and ``error``.
 
-    HA only offers this over its WebSocket API (``media_source/local_source/
-    remove``, administrators only), so this opens a short-lived socket:
-    authenticate, send the one command, close. Used to take an uploaded
-    OpenDisplay frame back out when its device is removed. Raises on missing
-    config, a refused login or a transport error."""
+    For the things HA does not offer over REST. Opens a short-lived socket:
+    authenticate, send the one command, close. Raises on missing config, a
+    refused login, a transport error or no answer inside ``timeout``."""
     if not is_configured():
         raise _not_configured()
     from websockets.sync.client import connect
@@ -349,30 +347,93 @@ def remove_media(media_id: str, *, timeout: float = 15.0) -> bool:
         answer = json.loads(ws.recv(timeout=timeout))
         if answer.get("type") != "auth_ok":
             raise RuntimeError("Home Assistant refused the access token")
-        ws.send(
-            json.dumps(
-                {
-                    "id": 1,
-                    "type": "media_source/local_source/remove",
-                    "media_content_id": media_id,
-                }
-            )
-        )
+        ws.send(json.dumps({**command, "id": 1}))
         deadline = time.monotonic() + timeout
         while True:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                raise TimeoutError("Home Assistant did not answer the remove request")
+                raise TimeoutError(f"Home Assistant did not answer {command.get('type')}")
             result = json.loads(ws.recv(timeout=remaining))
-            if result.get("id") != 1 or result.get("type") != "result":
-                continue
-            if result.get("success"):
-                return True
-            code = (result.get("error") or {}).get("code")
-            if code == "not_found":
-                return True
-            message = (result.get("error") or {}).get("message") or code or "refused"
-            raise RuntimeError(f"Home Assistant would not remove the file: {message}")
+            if result.get("id") == 1 and result.get("type") == "result":
+                return dict(result)
+
+
+def remove_media(media_id: str, *, timeout: float = 15.0) -> bool:
+    """Delete one file from HA's local media folder. True when HA removed it
+    or it was already gone.
+
+    HA only offers this over its WebSocket API (``media_source/local_source/
+    remove``, administrators only). Used to take an uploaded OpenDisplay
+    frame back out when its device is removed. Raises on missing config, a
+    refused login or a transport error."""
+    result = ws_command(
+        {"type": "media_source/local_source/remove", "media_content_id": media_id},
+        timeout=timeout,
+    )
+    if result.get("success"):
+        return True
+    code = (result.get("error") or {}).get("code")
+    if code == "not_found":
+        return True
+    message = (result.get("error") or {}).get("message") or code or "refused"
+    raise RuntimeError(f"Home Assistant would not remove the file: {message}")
+
+
+# The theme list only changes when someone edits themes.yaml or installs a
+# theme, and the page editor asks for it on every load, so one answer is
+# kept for a minute. A failure is kept too, so an unreachable HA costs the
+# editor one timeout rather than one per load. Keyed on (base_url, token)
+# like the caches below.
+_THEMES_TTL_S = 60.0
+_THEMES_TIMEOUT_S = 4.0
+_themes_lock = threading.Lock()
+_themes_cache: tuple[tuple[str, str], float, list[str] | Exception] | None = None
+
+
+def theme_names() -> list[str]:
+    """Names of the themes installed in Home Assistant, sorted, without the
+    built-in default. HA lists them only over WebSocket
+    (``frontend/get_themes``)."""
+    global _themes_cache
+    key = (base_url(), token())
+    with _themes_lock:
+        if _themes_cache is not None:
+            cached_key, ts, value = _themes_cache
+            if cached_key == key and time.monotonic() - ts < _THEMES_TTL_S:
+                if isinstance(value, Exception):
+                    raise value
+                return value
+        try:
+            result = ws_command({"type": "frontend/get_themes"}, timeout=_THEMES_TIMEOUT_S)
+            if not result.get("success"):
+                error = result.get("error") or {}
+                raise RuntimeError(str(error.get("message") or error.get("code") or "refused"))
+            themes = (result.get("result") or {}).get("themes") or {}
+            names = sorted((str(name) for name in themes), key=str.lower)
+        except Exception as err:
+            _themes_cache = (key, time.monotonic(), err)
+            raise
+        _themes_cache = (key, time.monotonic(), names)
+        return names
+
+
+def theme_choices() -> list[dict[str, str]]:
+    """Powers a theme dropdown (``choices_from: "theme"``): HA's default
+    theme as the blank choice, then each installed theme by name. Unconfigured
+    or unreachable gives the same single guidance option as
+    ``entity_choices``."""
+    if not is_configured():
+        return [
+            {"value": "", "label": "Set HA URL + token in Settings → Widgets → Home Assistant Core"}
+        ]
+    try:
+        names = theme_names()
+    except Exception:
+        return [{"value": "", "label": "Home Assistant unreachable, check URL + token"}]
+    return [
+        {"value": "", "label": "Home Assistant default"},
+        *({"value": name, "label": name} for name in names),
+    ]
 
 
 def render_template(template: str, *, timeout: int = 10) -> str:
