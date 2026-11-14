@@ -48,6 +48,25 @@ The C3 panel cannot measure battery level, so Tesserae leaves it blank.
 
 Coverage for the remaining XIAO ePaper range is on the roadmap.
 
+## OpenDisplay kits
+
+Seeed's two OpenDisplay kits keep the OpenDisplay firmware they ship with.
+They have Bluetooth LE and no Wi-Fi, so there is nothing to flash:
+Tesserae sends pictures through Home Assistant's OpenDisplay integration or the `tesserae-opendisplay` bridge.
+
+| Model | Panel | Colour | Resolution |
+|---|---|---|---|
+| [OpenDisplay 4.26" Mono Kit](https://www.seeedstudio.com/OpenDisplay-4-26-Mono-Kit-p-7032.html) | 4.26" | Mono | 800×480 |
+| [OpenDisplay 7.3" Color Kit](https://www.seeedstudio.com/OpenDisplay-7-3-Color-Kit-p-7031.html) | 7.3" | Spectra 6 (6-colour) | 800×480 |
+
+Both arrive assembled in a printed case with a 2,000 mAh battery.
+Set them up with the [OpenDisplay guide](../install/opendisplay.md).
+
+## Discount code
+
+The code **TESSERAE** gives a discount at [seeedstudio.com](https://www.seeedstudio.com/)
+on the reTerminal E-Series, the reTerminal Sticky and the OpenDisplay kits.
+
 ## Getting started
 
 1. Install Tesserae with the [server guide](../install/server.md) or
