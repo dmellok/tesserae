@@ -53,6 +53,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- Home Assistant, Dashboard widget: the **Theme** and **Dark theme** options now take effect on Home Assistant versions that save each person's theme to their account. The capture used to come out in whatever theme the owner of the access token had picked for themselves.
 - OpenDisplay via Home Assistant: with **Colour conversion** set to Tesserae, colours no longer shift on the tag (green came out yellow on a six-colour panel). Home Assistant was still applying its automatic tone compression to the already-converted picture; Tesserae now turns that off for these pictures.
 - OpenDisplay via Home Assistant: a tag that is taller than wide, such as a Solum 3.5", gets its picture the right way round. Tesserae assumed every tag was wider than tall and turned a portrait dashboard sideways, which Home Assistant then shrank to fit. It now reads each tag's size and rotation from Home Assistant.
 - OpenDisplay via Home Assistant: sending to one display no longer makes other OpenDisplay tags repaint the frame they already show first. Tesserae forgot what each tag had been sent after a restart or any device settings save, so the next send re-uploaded every tag in turn. It now remembers, and when several tags are due the one just rendered goes first.

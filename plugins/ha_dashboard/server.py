@@ -100,6 +100,35 @@ READY_JS = """() => {
 }"""
 
 
+# Runs inside the init script, before any page script. Rewrites the key on
+# the frontend's per-user theme messages (get, subscribe and, should one ever
+# be sent, set) so the capture neither follows nor touches the theme the
+# token's owner picked for themselves. Outgoing frames can be one message or
+# a coalesced array of them. See ``init_script``.
+THEME_USER_DATA_KEY = "tesserae_capture_theme"
+THEME_REDIRECT_JS = """  const nativeSend = WebSocket.prototype.send;
+  WebSocket.prototype.send = function (data) {
+    if (typeof data === "string" && data.includes("_user_data")) {
+      try {
+        const parsed = JSON.parse(data);
+        let changed = false;
+        for (const msg of Array.isArray(parsed) ? parsed : [parsed]) {
+          if (
+            msg &&
+            /^frontend\\/(get|subscribe|set)_user_data$/.test(String(msg.type)) &&
+            msg.key === "theme"
+          ) {
+            msg.key = "__KEY__";
+            changed = true;
+          }
+        }
+        if (changed) data = JSON.stringify(parsed);
+      } catch (err) {}
+    }
+    return nativeSend.call(this, data);
+  };""".replace("__KEY__", THEME_USER_DATA_KEY)
+
+
 class Params(NamedTuple):
     """Everything that changes what gets captured; doubles as the cache key.
 
@@ -244,6 +273,15 @@ def init_script(base_url: str, token: str, params: Params) -> str:
     leaves what people see in their own browsers alone. A name Home
     Assistant does not have falls back to its default theme.
 
+    Newer frontends also keep the theme in the signed-in user's server-side
+    data (``frontend/subscribe_user_data``, key ``theme``), and a value there
+    replaces the ``localStorage`` one as soon as the socket connects. The
+    capture signs in as the token's owner, so that person's own theme would
+    win over the cell's every time. ``THEME_REDIRECT_JS`` points those
+    messages at a key nothing writes: the server answers "no value", the
+    frontend keeps the seeded record, and the owner's saved theme is never
+    read or changed. Frontends from before the sync never send the message.
+
     The zoom is applied on ``<body>`` once it exists, matching Puppet, so
     the header stays ``HEADER_PX * zoom`` tall and the crop below lines up."""
     root = base_url.rstrip("/") + "/"
@@ -270,6 +308,7 @@ def init_script(base_url: str, token: str, params: Params) -> str:
         "  for (const [key, value] of Object.entries(entries)) {\n"
         "    try { localStorage.setItem(key, value); } catch (err) {}\n"
         "  }\n"
+        f"{THEME_REDIRECT_JS}\n"
         f"  const zoom = {json.dumps(params.zoom)};\n"
         "  const applyZoom = () => { if (document.body) document.body.style.zoom = String(zoom); };\n"
         "  if (document.readyState === 'loading') {\n"

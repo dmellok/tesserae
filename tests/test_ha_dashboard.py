@@ -180,6 +180,20 @@ def test_theme_option_is_trimmed_and_default_means_none(
     assert widget._params({"theme": raw}, _ctx()).theme == expected
 
 
+def test_init_script_keeps_the_token_owners_saved_theme_out_of_the_capture(widget: Any) -> None:
+    """Newer frontends sync the theme per user on the server, and that value
+    beats localStorage. The capture must not read (or write) it."""
+    p = widget.Params("/lovelace/0", 800, 480, 1.0, False, True, 2.0, "Graphite Light")
+    script = widget.init_script(BASE, TOKEN, p)
+    assert "WebSocket.prototype.send = function" in script
+    assert "/^frontend\\/(get|subscribe|set)_user_data$/" in script
+    assert 'msg.key === "theme"' in script
+    assert f'msg.key = "{widget.THEME_USER_DATA_KEY}"' in script
+    # Applies with no theme chosen too: light/dark alone must also hold.
+    plain = widget.Params("/lovelace/0", 800, 480, 1.0, False, True, 2.0)
+    assert widget.THEME_REDIRECT_JS in widget.init_script(BASE, TOKEN, plain)
+
+
 def test_theme_choices_come_from_ha_core(widget: Any, app: Flask) -> None:
     rows = [{"value": "", "label": "Home Assistant default"}, {"value": "Ink", "label": "Ink"}]
     app.config["PLUGIN_REGISTRY"]["ha_core"].server_module.theme_choices = lambda: rows
