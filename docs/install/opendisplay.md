@@ -180,8 +180,8 @@ Sizes are as the tag reports them with its default rotation.
 
 | Model | Size | Palette |
 | --- | --- | --- |
-| OpenDisplay 4.26" Mono Kit | 800 × 480 | Black and white |
-| OpenDisplay 7.3" Color Kit | 800 × 480 | Six colours |
+| [OpenDisplay 4.26" Mono Kit](https://www.seeedstudio.com/OpenDisplay-4-26-Mono-Kit-p-7032.html?sensecap_affiliate=YcT0R1h&referring_service=link) (Seeed) | 800 × 480 | Black and white |
+| [OpenDisplay 7.3" Color Kit](https://www.seeedstudio.com/OpenDisplay-7-3-Color-Kit-p-7031.html?sensecap_affiliate=YcT0R1h&referring_service=link) (Seeed) | 800 × 480 | Six colours |
 | Seeed reTerminal E1001 | 800 × 480 | Black and white |
 | Seeed reTerminal E1002 | 800 × 480 | Six colours |
 | Seeed reTerminal E1003 | 1872 × 1404 | 16 greys |
@@ -191,6 +191,10 @@ Sizes are as the tag reports them with its default rotation.
 | Waveshare PhotoPainter 7.3" | 800 × 480 | Six colours |
 
 Any other OpenDisplay tag works too: add it from Home Assistant, or type its size.
+
+Both OpenDisplay kits are made by Seeed and have been run with Tesserae through Home Assistant.
+Their links are affiliate links: buying through one pays a small commission to the project and gives a discount at checkout.
+The code **TESSERAE** gives a discount on them at seeedstudio.com.
 
 ## Which path?
 

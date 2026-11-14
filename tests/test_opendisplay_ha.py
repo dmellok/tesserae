@@ -533,6 +533,7 @@ def test_home_assistant_converts_colour_by_default(app: Flask, tmp_path: Path) -
     calls: list[Any] = []
     _publisher(app, tmp_path / "media", calls).on_push()
     assert "dither_mode" not in calls[0][2]
+    assert "tone_compression" not in calls[0][2]
     assert "refresh_mode" not in calls[0][2]
 
 
@@ -563,6 +564,9 @@ def test_tesserae_conversion_sends_the_tags_own_inks(app: Flask, tmp_path: Path)
     assert colours <= {(0, 0, 0), (255, 255, 255), (255, 0, 0)}
     assert len(colours) > 1
     assert calls[0][2]["dither_mode"] == "none"
+    # Tone compression off too: HA's default ("auto") rewrites the pixels
+    # before matching, and a Spectra 6 then shows pure green as yellow.
+    assert calls[0][2]["tone_compression"] == 0
 
 
 def test_changing_colour_conversion_resends_the_frame(app: Flask, tmp_path: Path) -> None:

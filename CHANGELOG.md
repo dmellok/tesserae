@@ -40,6 +40,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - OpenDisplay via Home Assistant: removing a tag deletes its uploaded picture from Home Assistant's media folder.
 - OpenDisplay via Home Assistant: **Panel → Rotation** now turns the frame, so it is the only rotation setting and 180° and 270° work; **Underscan** applies too. The tag's page no longer shows the client rotation, scale and letterbox options, which never reached Home Assistant. A tag that used the old Home Assistant rotation keeps working as it was and shows it as **Turn in Home Assistant (older setup)** until it is set to None.
 - Devices: the messages for the numbered orientation card now call it that, not a calibration card, so it is not mistaken for colour calibration.
+- Docs: Seeed's OpenDisplay 4.26" Mono Kit and 7.3" Color Kit are listed in the README, the Seeed hardware page and the OpenDisplay guide, with store links. Seeed's discount code for Tesserae readers, TESSERAE, is on those pages and the compatibility page; it covers the reTerminal E-Series, the reTerminal Sticky and the OpenDisplay kits.
 - Docs: the Fraimic quickstart and the compatibility page carry Fraimic's discount code for Tesserae readers (TESSERAE10, 10% off at fraimic.com), with a disclosure that Fraimic supplied the Large Canvas free and that sales made with the code pay the project a commission.
 - Docs: plainer wording across the wiki, and corrected facts that no longer matched the app.
 - Docs: docs.tesserae.ink takes the Paper design of the app and tesserae.ink (warm paper, red ink, Archivo and Martian Mono) in place of the teal Material theme, in light and dark. The fonts are served from the docs site, so its pages no longer load anything from Google Fonts.
@@ -51,6 +52,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- OpenDisplay via Home Assistant: with **Colour conversion** set to Tesserae, colours no longer shift on the tag (green came out yellow on a six-colour panel). Home Assistant was still applying its automatic tone compression to the already-converted picture; Tesserae now turns that off for these pictures.
 - OpenDisplay via Home Assistant: a tag that is taller than wide, such as a Solum 3.5", gets its picture the right way round. Tesserae assumed every tag was wider than tall and turned a portrait dashboard sideways, which Home Assistant then shrank to fit. It now reads each tag's size and rotation from Home Assistant.
 - OpenDisplay via Home Assistant: sending to one display no longer makes other OpenDisplay tags repaint the frame they already show first. Tesserae forgot what each tag had been sent after a restart or any device settings save, so the next send re-uploaded every tag in turn. It now remembers, and when several tags are due the one just rendered goes first.
 - Calendar: events with a floating time (no `TZID` and no `Z`, e.g. `DTSTART:20261116T090000`) show at their local time. They were read as UTC, so a 9:00 event showed at 04:00 in New York. To-do due times get the same fix.
