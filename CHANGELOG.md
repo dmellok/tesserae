@@ -8,6 +8,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Home Assistant, Dashboard widget: a **Fit to cell** option shrinks the dashboard until all of it fits, so a view taller than the cell is no longer cut off at the bottom. **Zoom** then sets the largest size it may be drawn at.
 - Home Assistant, Dashboard widget: a **Theme** option, listing the themes installed in Home Assistant, captures the dashboard in the one you pick, so a panel can use a high-contrast or e-ink theme without changing the theme anyone sees in their browser. Blank keeps Home Assistant's default theme.
 - OpenDisplay via Home Assistant: **Add device → OpenDisplay** lists the tags Home Assistant knows under **Found in Home Assistant**, each with a one-click **Add** that takes the tag's size and colour palette from the tag itself.
 - OpenDisplay via Home Assistant: the tag's page shows whether the last picture arrived, with Home Assistant's reason when it did not, and a **Send again** button. A failed picture is tried again after 1, 5, 15 and then 30 minutes.

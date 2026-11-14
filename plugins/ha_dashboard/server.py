@@ -19,7 +19,7 @@ the frontend expects to be driven.
 Timing is the constraint that shapes the rest. A widget ``fetch()`` runs
 inside the composer's 6 s hydrate budget and a cold Chromium plus a
 dashboard load does not fit, so the render runs on its own thread and the
-result is cached per (path, size, zoom, theme, light or dark). ``fetch()`` returns the
+result is cached per (path, size, zoom, fit, theme, light or dark). ``fetch()`` returns the
 cached frame when it is younger than ``refresh_seconds``, otherwise it
 starts a render and returns the previous frame while that runs. Only the
 very first render for a cell is waited for, and only up to ``FIRST_WAIT_S``,
@@ -99,6 +99,66 @@ READY_JS = """() => {
   return !("_loading" in panel) || !panel._loading;
 }"""
 
+# Fit to cell. Appended to the ready wait rather than run afterwards because
+# the renderer screenshots straight after it: the zoom has to be settled by
+# then. The renderer polls the function once a frame, so each call does one
+# step and keeps its place on ``window.__tesseraeFit``.
+#
+# Zooming is not a plain scale. A sections view lays its columns out from the
+# width it is given, and a smaller zoom gives it more, so the height does not
+# follow the zoom in proportion. The search therefore measures: the largest
+# zoom first (the common case, where everything already fits and nothing
+# changes), then the smallest, then a bisection between them. Each
+# measurement waits for the height to hold still, since cards arrive and
+# reflow on their own schedule.
+#
+# The height is the bottom of ``hui-view``, which is as tall as its cards.
+# The document is never shorter than the window, so it would call a short
+# dashboard too tall at every zoom below the largest; it only stands in when
+# a frontend has no such element.
+FIT_MIN_ZOOM = 0.25
+FIT_FIRST_STABLE_MS = 800
+FIT_STEP_STABLE_MS = 350
+FIT_MAX_STEPS = 8
+FIT_READY_TIMEOUT_MS = 16_000
+FIT_JS = """
+  const fit = __FIT__;
+  const st = (window.__tesseraeFit ||= {
+    z: fit.max, lo: null, hi: null, steps: 0, lastH: -1, since: 0, done: false,
+  });
+  if (st.done) return true;
+  const view = panel.shadowRoot?.querySelector("hui-root")?.shadowRoot?.querySelector("hui-view");
+  const height = Math.ceil(
+    view
+      ? view.getBoundingClientRect().bottom + window.scrollY
+      : document.documentElement.scrollHeight
+  );
+  const now = performance.now();
+  if (height !== st.lastH) { st.lastH = height; st.since = now; return false; }
+  if (now - st.since < (st.steps ? fit.stepMs : fit.firstMs)) return false;
+  const fits = height <= fit.height + fit.header * st.z + 1;
+  const apply = (z) => {
+    st.z = z; st.steps += 1; st.lastH = -1;
+    document.body.style.zoom = String(z);
+  };
+  if (st.lo === null && st.hi === null) {
+    if (fits) { st.done = true; return true; }
+    st.hi = st.z; apply(fit.min); return false;
+  }
+  if (st.lo === null) {
+    if (!fits) { st.done = true; return true; }
+    st.lo = st.z;
+  } else if (st.z !== st.lo) {
+    if (fits) st.lo = st.z; else st.hi = st.z;
+  } else { st.done = true; return true; }
+  if (st.steps >= fit.maxSteps || st.hi - st.lo < 0.02) { apply(st.lo); return false; }
+  apply(Math.round(((st.lo + st.hi) / 2) * 1000) / 1000);
+  return false;
+}"""
+# What the capture reads back: where the page ended up, and the zoom the fit
+# left on it (null when fit is off), which sets how tall the header is.
+RESULT_JS = "({href: location.href, zoom: window.__tesseraeFit ? window.__tesseraeFit.z : null})"
+
 
 # Runs inside the init script, before any page script. Rewrites the key on
 # the frontend's per-user theme messages (get, subscribe and, should one ever
@@ -144,6 +204,7 @@ class Params(NamedTuple):
     kiosk: bool
     settle_s: float
     theme: str = ""
+    fit: bool = False
 
     @property
     def header_px(self) -> int:
@@ -248,6 +309,7 @@ def _params(options: dict[str, Any], ctx: dict[str, Any]) -> Params:
         kiosk=options.get("kiosk", True) is not False,
         settle_s=_float_option(options, "settle_seconds", DEFAULT_SETTLE_S, 0.0, 12.0),
         theme=normalise_theme(options.get("theme")),
+        fit=options.get("fit") is True,
     )
 
 
@@ -325,13 +387,37 @@ def dashboard_url(base_url: str, params: Params) -> str:
     return url
 
 
-def crop_header(png: bytes, params: Params) -> bytes:
+def ready_script(params: Params) -> str:
+    """The function the renderer polls before it screenshots: the frontend's
+    own "loaded" check, followed by the fit search when the cell asks for it."""
+    if not params.fit:
+        return READY_JS
+    config = {
+        "max": params.zoom,
+        "min": min(FIT_MIN_ZOOM, params.zoom),
+        "height": params.h,
+        "header": HEADER_PX,
+        "firstMs": FIT_FIRST_STABLE_MS,
+        "stepMs": FIT_STEP_STABLE_MS,
+        "maxSteps": FIT_MAX_STEPS,
+    }
+    head, tail = READY_JS.rsplit('  return !("_loading" in panel) || !panel._loading;\n}', 1)
+    assert not tail
+    return (
+        head
+        + '  if ("_loading" in panel && panel._loading) return false;'
+        + FIT_JS.replace("__FIT__", json.dumps(config))
+    )
+
+
+def crop_header(png: bytes, params: Params, zoom: float | None = None) -> bytes:
     """Drop the app header from the top of the capture and return a PNG of
-    exactly ``params.w × params.h``."""
+    exactly ``params.w × params.h``. ``zoom`` is the zoom the page was left
+    at when a fit changed it; the header shrinks with it."""
     from PIL import Image
 
     with Image.open(io.BytesIO(png)) as im:
-        top = params.header_px
+        top = params.header_px if zoom is None else round(HEADER_PX * zoom)
         frame = im.convert("RGB").crop((0, top, params.w, top + params.h))
         out = io.BytesIO()
         frame.save(out, format="PNG", optimize=True)
@@ -376,19 +462,25 @@ def render_frame(
         is_composer=False,
         timezone_id=timezone_id,
         init_script=init_script(base_url, token, params),
-        ready_js=READY_JS,
-        ready_timeout_ms=READY_TIMEOUT_MS,
+        ready_js=ready_script(params),
+        ready_timeout_ms=FIT_READY_TIMEOUT_MS if params.fit else READY_TIMEOUT_MS,
         settle_ms=int(params.settle_s * 1000),
         ignore_https_errors=not verify_tls,
     )
-    png, href = _capture(request, "location.href")
+    png, result = _capture(request, RESULT_JS)
+    href, zoom = "", None
+    if isinstance(result, dict):
+        href = result.get("href") or ""
+        fitted = result.get("zoom")
+        if params.fit and isinstance(fitted, (int, float)) and 0 < fitted <= params.zoom:
+            zoom = float(fitted)
     landed = urlsplit(str(href or "")).path
     if landed.startswith("/auth/"):
         raise RuntimeError(
             "Home Assistant showed the login page instead of the dashboard; "
             "check the access token in Settings -> Plugins -> Home Assistant Core"
         )
-    return crop_header(png, params)
+    return crop_header(png, params, zoom)
 
 
 def _run_job(params: Params, job: _Job, render_kwargs: dict[str, Any]) -> None:

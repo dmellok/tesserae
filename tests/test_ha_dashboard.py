@@ -54,6 +54,9 @@ class _FakeBrowser:
     def __init__(self) -> None:
         self.requests: list[RenderRequest] = []
         self.href = BASE + "/lovelace/0"
+        # The zoom a fit left on the page; None when the page ran no fit.
+        self.zoom: float | None = None
+        self.header: int | None = None
         self.delay_s = 0.0
         self.fail: Exception | None = None
         self.lock = threading.Lock()
@@ -66,7 +69,10 @@ class _FakeBrowser:
         if self.fail is not None:
             raise self.fail
         header = request.viewport_h - 480 if request.viewport_h > 480 else 0
-        return _png(request.viewport_w, request.viewport_h, header), self.href
+        if self.header is not None:
+            header = self.header
+        png = _png(request.viewport_w, request.viewport_h, header)
+        return png, {"href": self.href, "zoom": self.zoom}
 
 
 @pytest.fixture
@@ -251,6 +257,64 @@ def test_zoom_scales_the_header_crop(widget: Any, browser: _FakeBrowser, app: Fl
     (request,) = browser.requests
     assert request.viewport_h == 480 + 84
     assert _decode(data).size == (800, 480)
+
+
+def test_fit_is_off_by_default(widget: Any) -> None:
+    assert widget._params({}, _ctx()).fit is False
+    assert widget._params({"fit": True}, _ctx()).fit is True
+    plain = widget.Params("/lovelace/0", 800, 480, 1.0, False, True, 2.0)
+    assert widget.ready_script(plain) == widget.READY_JS
+
+
+def test_fit_ready_script_searches_below_the_chosen_zoom(widget: Any) -> None:
+    p = widget.Params("/lovelace/0", 800, 480, 1.5, False, True, 2.0, "", True)
+    script = widget.ready_script(p)
+    # Still the frontend's own loaded check first, then the search.
+    assert script.startswith(widget.READY_JS[:200])
+    assert 'if ("_loading" in panel && panel._loading) return false;' in script
+    config = json.loads(script.split("const fit = ", 1)[1].split(";\n", 1)[0])
+    assert config["max"] == 1.5
+    assert config["min"] == widget.FIT_MIN_ZOOM
+    assert config["height"] == 480
+    assert config["header"] == widget.HEADER_PX
+    assert "__FIT__" not in script
+    assert script.rstrip().endswith("}")
+
+
+def test_fit_crops_the_header_at_the_zoom_the_page_ended_on(
+    widget: Any, browser: _FakeBrowser, app: Flask
+) -> None:
+    # The page shrank itself to 50%, so its header is 28 px, not 56.
+    browser.zoom = 0.5
+    browser.header = 28
+    with app.app_context():
+        data = widget.fetch({"fit": True}, {}, ctx=_ctx())
+    (request,) = browser.requests
+    assert request.viewport_h == 480 + 56
+    assert request.ready_js == widget.ready_script(widget._params({"fit": True}, _ctx()))
+    assert request.ready_timeout_ms == widget.FIT_READY_TIMEOUT_MS
+    im = _decode(data).convert("RGB")
+    assert im.size == (800, 480)
+    assert im.getpixel((0, 0)) == (0, 128, 255)  # header row gone
+    assert im.getpixel((799, 479)) == (0, 128, 255)
+
+
+def test_fit_that_changed_nothing_crops_the_full_header(
+    widget: Any, browser: _FakeBrowser, app: Flask
+) -> None:
+    browser.zoom = 1.0
+    with app.app_context():
+        data = widget.fetch({"fit": True}, {}, ctx=_ctx())
+    assert _decode(data).convert("RGB").getpixel((0, 0)) == (0, 128, 255)
+
+
+def test_a_reported_zoom_is_ignored_when_fit_is_off(
+    widget: Any, browser: _FakeBrowser, app: Flask
+) -> None:
+    browser.zoom = 0.5
+    with app.app_context():
+        data = widget.fetch({}, {}, ctx=_ctx())
+    assert _decode(data).convert("RGB").getpixel((0, 0)) == (0, 128, 255)
 
 
 def test_self_signed_tls_follows_ha_core(widget: Any, browser: _FakeBrowser) -> None:
