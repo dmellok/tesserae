@@ -12,5 +12,6 @@
   "target": "Target",
   "climate": "Climate",
   "no_entities_selected": "No entities selected.",
-  "zones": "ZONES"
+  "zones": "ZONES",
+  "cell_options.title.placeholder": "Living room climate"
 }

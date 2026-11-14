@@ -250,6 +250,11 @@
     <span>Saved</span>
   </span>
   <span class="page-id-tag"><i class="ph ph-frame-corners" aria-hidden="true"></i> {{ panel.w }}×{{ panel.h }}</span>
+  <form method="post" action="{{ url_for('pages.editor_version') }}" class="inline editor-try-new">
+    <input type="hidden" name="version" value="new">
+    <input type="hidden" name="next" value="{{ request.full_path.rstrip('?') }}">
+    <button type="submit" class="ghost">Try the new editor</button>
+  </form>
   <span class="editor-spacer"></span>
   <div class="editor-actions">
     {# Push refuses unbound pushes: if devices exist but none are bound

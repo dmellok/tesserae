@@ -42,6 +42,7 @@ from app.network import detect_local_ip, docker_bridge_ip_warning, is_docker_bri
 from app.online import online_enabled
 from app.panel import PANEL_PRESET_CHOICES, PANEL_PRESETS
 from app.state.settings_store import SECRET_MASK
+from app.widget_options import localized_option_specs
 
 from . import visionect_routes
 from ._shared import (
@@ -1030,7 +1031,7 @@ def _build_sections(kinds: set[str] | None = None) -> list[dict[str, Any]]:
 
     for plugin in plugins().plugins.values() if wanted("plugin") else ():
         fields = mark_unreadable_secrets(
-            list(plugin.manifest.get("settings", [])), "plugins", plugin.id
+            localized_option_specs(plugin, "settings"), "plugins", plugin.id
         )
         if not fields:
             continue

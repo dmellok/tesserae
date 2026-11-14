@@ -76,6 +76,8 @@ def real(tmp_path: Path, request: pytest.FixtureRequest) -> Iterator[tuple[str, 
     store = app.config["SETTINGS_STORE"]
     store.patch_section("app", {"onboarded": True})
     store.patch_section("auth", {"disabled": True})
+    # The custom layout board lives in the classic editor.
+    store.patch_section("ui", {"dashboard_editor": "classic"})
     app.config["PAGE_STORE"].save(
         Page(
             id="split",

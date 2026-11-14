@@ -1,0 +1,48 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Newspapers",
+  "version": "0.1.0",
+  "kind": "widget",
+  "locales": [
+    "en"
+  ],
+  "description": "Today's newspaper front pages from the Freedom Forum archive, drawn sharp from each paper's PDF at the panel's own width. One paper per render, rotating through the papers on its admin page (each with optional CSS) or pinned. Keeps the last good page up. No API key.",
+  "icon": "ph-newspaper",
+  "category": "reading",
+  "supports": {
+    "sizes": [
+      "sm",
+      "md",
+      "lg"
+    ]
+  },
+  "cell_options": [
+    {
+      "name": "paper",
+      "type": "select",
+      "label": "Paper",
+      "default": "",
+      "choices_from": "papers",
+      "help": "Show one paper or rotate through the list."
+    }
+  ],
+  "updates": {
+    "on_schedule": [
+      {
+        "kind": "daily",
+        "suggested_at": "06:00"
+      }
+    ]
+  },
+  "render": {
+    "dither": "floyd-steinberg",
+    "needs_network": true,
+    "full_bleed": true,
+    "warm_ahead_s": 60
+  },
+  "requires": [
+    "network:cdn.freedomforum.org",
+    "network:frontpages.freedomforum.org",
+    "settings:plugin"
+  ]
+}

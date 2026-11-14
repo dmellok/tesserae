@@ -27,6 +27,8 @@
     },
     {
       "name": "birth_year",
+      "help": "Your four-digit birth year, used in Life in weeks mode.",
+      "placeholder": "1985",
       "type": "number",
       "label": "Birth year",
       "default": "",
@@ -36,6 +38,7 @@
     },
     {
       "name": "life_expectancy_years",
+      "unit": "years",
       "type": "number",
       "label": "Life expectancy",
       "default": 80,

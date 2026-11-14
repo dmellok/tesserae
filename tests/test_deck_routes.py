@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+from html import unescape
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from flask import Flask
@@ -330,6 +332,126 @@ def test_editor_renders_blank_and_existing(app: Flask) -> None:
     assert not state["isNew"] and state["deckId"] == deck.id
     assert [s["id"] for s in state["steps"]] == ["overview", "calendar"]
     assert state["when"]["mode"] == "manual"
+
+
+def test_new_lineup_prefills_dashboard_and_safe_return(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    target = "/pages/overview?new=1#lineup"
+    response = client.get("/decks/new", query_string={"page_id": "overview", "return": target})
+    state = _state(response.text)
+    assert [s["id"] for s in state["steps"]] == ["overview"]
+    assert state["returnTo"] == target
+    assert state["urls"]["back"] == target
+    assert f'href="{target}"' in response.text
+    saved = client.post(
+        "/decks/new/lineup",
+        data={
+            "name": "Overview loop",
+            "intent": "manual",
+            "page_ids": "overview",
+            "return": target,
+        },
+    ).get_json()
+    assert saved["ok"] is True
+    assert saved["editor_url"] == target
+    assert saved["url"] == target
+
+
+def test_first_editor_save_returns_but_later_saves_stay_on_lineup(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    target = "/pages/overview#schedules"
+    data = {"name": "Loop", "pages": "overview", "return": target, "respond": "json"}
+    first = client.post("/decks/editor-save", data=data).get_json()
+    assert first["ok"] is True and first["url"] == target
+    deck = app.config["DECK_STORE"].get(first["id"])
+    later = client.post("/decks/editor-save", data={**data, "deck_id": deck.id}).get_json()
+    assert later["ok"] is True and later["url"] == f"/decks/{deck.id}/edit"
+
+
+@pytest.mark.parametrize(
+    "target",
+    [
+        "https://evil.example/",
+        "//evil.example/",
+        "/\\evil.example/",
+        "/%2fevil.example/",
+        "/%5cevil.example/",
+        "/%0devil",
+    ],
+)
+def test_new_lineup_rejects_unsafe_return_paths(app: Flask, target: str) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    state = _state(client.get("/decks/new", query_string={"return": target}).text)
+    assert state["returnTo"] == ""
+    assert state["urls"]["back"] == "/decks"
+    saved = client.post(
+        "/decks/new/lineup",
+        data={"name": "Safe", "intent": "manual", "page_ids": "overview", "return": target},
+    ).get_json()
+    assert saved["editor_url"] == f"/decks/{saved['id']}/edit"
+    assert saved["url"].startswith("/decks?")
+    saved = client.post(
+        "/decks/editor-save",
+        data={"name": "Safe editor", "pages": "overview", "return": target, "respond": "json"},
+    ).get_json()
+    assert saved["url"] == f"/decks/{saved['id']}/edit"
+
+
+def test_new_lineup_prefill_follows_existing_dashboard_picker_rules(app: Flask) -> None:
+    from app.state.panel_store import CanvasLayout
+
+    pages = app.config["PAGE_STORE"]
+    pages.save(Page(id="canvas", name="Canvas", layout_kind="canvas", canvas=CanvasLayout()))
+    pages.save(Page(id="archived", name="Archived", archived=True))
+    client = app.test_client()
+    _sign_in(client)
+    assert [s["id"] for s in _state(client.get("/decks/new?page_id=canvas").text)["steps"]] == [
+        "canvas"
+    ]
+    for pid in ("missing", "archived"):
+        assert _state(client.get("/decks/new", query_string={"page_id": pid}).text)["steps"] == []
+    client.post("/decks/new", data={"name": "Existing", "graph_json": GRAPH})
+    deck = _decks(app)[0]
+    state = _state(client.get(f"/decks/{deck.id}/edit?page_id=canvas&return=/pages/canvas").text)
+    assert [s["id"] for s in state["steps"]] == ["overview", "calendar"]
+    assert state["returnTo"] == ""
+
+
+@pytest.mark.parametrize("is_new", [False, True])
+def test_dashboard_new_lineup_link_carries_first_real_display_and_return(
+    app: Flask, is_new: bool
+) -> None:
+    from app import device_service
+
+    for name in ("first", "second"):
+        device_service.create_instance(
+            devices=app.config["DEVICE_REGISTRY"],
+            renderers=app.config["RENDERER_REGISTRY"],
+            data_root=app.config["DEVICE_DATA_ROOT"],
+            instance_id=name,
+            kind_id="esp32_client",
+        )
+    pages = app.config["PAGE_STORE"]
+    page = pages.get("overview")
+    pages.save(page.model_copy(update={"device_ids": ["missing", "second", "first"]}))
+    client = app.test_client()
+    _sign_in(client)
+    for bound in (True, False):
+        if not bound:
+            pages.save(page.model_copy(update={"device_ids": []}))
+        body = client.get("/pages/overview", query_string={"new": "1"} if is_new else {}).text
+        links = [unescape(part.split('"', 1)[0]) for part in body.split('href="')[1:]]
+        query = parse_qs(
+            urlsplit(next(link for link in links if link.startswith("/decks/new?"))).query
+        )
+        assert query["page_id"] == ["overview"]
+        assert query.get("display") == (["second"] if bound else None)
+        assert query["return"] == [
+            "/pages/overview?new=1#lineup" if is_new else "/pages/overview#schedules"
+        ]
 
 
 def test_editor_save_js_shape_creates_deck_with_home(app: Flask) -> None:

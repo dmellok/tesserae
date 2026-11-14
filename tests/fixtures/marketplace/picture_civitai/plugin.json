@@ -1,0 +1,275 @@
+{
+  "tesserae_compat": "1.x",
+  "tesserae_min": "0.484.1",
+  "name": "Picture, AI galleries",
+  "version": "0.2.2",
+  "kind": "widget",
+  "description": "Artwork from Civitai. Filter by tags, creators or collections, preview up to 20 matches, then rotate images that suit the cell orientation and resolution.",
+  "icon": "ph-image",
+  "category": "art",
+  "lineups": { "pin_option": "pinned_image" },
+  "supports": {
+    "sizes": [
+      "sm",
+      "md",
+      "lg"
+    ]
+  },
+  "cell_options": [
+    {
+      "name": "pinned_image",
+      "type": "string",
+      "label": "Pinned artwork",
+      "default": "",
+      "advanced": true,
+      "help": "Choose an artwork using Show chosen in Lineups, or leave blank for normal rotation. A pin still obeys the frame orientation, resolution and filters. Pinned renders do not advance rotation history."
+    },
+    {
+      "name": "sources",
+      "type": "multiselect",
+      "label": "Civitai artwork sources",
+      "default": ["tags", "creators"],
+      "choices": [
+        { "value": "tags", "label": "Tags" },
+        { "value": "creators", "label": "Creators" },
+        { "value": "collections", "label": "My and followed collections" }
+      ],
+      "help": "Combine any sources, or use collections alone. Creator and collection picks do not need an included tag. Exclusions, minimum engagement, orientation and resolution still apply."
+    },
+    {
+      "name": "collections",
+      "type": "multiselect",
+      "label": "Choose collections",
+      "default": [],
+      "choices_from": "collections",
+      "show_if": { "sources": "collections" },
+      "help": "Choose up to 8 image collections you own or follow. Private collections are read using your saved Civitai key. The list refreshes every 15 minutes; artwork uses Collection refresh below."
+    },
+    {
+      "name": "positive_tags",
+      "type": "textarea",
+      "label": "Include tags",
+      "default": "illustration, painting",
+      "help": "Comma- or newline-separated tag names or numeric IDs, up to 6. Starts with illustration or painting. Tags use OR by default. Creator picks take priority; these tags add secondary discoveries. A Civitai API key enables full name lookup. Without one, other names must occur in the sampled public feed. Blank tags and creators use the popular public feed."
+    },
+    {
+      "name": "users",
+      "type": "textarea",
+      "label": "Creators",
+      "default": "",
+      "help": "Comma- or newline-separated Civitai usernames, up to 4. Prefer artwork from these creators even without an included tag; tags provide secondary discoveries. Excluded tags and minimum engagement still apply to every image. Leave blank to discover by tags.",
+      "show_if": {
+        "sources": "creators"
+      }
+    },
+    {
+      "name": "negative_tags",
+      "type": "textarea",
+      "label": "Exclude tags",
+      "default": "photography, photorealistic",
+      "help": "Comma- or newline-separated tag names or numeric IDs, up to 50. Starts by excluding photographic styles. An image with any excluded tag is rejected, even if it also has an included tag. No API key is needed for tag-name exclusions."
+    },
+    {
+      "name": "orientation",
+      "type": "select",
+      "label": "Orientation",
+      "default": "auto",
+      "choices": [
+        { "value": "auto", "label": "Auto (match this cell)" },
+        { "value": "landscape", "label": "Landscape" },
+        { "value": "portrait", "label": "Portrait" },
+        { "value": "any", "label": "Any" }
+      ],
+      "help": "Auto follows this cell's width and height, including square cells. Landscape and portrait exclude square images. No fallback to the wrong orientation; choose Any to accept every shape."
+    },
+    {
+      "name": "resolution",
+      "type": "select",
+      "label": "Resolution",
+      "default": "prefer_native",
+      "choices": [
+        { "value": "prefer_native", "label": "Prefer native size" },
+        { "value": "native_only", "label": "Native size only" },
+        { "value": "allow_smaller", "label": "Allow smaller images" }
+      ],
+      "help": "Native modes can download a larger original when needed. Native size only checks the downloaded dimensions and skips images that need enlargement. Allow smaller uses the lighter Civitai rendition when available. Fit or Fill and the target cell size determine whether enlargement is needed."
+    },
+    {
+      "name": "tag_match",
+      "type": "select",
+      "label": "Include matching",
+      "default": "any",
+      "advanced": true,
+      "choices": [
+        { "value": "any", "label": "Any tag" },
+        { "value": "all", "label": "All tags" }
+      ]
+    },
+    {
+      "name": "scale",
+      "type": "select",
+      "label": "Scale",
+      "default": "fill",
+      "advanced": true,
+      "choices": [
+        { "value": "fit", "label": "Fit (letterbox)" },
+        { "value": "fill", "label": "Fill (crop to cover)" }
+      ],
+      "help": "Fill is the default: edge-to-edge artwork, cropping the edges as needed. Fit preserves the whole image with letterboxing. Neither stretches the image's proportions."
+    },
+    {
+      "name": "refresh_hours",
+      "type": "number",
+      "label": "Collection refresh (hours)",
+      "default": 24,
+      "min": 1,
+      "max": 168,
+      "advanced": true,
+      "help": "How often to fetch a new candidate pool. Tesserae must render the widget to fetch updates."
+    },
+    {
+      "name": "rotation_minutes",
+      "type": "number",
+      "label": "Image rotation (minutes)",
+      "default": 60,
+      "min": 1,
+      "max": 10080,
+      "advanced": true,
+      "help": "A stable image per placement and time interval, advancing through the pool without repeats. Changes appear on the next Tesserae render; this does not schedule device refreshes."
+    },
+    {
+      "name": "repeat_days",
+      "type": "number",
+      "label": "Avoid repeats (days)",
+      "default": 7,
+      "min": 0,
+      "max": 30,
+      "advanced": true,
+      "help": "Prefer artwork not shown here within this window, including Civitai variants from the same post or from the same creator within five minutes. Use a whole number. Set 0 to disable repeat avoidance. If the pool is small, variants or repeats can appear sooner."
+    },
+    {
+      "name": "prioritize_fresh",
+      "type": "boolean",
+      "label": "Prioritize fresh art",
+      "default": false,
+      "help": "Fetch Civitai's newest results and prefer newer eligible art within each source priority. This overrides the Prioritize menu while enabled and uses the existing refresh schedule."
+    },
+    {
+      "name": "sort",
+      "type": "select",
+      "label": "Prioritize",
+      "default": "Most Reactions",
+      "choices": [
+        { "value": "Most Reactions", "label": "Most reactions" },
+        { "value": "Most Collected", "label": "Most collected" },
+        { "value": "Most Comments", "label": "Most comments" },
+        { "value": "Newest", "label": "Newest" }
+      ],
+      "help": "How Civitai ranks candidate artwork within the source time period (Month by default). Rotation cycles through the cached matches. Each priority has its own shared cache."
+    },
+    {
+      "name": "min_reactions",
+      "type": "number",
+      "label": "Minimum reactions",
+      "default": 0,
+      "min": 0,
+      "max": 1000000000,
+      "advanced": true,
+      "help": "Minimum combined likes, hearts, laughs and cries reported by Civitai. Use a whole number; 0 disables this filter. Missing counts cannot satisfy a positive minimum. Filters the cached collection without extra API requests."
+    },
+    {
+      "name": "min_comments",
+      "type": "number",
+      "label": "Minimum comments",
+      "default": 0,
+      "min": 0,
+      "max": 1000000000,
+      "advanced": true,
+      "help": "Minimum comment count reported by Civitai. Use a whole number; 0 disables this filter. Missing counts cannot satisfy a positive minimum. Counts update with the daily collection refresh."
+    },
+    {
+      "name": "period",
+      "type": "select",
+      "label": "Source time period",
+      "default": "Month",
+      "advanced": true,
+      "choices": [
+        { "value": "Day", "label": "Day" },
+        { "value": "Week", "label": "Week" },
+        { "value": "Month", "label": "Month" },
+        { "value": "AllTime", "label": "All time" }
+      ]
+    },
+    {
+      "name": "show_credit",
+      "type": "boolean",
+      "label": "Show creator credit",
+      "default": true,
+      "advanced": true,
+      "help": "A quiet service and creator credit at the bottom of the image, linked to the original artwork in the editor."
+    }
+  ],
+  "settings": [
+    {
+      "name": "api_key",
+      "type": "string",
+      "label": "Civitai API key",
+      "default": "",
+      "secret": true,
+      "help": "Optional. Enables full image tag-name lookup. Create a free personal API key at https://civitai.com/user/account. The public image feed and creator filters work without a key."
+    }
+  ],
+  "render": {
+    "dither": "floyd-steinberg",
+    "needs_network": true,
+    "full_bleed": true,
+    "per_placement": true
+  },
+  "design": {
+    "palette": "extended"
+  },
+  "requires": [
+    "network:civitai.com",
+    "network:image.civitai.com"
+  ],
+  "data_schema": {
+    "fields": [
+      {
+        "name": "images",
+        "type": "arr",
+        "label": "Filtered image pool (service, ID, URL, dimensions, creator, link, and source priority)"
+      },
+      {
+        "name": "placement_id",
+        "type": "str",
+        "label": "Placement rotation identity"
+      },
+      {
+        "name": "selected_id",
+        "type": "num",
+        "label": "Selected image for this rotation interval"
+      },
+      {
+        "name": "target_w",
+        "type": "num",
+        "label": "Physical cell width"
+      },
+      {
+        "name": "target_h",
+        "type": "num",
+        "label": "Physical cell height"
+      },
+      {
+        "name": "error",
+        "type": "str",
+        "label": "Fetch error"
+      }
+    ],
+    "sample": {
+      "images": [],
+      "placement_id": "",
+      "error": ""
+    }
+  },
+  "query_preview": true
+}

@@ -14,14 +14,15 @@
       "type": "string",
       "label": "Dashboard path",
       "help": "The part of the Home Assistant URL after the host, e.g. lovelace/0 or dashboard-kitchen/overview. Leave blank for the default dashboard.",
-      "default": "lovelace/0"
+      "default": "lovelace/0",
+      "placeholder": "dashboard-kitchen/overview"
     },
     {
       "name": "zoom",
       "type": "select",
-      "label": "Zoom",
+      "label": "Dashboard zoom",
       "default": "1",
-      "help": "Scales the dashboard before capture. Larger values make cards bigger and easier to read on e-ink, fewer of them fit.",
+      "help": "Scales Home Assistant cards and text before capture. 75% fits more cards; 125% makes them larger. Applies to this dashboard capture.",
       "choices": [
         {
           "value": "0.75",
@@ -50,35 +51,38 @@
       "type": "boolean",
       "label": "Dark theme",
       "default": false,
-      "help": "Render with Home Assistant's dark mode. Light is usually the better fit for a panel."
+      "help": "Render with Home Assistant's dark mode. Light is usually the better fit for a panel.",
+      "overrides_look": "uses its own dark mode"
     },
     {
       "name": "kiosk",
       "type": "boolean",
-      "label": "Kiosk query",
+      "label": "Add ?kiosk to the URL",
       "default": true,
       "advanced": true,
-      "help": "Appends ?kiosk to the URL so the kiosk-mode integration, if installed, strips the remaining chrome. Harmless without it."
+      "help": "Adds ?kiosk for the Home Assistant kiosk-mode integration, if installed. Without that integration, this option has no effect."
     },
     {
       "name": "settle_seconds",
       "type": "number",
       "label": "Settle delay",
-      "help": "Seconds to wait after the dashboard reports loaded, so cards that fetch their own data (history graphs, cameras, maps) have painted before capture.",
+      "help": "Seconds to wait after the dashboard loads, so cards that fetch their own data (history graphs, cameras, maps) finish drawing. 2 suits most dashboards; try 5 for cameras or maps. 0 to 12.",
       "default": 2,
       "advanced": true,
       "min": 0,
-      "max": 12
+      "max": 12,
+      "unit": "s"
     },
     {
       "name": "refresh_seconds",
       "type": "number",
-      "label": "Refresh",
-      "help": "Seconds a captured frame may age before the next render replaces it. Each render opens a browser for a few seconds, so keep this near the panel's own wake interval.",
+      "label": "Capture interval",
+      "help": "How long a capture is reused, in seconds. 300 is 5 minutes, 900 is 15 minutes, 3600 is 1 hour. 30 to 86400 (1 day). The next preview or display update after that requests a new capture.",
       "default": 300,
       "advanced": true,
       "min": 30,
-      "max": 86400
+      "max": 86400,
+      "unit": "s"
     }
   ],
   "render": { "dither": "ordered", "needs_network": true }

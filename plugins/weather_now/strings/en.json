@@ -28,5 +28,6 @@
   "cond_snow_heavy": "Heavy snow",
   "cond_showers": "Showers",
   "cond_showers_violent": "Violent showers",
-  "cond_thunderstorm": "Thunderstorm"
+  "cond_thunderstorm": "Thunderstorm",
+  "cell_options.label.placeholder": "Home"
 }

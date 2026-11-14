@@ -20,6 +20,29 @@ def choice_rows(plugin: Any, spec: dict[str, Any]) -> list[dict[str, Any]]:
     return list(spec.get("choices", []))
 
 
+# Labels of the single blank row a provider returns when it can't list
+# anything at all (as opposed to a real empty value like "(no folders yet)").
+# Any widget can say the same with ``"note": true`` on that row.
+GUIDANCE_PREFIXES = ("Set HA URL + token", "Home Assistant unreachable", "Stored secret for")
+
+
+def guidance_note(rows: Any) -> str | None:
+    """The provider's "why there is nothing to pick" label, or None."""
+    if (
+        isinstance(rows, list)
+        and len(rows) == 1
+        and isinstance(rows[0], dict)
+        and rows[0].get("value") == ""
+        and (
+            rows[0].get("note") is True
+            or str(rows[0].get("label") or "").startswith(GUIDANCE_PREFIXES)
+        )
+        and str(rows[0].get("label") or "").strip()
+    ):
+        return str(rows[0]["label"])
+    return None
+
+
 def resolve_choices(plugin: Any, spec: dict[str, Any]) -> tuple[list[dict[str, Any]], bool]:
     try:
         raw = choice_rows(plugin, spec)

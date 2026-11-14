@@ -1871,7 +1871,7 @@
             : "Add a dashboard to create it.");
       setButtons(
         btns,
-        `<a class="lu-btn-ghost lu-btn-line" href="${esc(S.urls.lineups)}" data-fk="f-cancel">Cancel</a>` +
+        `<a class="lu-btn-ghost lu-btn-line" href="${esc(S.urls.back)}" data-fk="f-cancel">Cancel</a>` +
           `<button type="button" class="lu-btn-primary" data-create data-fk="f-create"${ready && !ui.saving ? "" : " disabled"}>${ui.saving ? "Creating…" : "Create lineup"}</button>`
       );
       return;
@@ -2458,6 +2458,7 @@
       return;
     const fd = new FormData();
     const dev = deviceOf(st.display);
+    if (S.returnTo) fd.append("return", S.returnTo);
     fd.append("name", st.name.trim() || `${dev ? dev.name : "New"} lineup`);
     if (st.when.mode === "manual") fd.append("intent", "manual");
     else {

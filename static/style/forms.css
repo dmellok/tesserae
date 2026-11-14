@@ -1712,6 +1712,22 @@ input.slider-value {
   color: var(--t-fg-soft);
 }
 
+/* A number field with a unit (number_input ``unit``): the unit sits after
+   the box, the box sized for a number rather than a sentence. */
+.field-unit-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-2);
+}
+.field .field-unit-wrap input[type="number"] {
+  width: 9em;
+  max-width: 100%;
+}
+.field-unit {
+  font-size: var(--t-size-sm);
+  color: var(--t-fg-soft);
+}
+
 input[type="range"].slider {
   width: 100%;
   margin: var(--t-space-2) 0 var(--t-space-1);

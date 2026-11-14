@@ -1,0 +1,810 @@
+{% extends "_base.html" %}
+{% from "_components.html" import auto_field, info_pop %}
+{% from "_schedule_form.html" import schedule_form, schedule_form_scripts %}
+{% from "_query_preview.html" import query_preview_button %}
+{#- Steps on the left, live preview on the right. Controls autosave through
+    the existing page routes; scripts live in static/pages/editor_v2/. -#}
+{% block title %}{{ page.name }}, Dashboard editor, Tesserae{% endblock %}
+{% block page_class %}ev2-page{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='style/touch_interaction.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='style/editor_v2.css') }}">
+{% endblock %}
+
+{#- ------------------------------------------------------------ context -#}
+{% set _is_new = is_new if is_new is defined else (request.args.get('new') == '1') %}
+{% set _bound = device_options | selectattr('checked') | list %}
+{% set _using_test = not _bound %}
+{% set _td = test_display if (test_display is defined and test_display) else ({'w': panel.w, 'h': panel.h} if _using_test else {'w': 800, 'h': 480}) %}
+{% set _presets = test_display_presets if (test_display_presets is defined and test_display_presets) else [[800, 480], [480, 800], [1200, 825], [1920, 1080]] %}
+{% set _lineups = lineups if (lineups is defined and lineups) else [] %}
+{% set _joined = _lineups | selectattr('joined') | list %}
+{% set _sb_id = page.status_bar_cell_id if page.status_bar_enabled else None %}
+{% set _sb_cell = (page.cells | selectattr('id', 'equalto', _sb_id) | list | first) if _sb_id else None %}
+{% set _cells = page.cells | rejectattr('id', 'equalto', _sb_id) | list if _sb_id else page.cells %}
+{% set _filled = _cells | selectattr('plugin') | list %}
+{% set _group = preview_groups[0] if preview_groups else {'w': panel.w, 'h': panel.h} %}
+{% set _wmap = {} %}{% for w in widget_picker.widgets %}{% set _ = _wmap.update({w.id: w}) %}{% endfor %}
+{% set _layout_name = ((layouts | selectattr('slug', 'equalto', active_layout) | list | first).name) if active_layout else 'Your own layout' %}
+{% set _sb_frac = ((_sb_cell.h / panel.h) if _sb_cell else 0) %}
+{% set _font_options = [] %}{% for f in fonts %}{% set _ = _font_options.append({'value': f.id, 'label': f.name}) %}{% endfor %}
+{% set _page_styles = [
+  {'value': 'standard', 'label': 'Standard · Helvetica', 'group': 'Neutral styles'},
+  {'value': 'display', 'label': 'Display · grotesk poster', 'group': 'Neutral styles'},
+  {'value': 'editorial', 'label': 'Editorial · soft serif', 'group': 'Neutral styles'},
+  {'value': 'mono', 'label': 'Mono · console', 'group': 'Neutral styles'},
+  {'value': 'elegant', 'label': 'Elegant · Bodoni masthead', 'group': 'Neutral styles'},
+  {'value': 'condensed', 'label': 'Condensed · narrow board', 'group': 'Neutral styles'},
+  {'value': 'bauhaus', 'label': 'Bauhaus forms (typography only)', 'group': 'Movement styles'},
+  {'value': 'destijl', 'label': 'De Stijl forms (typography only)', 'group': 'Movement styles'},
+  {'value': 'brutalist', 'label': 'Brutalist forms (typography only)', 'group': 'Movement styles'},
+] %}
+{% set _cell_styles = [
+  {'value': 'standard', 'label': 'Standard', 'group': 'Neutral styles'},
+  {'value': 'display', 'label': 'Display', 'group': 'Neutral styles'},
+  {'value': 'editorial', 'label': 'Editorial', 'group': 'Neutral styles'},
+  {'value': 'mono', 'label': 'Mono', 'group': 'Neutral styles'},
+  {'value': 'elegant', 'label': 'Elegant', 'group': 'Neutral styles'},
+  {'value': 'condensed', 'label': 'Condensed', 'group': 'Neutral styles'},
+  {'value': 'bauhaus', 'label': 'Bauhaus forms', 'group': 'Movement styles'},
+  {'value': 'destijl', 'label': 'De Stijl forms', 'group': 'Movement styles'},
+  {'value': 'brutalist', 'label': 'Brutalist forms', 'group': 'Movement styles'},
+] %}
+{% set _edit_url = url_for('pages.edit', page_id=page.id) %}
+
+{#- ------------------------------------------------------------ macros -#}
+{% macro ico(name, cls='') -%}<i class="ph ph-{{ name }} {{ cls }}" aria-hidden="true"></i>{%- endmacro %}
+
+{#- A <select> with optional optgroups (options: dicts with value/label/group). -#}
+{% macro ev2_select(id, name, options, value, blank=None, attrs='') -%}
+<select class="ev2-select" id="{{ id }}" name="{{ name }}" {{ attrs | safe }}>
+  {% if blank is not none %}<option value="" {% if not value %}selected{% endif %}>{{ blank }}</option>{% endif %}
+  {% set ns = namespace(group=None) %}
+  {% for o in options %}
+    {% set g = o.group if o.group is defined else None %}
+    {% if g != ns.group %}
+      {% if ns.group %}</optgroup>{% endif %}
+      {% if g %}<optgroup label="{{ g }}">{% endif %}
+      {% set ns.group = g %}
+    {% endif %}
+    <option value="{{ o.value }}" {% if (value or '')|string == o.value|string %}selected{% endif %}>{{ o.label }}</option>
+  {% endfor %}
+  {% if ns.group %}</optgroup>{% endif %}
+</select>
+{%- endmacro %}
+
+{#- Preset / own-layout thumbnail, drawn in the display's aspect. ``cells`` are
+    (x, y, w, h) fractions; ``squeeze`` fits preset rows under the status bar. -#}
+{% macro lthumb(cells, gw, gh, sbfrac=0, squeeze=True, maxw=92, maxh=64) -%}
+{% set k = [maxw / gw, maxh / gh] | min %}
+{% set W = (gw * k) | round | int %}{% set H = (gh * k) | round | int %}
+{% set sbH = ([3, (H * sbfrac) | round | int] | max) if sbfrac else 0 %}
+<span class="ev2-lt-pic" style="width:{{ W }}px;height:{{ H }}px">
+  {%- if sbH %}<span class="sbar" style="left:0;top:0;width:{{ W }}px;height:{{ sbH }}px"></span>{% endif -%}
+  {%- for x, y, w, h in cells -%}
+    {%- if squeeze -%}{% set top = sbH + y * (H - sbH) %}{% set hh = h * (H - sbH) %}{%- else -%}{% set top = y * H %}{% set hh = h * H %}{%- endif -%}
+    <span class="{{ 'r ' if x + w < 0.999 }}{{ 'b' if y + h < 0.999 }}" style="left:{{ (x * W) | round(1) }}px;top:{{ top | round(1) }}px;width:{{ (w * W) | round(1) }}px;height:{{ hh | round(1) }}px"></span>
+  {%- endfor -%}
+</span>
+{%- endmacro %}
+
+{#- A display's outline in its real ratio. -#}
+{% macro shape(w, h, cls, maxw=110, maxh=62) -%}
+{% set k = [maxw / w, maxh / h] | min %}
+<span class="ev2-shape {{ cls }}" style="width:{{ (w * k) | round | int }}px;height:{{ (h * k) | round | int }}px"></span>
+{%- endmacro %}
+{% macro mini(w, h, cls, title) -%}
+{% set k = [28 / w, 18 / h] | min %}
+<span class="ev2-mshape {{ cls }}" title="{{ title }}" style="width:{{ [6, (w * k) | round | int] | max }}px;height:{{ [6, (h * k) | round | int] | max }}px"></span>
+{%- endmacro %}
+
+{#- One line under a widget row: the first option the user changed from its
+    default, readable. Numbers carry their label ("How many: 3"); nothing
+    changed means no line. -#}
+{% macro cell_summary(cell, plugin) -%}
+{% set ns = namespace(out='') %}
+{% for opt in plugin_cell_options.get(plugin.id, []) if not ns.out and not opt.get('advanced') and opt.name in cell.options %}
+  {% set t = opt.get('type', 'string') %}
+  {% if t not in ('boolean', 'switch', 'textarea', 'variables_textarea', 'entity_overrides', 'location_search', 'color', 'server_colour', 'days') and not opt.get('secret') and not opt.get('mask') %}
+    {% set v = cell.options.get(opt.name) %}
+    {% set d = opt.get('default') %}
+    {% if (v if v is not none else '') | string != (d if d is not none else '') | string %}
+      {% if t == 'select' %}
+        {% for c in opt.get('choices', []) %}
+          {% set cv = c.value if c is mapping else (c[0] if (c is not string and c is iterable) else c) %}
+          {% set cl = c.label if c is mapping else (c[1] if (c is not string and c is iterable) else c) %}
+          {% if cv|string == v|string and not ns.out %}{% set ns.out = cl|string %}{% endif %}
+        {% endfor %}
+      {% elif v is not none and v is not string and v is iterable %}
+        {% set ns.out = v | join(', ') %}
+      {% elif v is number %}
+        {% set ns.out = (opt.get('label') ~ ': ' if opt.get('label') else '') ~ v %}
+      {% elif v not in (none, '') %}
+        {% set ns.out = v|string %}
+      {% endif %}
+    {% endif %}
+  {% endif %}
+{% endfor %}
+{{- ns.out -}}
+{%- endmacro %}
+
+{% macro shape_word(cell) -%}
+{% set r = cell.w / ([cell.h, 1] | max) %}{{ 'wide' if r > 1.6 else ('tall' if r < 0.7 else 'square-ish') }}
+{%- endmacro %}
+
+{#- One widget option. A field whose choices could not be listed says so in
+    a few words; the reason is the note above the options. -#}
+{% macro ev2_opt_field(cell, opt, cell_opts) -%}
+{% if opt.choices_note is defined %}{% set opt = dict(opt, choices=[{'value': '', 'label': 'Nothing to pick yet, see above'}]) %}{% endif %}
+{% set field_id = 'ev2-' ~ cell.id ~ '-opt-' ~ opt.name %}
+{% set fill = opt.get('fill_from') %}
+{% set filled = fill.get('map', {}).get(cell.options.get(fill.get('option'))) if fill else none %}
+{% set value = filled if filled is not none else cell.options.get(opt.name, opt.get('default', '')) %}
+{{ auto_field(field_id, 'opt_' ~ opt.name, opt, value, readonly=filled is not none,
+              visible=option_visible(opt, cell.options, cell_opts)) }}
+{%- endmacro %}
+
+{#- One section's options on the two-column grid (app/option_conditions.py
+    option_layout): every switch in one list where the first one was (two
+    short-labelled ones to a row), short fields (numbers, short selects,
+    short text) side by side, the rest across the row. The grid answers
+    the row's own width (editor_v2.css). -#}
+{% macro ev2_opt_blocks(cell, section, cell_opts) -%}
+{% for b in option_layout(section, cell.options, cell_opts) %}
+  {%- if b.kind == 'switches' %}
+  <div class="ev2-oi ev2-swg" data-ev2-swg>
+    {%- for row in b.rows %}<div class="ev2-swr{{ ' ev2-swr--pair' if row | length > 1 }}">{% for opt in row %}{{ ev2_opt_field(cell, opt, cell_opts) }}{% endfor %}</div>{% endfor -%}
+  </div>
+  {%- else %}
+  <div class="ev2-oi ev2-oi--{{ b.size }}">{{ ev2_opt_field(cell, b.opt, cell_opts) }}</div>
+  {%- endif %}
+{% endfor %}
+{%- endmacro %}
+
+{#- The widget settings that open in place under a filled row. -#}
+{% macro cell_body(cell, idx, is_bar=False) %}
+{% set plugin = (plugins | selectattr('id', 'equalto', cell.plugin) | list | first) if cell.plugin else None %}
+{% set entry = _wmap.get(cell.plugin) or {} %}
+<form method="post" class="ev2-cell-form" id="ev2-cell-form-{{ cell.id }}"
+      action="{{ url_for('pages.update_cell', page_id=page.id, cell_id=cell.id) }}"
+      data-ev2-cell-form data-cell-id="{{ cell.id }}" data-opt-scope>
+  <input type="hidden" name="plugin" value="{{ cell.plugin or '' }}" data-ev2-plugin>
+  {% if is_bar %}
+  <p class="ev2-wsub">The 48 px strip across the top. Turn it off in Layout.</p>
+  {% elif entry.desc %}
+  <p class="ev2-wsub">{{ entry.desc }}</p>
+  {% endif %}
+  {% if plugin %}
+  {% set cell_opts = plugin_cell_options.get(plugin.id, []) %}
+  {% set secs = option_sections(cell_opts, cell.options) %}
+  {#- A choices provider that can't list anything (Home Assistant not set up
+      or unreachable) answers with one blank row whose label says why. Say
+      that once, above the options, rather than in every field. -#}
+  {% set choice_notes = cell_opts | selectattr('choices_note', 'defined') | map(attribute='choices_note') | unique | list %}
+  {% for note in choice_notes %}
+  <p class="ev2-note" data-ev2-choices-note>{{ ico('plug', 'ev2-note-ico') }}<span>{{ note }}</span></p>
+  {% endfor %}
+  {#- The main options stack first; a query preview button (a widget that
+      declares ``query_preview``) is their last row. The manifest's
+      ``advanced`` options go inside "More <widget> settings", whose count is
+      what is showing now (components.js keeps it current with show_if). -#}
+  {% set qp = query_preview_button(plugin, cell.w, cell.h) | trim %}
+  {% if secs.basic or qp %}
+  <div class="ev2-opts">
+    {{ ev2_opt_blocks(cell, secs.basic, cell_opts) }}
+    {% if qp %}<div class="ev2-of ev2-of--act">{{ qp | safe }}</div>{% endif %}
+  </div>
+  {% endif %}
+  {% if secs.advanced %}
+  {#- The summary counts the settings changed from their defaults
+      (widgets.js keeps it current from data-ev2-defaults). -#}
+  {% set _defs = {} %}{% set n_chg = namespace(n=0) %}
+  {% for opt in secs.advanced %}
+    {% set _ = _defs.update({'opt_' ~ opt.name: opt.get('default')}) %}
+    {% set v = cell.options.get(opt.name) %}{% set d = opt.get('default') %}
+    {% if opt.name in cell.options and (v if v is not none else '') | string != (d if d is not none else '') | string %}{% set n_chg.n = n_chg.n + 1 %}{% endif %}
+  {% endfor %}
+  <details class="ev2-adv" data-opt-more data-ev2-adv="more" data-ev2-defaults="{{ _defs | tojson | forceescape }}" {% if not secs.more_visible %}hidden{% endif %}>
+    <summary>{{ ico('caret-right', 'ev2-caret') }}<b>More {{ entry.item or plugin.name }} settings</b><span data-ev2-adv-sum>{{ (n_chg.n ~ ' changed') if n_chg.n else 'defaults' }}</span></summary>
+    <div class="ev2-adv-in"><div class="ev2-opts" data-opt-more-list>
+    {{ ev2_opt_blocks(cell, secs.advanced, cell_opts) }}
+    </div></div>
+  </details>
+  {% endif %}
+
+  {% if not is_bar %}
+  {% set own = [] %}
+  {% if cell.theme %}{% set _ = own.append('theme') %}{% endif %}
+  {% if cell.style %}{% set _ = own.append('style') %}{% endif %}
+  {% if cell.font %}{% set _ = own.append('font') %}{% endif %}
+  {% set n_look = own | length + (0 if (cell.zoom or 1) == 1 or cell.plugin == 'ha_dashboard' else 1) %}
+  <details class="ev2-adv" data-ev2-look data-ev2-adv="look">
+    <summary>{{ ico('caret-right', 'ev2-caret') }}<b>Look of this cell</b><span class="{{ 'ovw' if own }}" data-ev2-look-sum data-ev2-adv-sum>{{ (n_look ~ ' changed') if n_look else 'defaults' }}</span></summary>
+    <div class="ev2-adv-in"><div class="ev2-opts">
+      <div class="ev2-of ev2-oi--short"><label for="ev2-{{ cell.id }}-theme">Theme</label>{{ ev2_select('ev2-' ~ cell.id ~ '-theme', 'theme', theme_options, cell.theme, 'Use dashboard', 'data-ev2-ov="theme"') }}</div>
+      <div class="ev2-of ev2-oi--short"><label for="ev2-{{ cell.id }}-style">Style</label>{{ ev2_select('ev2-' ~ cell.id ~ '-style', 'style', _cell_styles, cell.style, 'Use dashboard', 'data-ev2-ov="style"') }}</div>
+      <div class="ev2-of ev2-oi--short"><label for="ev2-{{ cell.id }}-font">Font</label>{{ ev2_select('ev2-' ~ cell.id ~ '-font', 'font', _font_options, cell.font, 'Use dashboard', 'data-ev2-ov="font"') }}</div>
+      {% if cell.plugin == 'ha_dashboard' %}
+      <input type="hidden" name="zoom" value="{{ cell.zoom }}">
+      <p class="ev2-help">Use Dashboard zoom above to resize Home Assistant cards.</p>
+      {% else %}
+      <div class="ev2-of ev2-of--rng">
+        <label for="ev2-{{ cell.id }}-zoom">Zoom{{ info_pop('Makes text and icons bigger or smaller without changing the cell.') }}</label>
+        <div class="ev2-rng">
+          <input type="range" id="ev2-{{ cell.id }}-zoom" name="zoom" min="0.25" max="2" step="0.05" value="{{ cell.zoom }}" data-ev2-zoom>
+          <span class="ev2-rng-out" data-ev2-zoom-out>{{ '%.2f' | format(cell.zoom) }}×</span>
+        </div>
+      </div>
+      {% endif %}
+    </div></div>
+  </details>
+  {% else %}
+  <input type="hidden" name="zoom" value="{{ cell.zoom }}">
+  {% endif %}
+
+  {% set extras = [] %}
+  {% if cell.update_on_change %}{% set _ = extras.append('refresh on change') %}{% endif %}
+  {% if cell.update_schedule %}{% set _ = extras.append('daily refresh') %}{% endif %}
+  {% if cell.on_tap or cell.on_swipe or cell.on_slide %}{% set _ = extras.append('touch') %}{% endif %}
+  {% if cell.padding_override is not none %}{% set _ = extras.append('own padding') %}{% endif %}
+  {% if cell.dither is not none %}{% set _ = extras.append('flat' if cell.dither == 'none' else 'smooth') %}{% endif %}
+  {% set pad = cell.padding_override %}
+  {% set pad_choice = '' if pad is none else (pad|string if pad in (0, 8, 16) else 'custom') %}
+  <details class="ev2-adv" data-ev2-adv="extras">
+    <summary>{{ ico('caret-right', 'ev2-caret') }}<b>Refresh, taps and dithering</b><span class="{{ 'ovw' if cell.padding_override is not none }}" data-ev2-adv-sum>{{ (extras | length ~ ' changed') if extras else 'defaults' }}</span></summary>
+    <div class="ev2-adv-in"><div class="ev2-opts">
+      {#- The refresh switches are one group, like a widget's own. -#}
+      {% if plugin.on_change_updates %}<input type="hidden" name="update_on_change_present" value="1">{% endif %}
+      {% if plugin.on_schedule_updates %}<input type="hidden" name="update_schedule_present" value="1">{% endif %}
+      {% if plugin.on_change_updates or plugin.on_schedule_updates %}
+      <div class="ev2-oi ev2-swg" data-ev2-swg>
+        {% if plugin.on_change_updates %}
+        <div class="ev2-swr"><div class="ev2-swi">
+          <label for="ev2-{{ cell.id }}-uoc">Refresh when its data changes</label>{{ info_pop('Only on displays already showing this dashboard.') }}
+          <span class="ev2-switch"><input type="checkbox" role="switch" id="ev2-{{ cell.id }}-uoc" name="update_on_change" value="1" {% if cell.update_on_change %}checked{% endif %}><span aria-hidden="true"></span></span>
+        </div></div>
+        {% endif %}
+        {% if plugin.on_schedule_updates %}
+        <div class="ev2-swr"><div class="ev2-swi">
+          <label for="ev2-{{ cell.id }}-daily">Refresh once a day</label>{{ info_pop('After the day changes, or at a time you pick.') }}
+          <span class="ev2-switch"><input type="checkbox" role="switch" id="ev2-{{ cell.id }}-daily" name="update_schedule_enabled" value="1" {% if cell.update_schedule %}checked{% endif %} data-ev2-reveal="ev2-{{ cell.id }}-daily-at"><span aria-hidden="true"></span></span>
+        </div></div>
+        {% endif %}
+      </div>
+      {% endif %}
+      {% if plugin.on_schedule_updates %}
+      {% set schedule_spec = plugin.on_schedule_updates[0] %}
+      {% set schedule_at = cell.update_schedule.at if cell.update_schedule else none %}
+      <div class="ev2-of ev2-daily" id="ev2-{{ cell.id }}-daily-at" {% if not cell.update_schedule %}hidden{% endif %}>
+        <span class="ev2-lbl">When</span>
+        <label class="ev2-radio"><input type="radio" name="update_schedule_timing" value="boundary" {% if not schedule_at %}checked{% endif %}> When the day changes</label>
+        <label class="ev2-radio"><input type="radio" name="update_schedule_timing" value="custom" {% if schedule_at %}checked{% endif %}> At
+          <input class="ev2-input ev2-time" type="time" name="update_schedule_at" aria-label="Refresh time" value="{{ schedule_at or schedule_spec.get('suggested_at', '07:00') }}"></label>
+      </div>
+      {% endif %}
+      <div class="ev2-of">
+        <span class="ev2-lbl"><span id="ev2-{{ cell.id }}-tap-l">When tapped</span>{{ info_pop('For touch panels.') }}</span>
+        <input type="hidden" name="touch_json" data-touch-input
+               value='{{ {"on_tap": cell.on_tap, "on_swipe": cell.on_swipe, "on_slide": cell.on_slide}|tojson }}'>
+        <div data-touch-mount aria-labelledby="ev2-{{ cell.id }}-tap-l"
+             data-touch-value='{{ {"on_tap": cell.on_tap, "on_swipe": cell.on_swipe, "on_slide": cell.on_slide}|tojson }}'
+             data-default-axis="{% if cell.w >= cell.h %}x{% else %}y{% endif %}"
+             data-pages-url="{{ url_for('pages.dashboards_json') }}"
+             data-ha-url="{{ url_for('pages.ha_actions_json') }}"></div>
+      </div>
+      <div class="ev2-of ev2-oi--short" data-ev2-pad>
+        <label for="ev2-{{ cell.id }}-pad">Padding</label>
+        <select class="ev2-select" id="ev2-{{ cell.id }}-pad" data-ev2-pad-choice>
+          <option value="" {% if pad_choice == '' %}selected{% endif %}>Use dashboard</option>
+          <option value="0" {% if pad_choice == '0' %}selected{% endif %}>0 px</option>
+          <option value="8" {% if pad_choice == '8' %}selected{% endif %}>8 px</option>
+          <option value="16" {% if pad_choice == '16' %}selected{% endif %}>16 px</option>
+          <option value="custom" {% if pad_choice == 'custom' %}selected{% endif %}>Custom…</option>
+        </select>
+        <input type="checkbox" name="padding_override_enabled" value="1" hidden {% if pad is not none %}checked{% endif %} data-ev2-pad-on>
+        <div class="ev2-rng" data-ev2-pad-custom {% if pad_choice != 'custom' %}hidden{% endif %}>
+          <input type="range" min="0" max="80" step="1" value="{{ pad if pad is not none else 0 }}" aria-label="Custom padding" data-ev2-pair="pad-{{ cell.id }}">
+          <span class="ev2-numu"><input class="ev2-input ev2-num" inputmode="numeric" name="padding_override" value="{{ pad if pad is not none else 0 }}" aria-label="Custom padding in px" data-ev2-pair="pad-{{ cell.id }}" data-ev2-pad-value><span>px</span></span>
+        </div>
+      </div>
+      <div class="ev2-of" data-ev2-dither>
+        <span class="ev2-lbl"><span id="ev2-{{ cell.id }}-dith-l">Dithering</span>{{ info_pop('Flat is cleaner for solid blocks and line art. Only on e-ink panels the server converts.') }}</span>
+        <input type="checkbox" name="dither_override_enabled" value="1" hidden {% if cell.dither is not none %}checked{% endif %} data-ev2-dither-on>
+        <input type="hidden" name="dither_mode" value="{{ cell.dither or 'none' }}" data-ev2-dither-mode>
+        <div class="ev2-seg ev2-seg--sm" role="group" aria-labelledby="ev2-{{ cell.id }}-dith-l">
+          <button type="button" data-ev2-dither-set="" aria-pressed="{{ 'true' if cell.dither is none else 'false' }}">Use dashboard</button>
+          <button type="button" data-ev2-dither-set="auto" aria-pressed="{{ 'true' if cell.dither == 'auto' else 'false' }}">Smooth</button>
+          <button type="button" data-ev2-dither-set="none" aria-pressed="{{ 'true' if cell.dither == 'none' else 'false' }}">Flat</button>
+        </div>
+      </div>
+    </div></div>
+  </details>
+  {% endif %}
+  {#- The footer: the row's status line first (full width, static/pages/
+      editor_v2/status.js fills it), then "Empty this cell" (link, left),
+      the move buttons and Done (primary, last). -#}
+  {% set status_kind = {'ha_dashboard': 'capture'}.get(cell.plugin) %}
+  <div class="ev2-cv-foot">
+    <p class="ev2-cv-status" data-ev2-cell-status role="status" aria-live="polite"{% if status_kind %} data-ev2-status-kind="{{ status_kind }}"{% endif %}>{% if status_kind == 'capture' %}Checking capture status…{% endif %}</p>
+    {% if not is_bar %}<button type="button" class="ev2-link ev2-link--quiet" data-ev2-empty>Empty this cell</button>{% endif %}
+    <span class="sp"></span>
+    {#- Touch has no drag-to-swap: these two do the same on a phone. -#}
+    {% if not is_bar %}<span class="ev2-mv" role="group" aria-label="Move this widget"><button type="button" class="ev2-iconbtn" data-ev2-move="up" aria-label="Move up" title="Swap with the cell above">{{ ico('arrow-up') }}</button><button type="button" class="ev2-iconbtn" data-ev2-move="down" aria-label="Move down" title="Swap with the cell below">{{ ico('arrow-down') }}</button></span>{% endif %}
+    <button type="button" class="ev2-btn ev2-btn--primary ev2-btn--sm" data-ev2-done>Done</button>
+  </div>
+  <noscript><button type="submit">Save</button></noscript>
+</form>
+{% endmacro %}
+
+{#- Accordion header for one step. ``state``: open | done | wait. -#}
+{% macro step_head(key, n, title, summary='', vis='', warn=False, opt=False, icon=None) -%}
+<h2 class="ev2-st-hd">
+  <button type="button" class="ev2-st-h" id="ev2-h-{{ key }}" aria-expanded="false" aria-controls="ev2-b-{{ key }}" data-ev2-toggle="{{ key }}">
+    <span class="ev2-sn" aria-hidden="true"><span class="ev2-sn-n">{% if icon %}{{ ico(icon) }}{% else %}{{ n }}{% endif %}</span><span class="ev2-sn-ok">{% if icon %}{{ ico(icon) }}{% else %}{{ ico('check', 'ph-bold') }}{% endif %}</span></span>
+    <span class="ev2-st-t">{{ title }}{% if opt %} <span class="ev2-opt">optional</span>{% endif %}</span>
+    <span class="ev2-st-sum{{ ' warn' if warn }}" data-ev2-sum="{{ key }}">{{ summary }}</span>
+    <span class="sp"></span>
+    {% if vis %}<span class="ev2-st-vis" aria-hidden="true" data-ev2-vis="{{ key }}">{{ vis }}</span>{% endif %}
+    <span class="ev2-chg">Change</span>
+  </button>
+</h2>
+{%- endmacro %}
+
+{% macro next_btn(key, label) -%}
+{% if _is_new %}<div class="ev2-st-next"><button type="button" class="ev2-btn ev2-btn--primary" data-ev2-next="{{ key }}">{{ label }}</button></div>{% endif %}
+{%- endmacro %}
+
+{% block main %}
+<div class="ev2" id="ev2"
+     data-page-id="{{ page.id }}"
+     data-new="{{ '1' if _is_new else '0' }}"
+     data-edit-url="{{ _edit_url }}"
+     data-index-url="{{ url_for('pages.index') }}"
+     data-update-url="{{ url_for('pages.update', page_id=page.id) }}"
+     data-layout-url="{{ url_for('pages.apply_layout', page_id=page.id) }}"
+     data-status-bar-url="{{ url_for('pages.status_bar_toggle', page_id=page.id) }}"
+     data-refit-url="{{ url_for('pages.refit_cells', page_id=page.id) }}"
+     data-lineups-url="{{ _edit_url }}/lineups"
+     data-cell-count="{{ _cells | length }}"
+     data-panel-w="{{ panel.w }}" data-panel-h="{{ panel.h }}"
+     data-group-w="{{ _group.w }}" data-group-h="{{ _group.h }}"
+     data-using-test="{{ '1' if _using_test else '0' }}"
+     data-emptied-lineups="{{ (page_emptied_lineups | default([])) | tojson | forceescape }}">
+
+  {#- ---------------------------------------------------------- head -#}
+  <div class="ev2-crumbs">
+    <a href="{{ url_for('pages.index') }}">Dashboards</a><span aria-hidden="true">/</span><span data-ev2-crumb>{{ page.name }}</span>
+    <span class="sp"></span>
+    <span class="ev2-info">
+      <button type="button" class="ev2-info-btn" aria-expanded="false" aria-controls="ev2-info-pop" aria-label="About this editor" title="About this editor" data-ev2-info>{{ ico('info') }}</button>
+      <span class="ev2-info-pop" id="ev2-info-pop" role="group" aria-label="About this editor" hidden>
+        <span class="ev2-info-txt">This is the new dashboard editor.</span>
+        <form method="post" action="{{ url_for('pages.index') }}/editor-version">
+          <input type="hidden" name="version" value="classic">
+          <input type="hidden" name="next" value="{{ _edit_url }}">
+          <button type="submit" class="ev2-btn ev2-btn--sm">Switch to the old editor</button>
+        </form>
+      </span>
+    </span>
+    <span class="ev2-saved" data-ev2-status role="status" aria-live="polite" data-state="saved">{{ ico('check', 'ph-bold') }}<span>Saved</span></span>
+  </div>
+
+  <div class="ev2-sr" role="status" aria-live="polite" data-ev2-live></div>
+
+  <div class="ev2-titlerow">
+    <form method="post" action="{{ url_for('pages.update', page_id=page.id) }}" class="ev2-title-form" data-ev2-name-form>
+      <input type="text" name="name" class="ev2-title" value="{{ page.name }}" aria-label="Dashboard name" placeholder="Name it (or leave it for later)" autocomplete="off" spellcheck="false" data-ev2-name>
+    </form>
+    <form method="post" action="{{ url_for('pages.update', page_id=page.id) }}" class="ev2-icon-form" data-ev2-icon-form>
+      <input type="hidden" name="icon" value="{{ page.icon or '' }}" data-icon-value data-icon-picker-id="ev2-page-icon">
+      <div class="icon-picker ev2-icon-picker" data-icon-picker data-icon-picker-id="ev2-page-icon">
+        <button type="button" class="ev2-iconpick{{ ' set' if page.icon }}" data-icon-trigger aria-label="Dashboard icon{{ ': ' ~ page.icon if page.icon }}" title="Dashboard icon">
+          <span class="icon-picker-current" data-ev2-icon-current>{% if page.icon %}<i class="ph ph-{{ page.icon }}" aria-hidden="true"></i>{% else %}{{ ico('plus') }}<span>Icon</span>{% endif %}</span>
+        </button>
+        <div class="icon-picker-popover" data-icon-popover hidden>
+          <div class="icon-picker-search"><input type="search" placeholder="Search icons…" aria-label="Search icons" data-icon-search autocomplete="off" spellcheck="false"></div>
+          <div class="icon-picker-grid" data-icon-grid></div>
+          <div class="icon-picker-empty" data-icon-empty hidden>No icons match that search.</div>
+        </div>
+      </div>
+    </form>
+  </div>
+  <p class="ev2-sub" data-ev2-sub>
+    {%- if _is_new -%}
+    Four short steps: where it shows, how the screen is split, what goes in each part, and how it looks. Then, if you like, add it to a lineup.
+    {%- else -%}
+    Shows on {% if _using_test %}a {{ _td.w }}×{{ _td.h }} test display{% else %}{{ _bound | map(attribute='label') | join(' and ') }}{% endif %}. {{ _cells | length }} cell{{ '' if _cells | length == 1 else 's' }}, {{ _filled | length }} with widgets.
+    {%- endif -%}
+  </p>
+
+  <div class="ev2-ed">
+    <div class="ev2-steps" id="ev2-steps">
+
+      {#- ====================================================== 1 Display -#}
+      {% set _dsum = ('Test display · ' ~ _td.w ~ '×' ~ _td.h) if _using_test else (_bound | map(attribute='label') | join(', ')) %}
+      {% set _dvis %}{% if _using_test %}{{ mini(_td.w, _td.h, 'test', 'Test display') }}{% else %}{% for d in _bound %}{{ mini(d.w, d.h, '', d.label) }}{% endfor %}{% endif %}{% endset %}
+      <section class="ev2-step" id="ev2-step-display" data-step="display" data-index="1">
+        {{ step_head('display', 1, 'Display', _dsum, _dvis) }}
+        <p class="ev2-st-wait" data-ev2-wait></p>
+        <div class="ev2-st-body" id="ev2-b-display" role="region" aria-labelledby="ev2-h-display" hidden>
+          <p class="ev2-lead">Where will this dashboard show? Pick one or more displays, or use a <b>test display</b> if you don't have one yet.</p>
+          <div class="ev2-st-b">
+            <div class="ev2-pick" role="group" aria-label="Displays">
+              <button type="button" class="ev2-pcard{{ ' on' if _using_test }}" data-ev2-dev="" aria-pressed="{{ 'true' if _using_test else 'false' }}">
+                <span class="ev2-pc-pic">{{ shape(_td.w, _td.h, 'test') }}</span>
+                <span class="ev2-pc-t"><b>Test display</b><small>No hardware needed · {{ _td.w }}×{{ _td.h }}</small></span>
+                <span class="ev2-tick" aria-hidden="true">{% if _using_test %}{{ ico('check', 'ph-bold') }}{% endif %}</span>
+              </button>
+              {% for d in device_options %}
+              <button type="button" class="ev2-pcard{{ ' on' if d.checked }}" data-ev2-dev="{{ d.id }}" aria-pressed="{{ 'true' if d.checked else 'false' }}">
+                <span class="ev2-pc-pic">{{ shape(d.w, d.h, 'dev') }}</span>
+                <span class="ev2-pc-t"><b>{{ d.label }}</b><small>{{ d.dims }}</small></span>
+                <span class="ev2-tick" aria-hidden="true">{% if d.checked %}{{ ico('check', 'ph-bold') }}{% endif %}</span>
+              </button>
+              {% endfor %}
+            </div>
+            {% if _using_test %}
+            {% set _custom = not (_presets | selectattr('0', 'equalto', _td.w) | selectattr('1', 'equalto', _td.h) | list) %}
+            <div class="ev2-sizes">
+              <span class="ev2-lbl" id="ev2-size-l">Test size</span>
+              <div class="ev2-seg ev2-seg--sm ev2-sizeseg" role="group" aria-labelledby="ev2-size-l">
+                {% for w, h in _presets %}
+                <button type="button" data-ev2-size="{{ w }}x{{ h }}" aria-pressed="{{ 'true' if (w == _td.w and h == _td.h) else 'false' }}">{{ w }}×{{ h }}</button>
+                {% endfor %}
+                <span class="ev2-cust" data-on="{{ 'true' if _custom else 'false' }}">
+                  <input id="ev2-tw" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" value="{{ _td.w }}" aria-label="Custom width" data-ev2-custom-size>
+                  <i aria-hidden="true">×</i>
+                  <input id="ev2-th" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" value="{{ _td.h }}" aria-label="Custom height" data-ev2-custom-size>
+                </span>
+              </div>
+            </div>
+            <p class="ev2-help muted">Build and preview now, pick a real display later. You can push once a real display is picked.</p>
+            {% elif preview_groups | length > 1 %}
+            <p class="ev2-help">These displays have different shapes, so the preview gets one tab per shape. The layout stretches to each.</p>
+            {% else %}
+            <p class="ev2-help">Push sends it to the ticked displays only.</p>
+            {% endif %}
+            {% if not device_options %}
+            <p class="ev2-help muted">No displays yet. Add one in <a href="{{ url_for('auth.settings_area', area='devices') }}">Settings → Devices</a>.</p>
+            {% endif %}
+            {{ next_btn('display', 'Next: choose a layout') }}
+          </div>
+        </div>
+      </section>
+
+      {#- ====================================================== 2 Layout -#}
+      {% set _lsum = _layout_name ~ ' · ' ~ (_cells | length) ~ ' cell' ~ ('' if _cells | length == 1 else 's') ~ (' · status bar' if page.status_bar_enabled else '') %}
+      {% set _own = [] %}{% for c in _cells %}{% set _ = _own.append((c.x / panel.w, c.y / panel.h, c.w / panel.w, c.h / panel.h)) %}{% endfor %}
+      {% set _lvis %}{% if _own %}{% set k2 = [36 / _group.w, 22 / _group.h] | min %}{% set TW = (_group.w * k2) | round | int %}{% set TH = (_group.h * k2) | round | int %}<span class="ev2-mlay" style="width:{{ TW }}px;height:{{ TH }}px">{% for x, y, w, h in _own %}<span style="left:{{ (x * TW) | round(1) }}px;top:{{ (y * TH) | round(1) }}px;width:{{ (w * TW) | round(1) }}px;height:{{ (h * TH) | round(1) }}px"></span>{% endfor %}</span>{% endif %}{% endset %}
+      <section class="ev2-step" id="ev2-step-layout" data-step="layout" data-index="2">
+        {{ step_head('layout', 2, 'Layout', _lsum, _lvis) }}
+        <p class="ev2-st-wait" data-ev2-wait></p>
+        <div class="ev2-st-body" id="ev2-b-layout" role="region" aria-labelledby="ev2-h-layout" hidden>
+          <p class="ev2-lead">How should the screen be split? Pick a starting point. Each part becomes a <b>cell</b> that holds one widget.</p>
+          <div class="ev2-st-b">
+            <div class="ev2-lgrid" role="group" aria-label="Layouts">
+              {% if not active_layout and _cells %}
+              <button type="button" class="ev2-lt on" aria-pressed="true" data-ev2-layout="custom" aria-label="Your own layout (current)">{{ lthumb(_own, _group.w, _group.h, _sb_frac, False) }}<span>Your own</span></button>
+              {% endif %}
+              {% for layout in layouts %}
+              <button type="button" class="ev2-lt{{ ' on' if active_layout == layout.slug }}" aria-pressed="{{ 'true' if active_layout == layout.slug else 'false' }}" data-ev2-layout="{{ layout.slug }}" data-slots="{{ layout.cells | length }}" data-name="{{ layout.name }}">{{ lthumb(layout.cells, _group.w, _group.h, _sb_frac) }}<span>{{ layout.name }}</span></button>
+              {% endfor %}
+            </div>
+            <div class="ev2-lrows">
+              <div class="ev2-lrow">
+                <span class="t">Draw your own</span>
+                <span class="d">Split and remove cells on the preview. Resizing works any time: drag the line between two cells.</span>
+                <span class="c"><button type="button" class="ev2-btn ev2-btn--sm" aria-pressed="false" data-ev2-draw {% if not _cells %}disabled{% endif %}>{{ ico('pencil-simple') }}<span>Edit on preview</span></button></span>
+              </div>
+              <div class="ev2-drawbar" data-ev2-drawbar hidden>
+                <p class="ev2-drawhint">{{ ico('cursor-click') }} <span><span class="ev2-click">Click</span><span class="ev2-tap">Tap</span> a cell on the preview to split or remove it.<span class="ev2-click"> Esc stops.</span></span></p>
+                <div class="ev2-drawrow">
+                  <label class="ev2-switch-l">Snap to grid <span class="ev2-switch"><input type="checkbox" role="switch" data-ev2-snap><span aria-hidden="true"></span></span></label>
+                  <span class="ev2-snapdims" data-ev2-snapdims hidden>
+                    <input class="ev2-input ev2-num" inputmode="numeric" value="12" aria-label="Columns" data-ev2-snap-cols> × <input class="ev2-input ev2-num" inputmode="numeric" value="8" aria-label="Rows" data-ev2-snap-rows>
+                  </span>
+                  <span class="sp"></span>
+                  <button type="button" class="ev2-link ev2-link--quiet" data-ev2-refit>Stretch cells to {{ panel.w }}×{{ panel.h }}</button>
+                </div>
+              </div>
+              <div class="ev2-lrow">
+                <span class="t" id="ev2-sbar-l">Status bar</span>
+                <span class="d">A 48 px strip across the top with the time, battery and update dots. Cells move down to make room.</span>
+                <span class="c"><span class="ev2-switch"><input type="checkbox" role="switch" aria-labelledby="ev2-sbar-l" {% if page.status_bar_enabled %}checked{% endif %} data-ev2-sbar><span aria-hidden="true"></span></span></span>
+              </div>
+            </div>
+            {{ next_btn('layout', 'Next: add widgets') }}
+          </div>
+        </div>
+      </section>
+
+      {#- ====================================================== 3 Widgets -#}
+      {% set _all_filled = _filled | length == _cells | length %}
+      {% set _wsum = ((_cells | length) ~ ' widget' ~ ('' if _cells | length == 1 else 's')) if _all_filled else ((_filled | length) ~ ' of ' ~ (_cells | length) ~ ' filled') %}
+      {% set _wvis %}{% for c in _filled[:5] %}{% set e = _wmap.get(c.plugin) or {} %}<span class="ev2-wico" title="{{ e.item or c.plugin }}"><i class="ph {{ e.icon or 'ph-squares-four' }}" aria-hidden="true"></i></span>{% endfor %}{% if _filled | length > 5 %}<span class="ev2-wmore">+{{ _filled | length - 5 }}</span>{% endif %}{% for c in (_cells | rejectattr('plugin') | list)[:3] %}<span class="ev2-wico empty" title="Empty cell"></span>{% endfor %}{% endset %}
+      <section class="ev2-step" id="ev2-step-widgets" data-step="widgets" data-index="3">
+        {{ step_head('widgets', 3, 'Widgets', _wsum, _wvis, warn=not _all_filled) }}
+        <p class="ev2-st-wait" data-ev2-wait></p>
+        <div class="ev2-st-body" id="ev2-b-widgets" role="region" aria-labelledby="ev2-h-widgets" hidden>
+          <p class="ev2-lead">What goes in each cell? <span class="ev2-click">Click</span><span class="ev2-tap">Tap</span> a row, or <b><span class="ev2-click">click</span><span class="ev2-tap">tap</span> a cell on the preview</b>. <span class="ev2-nt">Drag rows to swap two widgets.</span><span class="ev2-t">Open a row to move its widget up or down.</span></p>
+          <div class="ev2-st-b">
+            <ul class="ev2-cells" data-ev2-cells>
+              {% if _sb_cell %}
+              <li class="ev2-cl" data-cell-id="{{ _sb_cell.id }}" data-bar="1">
+                <div class="ev2-cl-head">
+                  <button type="button" class="ev2-cl-row" aria-expanded="false" aria-controls="ev2-cb-{{ _sb_cell.id }}" data-ev2-row>
+                    <span class="ev2-grip none" aria-hidden="true"></span>
+                    <span class="ev2-cl-n"><b>{{ ico('bell') }}<span class="nm">Status bar</span></b><small>Time, battery, update dots</small></span>
+                  </button>
+                  <button type="button" class="ev2-cl-go" tabindex="-1" aria-hidden="true" data-ev2-go>{{ ico('caret-right') }}</button>
+                </div>
+                <div class="ev2-cl-b" id="ev2-cb-{{ _sb_cell.id }}" hidden>{{ cell_body(_sb_cell, 0, True) }}</div>
+              </li>
+              {% endif %}
+              {% for cell in _cells %}
+              {% set e = _wmap.get(cell.plugin) or {} %}
+              {% set plugin = (plugins | selectattr('id', 'equalto', cell.plugin) | list | first) if cell.plugin else None %}
+              <li class="ev2-cl{{ ' empty' if not cell.plugin }}" data-cell-id="{{ cell.id }}" data-n="{{ loop.index }}"
+                  data-ev2-look-rules="{{ (widget_look_rules | default({})).get(cell.plugin, {}) | tojson | forceescape }}"
+                  data-swap-url="{{ url_for('pages.swap_cells', page_id=page.id, cell_id=cell.id) }}"
+                  data-widget="{{ cell.plugin or '' }}" data-item="{{ e.item or (plugin.name if plugin else cell.plugin) or '' }}"
+                  data-shape="{{ shape_word(cell) }}" data-cat="{{ e.category or '' }}">
+                <div class="ev2-cl-head">
+                  <button type="button" class="ev2-cl-row" aria-expanded="false" aria-controls="ev2-cb-{{ cell.id }}" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown" data-ev2-row>
+                    <span class="ev2-grip" draggable="true" title="Drag onto another row to swap the widgets, or press Alt+Up or Alt+Down on the row" aria-hidden="true">{{ ico('dots-six-vertical', 'ph-bold') }}</span>
+                    <span class="ev2-cl-n">
+                      {% if cell.plugin %}
+                      <b><i class="ph {{ e.icon or 'ph-squares-four' }}" aria-hidden="true"></i><span class="nm">{{ e.item or (plugin.name if plugin else cell.plugin) }}</span>{% if e.family %}<span class="ev2-tag">{{ e.family }}</span>{% endif %}</b>
+                      {% set _sum = cell_summary(cell, plugin) | trim if plugin else 'Widget not installed' %}
+                      {% if _sum %}<small>{{ _sum }}</small>{% endif %}
+                      {% else %}
+                      <b><span>Empty</span></b>
+                      <small data-ev2-shape-txt>Cell {{ loop.index }} · {{ shape_word(cell) }}</small>
+                      {% endif %}
+                    </span>
+                  </button>
+                  {% if cell.plugin %}
+                  <button type="button" class="ev2-btn ev2-btn--sm ev2-replace" data-ev2-replace hidden>Replace</button>
+                  <button type="button" class="ev2-cl-go" tabindex="-1" aria-hidden="true" data-ev2-go>{{ ico('caret-right') }}</button>
+                  {% else %}
+                  <button type="button" class="ev2-cl-go ev2-cl-go--pick" tabindex="-1" aria-hidden="true" data-ev2-choose>Choose {{ ico('caret-right') }}</button>
+                  {% endif %}
+                </div>
+                <div class="ev2-cl-b" id="ev2-cb-{{ cell.id }}" hidden>{% if cell.plugin %}{{ cell_body(cell, loop.index) }}{% else %}<form method="post" class="ev2-cell-form" action="{{ url_for('pages.update_cell', page_id=page.id, cell_id=cell.id) }}" data-ev2-cell-form data-cell-id="{{ cell.id }}"><input type="hidden" name="plugin" value="" data-ev2-plugin></form>{% endif %}</div>
+              </li>
+              {% endfor %}
+            </ul>
+            {% if not _cells %}<p class="ev2-help muted">Pick a layout first; each part of it becomes a cell here.</p>{% endif %}
+            {{ next_btn('widgets', 'Next: style it') }}
+          </div>
+        </div>
+      </section>
+
+      {#- ====================================================== 4 Look -#}
+      {% set _theme_label = ((theme_options | selectattr('value', 'equalto', page.theme or 'light') | list | first) or {}).label or page.theme %}
+      {% set _style_label = (((_page_styles | selectattr('value', 'equalto', page.style or 'standard') | list | first) or {}).label or page.style).split(' · ')[0] %}
+      {% set _gap_max = [60, page.gap] | max %}{% set _rad_max = [40, page.corner_radius] | max %}
+      {% set _overrides = look_overrides | default([]) %}
+      {% set _look_summary %}{% if _overrides %}{{ ico('warning') }} {{ _overrides | length }} widget{{ 's' if _overrides | length != 1 }} override{{ 's' if _overrides | length == 1 }} it · {% endif %}{{ _theme_label }} · {{ _style_label }} · padding {{ page.gap }}{% endset %}
+      <section class="ev2-step" id="ev2-step-look" data-step="look" data-index="4">
+        {{ step_head('look', 4, 'Look', _look_summary, warn=_overrides | length > 0, opt=_is_new) }}
+        <p class="ev2-st-wait" data-ev2-wait></p>
+        <div class="ev2-st-body" id="ev2-b-look" role="region" aria-labelledby="ev2-h-look" hidden>
+          <p class="ev2-lead">Set the dashboard defaults here. Cells and widget options can use their own appearance.</p>
+          <div class="ev2-st-b">
+            <div class="ev2-ovbox" data-ev2-ovbox role="note" {% if not _overrides %}hidden{% endif %}>
+              {% if _overrides %}
+              {{ ico('warning') }}
+              <div>
+                <b>{{ _overrides | length }} widget{{ 's have their' if _overrides | length != 1 else ' has its' }} own look settings.</b>
+                Review these settings if the dashboard look has no effect.
+                <ul>
+                  {% for row in _overrides %}
+                  <li>
+                    <button type="button" class="ev2-link ev2-link--quiet" data-ev2-showov="{{ row.cell_id }}">{{ row.name }}</button>
+                    <span>{% for reason in row.reasons %}{% if not loop.first %}, {% endif %}<button type="button" class="ev2-link ev2-link--quiet" data-ev2-showov="{{ row.cell_id }}" data-ev2-setting="{{ reason.field }}">{{ reason.label }}</button>{% endfor %}</span>
+                  </li>
+                  {% endfor %}
+                </ul>
+                {% if _overrides | selectattr('widget_owned') | list %}<p>Review widget options using their links. Resetting cell overrides leaves those options unchanged.</p>{% endif %}
+                {% if _overrides | selectattr('resettable') | list %}<div class="ev2-row-btns"><button type="button" class="ev2-link" data-ev2-resetov>Reset cell look overrides</button></div>{% endif %}
+              </div>
+              {% endif %}
+            </div>
+            <form method="post" action="{{ url_for('pages.update', page_id=page.id) }}" class="ev2-look-form" data-ev2-look-form>
+              <div class="ev2-lk">
+                <div class="ev2-of"><label for="ev2-lk-theme">Theme</label>{{ ev2_select('ev2-lk-theme', 'theme', theme_options, page.theme or 'light') }}</div>
+                <div class="ev2-of"><label for="ev2-lk-style">Style</label>{{ ev2_select('ev2-lk-style', 'style', _page_styles, page.style or 'standard') }}</div>
+                <div class="ev2-of"><label for="ev2-lk-font">Font</label>{{ ev2_select('ev2-lk-font', 'font', _font_options, page.font, "Style's own font") }}</div>
+                <div class="ev2-of">
+                  <span class="ev2-lbl" id="ev2-mat-l">Matting</span>
+                  {% set _mat = (page.bleed_color or '#ffffff') | lower %}
+                  <span class="ev2-sw" role="group" aria-labelledby="ev2-mat-l">
+                    {% for m, label in [('#ffffff', 'White'), ('#f1ece1', 'Paper'), ('#c9c4b8', 'Grey'), ('#1c1b19', 'Black')] %}
+                    <button type="button" style="background:{{ m }}" data-ev2-mat="{{ m }}" aria-pressed="{{ 'true' if _mat == m else 'false' }}" aria-label="Matting {{ label }}" title="{{ label }}"></button>
+                    {% endfor %}
+                    <input type="color" name="bleed_color" value="{{ _mat }}" aria-label="Custom matting colour" data-ev2-matc>
+                  </span>
+                </div>
+                <div class="ev2-of wide">
+                  <label for="ev2-lk-gap">Padding</label>
+                  <div class="ev2-rng">
+                    <input type="range" min="0" max="{{ _gap_max }}" value="{{ page.gap }}" aria-label="Padding" data-ev2-pair="gap">
+                    <span class="ev2-numu"><input class="ev2-input ev2-num" id="ev2-lk-gap" inputmode="numeric" name="gap" value="{{ page.gap }}" data-ev2-pair="gap"><span>px</span></span>
+                  </div>
+                </div>
+                <div class="ev2-of wide">
+                  <label for="ev2-lk-rad">Corners</label>
+                  <div class="ev2-rng">
+                    <input type="range" min="0" max="{{ _rad_max }}" value="{{ page.corner_radius }}" aria-label="Corners" data-ev2-pair="rad">
+                    <span class="ev2-numu"><input class="ev2-input ev2-num" id="ev2-lk-rad" inputmode="numeric" name="corner_radius" value="{{ page.corner_radius }}" data-ev2-pair="rad"><span>px</span></span>
+                  </div>
+                </div>
+              </div>
+              <p class="ev2-help muted ev2-lk-help">Padding is the space between cells and around the edge, filled with the matting colour. Edit or add themes in <a href="{{ url_for('themes.index') }}">Settings → Themes</a>.</p>
+              <details class="ev2-adv" {% if page.custom_css %}open{% endif %}>
+                <summary>{{ ico('caret-right', 'ev2-caret') }}<b>Custom CSS</b><span>{{ 'in use' if page.custom_css else 'for fine tweaks' }}</span></summary>
+                <div class="ev2-adv-in">
+                  <textarea class="ev2-input ev2-css" name="custom_css" rows="4" aria-label="Custom CSS" spellcheck="false" placeholder='[data-widget="weather_now"] .w-title { display: none; }'>{{ page.custom_css or '' }}</textarea>
+                  <p class="ev2-help muted">Reaches the page and the inside of every widget. A widget's root is <code>[data-widget="id"]</code>, its title row <code>.w-title</code>. Saves when you leave the box.</p>
+                </div>
+              </details>
+            </form>
+            {{ next_btn('look', 'Next: add to a lineup') }}
+          </div>
+        </div>
+      </section>
+
+      {#- ============================================ 5 Lineup / Schedules -#}
+      {% macro lineup_rows(avail) -%}
+      {% for l in avail %}
+      {% set where = (l.device_names | join(' and ')) if l.device_names else 'no display yet' %}
+      <button type="button" class="ev2-lp-row" data-ev2-ladd="{{ l.id }}" data-name="{{ l.name }}" data-where="{{ where }}" data-same="{{ '1' if l.same_display or not l.device_ids else '0' }}">
+        <span><b>{{ l.name }}</b><small>{{ where }}</small></span>
+        <span class="ev2-lp-tag{{ '' if (l.same_display or not l.device_ids) else ' warn' }}">{{ 'Same display' if (l.same_display or not l.device_ids) else 'Adds ' ~ where }}</span>
+      </button>
+      {% endfor %}
+      {%- endmacro %}
+      {% macro joined_list() -%}
+      <ul class="ev2-lineups-joined" data-ev2-joined>
+        {% for l in _joined %}
+        <li data-ev2-lrow="{{ l.id }}"{% if not l.enabled %} class="is-off"{% endif %}>
+          <div><b>{{ l.name }}</b><small>{{ 'Schedule' if l.is_schedule else 'Lineup' }} · {{ l.when }}{% if not l.enabled %} · off{% endif %}</small></div>
+          <div class="ev2-lineups-row-actions">
+            {% if l.schedule_dialog %}<button type="button" class="ev2-link" data-open-schedule-dialog="{{ l.schedule_dialog }}">Edit</button>{% else %}<a class="ev2-link" href="{{ l.edit_url }}">Edit</a>{% endif %}
+            <button type="button" class="ev2-link ev2-link--quiet" data-ev2-lremove="{{ l.id }}" data-schedule="{{ '1' if l.is_schedule else '0' }}" data-deletes="{{ '1' if l.deletes_on_leave else '0' }}">Remove</button>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {%- endmacro %}
+      {% macro lineup_confirm() -%}
+      <div class="ev2-confirm" role="alertdialog" aria-labelledby="ev2-lc-t" aria-describedby="ev2-lc-d" data-ev2-lconfirm hidden>
+        <p id="ev2-lc-t"><b data-ev2-lc-title></b> <span data-ev2-lc-sub></span></p>
+        <p class="muted" id="ev2-lc-d" data-ev2-lc-body></p>
+        <div class="ev2-row-btns"><button type="button" class="ev2-link ev2-link--quiet" data-ev2-lcancel>Cancel</button><button type="button" class="ev2-btn ev2-btn--primary ev2-btn--sm" data-ev2-ljoin></button></div>
+      </div>
+      {%- endmacro %}
+      {% set _avail = _lineups | rejectattr('joined') | rejectattr('is_schedule') | list %}
+      {% set _lineup_step = 'lineup' if _is_new else 'schedules' %}
+      {% set _schedule_count = _joined | selectattr('is_schedule') | list | length %}
+      {% set _lineup_summary = 'In ' ~ (_joined | length) ~ ' lineup' ~ ('' if _joined | length == 1 else 's') if _joined else 'Not in any lineup' %}
+      {% if _schedule_count %}{% set _lineup_summary = _lineup_summary ~ ' · ' ~ _schedule_count ~ ' schedule' ~ ('' if _schedule_count == 1 else 's') %}{% endif %}
+      <section class="ev2-step ev2-lineups" id="ev2-step-{{ _lineup_step }}" data-step="{{ _lineup_step }}" data-index="5">
+        <span id="{{ _lineup_step }}" class="ev2-anchor"></span>
+        {{ step_head(_lineup_step, 5, 'Lineups', _lineup_summary, opt=_is_new) }}
+        {% if _is_new %}<p class="ev2-st-wait" data-ev2-wait></p>{% endif %}
+        <div class="ev2-st-body" id="ev2-b-{{ _lineup_step }}" role="region" aria-labelledby="ev2-h-{{ _lineup_step }}" hidden>
+          <p class="ev2-lead">Lineups decide when this dashboard shows: on its own schedule, or rotating with others.</p>
+          <div class="ev2-st-b" data-ev2-lineups>
+            {% if _joined %}{{ joined_list() }}{% else %}<p class="ev2-none">Not in any lineup.</p>{% endif %}
+            <div class="ev2-lpick" data-ev2-lpick hidden>
+              {{ lineup_rows(_avail) }}
+              {% if not _avail %}<p class="ev2-none">No other lineups to join.</p>{% endif %}
+              <div class="ev2-row-btns"><a class="ev2-link ev2-link--quiet" href="{{ new_lineup_url }}">Make a new lineup</a><button type="button" class="ev2-link ev2-link--quiet" data-ev2-lclose>Cancel</button></div>
+            </div>
+            {{ lineup_confirm() }}
+            <div class="ev2-lineups-actions">
+              <a class="ev2-link ev2-link--quiet" href="{{ url_for('decks.index') }}">All lineups</a>
+              <button type="button" class="ev2-btn ev2-btn--sm" data-ev2-lopen data-ev2-ladd-row>Add to a lineup</button>
+              <button type="button" class="ev2-btn ev2-btn--primary ev2-btn--sm" data-open-schedule-dialog="schedule-dialog-new">New scheduled lineup</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section id="ev2-preview" class="ev2-pv" aria-label="Preview">
+      {% include "partials/page_editor_v2_preview.html" ignore missing %}
+    </section>
+  </div>
+</div>
+
+{#- ---------------------------------------------------------- bottom bar -#}
+{% set _push_label = 'Push to display' if _using_test else ('Push to ' ~ _bound[0].label if _bound | length == 1 else 'Push to ' ~ (_bound | length) ~ ' displays') %}
+{% set _lineup_names = page_lineups | default([]) %}
+{% set _emptied = page_emptied_lineups | default([]) %}
+<div class="ev2-bar" id="ev2-bar" data-ev2-bar>
+  {% if _is_new %}
+  <span class="ev2-bar-st" data-ev2-bar-st><span class="ev2-long">Step 1 of 5 · changes save as you go{% if _cells %} · <b>{{ _filled | length }} of {{ _cells | length }} cell{{ '' if _cells | length == 1 else 's' }} filled</b>{% endif %}</span><span class="ev2-short">Step 1 of 5</span></span>
+  <form method="post" action="{{ url_for('pages.delete', page_id=page.id) }}" class="ev2-inline" data-ev2-discard>
+    <input type="hidden" name="remove_from_lineups" value="1">
+    <button type="submit" class="ev2-link ev2-link--danger" title="Delete this new dashboard">Discard</button>
+  </form>
+  <a class="ev2-btn ev2-btn--primary" href="{{ _edit_url }}" data-ev2-finish>Done</a>
+  {% else %}
+  <span class="ev2-bar-st"><span class="ev2-long">Changes save as you go.{% if _using_test %} <b>On a test display, so Push is off.</b>{% endif %}</span><span class="ev2-short">{% if _using_test %}Test display · Push off{% endif %}</span></span>
+  <form method="post" action="{{ url_for('pages.duplicate', page_id=page.id) }}" class="ev2-inline" data-ev2-after-save>
+    <button type="submit" class="ev2-iconbtn" title="Duplicate dashboard" aria-label="Duplicate dashboard">{{ ico('copy') }}</button>
+  </form>
+  <form method="post" action="{{ url_for('pages.delete', page_id=page.id) }}" class="ev2-inline"
+        data-confirm="{% if _lineup_names %}{{ page.name }} is in the lineup{{ '' if _lineup_names|length == 1 else 's' }} {{ _lineup_names|join(', ') }}. Delete it and remove it from {{ 'it' if _lineup_names|length == 1 else 'them' }}?{% if _emptied %} {{ 'Lineup' if _emptied|length == 1 else 'Lineups' }} {{ _emptied|join(', ') }} {{ 'has' if _emptied|length == 1 else 'have' }} no other dashboard and will be deleted too.{% endif %}{% else %}Delete this dashboard entirely?{% endif %}"
+        data-ev2-confirm-submit>
+    {% if _lineup_names %}<input type="hidden" name="remove_from_lineups" value="1">{% endif %}
+    <button type="submit" class="ev2-iconbtn" title="Delete dashboard" aria-label="Delete dashboard">{{ ico('trash') }}</button>
+  </form>
+  <form method="post" action="{{ url_for('send.send_page') }}" class="ev2-inline" data-ev2-after-save>
+    <input type="hidden" name="page_id" value="{{ page.id }}">
+    <input type="hidden" name="return_to" value="editor">
+    <button type="submit" class="ev2-btn ev2-btn--primary" {% if _using_test %}disabled title="Pick a real display in step 1 to push"{% else %}title="Push this dashboard to {{ 'its display' if _bound | length == 1 else 'every ticked display' }}"{% endif %}>{{ ico('paper-plane-tilt') }}<span class="ev2-long">{{ _push_label }}</span><span class="ev2-short">Push</span></button>
+  </form>
+  {% endif %}
+</div>
+
+{#- ---------------------------------------------------------- widget catalog -#}
+<div class="ev2-pk-scrim" data-ev2-pk-scrim hidden></div>
+<div class="ev2-pk-pop" id="ev2-pk" role="dialog" aria-modal="true" aria-labelledby="ev2-pk-title" data-ev2-pk hidden>
+  <div class="ev2-pk-head">
+    <h3 id="ev2-pk-title" data-ev2-pk-title>Choose a widget</h3>
+    <span class="sp"></span>
+    <button type="button" class="ev2-link ev2-link--quiet" data-ev2-pk-keep hidden>Keep current</button>
+    <button type="button" class="ev2-iconbtn" aria-label="Close" title="Close (Esc)" data-ev2-pk-close>{{ ico('x') }}</button>
+  </div>
+  <p class="ev2-pk-sub"><span class="ev2-click">Click</span><span class="ev2-tap">Tap</span> one to use it.</p>
+  <div class="ev2-wp-search">{{ ico('magnifying-glass') }}<input type="search" class="ev2-input" placeholder="Search all widgets" aria-label="Search all widgets" autocomplete="off" spellcheck="false" data-ev2-pk-q></div>
+  <div class="ev2-pk">
+    <nav class="ev2-pk-cats" aria-label="Widget categories" data-ev2-pk-cats></nav>
+    <ul class="ev2-pk-list" aria-label="Widgets" data-ev2-pk-list></ul>
+  </div>
+</div>
+
+{#- ---------------------------------------------------------- schedule dialogs (#280) -#}
+{% set _schedule_next = lineups_return_url %}
+{% macro schedule_dialog(dialog_id, title, icon, s, edit_mode, next_url) %}
+<dialog id="{{ dialog_id }}" class="wizard-dialog schedule-dialog" aria-labelledby="{{ dialog_id }}-title" data-schedule-dialog>
+  <div class="wizard-head">
+    <span class="wizard-head-icon" aria-hidden="true"><i class="ph ph-{{ icon }}"></i></span>
+    <div class="wizard-head-text">
+      <h2 id="{{ dialog_id }}-title">{{ title }}</h2>
+      <p class="wizard-progress">Fires {{ page.name }}. Pick a cadence, add conditions if you need them.</p>
+    </div>
+    <button type="button" class="wizard-close" data-schedule-dialog-close aria-label="Close">
+      <i class="ph ph-x" aria-hidden="true"></i>
+    </button>
+  </div>
+  <div class="wizard-body">
+    <p class="schedule-dialog-note" data-schedule-dialog-note hidden></p>
+    {{ schedule_form(s, edit_mode, schedule_pages, schedule_devices, next_url=next_url, in_dialog=true) }}
+  </div>
+</dialog>
+{% endmacro %}
+{% set _blank_schedule = {'id': '', 'name': '', 'page_id': page.id, 'enabled': true, 'type': 'interval', 'interval_minutes': 30, 'fires_at': none, 'device_ids': [], 'time_of_day_start': '', 'time_of_day_end': '', 'priority': 0, 'days_of_week': [0,1,2,3,4,5,6], 'smart_sync': false, 'smart_sync_lead_s': 10} %}
+{{ schedule_dialog('schedule-dialog-new', 'New scheduled lineup', 'plus-circle', _blank_schedule, false, _schedule_next) }}
+{% for s in schedules_for_page %}
+{{ schedule_dialog('schedule-dialog-' ~ s.id, 'Edit scheduled lineup', 'pencil-simple', s, true, _schedule_next) }}
+{% endfor %}
+
+{#- Catalog data: the contract's widget_catalog when the backend sends it,
+    otherwise the classic picker's entries (same fields, older names). -#}
+<script type="application/json" id="ev2-catalog-data">{{ (widget_catalog if (widget_catalog is defined and widget_catalog) else widget_picker) | tojson }}</script>
+<script src="{{ url_for('static', filename='touch_interaction.js') }}"></script>
+<script src="{{ url_for('static', filename='pages/editor_v2/shell.js') }}"></script>
+<script src="{{ url_for('static', filename='pages/editor_v2/steps.js') }}"></script>
+<script src="{{ url_for('static', filename='pages/editor_v2/widgets.js') }}"></script>
+<script src="{{ url_for('static', filename='pages/editor_v2/status.js') }}"></script>
+<script src="{{ url_for('static', filename='pages/editor_v2/catalog.js') }}"></script>
+<script src="{{ url_for('static', filename='pages/editor_v2/look.js') }}"></script>
+<script src="{{ url_for('static', filename='pages/editor_v2/lineup.js') }}"></script>
+{{ schedule_form_scripts() }}
+{% endblock %}

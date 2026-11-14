@@ -16,6 +16,7 @@
   "cell_options": [
     {
       "name": "feeds_filter",
+      "placeholder": "a1b2c3d4e5f6,7a8b9c0d1e2f",
       "type": "string",
       "label": "Calendars",
       "default": "",

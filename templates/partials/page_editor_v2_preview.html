@@ -1,0 +1,95 @@
+{#- Dashboard editor v2: the live preview pane.
+
+    Included by page_editor_v2.html inside <section id="ev2-preview">. Uses the
+    same context as the classic editor (_editor_context): page, panel,
+    preview_groups, layout_editor_cells, widget_names. Everything visual is
+    built by static/pages/editor_v2/preview.js from the JSON below, so the
+    pane can rebuild itself when the displays or the layout change.
+
+    Steps <-> preview events and window.EV2Preview are documented at the top
+    of preview.js. -#}
+{%- from "_preview_color.html" import attrs as color_attrs with context -%}
+{%- set _ev2pv_groups = [] -%}
+{%- for g in preview_groups -%}
+  {%- set _ids = g.device_ids | default([]) -%}
+  {%- set _color = preview_color(_ids) -%}
+  {%- set _ = _ev2pv_groups.append({
+        "key": g.w ~ "x" ~ g.h,
+        "w": g.w,
+        "h": g.h,
+        "devices": g.devices | default([]),
+        "deviceIds": _ids,
+        "label": (g.devices | join(", ")) if g.devices else "Test display",
+        "kind": "test" if not g.devices else ("tv" if g.gamut == "rgb24" else "eink"),
+        "gamut": _color.gamut,
+        "greyLevels": _color.levels,
+      }) -%}
+{%- endfor -%}
+{%- set _ev2pv = {
+      "pageId": page.id,
+      "panel": {"w": panel.w, "h": panel.h},
+      "cells": layout_editor_cells,
+      "statusBarCellId": page.status_bar_cell_id if page.status_bar_enabled else none,
+      "widgetNames": widget_names,
+      "groups": _ev2pv_groups,
+      "version": config.APP_VERSION,
+      "urls": {
+        "batch": url_for("pages.batch_cells", page_id=page.id),
+        "compose": url_for("composer.compose", page_id=page.id),
+        "panel": url_for("composer.compose_panel_preview", page_id=page.id),
+        "edit": url_for("pages.edit", page_id=page.id),
+      },
+    } -%}
+<link rel="stylesheet" href="{{ url_for('static', filename='style/editor_v2_preview.css') }}">
+<div class="ev2pv" data-ev2-preview>
+  <script type="application/json" data-ev2pv-data>{{ _ev2pv | tojson }}</script>
+
+  {# One tab per display shape; preview.js fills it when there is more than one. #}
+  <div class="ev2pv-tabs" data-ev2pv-tabs role="group" aria-label="Display shape" hidden></div>
+
+  <div class="ev2pv-tools">
+    <div class="ev2pv-seg" role="group" aria-label="Preview mode">
+      <button type="button" data-ev2pv-mode="live" aria-pressed="true"
+              title="Full-colour render">Live</button>
+      <button type="button" data-ev2pv-mode="panel" aria-pressed="false"
+              title="Exactly what the e-ink panel shows, after dithering">As the panel shows it</button>
+    </div>
+    <div class="ev2pv-icons">
+      <button type="button" class="ev2pv-iconbtn" data-ev2pv-reload
+              title="Re-render now with fresh widget data" aria-label="Re-render now">
+        <i class="ph ph-arrow-clockwise" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="ev2pv-iconbtn" data-ev2pv-native
+              title="Open at 100%" aria-label="Open at 100%">
+        <i class="ph ph-corners-out" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="ev2pv-done" data-ev2pv-done hidden>Done drawing</button>
+    </div>
+  </div>
+
+  {# The display colour mode per shape, from the same macro the classic editor
+     and the dashboard list use (data-gamut / data-grey-levels). preview.js
+     reads it and puts it on each canvas, where preview-color.css greys or
+     thresholds the Live render to match a grey or black-and-white panel. #}
+  <span hidden aria-hidden="true">
+    {%- for g in _ev2pv_groups %}
+    <i data-ev2pv-color="{{ g.key }}" {{ color_attrs(g.deviceIds) }}></i>
+    {%- endfor %}
+  </span>
+  <div class="ev2pv-groups" data-ev2pv-groups></div>
+
+  <p class="ev2pv-hint" data-ev2pv-hint></p>
+  <p class="ev2pv-status" data-ev2pv-status role="status" aria-live="polite"></p>
+
+  <dialog class="ev2pv-native" data-ev2pv-dialog aria-labelledby="ev2pv-native-title">
+    <div class="ev2pv-native-head">
+      <h2 id="ev2pv-native-title">Preview at 100%</h2>
+      <button type="button" class="ev2pv-iconbtn" data-ev2pv-dialog-close aria-label="Close">
+        <i class="ph ph-x" aria-hidden="true"></i>
+      </button>
+    </div>
+    <p class="ev2pv-native-help">One image pixel per screen pixel. Scroll to see the whole display.</p>
+    <div class="ev2pv-native-scroll" data-ev2pv-native-media></div>
+  </dialog>
+</div>
+<script src="{{ url_for('static', filename='pages/editor_v2/preview.js') }}" defer></script>

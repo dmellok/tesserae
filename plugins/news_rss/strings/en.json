@@ -5,5 +5,6 @@
   "weeks_abbr": "w",
   "months_abbr": "mo",
   "feed": "Feed",
-  "no_items": "No items."
+  "no_items": "No items.",
+  "cell_options.url.placeholder": "https://news.ycombinator.com/rss"
 }

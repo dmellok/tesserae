@@ -20,5 +20,6 @@
   "not_found": "not found",
   "entities": "Entities",
   "no_entities_selected": "No entities selected.",
-  "changed": "changed"
+  "changed": "changed",
+  "cell_options.number_format.placeholder": "0.00"
 }

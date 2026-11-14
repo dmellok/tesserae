@@ -1,0 +1,233 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Picture, Google Shared Album",
+  "version": "0.4.0",
+  "kind": "widget",
+  "requires": [
+    "network:photos.app.goo.gl",
+    "network:photos.google.com",
+    "network:lh3.googleusercontent.com"
+  ],
+  "description": "Rotates through photos in a Google Photos album shared by link, full bleed. In Google Photos: open the album, Share, 'Create link', then paste the link (https://photos.app.goo.gl/…). Reads the public share page directly, no Google account or API key needed.",
+  "icon": "ph-google-photos-logo",
+  "supports": {
+    "sizes": [
+      "sm",
+      "md",
+      "lg"
+    ]
+  },
+  "cell_options": [
+    {
+      "name": "album",
+      "type": "string",
+      "label": "Album link",
+      "default": "",
+      "help": "The shared album's link, such as https://photos.app.goo.gl/..."
+    },
+    {
+      "name": "mode",
+      "type": "select",
+      "label": "Selection",
+      "default": "random",
+      "choices": [
+        {
+          "value": "random",
+          "label": "Random each render"
+        },
+        {
+          "value": "sequential",
+          "label": "Sequential (rotates one per render)"
+        }
+      ]
+    },
+    {
+      "name": "orientation",
+      "type": "select",
+      "label": "Orientation",
+      "default": "any",
+      "choices": [
+        {
+          "value": "any",
+          "label": "Any"
+        },
+        {
+          "value": "portrait",
+          "label": "Portrait"
+        },
+        {
+          "value": "landscape",
+          "label": "Landscape"
+        },
+        {
+          "value": "square",
+          "label": "Square"
+        },
+        {
+          "value": "splitview",
+          "label": "Split view"
+        }
+      ],
+      "help": "Only photos of this shape. Split view shows a portrait photo as a pair in a landscape cell, or a landscape photo as a pair in a portrait cell. Square photos and near-square cells are never paired. Split view pairs only with random selection."
+    },
+    {
+      "name": "scale",
+      "type": "select",
+      "label": "Scale",
+      "default": "fit",
+      "choices": [
+        {
+          "value": "fit",
+          "label": "Fit (letterbox)"
+        },
+        {
+          "value": "fill",
+          "label": "Fill (crop to cover)"
+        },
+        {
+          "value": "stretch",
+          "label": "Stretch (distort to fill)"
+        },
+        {
+          "value": "blurred",
+          "label": "Fit with blurred background"
+        }
+      ]
+    },
+    {
+      "name": "show_caption",
+      "type": "boolean",
+      "label": "Caption",
+      "default": true,
+      "help": "The photo's date and the album name over the bottom of the photo.",
+      "advanced": true,
+      "show_if": {
+        "orientation": {
+          "not": "splitview"
+        }
+      }
+    },
+    {
+      "name": "show_sequence",
+      "type": "boolean",
+      "label": "Position in the album",
+      "default": true,
+      "help": "Which photo this is out of how many, such as 3 / 12.",
+      "advanced": true,
+      "show_if": {
+        "orientation": {
+          "not": "splitview"
+        }
+      }
+    },
+    {
+      "name": "pair_gap",
+      "type": "number",
+      "label": "Gap between pair",
+      "default": 2,
+      "advanced": true,
+      "help": "Space between the two photos of a pair, in pixels. 0 for none.",
+      "min": 0,
+      "max": 100,
+      "show_if": {
+        "orientation": "splitview"
+      }
+    },
+    {
+      "name": "pair_divider",
+      "type": "select",
+      "label": "Divider colour",
+      "default": "background",
+      "advanced": true,
+      "choices": [
+        {
+          "value": "background",
+          "label": "Background"
+        },
+        {
+          "value": "white",
+          "label": "White"
+        },
+        {
+          "value": "black",
+          "label": "Black"
+        }
+      ],
+      "help": "Colour of the gap between the two photos of a pair.",
+      "show_if": {
+        "orientation": "splitview"
+      }
+    },
+    {
+      "name": "include_videos",
+      "type": "boolean",
+      "label": "Videos",
+      "default": false,
+      "help": "Includes the album's videos, shown as a still frame.",
+      "advanced": true
+    }
+  ],
+  "lineups": {
+    "draw": true
+  },
+  "render": {
+    "dither": "floyd-steinberg",
+    "needs_network": true,
+    "full_bleed": true
+  },
+  "data_schema": {
+    "fields": [
+      {
+        "name": "url",
+        "type": "str",
+        "label": "Photo URL"
+      },
+      {
+        "name": "date",
+        "type": "str",
+        "label": "Date taken (ISO)"
+      },
+      {
+        "name": "stream",
+        "type": "str",
+        "label": "Album name"
+      },
+      {
+        "name": "width",
+        "type": "num",
+        "label": "Photo width (px)"
+      },
+      {
+        "name": "height",
+        "type": "num",
+        "label": "Photo height (px)"
+      },
+      {
+        "name": "index",
+        "type": "num",
+        "label": "Sequence index (1-based)"
+      },
+      {
+        "name": "count",
+        "type": "num",
+        "label": "Photos after filter"
+      },
+      {
+        "name": "url2",
+        "type": "str",
+        "label": "Second photo URL (pair)"
+      }
+    ],
+    "sample": {
+      "url": "https://lh3.googleusercontent.com/pw/EXAMPLE=w2048-h1536",
+      "id": "AF1QipExample",
+      "date": "2026-07-14T09:30:00Z",
+      "stream": "Family Album",
+      "width": 2048,
+      "height": 1536,
+      "index": 3,
+      "count": 12,
+      "url2": null
+    }
+  }
+}
