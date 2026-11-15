@@ -1657,18 +1657,27 @@ def devices_update_combined(instance_id: str) -> Response:
             ok_messages.append("panel updated")
             any_change = True
 
-    # 4. Quiet-hours override. The inputs always submit on the combined
-    # form (toggle, start, end). Empty start+end with toggle off clears
-    # the block; the service helper handles that.
-    if "quiet_hours_enabled" in form or "quiet_hours_start" in form or "quiet_hours_end" in form:
+    # 4. Quiet-hours override. With Own hours off, the page disables the
+    # times and the pickers, and an unchecked switch posts nothing, so the
+    # form's ``quiet_hours__present`` marker is the only sign the section
+    # was submitted (#523). The times it could not post are kept as
+    # stored, so switching the override back on restores the window.
+    if (
+        "quiet_hours__present" in form
+        or "quiet_hours_enabled" in form
+        or "quiet_hours_start" in form
+        or "quiet_hours_end" in form
+    ):
+        stored_dev = devices_registry.get(instance_id)
+        stored_qh = (stored_dev.manifest.get("quiet_hours") if stored_dev else None) or {}
         qh_result = device_service.update_instance_quiet_hours(
             devices=devices_registry,
             renderers=renderers(),
             data_root=device_data_root(),
             instance_id=instance_id,
             enabled=bool(form.get("quiet_hours_enabled")),
-            start=form.get("quiet_hours_start"),
-            end=form.get("quiet_hours_end"),
+            start=form.get("quiet_hours_start", stored_qh.get("start")),
+            end=form.get("quiet_hours_end", stored_qh.get("end")),
             **_quiet_days_from_form(form),
         )
         if not qh_result.ok:
