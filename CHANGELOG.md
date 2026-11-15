@@ -19,6 +19,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - Device page: a display's **Own hours** switch under Quiet hours can be turned off again. Saving with it off left it on, because the page sent nothing for that section. The window you set is kept for when you switch it back on. (#523)
 - Lineup editor: a dashboard switched from canvas to grid lists its items again (its leftover canvas data counted as a second widget).
 - New dashboard editor: adding a dashboard to a rotating lineup, or removing it, shows the right dashboard on the next tick instead of at the next boundary. A lineup is deleted by leaving it only when the request confirms it, and a lineup whose times can't be described no longer stops the editor from opening.
+- News, Wikipedia On This Day: the date follows your timezone setting. It used UTC, so west of Greenwich it showed tomorrow's entries from the early evening until local midnight.
 
 ## [0.513.0], 2026-11-15
 
