@@ -6,6 +6,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.512.0], 2026-11-15
+
 ### Added
 
 - Home Assistant, Dashboard widget: a **Fit to cell** option shrinks the dashboard until all of it fits, so a view taller than the cell is no longer cut off at the bottom. **Zoom** then sets the largest size it may be drawn at.
