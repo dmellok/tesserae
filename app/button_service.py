@@ -2309,10 +2309,24 @@ class ButtonService:
         # the rotation position (or was a rotation-manipulating action
         # in general). page:<id> shortcuts don't set an override; the
         # scheduler resumes on the next timer wake.
-        if rotation is not None and result.target_page_id is None:
-            landed = self._skip_failing_steps(rotation, current_step_index, result.new_step_index)
+        # Only Next / Previous skip. An explicit ``step:<n>`` goes where it
+        # was told, whatever that step's conditions say.
+        action_name = str(spec).split(":", 1)[0].strip()
+        direction = {"rotate_next": 1, "rotate_prev": -1}.get(action_name)
+        if rotation is not None and result.target_page_id is None and direction is not None:
+            landed = self._skip_failing_steps(
+                rotation, current_step_index, result.new_step_index, direction
+            )
             if landed != result.new_step_index:
-                result = replace(result, new_step_index=landed)
+                # Say where the press landed, so History doesn't name the
+                # step it skipped.
+                described = (
+                    f"{action_name} no-op (no other step's conditions pass)"
+                    if landed == current_step_index
+                    else f"{action_name} -> step {landed} "
+                    f"(skipped step {result.new_step_index}, conditions fail)"
+                )
+                result = replace(result, new_step_index=landed, description=described)
         rotation_changed = rotation is not None and result.new_step_index != current_step_index
         wants_hold = (
             rotation is not None
@@ -2701,13 +2715,16 @@ class ButtonService:
             return 0
         return idx
 
-    def _skip_failing_steps(self, rotation: Rotation, start: int, index: int) -> int:
-        """Next / Previous land on a step whose conditions pass, walking the
-        same way the press moved; back to ``start`` when none does."""
+    def _skip_failing_steps(
+        self, rotation: Rotation, start: int, index: int, direction: int
+    ) -> int:
+        """Next / Previous land on a step whose conditions pass, walking on
+        in ``direction`` (1 forward, -1 back); back to ``start`` when none
+        does."""
         if self._step_ok is None or index == start:
             return index
         n = len(rotation.steps)
-        step = 1 if (index - start) % n <= n // 2 else -1
+        step = 1 if direction >= 0 else -1
         idx = index
         for _ in range(n):
             try:

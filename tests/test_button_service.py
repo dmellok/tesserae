@@ -1357,6 +1357,62 @@ def test_next_and_previous_skip_steps_whose_conditions_fail(
     assert result.step_index == 2  # Previous from B skips A's page backwards to photos
 
 
+def test_an_explicit_step_goes_where_it_was_told(
+    rotation_store: RotationStore,
+    state_store: DeviceRotationStateStore,
+    settings_store: SettingsStore,
+    page_store: PageStore,
+    push_manager: StubPushManager,
+    clock: FakeClock,
+) -> None:
+    """Only Next / Previous skip. A button mapped to ``step:0`` shows step 0
+    even while its conditions fail; it is not moved on to step 1."""
+    _printers_first(rotation_store)
+    settings_store.patch_section("devices", {"kitchen": {"button_map": {"top": "step:0"}}})
+    svc = _wire_live(
+        2,
+        {1, 2},
+        rotation_store=rotation_store,
+        state_store=state_store,
+        settings_store=settings_store,
+        page_store=page_store,
+        push_manager=push_manager,
+        clock=clock,
+    )
+    result = svc.handle_button(device_id="kitchen", button="top", event_id=1)
+    assert result.step_index == 0 and result.pushed_page_id == "morning"
+    assert result.action_description == "step -> 0"
+
+
+def test_a_skipping_press_says_where_it_landed(
+    rotation_store: RotationStore,
+    state_store: DeviceRotationStateStore,
+    settings_store: SettingsStore,
+    page_store: PageStore,
+    push_manager: StubPushManager,
+    clock: FakeClock,
+) -> None:
+    _printers_first(rotation_store)
+    stores: dict[str, Any] = dict(
+        rotation_store=rotation_store,
+        state_store=state_store,
+        settings_store=settings_store,
+        page_store=page_store,
+        push_manager=push_manager,
+        clock=clock,
+    )
+    svc = _wire_live(2, {1, 2}, **stores)
+    result = svc.handle_button(device_id="kitchen", button="right", event_id=1)
+    assert result.step_index == 1
+    assert result.action_description == "rotate_next -> step 1 (skipped step 0, conditions fail)"
+
+    state_store.upsert(state_store.get("kitchen").model_copy(update={"override_until": None}))
+    svc = _wire_live(2, {2}, **stores)
+    result = svc.handle_button(device_id="kitchen", button="right", event_id=2)
+    assert result.step_index == 2
+    assert result.action_description == "rotate_next no-op (no other step's conditions pass)"
+
+
 def test_without_a_scheduler_a_press_keeps_the_old_first_step(
     rotation_store: RotationStore,
     state_store: DeviceRotationStateStore,
