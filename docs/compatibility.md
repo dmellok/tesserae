@@ -79,6 +79,8 @@ Tesserae chooses each model's protocol and renderer when it pairs. Click a produ
 !!! info "Some links are affiliate links"
     Seeed product links and the Pimoroni Inky Frame and Inky Impression links carry a Tesserae affiliate tag. Buying through them pays a small commission to the project. Seeed links also give a discount at checkout.
 
+    Seeed also has a discount code: **TESSERAE** gives a discount at seeedstudio.com on the reTerminal E-Series, the reTerminal Sticky and the OpenDisplay kits.
+
     Tags do not affect which products are listed or their tested / not-tested status. Other links are plain product links.
 
     Fraimic links are plain links, with a discount code instead: **TESSERAE10** takes 10% off at fraimic.com. Fraimic supplied a Large Canvas to Tesserae free of charge, and Tesserae earns a commission on sales made with the code.

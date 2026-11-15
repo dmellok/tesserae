@@ -27,10 +27,11 @@ import logging
 import re
 import sys
 from collections.abc import Callable, Collection
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from types import ModuleType
 from typing import Any
+from urllib.parse import urlsplit
 
 import jsonschema
 from flask import (
@@ -52,6 +53,7 @@ from werkzeug.wrappers import Response
 from app import schema_validation
 from app.capabilities import Capabilities, set_delegate_resolver
 from app.capabilities import parse as _parse_capabilities
+from app.state.settings_store import SettingsStore
 
 logger = logging.getLogger(__name__)
 
@@ -434,6 +436,7 @@ def discover(
     data_root: Path,
     additional_plugins_dirs: list[Path] | None = None,
     disabled_ids: Collection[str] = (),
+    settings_store: SettingsStore | None = None,
 ) -> PluginRegistry:
     """Walk ``plugins_dir`` and ``additional_plugins_dirs`` (if any) and
     return a registry of validated plugins.
@@ -473,7 +476,32 @@ def discover(
     # directory order.
     def _delegate(plugin_id: str) -> Capabilities | None:
         target = registry.get(plugin_id) or registry.disabled.get(plugin_id)
-        return target.capabilities if target is not None else None
+        if target is None:
+            return None
+
+        capabilities = target.capabilities
+        if plugin_id != "ha_core" or capabilities is None or settings_store is None:
+            return capabilities
+
+        plugins_settings = settings_store.get_section("plugins")
+        ha_settings = plugins_settings.get("ha_core")
+        base_url = ha_settings.get("base_url") if isinstance(ha_settings, dict) else None
+        if not isinstance(base_url, str):
+            return capabilities
+        try:
+            parsed_url = urlsplit(base_url.strip())
+        except ValueError:
+            return capabilities
+        if parsed_url.scheme not in {"http", "https"} or not parsed_url.hostname:
+            return capabilities
+
+        # ha_core is the shared Home Assistant client; a plugin that
+        # explicitly delegates to it may reach only its configured host.
+        return replace(
+            capabilities,
+            network_hosts=capabilities.network_hosts | {parsed_url.hostname},
+            declared=True,
+        )
 
     set_delegate_resolver(_delegate)
     registry.apply_disabled(disabled_ids)

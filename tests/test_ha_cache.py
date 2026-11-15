@@ -291,3 +291,131 @@ def test_the_helper_survives_a_store_that_cannot_answer() -> None:
     with app.app_context(), pytest.raises(RuntimeError) as err:
         core.get_states()
     assert "not configured" in str(err.value)
+
+
+# ---------------------------------------------------------------------------
+# ha_core.theme_names / theme_choices
+
+
+def _themes_result(*names: str) -> dict[str, Any]:
+    return {
+        "success": True,
+        "result": {"themes": {n: {} for n in names}, "default_theme": "default"},
+    }
+
+
+def test_theme_choices_lead_with_the_default_and_sort_by_name(
+    core: Any, monkeypatch: pytest.MonkeyPatch
+):
+    sent = []
+    monkeypatch.setattr(core, "is_configured", lambda: True)
+    monkeypatch.setattr(
+        core,
+        "ws_command",
+        lambda command, **kw: sent.append(command) or _themes_result("paper", "Graphite"),
+    )
+    assert core.theme_choices() == [
+        {"value": "", "label": "Home Assistant default"},
+        {"value": "Graphite", "label": "Graphite"},
+        {"value": "paper", "label": "paper"},
+    ]
+    assert sent == [{"type": "frontend/get_themes"}]
+
+
+def test_theme_names_share_one_request_within_ttl(core: Any, monkeypatch: pytest.MonkeyPatch):
+    calls = []
+    monkeypatch.setattr(
+        core, "ws_command", lambda command, **kw: calls.append(command) or _themes_result("Ink")
+    )
+    assert core.theme_names() == ["Ink"]
+    assert core.theme_names() == ["Ink"]
+    assert len(calls) == 1
+
+
+def test_theme_failure_is_cached_and_shown_as_unreachable(
+    core: Any, monkeypatch: pytest.MonkeyPatch
+):
+    calls = []
+
+    def boom(command: dict[str, Any], **kw: Any) -> dict[str, Any]:
+        calls.append(command)
+        raise TimeoutError("no answer")
+
+    monkeypatch.setattr(core, "is_configured", lambda: True)
+    monkeypatch.setattr(core, "ws_command", boom)
+    first = core.theme_choices()
+    assert first == core.theme_choices()
+    assert len(first) == 1 and first[0]["label"].startswith("Home Assistant unreachable")
+    assert len(calls) == 1
+
+
+def test_theme_choices_explain_a_missing_config(core: Any, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(core, "is_configured", lambda: False)
+    rows = core.theme_choices()
+    assert len(rows) == 1 and rows[0]["label"].startswith("Set HA URL + token")
+
+
+# ---------------------------------------------------------------------------
+# ha_core.ws_command, against a real local socket
+
+
+@pytest.fixture
+def ha_socket(core: Any, monkeypatch: pytest.MonkeyPatch) -> Any:
+    """A stand-in for HA's WebSocket API: the auth handshake, then one
+    scripted answer per command type. Yields the dict of answers to fill
+    and the list of commands it received."""
+    import json
+
+    from websockets.sync.server import serve
+
+    answers: dict[str, dict[str, Any]] = {}
+    received: list[dict[str, Any]] = []
+
+    def handler(ws: Any) -> None:
+        ws.send(json.dumps({"type": "auth_required"}))
+        auth = json.loads(ws.recv())
+        if auth.get("access_token") != "tok":
+            ws.send(json.dumps({"type": "auth_invalid"}))
+            return
+        ws.send(json.dumps({"type": "auth_ok"}))
+        command = json.loads(ws.recv())
+        received.append(command)
+        # An event for another subscription first: the caller must skip it.
+        ws.send(json.dumps({"id": 99, "type": "event"}))
+        ws.send(json.dumps({"id": command["id"], "type": "result", **answers[command["type"]]}))
+
+    with serve(handler, "127.0.0.1", 0) as server:
+        port = server.socket.getsockname()[1]
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        monkeypatch.setattr(core, "base_url", lambda: f"http://127.0.0.1:{port}")
+        monkeypatch.setattr(core, "is_configured", lambda: True)
+        yield SimpleNamespace(answers=answers, received=received)
+        server.shutdown()
+        thread.join(timeout=2)
+
+
+def test_ws_command_authenticates_and_returns_the_result(core: Any, ha_socket: Any):
+    ha_socket.answers["frontend/get_themes"] = _themes_result("Ink", "Graphite")
+    assert core.theme_names() == ["Graphite", "Ink"]
+    assert ha_socket.received == [{"type": "frontend/get_themes", "id": 1}]
+
+
+def test_ws_command_reports_a_refused_token(
+    core: Any, ha_socket: Any, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(core, "token", lambda: "wrong")
+    with pytest.raises(RuntimeError, match="refused the access token"):
+        core.ws_command({"type": "frontend/get_themes"}, timeout=2)
+
+
+def test_remove_media_treats_removed_and_already_gone_as_done(core: Any, ha_socket: Any):
+    kind = "media_source/local_source/remove"
+    ha_socket.answers[kind] = {"success": True, "result": None}
+    assert core.remove_media("media-source://media_source/local/a.png", timeout=2) is True
+    assert ha_socket.received[0]["media_content_id"] == "media-source://media_source/local/a.png"
+    ha_socket.answers[kind] = {"success": False, "error": {"code": "not_found"}}
+    assert core.remove_media("x", timeout=2) is True
+    ha_socket.answers[kind] = {"success": False, "error": {"code": "unauthorized", "message": "no"}}
+    with pytest.raises(RuntimeError, match="would not remove the file: no"):
+        core.remove_media("x", timeout=2)

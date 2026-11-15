@@ -669,6 +669,7 @@ def create_app(
             data_root=plugin_data_root,
             additional_plugins_dirs=[authored_dir, user_plugins_dir],
             disabled_ids=plugin_loader.disabled_ids(settings),
+            settings_store=settings,
         )
 
     plugins = _rediscover_plugins()

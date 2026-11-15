@@ -25,7 +25,15 @@ from flask import Response as FlaskResponse
 from flask import current_app, flash, redirect, request, session, url_for
 from werkzeug.wrappers import Response
 
-from app import calibration, device_cleanup, device_service, renderer_loader, test_patterns
+from app import (
+    calibration,
+    device_cleanup,
+    device_service,
+    opendisplay_ha,
+    opendisplay_tags,
+    renderer_loader,
+    test_patterns,
+)
 from app.button_actions import (
     ButtonActionError,
     page_name_index,
@@ -315,6 +323,8 @@ def devices_add() -> Response:
             )
             if problem:
                 return _undo_add(result.device, problem, "added")
+    if "palettes" in (getattr(devices().get(str(result.device.kind_of)), "manifest", None) or {}):
+        _finish_opendisplay_add(result.device, form)
     device_service.device_added(settings_store(), result.device)
     # New device's clones inherit picture-quality (dither/saturation/
     # contrast) from the user's existing base-renderer values where
@@ -742,8 +752,114 @@ def devices_ha_list() -> Response:
     plugin = registry.get("ha_core") if registry is not None else None
     mod = getattr(plugin, "server_module", None) if plugin is not None else None
     found, error = list_integration_devices(mod, integration)
+    if integration == opendisplay_tags.INTEGRATION and found:
+        found = _describe_opendisplay_tags(found, mod)
     payload = {"devices": found, "error": error}
     return current_app.response_class(json.dumps(payload), mimetype="application/json")
+
+
+@bp.post("/settings/devices/<instance_id>/opendisplay/resend")
+def devices_opendisplay_resend(instance_id: str) -> Response:
+    """Send an OpenDisplay-via-HA tag its current picture again, whatever it
+    was last sent (the device page's Send again)."""
+    device = devices().get(instance_id)
+    publisher = current_app.config.get("OPENDISPLAY_HA_PUBLISHER")
+    if device is None or device.kind_of != opendisplay_ha.KIND or publisher is None:
+        flash(f"Unknown OpenDisplay tag {instance_id!r}.", "error")
+        return redirect(url_for("auth.settings_area", area="devices"))
+    push_mgr = current_app.config.get("PUSH_MANAGER")
+    if push_mgr is None or not push_mgr.latest_render_for(instance_id):
+        flash("Nothing has been sent to this tag yet. Send it a dashboard first.", "error")
+        return _device_page_redirect(instance_id, "display")
+    publisher.resend(instance_id)
+    flash(
+        "Sending the picture again. A Bluetooth upload takes up to a minute; "
+        "reload to see the result.",
+        "ok",
+    )
+    return _device_page_redirect(instance_id, "display")
+
+
+def _describe_opendisplay_tags(rows: list[dict[str, Any]], mod: Any) -> list[dict[str, Any]]:
+    """Add what the add form needs to each OpenDisplay picker row: the size
+    and palette the tag itself reports, the palette's name, a device id to
+    suggest, and which Tesserae device (if any) already drives it."""
+    from app.quantizer import canonicalise_gamut
+    from app.settings.index_routes import palette_label
+
+    opendisplay_tags.enrich(rows, mod)
+    section = settings_store().get_section("devices") or {}
+    taken = {d.id for d in devices().all()}
+    in_use: dict[str, str] = {}
+    for device in devices().all():
+        if device.kind_of != opendisplay_ha.KIND:
+            continue
+        stored = section.get(device.id) if isinstance(section, dict) else None
+        ha_id = str((stored or {}).get("ha_device_id") or "").strip()
+        if ha_id:
+            in_use[ha_id] = device.id
+    for row in rows:
+        gamut = row.get("gamut")
+        if isinstance(gamut, str) and gamut:
+            row["gamut"] = canonicalise_gamut(gamut)
+            row["palette"] = palette_label(row["gamut"])
+        row["registered"] = in_use.get(str(row.get("device_id") or ""), "")
+        row["suggested_id"] = _free_device_id(str(row.get("name") or ""), taken)
+        taken.add(row["suggested_id"])
+    return rows
+
+
+def _free_device_id(name: str, taken: set[str]) -> str:
+    """A device id made from a tag's name that no device uses yet."""
+    slug = re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_") or "tag"
+    if not slug[0].isalpha():
+        slug = f"tag_{slug}"
+    slug = slug[:40].rstrip("_")
+    candidate, n = slug, 2
+    while candidate in taken:
+        candidate = f"{slug}_{n}"
+        n += 1
+    return candidate
+
+
+def _finish_opendisplay_add(device: Any, form: Any) -> None:
+    """After an OpenDisplay tag is added: set the palette the form carried,
+    then store what HA reports about the tag (its surface, and its palette,
+    which wins over the form's). Best effort; the device already exists."""
+    from app.quantizer import canonicalise_gamut
+
+    kind = devices().get(str(device.kind_of)) if device.kind_of else None
+    offered = {
+        canonicalise_gamut(str(g))
+        for g in ((kind.manifest.get("palettes") if kind is not None else None) or [])
+    }
+    picked = (form.get("panel_gamut") or "").strip()
+    panel = device.panel or {}
+    if picked and panel and canonicalise_gamut(picked) in offered:
+        device_service.update_instance_panel(
+            devices=devices(),
+            renderers=renderers(),
+            data_root=device_data_root(),
+            instance_id=device.id,
+            w=int(panel["w"]),
+            h=int(panel["h"]),
+            orientation=str(panel.get("orientation") or "landscape"),
+            gamut=canonicalise_gamut(picked),
+        )
+    if device.kind_of != opendisplay_ha.KIND:
+        return
+    ha_id = (form.get("ha_device_id") or "").strip()
+    if not ha_id:
+        return
+    registry = current_app.config.get("PLUGIN_REGISTRY")
+    plugin = registry.get("ha_core") if registry is not None else None
+    mod = getattr(plugin, "server_module", None) if plugin is not None else None
+    try:
+        facts = opendisplay_tags.lookup(mod, ha_id)
+        fresh = devices().get(device.id) or device
+        opendisplay_ha.apply_tag_facts(current_app, fresh, facts)
+    except Exception:
+        current_app.logger.debug("opendisplay add: tag detection failed", exc_info=True)
 
 
 @bp.post("/settings/devices/discovery/<discovered_id>/register")
@@ -2014,10 +2130,10 @@ def devices_calibrate(instance_id: str) -> Response:
         card, source_label=f"calibration:{instance_id}", device_id=instance_id
     )
     if result.status == "sent":
-        flash("Calibration card sent, look at your panel, then answer below.", "ok")
+        flash("Orientation card sent. Look at your panel, then answer below.", "ok")
         flash_delivery([instance_id])
     else:
-        flash(f"Calibration push {result.status}: {result.error or '(no detail)'}", "error")
+        flash(f"Orientation card {result.status}: {result.error or '(no detail)'}", "error")
     # ?calibrating=<id> makes the device page render the answer form
     # inside the Display section's orientation band.
     return redirect(
@@ -2066,7 +2182,7 @@ def devices_calibrate_apply(instance_id: str) -> Response:
         orientation=target,
     )
     if not result.ok or result.device is None:
-        flash(result.error or "Calibration failed.", "error")
+        flash(result.error or "Could not set the rotation.", "error")
         return _device_page_redirect(instance_id, anchor)
     rebuild_transport_fn()()
     # Confirm re-push at the new orientation.

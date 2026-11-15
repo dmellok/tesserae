@@ -63,6 +63,9 @@
 <form method="post" id="album-resync-{{ section.device_id }}"
       action="{{ url_for('auth.devices_album_resync', instance_id=section.device_id) }}"></form>
 <form method="post" id="{{ section.id }}-push-now" action="{{ section.push_now_endpoint }}"></form>
+{% if section.opendisplay_delivery %}
+<form method="post" id="{{ section.id }}-od-resend" action="{{ section.opendisplay_delivery.resend_endpoint }}"></form>
+{% endif %}
 {% if section.calibrate_endpoint %}
 <form method="post" id="{{ section.id }}-calibrate" action="{{ section.calibrate_endpoint }}"></form>
 <form method="post" id="{{ section.id }}-calibrate-apply" action="{{ section.calibrate_apply_endpoint }}"></form>
@@ -130,6 +133,33 @@
       {{ dsec_head('display', 'image-square', 'Display', _name ~ ((' · ' ~ section.panel.w ~ ' × ' ~ section.panel.h ~ ' · ' ~ _rot_label) if section.panel else '')) }}
       <div class="dx-dsec-body" id="display-body" data-collapsible-body>
 
+        {#- OpenDisplay via Home Assistant: whether the last picture reached
+            the tag. The tag never reports back, so this is the only place
+            a Bluetooth upload that failed shows up outside the log. -#}
+        {% set _od = section.opendisplay_delivery %}
+        {% if _od %}
+        <div class="dx-band{% if _od.state == 'failed' %} is-warn{% endif %}" id="opendisplay-delivery">
+          <i class="ph ph-{{ 'warning' if _od.state == 'failed' else ('check-circle' if _od.state == 'sent' else 'bluetooth') }}" aria-hidden="true"></i>
+          <div class="dx-band-text">
+            {% if _od.state == 'failed' %}
+            <p class="dx-band-title">The last picture did not reach the tag</p>
+            <p class="dx-help">{{ _od.error }}{% if _od.at %} Tried {{ _od.at }}{% if _od.attempts > 1 %}, {{ _od.attempts }} times so far{% endif %}.{% endif %}{% if _od.retry_in_min %} Trying again in about {{ _od.retry_in_min }} min.{% endif %}</p>
+            {% elif _od.state == 'sent' %}
+            <p class="dx-band-title">Picture delivered{% if _od.at %} {{ _od.at }}{% endif %}</p>
+            <p class="dx-help">Home Assistant sent the last picture to the tag over Bluetooth.</p>
+            {% else %}
+            <p class="dx-band-title">Nothing sent yet</p>
+            <p class="dx-help">Send this tag a dashboard and its delivery shows here.</p>
+            {% endif %}
+            {% if _od.state %}
+            <div class="dx-band-actions">
+              <button type="submit" form="{{ section.id }}-od-resend" class="dx-link-btn"><i class="ph ph-arrow-clockwise" aria-hidden="true"></i><span>Send again</span></button>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+
         {#- A field's ``group`` (device.json config_schema) sets where it sits: 'sign' and
             'sign_net' are Visionect's frame settings; any other name is a group of its own
             after Rendering. A field without one stays in Identity, Rendering or Timing. -#}
@@ -193,11 +223,10 @@
               <button type="submit" form="{{ section.id }}-calibrate" class="dx-btn is-icon" aria-label="Send orientation card" title="Send orientation card"><i class="ph ph-compass" aria-hidden="true"></i></button>
               {% endif %}
             {% endcall %}
-            {% if section.gamut_capable %}
-            {% call fld(section.id ~ '-gamut', 'Colour gamut', help='The palette the .bin frame is packed to on the server.', w='lg') %}
-              {{ dx_select(section.id ~ '-gamut', 'panel_gamut', section.panel.get('gamut', 'waveshare_e6'),
-                  [{'value':'waveshare_e6','label':'Waveshare E6 / Spectra 6 (6-colour)'},
-                   {'value':'inky_7colour','label':'Inky Impression 7-colour (adds orange)'}], form=_form) }}
+            {% if section.palette %}
+            {% call fld(section.id ~ '-gamut', section.palette.label, help=section.palette.help, w='lg') %}
+              {{ dx_select(section.id ~ '-gamut', 'panel_gamut', section.palette.value,
+                  section.palette.choices, form=_form) }}
             {% endcall %}
             {% endif %}
           </div>

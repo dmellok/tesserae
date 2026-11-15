@@ -1133,6 +1133,7 @@ def _gamut_info(gamut: str) -> dict[str, Any]:
         "inky_7colour": ("7-colour (ACeP)", q.INKY_7COLOUR_PALETTE),
         "bwry_4": ("4-colour · black/white/red/yellow", q.BWRY_4_PALETTE),
         "bwr_3": ("3-colour · black/white/red", q.BWR_3_PALETTE),
+        "bwy_3": ("3-colour · black/white/yellow", q.BWY_3_PALETTE),
         "gray_4": ("4-level grayscale", q.GRAY_4_PALETTE),
         "gray_8": ("8-level grayscale", q.GRAY_8_PALETTE),
         "gray_16": ("16-level grayscale", q.GRAY_16_PALETTE),

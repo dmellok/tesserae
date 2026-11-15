@@ -6,8 +6,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.512.0], 2026-11-15
+
 ### Added
 
+- Home Assistant, Dashboard widget: **Dashboard hides its own header** skips the header crop for dashboards that have no header (kiosk-mode, or a theme that hides it), so their top row is no longer cut off.
+- Home Assistant, Dashboard widget: a **Fit to cell** option shrinks the dashboard until all of it fits, so a view taller than the cell is no longer cut off at the bottom. **Zoom** then sets the largest size it may be drawn at.
+- Home Assistant, Dashboard widget: a **Theme** option, listing the themes installed in Home Assistant, captures the dashboard in the one you pick, so a panel can use a high-contrast or e-ink theme without changing the theme anyone sees in their browser. Blank keeps Home Assistant's default theme.
+- OpenDisplay via Home Assistant: **Add device → OpenDisplay** lists the tags Home Assistant knows under **Found in Home Assistant**, each with a one-click **Add** that takes the tag's size and colour palette from the tag itself.
+- OpenDisplay via Home Assistant: the tag's page shows whether the last picture arrived, with Home Assistant's reason when it did not, and a **Send again** button. A failed picture is tried again after 1, 5, 15 and then 30 minutes.
+- OpenDisplay via Home Assistant: **Colour conversion** can be set to Tesserae, which reduces the picture to the tag's palette the way previews are drawn and has Home Assistant send it unchanged. Home Assistant converting it stays the default.
+- OpenDisplay via Home Assistant: **Refresh** can be set to Fast, for less flashing on panels that support it.
+- OpenDisplay tags: a **Model** choice on the add form for known hardware, and two more palettes, black, white and yellow and seven colours.
+- Device kinds can list named hardware (`models`) for the add form.
+- OpenDisplay tags: **Panel → Colour palette** on the tag's page sets which colours the panel has (black and white, red, red and yellow, six colours, or greys), since the tag does not report it. Previews are drawn in those colours. Applies to the Home Assistant and bridge kinds.
+- Device kinds can list the palettes an operator may pick (`palettes`) and mark a replaced config field (`retired`) so it shows only on devices that still use it.
+- OpenDisplay via Home Assistant works from any install, not only the HA add-on. With the Home Assistant Core plugin configured, **Add device → OpenDisplay** shows the tag form, and Tesserae uploads each frame to HA's media folder through its API. The token must belong to an HA administrator. The add-on still writes to the shared `/media`, and now uploads instead when that folder is not writable.
 - Fraimic: the Large Canvas (31.5") and the Standard Canvas (13.3") are in the hardware catalog, so **Add device → Fraimic** has a **Model** choice that sets the panel size, and both are listed on the compatibility page. A frame added before this keeps working as it is.
 - Device kinds can place a config field in a named group (`group`) and show it only for some values (`show_if`).
 - Lineups: a + beside each display's chevron starts a new lineup for that display.
@@ -27,6 +41,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Changed
 
+- OpenDisplay via Home Assistant: the palette is set from what the tag reports, and follows the tag if it is reconfigured. A palette you pick afterwards is kept.
+- OpenDisplay via Home Assistant: removing a tag deletes its uploaded picture from Home Assistant's media folder.
+- OpenDisplay via Home Assistant: **Panel → Rotation** now turns the frame, so it is the only rotation setting and 180° and 270° work; **Underscan** applies too. The tag's page no longer shows the client rotation, scale and letterbox options, which never reached Home Assistant. A tag that used the old Home Assistant rotation keeps working as it was and shows it as **Turn in Home Assistant (older setup)** until it is set to None.
+- Devices: the messages for the numbered orientation card now call it that, not a calibration card, so it is not mistaken for colour calibration.
+- Docs: Seeed's OpenDisplay 4.26" Mono Kit and 7.3" Color Kit are listed in the README, the Seeed hardware page and the OpenDisplay guide, with store links. Seeed's discount code for Tesserae readers, TESSERAE, is on those pages and the compatibility page; it covers the reTerminal E-Series, the reTerminal Sticky and the OpenDisplay kits.
 - Docs: the Fraimic quickstart and the compatibility page carry Fraimic's discount code for Tesserae readers (TESSERAE10, 10% off at fraimic.com), with a disclosure that Fraimic supplied the Large Canvas free and that sales made with the code pay the project a commission.
 - Docs: plainer wording across the wiki, and corrected facts that no longer matched the app.
 - Docs: docs.tesserae.ink takes the Paper design of the app and tesserae.ink (warm paper, red ink, Archivo and Martian Mono) in place of the teal Material theme, in light and dark. The fonts are served from the docs site, so its pages no longer load anything from Google Fonts.
@@ -38,6 +57,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- Home Assistant, Dashboard widget: the **Theme** and **Dark theme** options now take effect on Home Assistant versions that save each person's theme to their account. The capture used to come out in whatever theme the owner of the access token had picked for themselves.
+- OpenDisplay via Home Assistant: with **Colour conversion** set to Tesserae, colours no longer shift on the tag (green came out yellow on a six-colour panel). Home Assistant was still applying its automatic tone compression to the already-converted picture; Tesserae now turns that off for these pictures.
+- OpenDisplay via Home Assistant: a tag that is taller than wide, such as a Solum 3.5", gets its picture the right way round. Tesserae assumed every tag was wider than tall and turned a portrait dashboard sideways, which Home Assistant then shrank to fit. It now reads each tag's size and rotation from Home Assistant.
+- OpenDisplay via Home Assistant: sending to one display no longer makes other OpenDisplay tags repaint the frame they already show first. Tesserae forgot what each tag had been sent after a restart or any device settings save, so the next send re-uploaded every tag in turn. It now remembers, and when several tags are due the one just rendered goes first.
 - Calendar: events with a floating time (no `TZID` and no `Z`, e.g. `DTSTART:20261116T090000`) show at their local time. They were read as UTC, so a 9:00 event showed at 04:00 in New York. To-do due times get the same fix.
 - Blank pictures on a frame: a render whose images fail to load is retried once, and a scheduled, lineup or refresh send that still has broken images keeps the previous frame. A manual send goes out with a warning in History.
 - Device page: dashboard schedules have their own list instead of sitting in the Lineups list.
@@ -341,6 +364,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- Dashboard editor: dynamic widget configuration choices now run under the
+  widget's capability scope, preserving delegated access such as `plugin:ha_core`.
+- Widgets delegating to `ha_core` can reach only the hostname in the current
+  Home Assistant Core URL, without a direct network grant or access to other hosts.
 - Home Assistant, Entities: a door, window or motion sensor reads Closed / Open / Clear the way Home Assistant words it, instead of Off / On.
 - Visionect frames: a saved Wi-Fi password now reaches the frame, is masked on the device page instead of sent back to the browser, and is hidden in the frame log if the frame echoes it.
 - History: 12-hour times no longer overlap the thumbnail.

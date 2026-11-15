@@ -9,6 +9,7 @@ import pytest
 
 from app import plugin_loader
 from app.main import REPO_ROOT
+from app.state.settings_store import SettingsStore
 
 
 @pytest.fixture
@@ -43,6 +44,43 @@ def test_discovers_bundled_plugins(tmp_path: Path, schema_path: Path) -> None:
     assert "fonts_core" in registry.plugins
     assert registry.errors == []
     assert len(registry.fonts) > 0
+
+
+def test_ha_core_delegation_is_limited_to_its_configured_host(
+    tmp_path: Path, schema_path: Path
+) -> None:
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    _write_minimal_plugin(
+        plugins_dir,
+        "ha_core",
+        {"kind": "data", "supports": {"sizes": []}},
+    )
+    _write_minimal_plugin(
+        plugins_dir,
+        "heat_pump",
+        {"requires": ["plugin:ha_core"]},
+    )
+    settings = SettingsStore(tmp_path / "settings.json")
+    settings.update_section("plugins", {"ha_core": {"base_url": "https://ha.example:8123"}})
+
+    registry = plugin_loader.discover(
+        plugins_dir,
+        schema_path=schema_path,
+        data_root=tmp_path / "data",
+        settings_store=settings,
+    )
+    widget_capabilities = registry.plugins["heat_pump"].capabilities
+    assert widget_capabilities is not None
+    try:
+        assert widget_capabilities.allows_host("ha.example")
+        assert not widget_capabilities.allows_host("other.example")
+
+        settings.update_section("plugins", {"ha_core": {"base_url": "http://new-ha.example:8123"}})
+        assert not widget_capabilities.allows_host("ha.example")
+        assert widget_capabilities.allows_host("new-ha.example")
+    finally:
+        plugin_loader.set_delegate_resolver(None)
 
 
 def test_plugin_id_is_folder_name(tmp_path: Path, schema_path: Path) -> None:

@@ -2158,6 +2158,7 @@ dependencies = [
     { name = "segno" },
     { name = "tzdata" },
     { name = "waitress" },
+    { name = "websockets" },
     { name = "zeroconf" },
 ]
 
@@ -2204,6 +2205,7 @@ requires-dist = [
     { name = "types-jsonschema", marker = "extra == 'dev'" },
     { name = "tzdata" },
     { name = "waitress", specifier = ">=3.0,<4" },
+    { name = "websockets", specifier = ">=13,<16" },
     { name = "zeroconf", specifier = ">=0.130,<1" },
 ]
 provides-extras = ["dev", "docs"]

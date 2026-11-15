@@ -3,9 +3,22 @@
   "name": "OpenDisplay tag (via Home Assistant)",
   "icon": "devices",
   "version": "0.1.0",
-  "description": "An OpenDisplay BLE e-paper tag driven through Home Assistant. Tesserae renders a full-colour PNG, writes it into HA's media folder, and calls the opendisplay.upload_image action; HA's OpenDisplay integration pushes it to the tag over Bluetooth LE and dithers for the panel. No separate bridge or BLE hardware on the Tesserae host. Set the tag's HA device id below. Best when Tesserae runs as the Home Assistant add-on (shared /media). Requires the Home Assistant Core plugin.",
+  "description": "An OpenDisplay BLE e-paper tag driven through Home Assistant. Tesserae renders a full-colour PNG, puts it in HA's media folder, and calls the opendisplay.upload_image action; HA's OpenDisplay integration pushes it to the tag over Bluetooth LE and dithers for the panel. No separate bridge or BLE hardware on the Tesserae host. Set the tag's HA device id and its colour palette below. The Home Assistant add-on writes the frame to the shared /media; any other install uploads it through HA's API, which needs an administrator's token. Requires the Home Assistant Core plugin.",
   "renderers": ["pi_png"],
   "transport": "push",
+  "renderer_settings": false,
+  "palettes": ["mono", "bwr_3", "bwy_3", "bwry_4", "spectra_6", "acep_7colour", "gray_4", "gray_16"],
+  "models": [
+    { "label": "OpenDisplay 4.26\" Mono Kit", "w": 800, "h": 480, "gamut": "mono" },
+    { "label": "OpenDisplay 7.3\" Color Kit", "w": 800, "h": 480, "gamut": "spectra_6" },
+    { "label": "Seeed reTerminal E1001", "w": 800, "h": 480, "gamut": "mono" },
+    { "label": "Seeed reTerminal E1002", "w": 800, "h": 480, "gamut": "spectra_6" },
+    { "label": "Seeed reTerminal E1003", "w": 1872, "h": 1404, "gamut": "gray_16" },
+    { "label": "Seeed reTerminal E1004", "w": 1200, "h": 1600, "gamut": "spectra_6" },
+    { "label": "Solum M3 3.5\" (red and yellow)", "w": 184, "h": 384, "gamut": "bwry_4" },
+    { "label": "Solum M3 4.1\" (red and yellow)", "w": 400, "h": 300, "gamut": "bwry_4" },
+    { "label": "Waveshare PhotoPainter 7.3\"", "w": 800, "h": 480, "gamut": "spectra_6" }
+  ],
   "panel": { "w": 800, "h": 480, "orientation": "landscape", "name": "OpenDisplay tag (set your panel size)", "gamut": "spectra_6" },
   "config_schema": {
     "ha_device_id": {
@@ -15,17 +28,38 @@
       "default": "",
       "help": "Pick your tag from Home Assistant's OpenDisplay devices; Tesserae stores its device id and, when the model reports a resolution, fills the panel size. If Home Assistant isn't reachable, type the device id by hand (its internal hex id, e.g. 4ab9c7f0e2…, not the tag's own name/serial). Requires the Home Assistant Core plugin."
     },
+    "colour_conversion": {
+      "type": "select",
+      "label": "Colour conversion",
+      "default": "ha",
+      "choices": [
+        {"value": "ha", "label": "Home Assistant"},
+        {"value": "tesserae", "label": "Tesserae (matches previews)"}
+      ],
+      "help": "Who reduces the picture to the tag's colours. Home Assistant dithers a full-colour picture its own way. Tesserae reduces it to the Colour palette set under Panel, the same way previews are drawn, and Home Assistant sends it unchanged, so the tag shows what the preview showed. Check the palette matches the tag before choosing Tesserae."
+    },
+    "refresh_mode": {
+      "type": "select",
+      "label": "Refresh",
+      "default": "full",
+      "choices": [
+        {"value": "full", "label": "Full"},
+        {"value": "fast", "label": "Fast (less flashing)"}
+      ],
+      "help": "How the tag repaints. Full is the normal flashing refresh and the cleanest result. Fast flashes less on panels that support it and can leave faint ghosting; a tag without a fast mode repaints as usual."
+    },
     "rotate": {
       "type": "select",
-      "label": "Rotation",
+      "label": "Turn in Home Assistant (older setup)",
       "default": "0",
+      "retired": true,
       "choices": [
         {"value": "0", "label": "None"},
         {"value": "90", "label": "90°"},
         {"value": "180", "label": "180°"},
         {"value": "270", "label": "270°"}
       ],
-      "help": "Rotation applied by the HA upload action, if the tag's mounting needs it."
+      "help": "This tag was set up when Home Assistant did the turning. While a turn is set here, Home Assistant rotates the frame and Panel, Rotation only picks portrait or landscape. Set it to None to let Panel, Rotation turn the frame, as on every other display, then send the orientation card to check."
     }
   }
 }
