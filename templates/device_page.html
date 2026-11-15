@@ -444,6 +444,11 @@
             {{ toggle_fld(section.id ~ '-qh-enabled', 'quiet_hours_enabled', 'Own hours', checked=qh.get('enabled', False),
                 help="On, this display uses only the hours set here and the server's quiet hours don't apply to it. Off, it follows Settings › Server › Quiet hours.",
                 form=_form, input_attrs='data-master') }}
+            {# Always posted. With the switch off, every other quiet-hours
+               field is disabled and an unchecked box posts nothing, so
+               without this the save could not tell "switched off" from
+               "not on this form" (#523). #}
+            <input type="hidden" name="quiet_hours__present" value="1" form="{{ _form }}">
             {{ toggle_fld(section.id ~ '-qh-sleep', 'quiet_hours_sleep', 'Sleep through', checked=qh.get('sleep', False),
                 help='The display sleeps until the window ends instead of waking on its usual interval inside it. Saves power; a picture sent during the window shows when it ends.',
                 form=_form, attrs='data-dep-target') }}
