@@ -36,9 +36,10 @@ What we DON'T enforce in v1 (review-only):
 
 The active capability context is held on a :class:`contextvars.
 ContextVar` so concurrent renders (one widget's ``fetch`` running
-alongside another's) don't cross-contaminate. The context is set
-by ``capability_scope()`` around every call into a widget's
-``server.py``, see ``app.composer._fetch_plugin_data``.
+alongside another's) don't cross-contaminate. The context is set by
+``capability_scope()`` around calls into widget code:
+``app.composer._fetch_plugin_data`` for ``fetch()`` and
+``app.widget_choices.choice_rows`` for dynamic editor choices.
 
 mypy --strict applies, see pyproject.toml.
 """

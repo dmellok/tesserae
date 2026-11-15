@@ -1772,6 +1772,43 @@ def test_materialize_cell_options_keeps_empty_fallback_for_unrelated_errors() ->
     assert out["ha_zones"][0]["choices"] == []
 
 
+def test_materialize_cell_options_runs_choices_in_widget_capability_scope(
+    monkeypatch: Any,
+) -> None:
+    """Dynamic editor choices may fetch through a declared delegate such as
+    ``ha_core`` and therefore need the same capability scope as ``fetch()``."""
+    from types import SimpleNamespace
+
+    from app.capabilities import _active, parse
+    from app.page_routes import _materialize_cell_options
+
+    widget_caps = parse("ha_zones", ["plugin:ha_core"])
+    core_caps = parse("ha_core", ["network:ha.example"])
+    monkeypatch.setattr(
+        "app.capabilities._delegate_resolver",
+        lambda plugin_id: core_caps if plugin_id == "ha_core" else None,
+    )
+
+    def choices(name: str) -> list[dict[str, str]]:
+        active = _active.get()
+        assert active is widget_caps
+        assert active.allows_host("ha.example")
+        return [{"value": "sensor.room", "label": "Room"}]
+
+    plugin = SimpleNamespace(
+        id="ha_zones",
+        manifest={
+            "cell_options": [{"name": "entity", "type": "select", "choices_from": "entity"}],
+        },
+        server_module=SimpleNamespace(choices=choices),
+        capabilities=widget_caps,
+    )
+
+    result = _materialize_cell_options([plugin])
+
+    assert result["ha_zones"][0]["choices"] == [{"value": "sensor.room", "label": "Room"}]
+
+
 # -- freeform (canvas) dashboards integration (issue #60) ----------------
 
 
