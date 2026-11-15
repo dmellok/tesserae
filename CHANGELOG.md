@@ -6,6 +6,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Security
+
+- Zero-touch pairing: a display's MAC address collects its access token only once. Before, any request to `/api/v1/device/discover` carrying the MAC of a registered display was given that display's token, and a MAC can be read by anything on the network. Now the match stops working after the display's first request with its token. A display that is re-flashed or factory reset shows **This display is asking to pair again** on its page and on Settings › Devices, and **Allow re-pair** lets it collect its token again with its pages and history kept. Displays you already have are not affected until they lose their token. (#515)
+
 ### Added
 
 - Add a dashboard editor with guided steps, live preview and widget option examples. Switch back to classic from its help menu.
@@ -13,7 +17,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 ### Fixed
 
 - A button press on a lineup with conditions starts from the dashboard actually showing, not its first one, and Next / Previous skip dashboards whose conditions fail.
+- Device page: a display's **Own hours** switch under Quiet hours can be turned off again. Saving with it off left it on, because the page sent nothing for that section. The window you set is kept for when you switch it back on. (#523)
+- Lineup editor: a dashboard switched from canvas to grid lists its items again (its leftover canvas data counted as a second widget).
 - New dashboard editor: adding a dashboard to a rotating lineup, or removing it, shows the right dashboard on the next tick instead of at the next boundary. A lineup is deleted by leaving it only when the request confirms it, and a lineup whose times can't be described no longer stops the editor from opening.
+- News, Wikipedia On This Day: the date follows your timezone setting. It used UTC, so west of Greenwich it showed tomorrow's entries from the early evening until local midnight.
+- GTFS: when the agency publishes a new timetable, a pushed board now updates once the rebuild lands instead of keeping the old times. The stop list and the timetable also no longer download the same feed twice at once.
 
 ## [0.513.0], 2026-11-15
 

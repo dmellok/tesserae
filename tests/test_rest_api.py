@@ -637,6 +637,109 @@ def test_discover_mac_claim_heals_kind(app: Flask) -> None:
     assert devices.get("frame03").kind_of == "seeed_reterminal_e1004"
 
 
+def _register_with_mac(app: Flask, client, device_id: str, mac: str) -> str:
+    code = _issue_pairing(app)
+    resp = client.post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+        data=json.dumps({"device_id": device_id, "kind": "esp32_client", "mac": mac}),
+    )
+    assert resp.status_code == 201
+    return resp.get_json()["device_token"]
+
+
+def _announce(client, device_id: str, mac: str, token: str | None = None):
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return client.post(
+        "/api/v1/device/discover",
+        headers=headers,
+        data=json.dumps({"device_id": device_id, "kind": "esp32_client", "mac": mac}),
+    )
+
+
+def test_discover_mac_claim_closes_once_the_device_uses_its_token(app: Flask) -> None:
+    """#515: a MAC can be read off the network, so it collects the token
+    only until the device has authenticated with it once."""
+    client = app.test_client()
+    _sign_in(client)
+    devices = app.config["DEVICE_REGISTRY"]
+    mac = "aa:bb:cc:dd:ee:51"
+    token = _register_with_mac(app, client, "frame51", mac)
+
+    # Not used yet: a lost response must not strand the device.
+    assert _announce(client, "frame51", mac).get_json()["device_token"] == token
+    assert _announce(client, "frame51", mac).get_json()["device_token"] == token
+
+    # The device shows it holds the token.
+    authed = client.get(
+        "/api/v1/device/frame51/frame", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert authed.status_code in (200, 204)
+    assert devices.get("frame51").manifest.get("mac_claim_closed") is True
+    on_disk = json.loads(devices.get("frame51").path.read_text(encoding="utf-8"))
+    assert on_disk["mac_claim_closed"] is True
+
+    # Now the MAC alone gets nothing, in the "keep polling" shape.
+    refused = _announce(client, "frame51", mac)
+    assert refused.status_code == 200
+    body = refused.get_json()
+    assert body["registered"] is False
+    assert body["repair_required"] is True
+    assert "device_token" not in body
+    assert token not in refused.get_data(as_text=True)
+    # A registered device is not listed as a new one to Register.
+    assert all(d.id != "frame51" for d in app.config["DISCOVERY_CACHE"].all())
+
+    # A wrong token is no better than none.
+    assert "device_token" not in _announce(client, "frame51", mac, "nope").get_json()
+    # The device itself, announcing with its token, is answered as before.
+    assert _announce(client, "frame51", mac, token).get_json()["device_token"] == token
+
+
+def test_allow_repair_reopens_the_mac_claim_once(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    devices = app.config["DEVICE_REGISTRY"]
+    mac = "aa:bb:cc:dd:ee:52"
+    token = _register_with_mac(app, client, "frame52", mac)
+    auth = {"Authorization": f"Bearer {token}"}
+    client.get("/api/v1/device/frame52/frame", headers=auth)
+    assert "device_token" not in _announce(client, "frame52", mac).get_json()
+
+    # The request shows on the device's page and on the devices list.
+    page = client.get("/settings/devices/frame52").get_data(as_text=True)
+    assert "asking to pair again" in page
+    assert "/settings/devices/frame52/allow-repair" in page
+    assert "asking to pair again" in client.get("/settings/devices").get_data(as_text=True)
+
+    resp = client.post("/settings/devices/frame52/allow-repair")
+    assert resp.status_code == 302
+    assert "mac_claim_closed" not in devices.get("frame52").manifest
+    assert "asking to pair again" not in client.get("/settings/devices/frame52").get_data(
+        as_text=True
+    )
+
+    # The re-flashed device collects the same token, uses it, and the
+    # claim is closed again.
+    assert _announce(client, "frame52", mac).get_json()["device_token"] == token
+    client.get("/api/v1/device/frame52/frame", headers=auth)
+    assert "device_token" not in _announce(client, "frame52", mac).get_json()
+
+
+def test_allow_repair_needs_the_admin_session(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    mac = "aa:bb:cc:dd:ee:53"
+    token = _register_with_mac(app, client, "frame53", mac)
+    client.get("/api/v1/device/frame53/frame", headers={"Authorization": f"Bearer {token}"})
+
+    anon = app.test_client()
+    anon.post("/settings/devices/frame53/allow-repair")
+    assert app.config["DEVICE_REGISTRY"].get("frame53").manifest.get("mac_claim_closed") is True
+
+
 def test_heal_between_catalog_siblings_keeps_device_identity(app: Flask) -> None:
     """A reflash switches the same physical unit between catalog
     sibling kinds (E1001 mono <-> E1001 gray, XIAO mono <-> XIAO BWR).
@@ -1778,6 +1881,10 @@ def test_c3_panel_registered_against_the_s3_kit_heals_on_rediscover(app: Flask) 
     assert beat.status_code == 200
     assert devices.get(device_id).kind_of == "xiao_epaper_75"
 
+    # The device has used its token, so a tokenless re-announce (the
+    # reflash) waits for the owner to allow the re-pair (#515).
+    assert client.post(f"/settings/devices/{device_id}/allow-repair").status_code == 302
+
     # Re-announcing does heal it, and the identity survives.
     resp = client.post(
         "/api/v1/device/discover",
@@ -2373,7 +2480,8 @@ def test_repair_resets_event_dedup_counter(app: Flask) -> None:
     assert store.get("hall_e1003").last_button_event_id == 50
     # Pre-fix behaviour: a post-reflash event_id=1 would be swallowed.
 
-    # Reflash path A: MAC-claim discover.
+    # Reflash path A: MAC-claim discover, once the owner allows it (#515).
+    assert client.post("/settings/devices/hall_e1003/allow-repair").status_code == 302
     resp = client.post(
         "/api/v1/device/discover",
         headers={"Content-Type": "application/json"},

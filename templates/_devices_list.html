@@ -60,6 +60,24 @@
   </div>
   {% endif %}
 
+  {# A registered display that lost its token and is asking for it again
+     (#515). It is not in the discovered strip, since it is already
+     registered, so it is announced here. #}
+  {% for s in _devices if s.repair_request %}
+  <div class="dx-band is-warn">
+    <i class="ph ph-key" aria-hidden="true"></i>
+    <div class="dx-band-text">
+      <p class="dx-band-title">{{ s.device_name }} is asking to pair again</p>
+      <p class="dx-help">It asked {{ s.repair_request.relative }} without its access token, which happens after a re-flash or a factory reset. Allow it only if that was you.</p>
+    </div>
+    <div class="dx-band-actions">
+      <form method="post" action="{{ s.repair_request.endpoint }}" class="form--inline">
+        <button type="submit" class="dx-btn is-sm">Allow re-pair</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+
   {# DEVICES TABLE #}
   {% if _devices %}
   <div class="dx-devtable card" data-devtable>

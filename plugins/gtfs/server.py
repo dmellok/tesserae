@@ -59,6 +59,10 @@ VEHICLE_MAX_AGE_S = 600
 # loading state. Small feeds (and the test suite) finish inside this and
 # return data on the very first render; MTA-sized ones don't.
 BUILD_WAIT_S = 4.0
+# Seconds the host waits before fetching again while a rebuild is pending (the
+# ``live_refresh_s`` hint, 2 to 120). A build is tens of seconds, so this is
+# short enough to pick it up soon and long enough not to hammer the render.
+LIVE_REFRESH_S = 6
 # How long the cell editor may block building a cold stop index (all preset
 # feeds combined) before falling back to "it's still building".
 CHOICES_BUILD_BUDGET_S = 20.0
@@ -87,6 +91,10 @@ _MODES = {
 
 _BUILDS: dict[str, threading.Thread] = {}
 _BUILD_LOCK = threading.Lock()
+# One lock per feed URL, so the stop-index and timetable builders (and the admin
+# stop finder) never download the same expired zip at once.
+_FEED_LOCKS: dict[str, threading.Lock] = {}
+_FEED_LOCKS_GUARD = threading.Lock()
 
 # Known feeds, so the common case isn't "go find three URLs". The MTA splits
 # its realtime feeds by line group (one protobuf per group), all sharing one
@@ -226,16 +234,27 @@ def fetch(
     # attempt. Separate from tt_path deliberately: a build that fails while a
     # stale-but-usable timetable is on disk should leave that table alone.
     err, err_fresh = _read_error(err_path)
+    rebuilding = False
     if (table is None or not fresh) and not err_fresh:
         thread = _start_build(key, lambda: _build(gtfs_url, stop_opt, tt_path, err_path))
         if table is None:
             # Nothing to paint yet. Give a small feed a chance to land inside
             # this render before falling back to the loading state.
             thread.join(BUILD_WAIT_S)
+        if not thread.is_alive():
+            # Landed already (a small feed, or one that just failed): paint
+            # that rather than the table this render started with.
             table, _ = _read_cache(tt_path, TIMETABLE_TTL_S)
             err, _ = _read_error(err_path)
+        else:
+            rebuilding = True
+    # While a rebuild is pending, ask the host to render this page again. A push
+    # that caught the old timetable (or the loading state) then sends a follow-up
+    # once the new one lands, instead of keeping the old times until some
+    # unrelated render.
+    live_hint: dict[str, Any] = {"live_refresh_s": LIVE_REFRESH_S} if rebuilding else {}
     if table is None:
-        return {"error": err or "Loading the timetable from the GTFS feed…"}
+        return {"error": err or "Loading the timetable from the GTFS feed…", **live_hint}
 
     try:
         tz = ZoneInfo(table.get("tz") or "UTC")
@@ -302,6 +321,7 @@ def fetch(
         "feed_age_s": feed_age_s,
         "note": note,
         "arrivals": arrivals[:limit],
+        **live_hint,
     }
 
 
@@ -1355,17 +1375,23 @@ def _feed_bytes(url: str, data_dir: Path) -> bytes:
     stops and then rendering re-downloads the same tens of MB twice.
     """
     cache = data_dir / f"feed_{hashlib.sha1(url.encode()).hexdigest()[:16]}.zip"
-    try:
-        if cache.exists() and (time.time() - cache.stat().st_mtime) < TIMETABLE_TTL_S:
-            return cache.read_bytes()
-    except OSError:
-        pass
-    raw = _download(url, GTFS_TIMEOUT_S)
-    with contextlib.suppress(OSError):
-        tmp = cache.with_suffix(".tmp")
-        tmp.write_bytes(raw)
-        tmp.replace(cache)
-    return raw
+    with _FEED_LOCKS_GUARD:
+        feed_lock = _FEED_LOCKS.setdefault(url, threading.Lock())
+    # Serialised per URL: when the zip has expired, the stop-index and timetable
+    # workers both come here at once. The second waits, then finds the fresh
+    # copy the first wrote instead of downloading it again.
+    with feed_lock:
+        try:
+            if cache.exists() and (time.time() - cache.stat().st_mtime) < TIMETABLE_TTL_S:
+                return cache.read_bytes()
+        except OSError:
+            pass
+        raw = _download(url, GTFS_TIMEOUT_S)
+        with contextlib.suppress(OSError):
+            tmp = cache.with_suffix(".tmp")
+            tmp.write_bytes(raw)
+            tmp.replace(cache)
+        return raw
 
 
 class _StopNotFound(Exception):

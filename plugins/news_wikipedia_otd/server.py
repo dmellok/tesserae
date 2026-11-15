@@ -6,11 +6,12 @@ import contextlib
 import json
 import time
 import urllib.request
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from app.plugin_http import decode_body
+from app.tz_resolve import app_timezone
 
 CACHE_TTL_S = 6 * 3600
 HTTP_TIMEOUT_S = 12
@@ -26,7 +27,10 @@ def fetch(
         kind = "events"
     max_items = max(1, int(options.get("max_items") or 6))
 
-    today = datetime.now(UTC)
+    # The configured timezone picks the date, not UTC: in the evening west of Greenwich
+    # UTC is already tomorrow. The date is in the cache key, so the cache turns over
+    # at local midnight as well.
+    today = datetime.now(app_timezone())
     mm = f"{today.month:02d}"
     dd = f"{today.day:02d}"
 
@@ -39,7 +43,8 @@ def fetch(
     cache = data_dir / f"otd_{mm}_{dd}_{kind}_{max_items}.json"
     if cache.exists() and time.time() - cache.stat().st_mtime < CACHE_TTL_S:
         try:
-            return json.loads(cache.read_text(encoding="utf-8"))
+            cached: dict[str, Any] = json.loads(cache.read_text(encoding="utf-8"))
+            return cached
         except (json.JSONDecodeError, OSError):
             pass
 
