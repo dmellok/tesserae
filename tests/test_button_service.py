@@ -1266,3 +1266,113 @@ def test_a_global_map_binds_button_keys_too(
     assert svc._resolve_action_spec("hall", "d", "d") == "page:evening"
     # The device's own map still wins over the global one.
     assert svc._resolve_action_spec("kitchen", "d", "d") == "page:morning"
+
+
+# -- the step a press starts from: the scheduler's live pick -----------------
+
+
+def _printers_first(rotation_store: RotationStore) -> Rotation:
+    """A priority lineup: a print page per printer, photos when neither prints."""
+    rotation = Rotation(
+        id="kitchen_rot",
+        name="Kitchen",
+        device_ids=["kitchen"],
+        mode="priority",
+        steps=[
+            RotationStep(page_id="morning", dwell_minutes=5),  # printer A's page
+            RotationStep(page_id="afternoon", dwell_minutes=5),  # printer B's page
+            RotationStep(page_id="evening", dwell_minutes=60),  # photos
+        ],
+    )
+    rotation_store.upsert(rotation)
+    return rotation
+
+
+def _wire_live(
+    live: int | None,
+    ok: set[int],
+    **stores: Any,
+) -> ButtonService:
+    svc = _wire(**stores)
+    svc._live_step = lambda rotation: live
+    svc._step_ok = lambda rotation, index: index in ok
+    return svc
+
+
+def test_a_press_with_no_hold_starts_from_the_live_step_not_the_first(
+    rotation_store: RotationStore,
+    state_store: DeviceRotationStateStore,
+    settings_store: SettingsStore,
+    page_store: PageStore,
+    push_manager: StubPushManager,
+    clock: FakeClock,
+) -> None:
+    """Printer B prints, so the lineup shows step 1. A refresh re-sends that
+    page, not step 0 (printer A's page, while A is idle)."""
+    _printers_first(rotation_store)
+    svc = _wire_live(
+        1,
+        {1, 2},
+        rotation_store=rotation_store,
+        state_store=state_store,
+        settings_store=settings_store,
+        page_store=page_store,
+        push_manager=push_manager,
+        clock=clock,
+    )
+    result = svc.handle_button(device_id="kitchen", button="refresh", event_id=1)
+    assert result.step_index == 1
+    assert result.pushed_page_id == "afternoon"
+
+
+def test_next_and_previous_skip_steps_whose_conditions_fail(
+    rotation_store: RotationStore,
+    state_store: DeviceRotationStateStore,
+    settings_store: SettingsStore,
+    page_store: PageStore,
+    push_manager: StubPushManager,
+    clock: FakeClock,
+) -> None:
+    """Neither printer prints: photos (step 2) is live. Next wraps to step 0,
+    a printer page that can't show, so it lands back on photos; with printer
+    B printing, Next from photos skips A's page and lands on B's."""
+    _printers_first(rotation_store)
+    stores: dict[str, Any] = dict(
+        rotation_store=rotation_store,
+        state_store=state_store,
+        settings_store=settings_store,
+        page_store=page_store,
+        push_manager=push_manager,
+        clock=clock,
+    )
+    svc = _wire_live(2, {2}, **stores)
+    result = svc.handle_button(device_id="kitchen", button="right", event_id=1)
+    assert result.step_index == 2
+    state_store.upsert(state_store.get("kitchen").model_copy(update={"override_until": None}))
+    svc = _wire_live(2, {1, 2}, **stores)
+    result = svc.handle_button(device_id="kitchen", button="right", event_id=2)
+    assert result.step_index == 1 and result.pushed_page_id == "afternoon"
+    svc = _wire_live(1, {1, 2}, **stores)
+    result = svc.handle_button(device_id="kitchen", button="left", event_id=3)
+    assert result.step_index == 2  # Previous from B skips A's page backwards to photos
+
+
+def test_without_a_scheduler_a_press_keeps_the_old_first_step(
+    rotation_store: RotationStore,
+    state_store: DeviceRotationStateStore,
+    settings_store: SettingsStore,
+    page_store: PageStore,
+    push_manager: StubPushManager,
+    clock: FakeClock,
+) -> None:
+    _printers_first(rotation_store)
+    svc = _wire(
+        rotation_store=rotation_store,
+        state_store=state_store,
+        settings_store=settings_store,
+        page_store=page_store,
+        push_manager=push_manager,
+        clock=clock,
+    )
+    result = svc.handle_button(device_id="kitchen", button="refresh", event_id=1)
+    assert result.step_index == 0

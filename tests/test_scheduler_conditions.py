@@ -644,3 +644,39 @@ def test_rotation_status_records_held_when_no_step_eligible(tmp_path: Path) -> N
     assert snap["last_status"] == "held"
     assert snap["last_reason"] is not None
     assert "conditions" in snap["last_reason"]
+
+
+def test_live_step_index_is_the_pick_a_press_starts_from(tmp_path: Path) -> None:
+    """The step a button press works from: the priority pick, and each step's
+    own condition check for Next / Previous."""
+    rotation = _rotation(
+        "door",
+        mode="priority",
+        steps=[
+            RotationStep(
+                page_id="print_a",
+                dwell_minutes=5,
+                conditions=[ha_condition("sensor.a_print_status", "==", "running")],
+            ),
+            RotationStep(
+                page_id="print_b",
+                dwell_minutes=5,
+                conditions=[ha_condition("sensor.b_print_status", "==", "running")],
+            ),
+            RotationStep(page_id="photos", dwell_minutes=60),
+        ],
+    )
+    scheduler, _push = _scheduler(
+        tmp_path,
+        rotations=[rotation],
+        ha_states=[
+            {"entity_id": "sensor.a_print_status", "state": "finish"},
+            {"entity_id": "sensor.b_print_status", "state": "running"},
+        ],
+    )
+    scheduler._condition_evaluator.refresh_ha_states()
+    now = datetime.now(UTC)
+    assert scheduler.live_step_index(rotation, now) == 1
+    assert scheduler.step_conditions_pass(rotation, 0, now) is False
+    assert scheduler.step_conditions_pass(rotation, 2, now) is True
+    assert scheduler.step_conditions_pass(rotation, 9, now) is True  # out of range: no gate

@@ -1090,6 +1090,18 @@ def create_app(
         # in, so a hold that expires "at the anchor" agrees with the tick.
         # Resolved lazily: the resolver is registered further down.
         timezone_provider=lambda: _resolve_app_timezone(app),
+        # The scheduler's live step (conditions, priority order), read at each
+        # press; the scheduler is built further down, so look it up lazily.
+        live_step=lambda rotation: (
+            sched.live_step_index(rotation)
+            if (sched := app.config.get("SCHEDULER")) is not None
+            else None
+        ),
+        step_ok=lambda rotation, index: (
+            sched.step_conditions_pass(rotation, index)
+            if (sched := app.config.get("SCHEDULER")) is not None
+            else True
+        ),
     )
 
     # Transport + push manager are (re)built from current broker settings.

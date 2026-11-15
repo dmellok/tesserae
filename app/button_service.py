@@ -293,7 +293,15 @@ class ButtonService:
         devices: DeviceRegistry | None = None,
         device_status: Callable[[], dict[str, Any]] | None = None,
         timezone_provider: Callable[[], tzinfo | None] | None = None,
+        live_step: Callable[[Rotation], int | None] | None = None,
+        step_ok: Callable[[Rotation, int], bool] | None = None,
     ) -> None:
+        # The scheduler's own picks (conditions, priority order): with no
+        # manual hold a press starts from the step actually live, not step 0,
+        # and Next / Previous skip steps whose conditions fail. Unset keeps
+        # the old time-free behaviour (tests, hosts without a scheduler).
+        self._live_step = live_step
+        self._step_ok = step_ok
         self._rotations = rotation_store
         self._state = state_store
         self._settings = settings_store
@@ -2301,6 +2309,10 @@ class ButtonService:
         # the rotation position (or was a rotation-manipulating action
         # in general). page:<id> shortcuts don't set an override; the
         # scheduler resumes on the next timer wake.
+        if rotation is not None and result.target_page_id is None:
+            landed = self._skip_failing_steps(rotation, current_step_index, result.new_step_index)
+            if landed != result.new_step_index:
+                result = replace(result, new_step_index=landed)
         rotation_changed = rotation is not None and result.new_step_index != current_step_index
         wants_hold = (
             rotation is not None
@@ -2657,21 +2669,57 @@ class ButtonService:
         """
         if rotation is None or not rotation.steps:
             return 0, False
+        live = self._live_index(rotation)
         if state is None:
-            return 0, False
+            return live, False
         if state.rotation_id != rotation.id:
             # Manual state points at a different rotation (rebinding,
-            # deletion). Ignore the override; fall through to
-            # time-based / index 0.
-            return 0, False
+            # deletion). Ignore the override; fall through to the step
+            # the scheduler shows now.
+            return live, False
         if state.override_until is None:
-            return 0, False
+            return live, False
         if self._clock() >= state.override_until:
-            return 0, False
+            return live, False
         # Clamp to the current rotation's step count in case the
         # rotation was edited and shrank since the override.
         idx = max(0, min(state.step_index, len(rotation.steps) - 1))
         return idx, True
+
+    def _live_index(self, rotation: Rotation) -> int:
+        """The step the scheduler shows now (conditions and priority order
+        applied), else 0. A priority lineup whose printer page is live must
+        not answer a press with its first step."""
+        if self._live_step is None:
+            return 0
+        try:
+            idx = self._live_step(rotation)
+        except Exception:
+            log.exception("live step lookup failed: rotation=%s", rotation.id)
+            return 0
+        if idx is None or not 0 <= idx < len(rotation.steps):
+            return 0
+        return idx
+
+    def _skip_failing_steps(self, rotation: Rotation, start: int, index: int) -> int:
+        """Next / Previous land on a step whose conditions pass, walking the
+        same way the press moved; back to ``start`` when none does."""
+        if self._step_ok is None or index == start:
+            return index
+        n = len(rotation.steps)
+        step = 1 if (index - start) % n <= n // 2 else -1
+        idx = index
+        for _ in range(n):
+            try:
+                if self._step_ok(rotation, idx):
+                    return idx
+            except Exception:
+                log.exception("step condition check failed: rotation=%s", rotation.id)
+                return index
+            idx = (idx + step) % n
+            if idx == start:
+                return start
+        return start
 
     def reset_event_counter(self, device_id: str) -> None:
         """Forget the device's wake-event dedup state (monotonic counter
