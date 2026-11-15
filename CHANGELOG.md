@@ -10,6 +10,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 - Add a dashboard editor with guided steps, live preview and widget option examples. Switch back to classic from its help menu.
 
+### Fixed
+
+- New dashboard editor: adding a dashboard to a rotating lineup, or removing it, shows the right dashboard on the next tick instead of at the next boundary. A lineup is deleted by leaving it only when the request confirms it, and a lineup whose times can't be described no longer stops the editor from opening.
+
 ## [0.513.0], 2026-11-15
 
 ### Security

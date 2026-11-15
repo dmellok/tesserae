@@ -489,7 +489,7 @@ class OpenDisplayHaPublisher:
         if isinstance(upload_error, urllib.error.HTTPError) and upload_error.code in (401, 403):
             hint = (
                 " Home Assistant only accepts media uploads from an administrator: "
-                "use a long-lived token from an admin account in Settings -> Plugins "
+                "use a long-lived token from an admin account in Settings -> Widgets "
                 "-> Home Assistant Core."
             )
         if write_error is not None:

@@ -744,7 +744,7 @@ bauhaus, risograph), and "fit" (cover|contain|stretch).
 The fal.ai API key lives on the "AI image" widget (the fal-image widget) --
 that's the primary place it's configured, so if this returns a 400 about a
 missing key, tell the user to paste their fal.ai key into that widget's
-settings (Settings -> Plugins -> Fal Image). It also falls back to
+settings (Settings -> Widgets -> Fal Image). It also falls back to
 app.fal.api_key or the FAL_KEY env var. Returns the ack plus the stored
 "bg_image" URL; 502 if generation fails.""",
     "add_element": """\

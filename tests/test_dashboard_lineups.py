@@ -74,7 +74,12 @@ def test_quick_schedule_returns_and_leaving_removes_only_that_schedule(app, is_n
     created = next(d for d in app.config["DECK_STORE"].all() if d.name == "Evening")
     body = client.get(target).text
     assert f'data-ev2-lrow="{created.id}"' in body
-    response = client.post(f"/pages/home/lineups/{created.id}/leave")
+    # Leaving its only dashboard deletes the schedule, and the request has to
+    # say the person agreed: without that it is refused and nothing changes.
+    refused = client.post(f"/pages/home/lineups/{created.id}/leave", json={})
+    assert refused.status_code == 409 and refused.get_json()["deletes_lineup"] is True
+    assert app.config["DECK_STORE"].get(created.id) is not None
+    response = client.post(f"/pages/home/lineups/{created.id}/leave", json={"delete_lineup": True})
     assert response.get_json()["ok"] is True
     assert app.config["DECK_STORE"].get(created.id) is None
     assert app.config["SCHEDULE_STORE"].get(created.id) is None
@@ -132,3 +137,57 @@ def test_dashboard_without_lineups_has_empty_summary_and_creation_actions(app):
     assert "New scheduled lineup" in body
     assert "Add to a lineup" in body
     assert 'data-ev2-ladd="morning"' not in body
+
+
+class _Scheduler:
+    def __init__(self) -> None:
+        self.resynced: list[str] = []
+
+    def resync_cycle(self, rotation_id: str) -> None:
+        self.resynced.append(rotation_id)
+
+
+def _cycle(decks, **update):
+    deck = decks.get("rotation").model_copy(
+        update={"advance": "timer", "advance_trigger": "cycle", **update}
+    )
+    decks.upsert(Deck.model_validate(deck.model_dump(mode="json")))
+
+
+def test_joining_or_leaving_a_rotating_lineup_resyncs_its_step(app):
+    """The step number is kept mid-window, and now names another dashboard:
+    the scheduler is told, as it is when the lineup editor reorders steps."""
+    decks = app.config["DECK_STORE"]
+    _cycle(decks)
+    app.config["PAGE_STORE"].save(Page(id="third", name="Third"))
+    scheduler = app.config["SCHEDULER"] = _Scheduler()
+    client = app.test_client()
+
+    assert client.post("/pages/third/lineups/rotation/join", json={}).status_code == 200
+    assert decks.get("rotation").page_ids == ["home", "other", "third"]
+    assert scheduler.resynced == ["rotation"]
+
+    # Joining again changes nothing, so nothing is resynced.
+    assert client.post("/pages/third/lineups/rotation/join", json={}).status_code == 200
+    assert scheduler.resynced == ["rotation"]
+
+    assert client.post("/pages/home/lineups/rotation/leave", json={}).status_code == 200
+    assert decks.get("rotation").page_ids == ["other", "third"]
+    assert scheduler.resynced == ["rotation", "rotation"]
+
+
+def test_a_by_hand_lineup_is_not_resynced(app):
+    scheduler = app.config["SCHEDULER"] = _Scheduler()
+    app.test_client().post("/pages/home/lineups/rotation/leave", json={})
+    assert app.config["DECK_STORE"].get("rotation").page_ids == ["other"]
+    assert scheduler.resynced == []
+
+
+def test_a_lineup_whose_times_cannot_be_worded_does_not_break_the_editor(app, monkeypatch):
+    def broken(*args, **kwargs):
+        raise ValueError("no window")
+
+    monkeypatch.setattr("app.lineups_view.window_label", broken)
+    response = app.test_client().get("/pages/home")
+    assert response.status_code == 200
+    assert 'data-ev2-lrow="rotation"' in response.text
