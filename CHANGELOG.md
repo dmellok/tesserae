@@ -6,6 +6,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- Add a dashboard editor with guided steps, live preview and widget option examples. Switch back to classic from its help menu.
+
 ## [0.513.0], 2026-11-15
 
 ### Security

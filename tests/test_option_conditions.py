@@ -332,3 +332,202 @@ def test_alias_reads_as_its_choice() -> None:
     assert canonical_value(layout, "gone") == "gone"
     assert canonical_value(layout, "") == ""
     assert canonical_value({"name": "n", "type": "string"}, "packed") == "packed"
+
+
+# ----- option_layout: the dashboard editor's compact option grid ----------
+
+
+def _layout(specs: list[dict], values: dict | None = None) -> list[tuple]:
+    from app.option_conditions import option_layout
+
+    out = []
+    for b in option_layout(specs, values or {}, specs):
+        if b["kind"] == "switches":
+            out.append(("switches", [s["name"] for s in b["opts"]]))
+        else:
+            out.append((b["size"], b["opt"]["name"]))
+    return out
+
+
+def test_layout_gathers_switches_where_the_first_one_was() -> None:
+    specs = [
+        {"name": "path", "type": "string", "label": "Path", "placeholder": "lovelace/dashboard"},
+        {"name": "kiosk", "type": "boolean", "label": "Kiosk"},
+        {"name": "settle", "type": "number", "label": "Settle delay"},
+        {"name": "interval", "type": "number", "label": "Capture interval"},
+        {"name": "header", "type": "boolean", "label": "Hide header"},
+        {"name": "x", "type": "number", "label": "Offset X"},
+        {"name": "y", "type": "number", "label": "Offset Y"},
+    ]
+    assert _layout(specs) == [
+        ("long", "path"),
+        ("switches", ["kiosk", "header"]),
+        ("short", "settle"),
+        ("short", "interval"),
+        ("short", "x"),
+        ("short", "y"),
+    ]
+
+
+def test_layout_sizes() -> None:
+    from app.option_conditions import option_size
+
+    assert option_size({"type": "number", "label": "How many"}) == "short"
+    assert option_size({"type": "slider", "label": "Size"}) == "long"
+    assert (
+        option_size({"type": "select", "label": "Units", "choices": ["Metric", "Imperial"]})
+        == "short"
+    )
+    long_choice = {"value": "w", "label": "Current calendar week (fixed start day)"}
+    assert option_size({"type": "select", "label": "Window", "choices": [long_choice]}) == "long"
+    note = {
+        "type": "select",
+        "label": "List",
+        "choices": [{"value": "", "label": "x"}],
+        "choices_note": "Set up HA",
+    }
+    assert option_size(note) == "long"
+    assert option_size({"type": "string", "label": "Place name", "placeholder": "Home"}) == "short"
+    assert option_size({"type": "string", "label": "URL", "placeholder": "https://a.b"}) == "long"
+    assert (
+        option_size({"type": "string", "label": "Key", "placeholder": "abc", "secret": True})
+        == "long"
+    )
+    assert option_size({"type": "number", "label": "A label far too long for half a row"}) == "long"
+
+
+def test_short_fields_fit_by_width_not_just_by_count() -> None:
+    """m and w are three times as wide as i and l, so a count alone let
+    "Most comments" (13 characters) into a half-width select it overflows,
+    and an "i" button wrap under "Avoid repeats (days)"."""
+    from app.option_conditions import option_size
+
+    fits = {"type": "select", "label": "Time shown", "choices": ["Arrival time", "Departure time"]}
+    assert option_size(fits) == "short"
+    wide = {"type": "select", "label": "Prioritize", "choices": ["Newest", "Most comments"]}
+    assert option_size(wide) == "long"
+    assert option_size({"type": "number", "label": "Avoid repeats (days)"}) == "short"
+    assert option_size({"type": "number", "label": "Avoid repeats (days)", "help": "x"}) == "long"
+    assert option_size({"type": "string", "label": "Name", "placeholder": "Mmmmmmmmmmm"}) == "long"
+    assert (
+        option_size({"type": "string", "label": "Name", "placeholder": "illustration"}) == "short"
+    )
+
+
+def test_a_marked_blank_row_is_a_guidance_note() -> None:
+    from app.widget_choices import guidance_note
+
+    row = {"value": "", "label": "Add an Immich library under Settings → Widgets."}
+    assert guidance_note([row]) is None
+    assert guidance_note([dict(row, note=True)]) == row["label"]
+    assert guidance_note([dict(row, note=True), {"value": "a", "label": "A"}]) is None
+    assert guidance_note([{"value": "", "label": "", "note": True}]) is None
+    assert guidance_note([{"value": "", "label": "Set HA URL + token in Settings"}])
+
+
+def test_layout_lifts_the_next_short_field_into_a_hole() -> None:
+    specs = [
+        {"name": "count", "type": "number", "label": "How many"},
+        {"name": "url", "type": "textarea", "label": "Headers"},
+        {"name": "refresh", "type": "number", "label": "Refresh"},
+    ]
+    assert _layout(specs) == [("short", "count"), ("short", "refresh"), ("long", "url")]
+
+
+def test_layout_does_not_lift_over_what_a_field_depends_on() -> None:
+    specs = [
+        {"name": "title", "type": "string", "label": "Title", "placeholder": "Kitchen"},
+        {"name": "time", "type": "boolean", "label": "Time"},
+        {
+            "name": "fmt",
+            "type": "select",
+            "label": "Time format",
+            "choices": ["12 hour", "24 hour"],
+            "show_if": {"time": True},
+        },
+    ]
+    assert _layout(specs) == [("short", "title"), ("switches", ["time"]), ("short", "fmt")]
+
+
+def test_layout_lifts_over_at_most_two_full_width_fields() -> None:
+    long = {"type": "textarea", "label": "Notes"}
+    specs = [
+        {"name": "a", "type": "number", "label": "A"},
+        dict(long, name="l1"),
+        dict(long, name="l2"),
+        dict(long, name="l3"),
+        {"name": "b", "type": "number", "label": "B"},
+    ]
+    assert [n for _, n in _layout(specs)] == ["a", "l1", "l2", "l3", "b"]
+    del specs[3]
+    assert [n for _, n in _layout(specs)] == ["a", "b", "l1", "l2"]
+
+
+def test_layout_ignores_hidden_fields_when_pairing() -> None:
+    specs = [
+        {
+            "name": "mode",
+            "type": "select",
+            "label": "Mode",
+            "choices": ["Year", "Life"],
+            "default": "Year",
+        },
+        {"name": "born", "type": "number", "label": "Birth year", "show_if": {"mode": "Life"}},
+        {"name": "url", "type": "textarea", "label": "Notes"},
+        {"name": "n", "type": "number", "label": "How many"},
+    ]
+    # "born" is hidden, so "mode" is alone and "n" joins it.
+    assert [n for _, n in _layout(specs)] == ["mode", "born", "n", "url"]
+
+
+def test_switches_with_short_labels_share_a_row() -> None:
+    from app.option_conditions import option_layout
+
+    def sw(name: str, help: bool = True, **kw: object) -> dict:
+        return {"name": name, "label": name, "type": "boolean", "help": "x" if help else None, **kw}
+
+    specs = [
+        sw("Leading icon"),
+        sw("Time", help=False),
+        sw("Temperature"),
+        sw("Humidity"),
+        sw("Battery"),
+        sw("Wi-Fi"),
+        sw("Broker"),
+        sw("Firmware update"),
+    ]
+    (block,) = option_layout(specs, {}, specs)
+    assert [[s["name"] for s in row] for row in block["rows"]] == [
+        ["Leading icon"],
+        ["Time", "Humidity"],
+        ["Temperature"],
+        ["Battery", "Wi-Fi"],
+        ["Broker"],
+        ["Firmware update"],
+    ]
+
+
+def test_a_hidden_switch_keeps_its_own_row() -> None:
+    from app.option_conditions import option_layout
+
+    specs = [
+        {"name": "a", "label": "Wi-Fi", "type": "boolean"},
+        {"name": "b", "label": "Broker", "type": "boolean", "show_if": {"a": False}},
+        {"name": "c", "label": "Battery", "type": "boolean"},
+    ]
+    (block,) = option_layout(specs, {"a": True}, specs)
+    assert [[s["name"] for s in row] for row in block["rows"]] == [["a", "c"], ["b"]]
+
+
+def test_short_text_examples() -> None:
+    from app.option_conditions import option_size
+
+    assert (
+        option_size({"type": "string", "label": "Title", "placeholder": "Evening routines"})
+        == "short"
+    )
+    assert (
+        option_size({"type": "string", "label": "Theme", "placeholder": "Google Dark Theme"})
+        == "long"
+    )
+    assert option_size({"type": "string", "label": "Language", "placeholder": "pt-BR"}) == "short"

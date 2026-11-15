@@ -69,6 +69,7 @@ from app.lineups_view import (
     window_label,
 )
 from app.next_update import DeviceTiming, reach_for_device, tracks_held_frame
+from app.redirects import local_return_path
 from app.state.deck_model import Deck, DeckPage
 from app.state.deck_store import DeckStore
 from app.state.page_store import PageStore
@@ -3002,12 +3003,13 @@ def create_lineup() -> Response:
         for page in (pages.get(p.page_id) for p in deck.pages):
             if page is not None and not page.device_ids:
                 pages.save(page.model_copy(update={"device_ids": [display]}))
+    return_to = local_return_path(form.get("return"))
     return jsonify(
         {
             "ok": True,
             "id": deck.id,
-            "url": url_for("decks.index", hl=deck.id) + f"#udeck-{deck.id}",
-            "editor_url": url_for("decks.editor", deck_id=deck.id),
+            "url": return_to or url_for("decks.index", hl=deck.id) + f"#udeck-{deck.id}",
+            "editor_url": return_to or url_for("decks.editor", deck_id=deck.id),
             "warnings": warnings,
         }
     )
@@ -3386,6 +3388,11 @@ def _editor_state(deck: Deck | None) -> dict[str, Any]:
         }
         for p in (deck.pages if deck is not None else [])
     ]
+    if deck is None:
+        page_id = request.args.get("page_id") or ""
+        if page_id in page_meta:
+            steps = [{"id": page_id, "dwell": None, "override": None, "conditions": []}]
+    return_to = (local_return_path(request.args.get("return")) or "") if deck is None else ""
     interval = deck.advance_interval_minutes if deck is not None else 30
     if deck is not None and deck.advance_trigger == "cycle" and len(deck.pages) == 1:
         # Saving reshapes this into an interval at the dashboard's own dwell.
@@ -3394,6 +3401,7 @@ def _editor_state(deck: Deck | None) -> dict[str, Any]:
     return {
         "deckId": deck.id if deck is not None else "",
         "isNew": deck is None,
+        "returnTo": return_to,
         "revision": _deck_revision(deck) if deck is not None else "",
         "name": deck.name if deck is not None else "",
         "enabled": deck.enabled if deck is not None else True,
@@ -3429,6 +3437,7 @@ def _editor_state(deck: Deck | None) -> dict[str, Any]:
             "create": url_for("decks.create_lineup"),
             "items": url_for("decks.dashboard_items"),
             "lineups": url_for("decks.index"),
+            "back": return_to or url_for("decks.index"),
             "view": url_for("decks.view_json"),
             "newDashboard": url_for("pages.index"),
             "editPage": url_for("pages.edit", page_id="__ID__"),
@@ -3886,7 +3895,9 @@ def editor_save() -> Response:
         resync = getattr(current_app.config.get("SCHEDULER"), "resync_cycle", None)
         if callable(resync):
             resync(deck.id)
-    url = url_for("decks.editor", deck_id=deck.id)
+    url = (local_return_path(form.get("return")) if existing is None else None) or url_for(
+        "decks.editor", deck_id=deck.id
+    )
     flash(f"Saved {deck.name}.", "ok")
     for warning in warnings:
         flash(warning, "warn")

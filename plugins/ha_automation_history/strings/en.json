@@ -20,5 +20,7 @@
   "seven_days": "7 days",
   "recently_active": "Recently active",
   "nothing_in_last_days": "Nothing in the last {n} days.",
-  "stale": "stale"
+  "stale": "stale",
+  "cell_options.stale_hours.placeholder": "24",
+  "cell_options.title.placeholder": "Evening routines"
 }

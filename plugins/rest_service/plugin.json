@@ -11,6 +11,7 @@
   "cell_options": [
     {
       "name": "url",
+      "placeholder": "https://api.open-meteo.com/v1/forecast?latitude=33.4484&longitude=-112.0740&current=temperature_2m",
       "type": "string",
       "label": "URL",
       "default": "",
@@ -20,6 +21,7 @@
     },
     {
       "name": "headers",
+      "placeholder": "{\"Accept\": \"application/json\"}",
       "type": "textarea",
       "label": "Request headers",
       "default": "",

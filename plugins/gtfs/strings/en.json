@@ -20,5 +20,12 @@
   "arriving": "arriving",
   "cancelled": "Cancelled",
   "to": "to",
-  "nothing_approaching": "Nothing approaching"
+  "nothing_approaching": "Nothing approaching",
+  "cell_options.gtfs_url.placeholder": "https://rrgtfsfeeds.s3.amazonaws.com/gtfs_subway.zip",
+  "cell_options.rt_url.placeholder": "https://api.bart.gov/gtfsrt/tripupdate.aspx",
+  "cell_options.alerts_url.placeholder": "https://api.bart.gov/gtfsrt/alerts.aspx",
+  "cell_options.vehicles_url.placeholder": "https://api.bart.gov/gtfsrt/vehicleposition.aspx",
+  "cell_options.stop_id.placeholder": "A34N,A34S",
+  "cell_options.routes.placeholder": "A,C",
+  "cell_options.title.placeholder": "Home stop"
 }

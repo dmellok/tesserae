@@ -4,7 +4,7 @@
 The per-widget ``test_*_i18n.py`` files pin the English/French pair of
 the first translated widgets, plus each widget's own server.py mirrors.
 This file is the generic half: whatever set of locales a widget ships,
-every ``strings/<tag>.json`` must carry the English base keys with
+every ``strings/<tag>.json`` must carry the English display keys with
 no blank values, plus optional grammatical variants. The manifest must
 match the files on disk, and every
 literal ``t("key", "fallback")`` in client.js must resolve to an English
@@ -95,13 +95,22 @@ def test_literal_t_calls_resolve_to_english_with_matching_fallback(plugin_dir: P
 def test_every_locale_carries_the_english_key_set(plugin_dir: Path, locale: str) -> None:
     en_keys = set(_strings(plugin_dir, "en"))
     loc_keys = set(_strings(plugin_dir, locale))
+    # Editor metadata resolves missing keys to English independently of panel text.
+    manifest = _manifest(plugin_dir)
+    editor_keys = {
+        f"{group}.{option['name']}.{field}"
+        for group in ("cell_options", "settings")
+        for option in manifest.get(group, [])
+        for field in ("label", "help", "placeholder")
+    }
     invalid_extras = {
         key
         for key in loc_keys - en_keys
         if key.rpartition("_")[2] not in _FORM_SUFFIXES or key.rpartition("_")[0] not in en_keys
     }
-    assert en_keys <= loc_keys and not invalid_extras, (
-        f"{plugin_dir.name}/{locale}: missing {sorted(en_keys - loc_keys)}, "
+    missing = en_keys - loc_keys - editor_keys
+    assert not missing and not invalid_extras, (
+        f"{plugin_dir.name}/{locale}: missing {sorted(missing)}, "
         f"invalid variants {sorted(invalid_extras)}"
     )
 

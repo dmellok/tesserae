@@ -151,8 +151,15 @@ SURFACES: dict[str, dict[str, Any]] = {
     },
     "page-editor-preview": {
         "path": "/pages/agenda",
+        "editor": "classic",
         "frame": ".preview-frame",
         "img": "img.preview-panel-img",
+    },
+    "page-editor-v2-preview": {
+        "path": "/pages/agenda",
+        "editor": "new",
+        "frame": ".ev2pv-canvas",
+        "img": "img.ev2pv-panel-img",
     },
     "lineups": {
         "lineups": True,
@@ -335,6 +342,8 @@ def test_no_thumbnail_leaves_an_uncovered_edge(
         base = request.getfixturevalue("lineups_live")
     else:
         app.config["SETTINGS_STORE"].patch_section("app", {"ui_design": ui})
+        if "editor" in spec:  # which dashboard editor /pages/<id> renders
+            app.config["SETTINGS_STORE"].patch_section("ui", {"dashboard_editor": spec["editor"]})
     with sync_playwright() as p:
         browser = p.chromium.launch(executable_path=_EXE) if _EXE else p.chromium.launch()
         try:

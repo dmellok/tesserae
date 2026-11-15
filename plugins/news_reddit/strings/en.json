@@ -8,5 +8,6 @@
   "sort_hot": "HOT",
   "sort_new": "NEW",
   "reddit": "Reddit",
-  "no_posts": "No posts."
+  "no_posts": "No posts.",
+  "cell_options.subreddit.placeholder": "programming"
 }

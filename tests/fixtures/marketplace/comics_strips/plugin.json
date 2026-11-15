@@ -1,0 +1,38 @@
+{
+  "tesserae_compat": "1.x",
+  "tesserae_min": "0.484.1",
+  "name": "Comics, Strips",
+  "version": "0.1.0",
+  "kind": "widget",
+  "locales": [
+    "en"
+  ],
+  "description": "Comic strips on one page, full width and in your order: xkcd (the latest or a random one, with its title and alt text, credited to xkcd.com), any picture address fetched daily, or your own upload. As many as fit, never cut off; small screens take turns. Set up on its admin page.",
+  "icon": "ph-smiley",
+  "category": "reading",
+  "supports": {
+    "sizes": [
+      "sm",
+      "md",
+      "lg"
+    ]
+  },
+  "render": {
+    "per_placement": true,
+    "dither": "floyd-steinberg",
+    "needs_network": true,
+    "full_bleed": true,
+    "warm_ahead_s": 120
+  },
+  "updates": {
+    "on_schedule": [
+      {
+        "kind": "daily",
+        "suggested_at": "06:15"
+      }
+    ]
+  },
+  "requires": [
+    "network:*"
+  ]
+}

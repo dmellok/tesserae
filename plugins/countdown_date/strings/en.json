@@ -8,5 +8,7 @@
   "countdown": "Countdown",
   "set_target_date": "Set a target date in cell options.",
   "date_has_passed": "Date has passed.",
-  "today": "Today"
+  "today": "Today",
+  "cell_options.target_date.placeholder": "2027-07-01",
+  "cell_options.label.placeholder": "Holiday"
 }

@@ -460,6 +460,7 @@ def test_page_editor_picker_omits_disabled_themes(app: Flask) -> None:
     """End-to-end: disable a theme via the toggle, then load the page
     editor and confirm the disabled theme is gone from the rendered
     theme select while everything else is present."""
+    app.config["SETTINGS_STORE"].update_section("ui", {"dashboard_editor": "classic"})
     client = app.test_client()
     _sign_in(client)
     # Create a fresh page so we have an editor URL to load.

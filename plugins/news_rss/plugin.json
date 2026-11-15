@@ -17,6 +17,7 @@
   "cell_options": [
     {
       "name": "url",
+      "placeholder": "https://news.ycombinator.com/rss",
       "type": "string",
       "label": "Feed URL",
       "default": "https://news.ycombinator.com/rss"
