@@ -76,6 +76,14 @@
       "help": "Appends ?kiosk to the URL so the kiosk-mode integration, if installed, strips the remaining chrome. Harmless without it."
     },
     {
+      "name": "header_hidden",
+      "type": "boolean",
+      "label": "Dashboard hides its own header",
+      "default": false,
+      "advanced": true,
+      "help": "Turn on when the dashboard already has no Home Assistant header (kiosk-mode, or a theme that hides it). Tesserae then keeps the top of the capture instead of cropping the header off, which would cut into your cards."
+    },
+    {
       "name": "settle_seconds",
       "type": "number",
       "label": "Settle delay",

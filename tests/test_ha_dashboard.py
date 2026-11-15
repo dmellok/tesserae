@@ -259,6 +259,21 @@ def test_zoom_scales_the_header_crop(widget: Any, browser: _FakeBrowser, app: Fl
     assert _decode(data).size == (800, 480)
 
 
+def test_a_dashboard_without_a_header_is_not_cropped(
+    widget: Any, browser: _FakeBrowser, app: Flask
+) -> None:
+    """kiosk-mode (or a theme) already hid the header: cropping 56 px would cut the cards."""
+    with app.app_context():
+        data = widget.fetch({"zoom": "1.5", "header_hidden": True}, {}, ctx=_ctx())
+    (request,) = browser.requests
+    assert request.viewport_h == 480
+    assert _decode(data).size == (800, 480)
+    params = widget._params({"header_hidden": True, "fit": True}, _ctx())
+    assert params.header_px == 0 and params.header_at(0.5) == 0
+    assert '"header": 0' in widget.ready_script(params)
+    assert widget._params({}, _ctx()).header_hidden is False
+
+
 def test_fit_is_off_by_default(widget: Any) -> None:
     assert widget._params({}, _ctx()).fit is False
     assert widget._params({"fit": True}, _ctx()).fit is True
