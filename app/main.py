@@ -65,6 +65,22 @@ def _default_bind_host() -> str:
     return os.environ.get("TESSERAE_BIND_HOST", "").strip() or "0.0.0.0"
 
 
+# Options every production ``serve`` call carries.
+#
+# ``clear_untrusted_proxy_headers`` is off on purpose. Waitress otherwise
+# strips ``X-Forwarded-For`` / ``-Proto`` / ``-Host`` / ``-Port`` from every
+# request unless its own ``trusted_proxy`` is set, which left ProxyFix with
+# nothing to read: behind a reverse proxy every visitor carried the proxy's
+# private address, so an internet client passed the gate's local-network
+# checks (password-off mode, first-run setup). The app does its own vetting
+# instead: ``_TrustedProxyMiddleware`` in the app factory drops these headers
+# unless the direct peer is a private or operator-trusted proxy.
+WAITRESS_OPTIONS: dict[str, object] = {
+    "ident": "tesserae",
+    "clear_untrusted_proxy_headers": False,
+}
+
+
 def _serve(argv: list[str] | None = None) -> None:
     """Entry point for ``python -m app.main`` and the ``tesserae``
     console script. Defaults to a production WSGI server (waitress);
@@ -159,6 +175,15 @@ def _serve(argv: list[str] | None = None) -> None:
         apply_log_level(_ha_options)
     app = create_app(dev=args.dev)
 
+    # First run: put the setup token in the log, for anyone who reaches
+    # /setup from outside the local network. The Home Assistant App normally
+    # never sets a password (ingress signs the operator in), so it would
+    # print this on every start; there the token is logged on demand instead.
+    if not app.config.get("HA_INGRESS_MODE"):
+        from app import auth
+
+        auth.announce_setup_token(app.config["SETTINGS_STORE"])
+
     if args.dev:
         logging.getLogger(__name__).info(
             "Starting Flask DEV server on http://%s:%d/ (reload + debugger ON)",
@@ -197,7 +222,7 @@ def _serve(argv: list[str] | None = None) -> None:
         args.port,
         threads,
     )
-    serve(app, host=args.host, port=args.port, threads=threads, ident="tesserae")
+    serve(app, host=args.host, port=args.port, threads=threads, **WAITRESS_OPTIONS)
 
 
 def _reset_password() -> None:

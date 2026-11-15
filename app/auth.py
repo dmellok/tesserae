@@ -6,7 +6,9 @@ built-in signed-cookie sessions keyed off ``app.config['SECRET_KEY']``.
 
 First run: the gate sees no password and redirects every request (except
 ``/setup``, ``/static``, and the loopback ``/compose`` bypass) to
-``/setup`` so the user can pick one.
+``/setup`` so the user can pick one. A client outside the local network
+must also present the setup token from the server log (see
+``setup_requires_token``).
 
 Loopback bypass: ``/compose/<page_id>`` and ``/renders/<…>`` are reachable
 from ``127.0.0.1`` even without a session, the in-process Playwright
@@ -23,6 +25,7 @@ import ipaddress
 import logging
 import os
 import secrets
+import threading
 from dataclasses import dataclass
 from typing import Any, Final
 
@@ -246,6 +249,88 @@ def forget_password(settings: SettingsStore) -> None:
     for key in _PASSWORD_KEYS:
         section.pop(key, None)
     settings.update_section("auth", section)
+
+
+# First-run setup token. ``/setup`` is open to anyone who can reach the
+# port while no password is set, so on an internet-reachable host the first
+# stranger to arrive could pick the admin password. A browser on the local
+# network (loopback, the private ranges, the operator's trusted networks)
+# still sets the password with no extra step; anyone else must also present
+# this token, which only someone who can read the server log or the
+# container environment knows.
+SETUP_TOKEN_KEY: Final[str] = "setup_token_secret"
+SETUP_TOKEN_ENV: Final[str] = "TESSERAE_SETUP_TOKEN"
+_SETUP_TOKEN_LOCK = threading.Lock()
+
+
+def _ensure_setup_token(settings: SettingsStore) -> tuple[str, bool, bool]:
+    """Return ``(token, from_env, created)``. The environment variable wins;
+    otherwise the token is generated once and kept in the auth section so it
+    survives a restart. ``clear_password`` wipes it with the rest of the
+    section, so a password reset gets a fresh one."""
+    configured = os.environ.get(SETUP_TOKEN_ENV, "").strip()
+    if configured:
+        return configured, True, False
+    with _SETUP_TOKEN_LOCK:
+        existing = settings.get_section("auth").get(SETUP_TOKEN_KEY)
+        if isinstance(existing, str) and existing:
+            return existing, False, False
+        fresh = secrets.token_urlsafe(16)
+        settings.patch_section("auth", {SETUP_TOKEN_KEY: fresh})
+        return fresh, False, True
+
+
+def _log_setup_token(token: str, from_env: bool) -> None:
+    if from_env:
+        logger.warning(
+            "No admin password is set. Browsers on the local network can open /setup "
+            "directly; from any other address, setup asks for the token in %s.",
+            SETUP_TOKEN_ENV,
+        )
+        return
+    logger.warning(
+        "No admin password is set. Browsers on the local network can open /setup "
+        "directly; from any other address, setup asks for this setup token: %s",
+        token,
+    )
+
+
+def setup_token(settings: SettingsStore) -> str:
+    """The first-run setup token, generated (and written to the log) the
+    first time it is needed."""
+    token, from_env, created = _ensure_setup_token(settings)
+    if created:
+        _log_setup_token(token, from_env)
+    return token
+
+
+def announce_setup_token(settings: SettingsStore) -> None:
+    """Write the setup token to the log at startup while no password is
+    set, so it sits near the top of ``docker logs``."""
+    if password_is_set(settings):
+        return
+    token, from_env, _created = _ensure_setup_token(settings)
+    _log_setup_token(token, from_env)
+
+
+def verify_setup_token(settings: SettingsStore, candidate: str) -> bool:
+    """Constant-time check of a submitted setup token."""
+    expected = setup_token(settings)
+    return hmac.compare_digest(candidate.strip().encode("utf-8"), expected.encode("utf-8"))
+
+
+def discard_setup_token(settings: SettingsStore) -> None:
+    """Drop the stored token once a password exists. A later reset
+    generates a new one."""
+    section = dict(settings.get_section("auth"))
+    if section.pop(SETUP_TOKEN_KEY, None) is not None:
+        settings.update_section("auth", section)
+
+
+def setup_requires_token() -> bool:
+    """Whether this request must present the setup token to set the first
+    password: true for any client the gate does not treat as local."""
+    return not (_is_loopback() or _is_private_client())
 
 
 def password_required(settings: SettingsStore) -> bool:

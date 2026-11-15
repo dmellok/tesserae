@@ -37,6 +37,7 @@ tesserae [--dev] [--host HOST] [--port PORT] [--log-level LEVEL] [--reset-passwo
 | `TESSERAE_FORWARDED_HOPS` | `1` | Trusted `X-Forwarded-*` proxy hops. Use `2` for two proxies or `0` to trust none. |
 | `TESSERAE_TRUSTED_PROXIES` | unset | Extra trusted proxy addresses in comma-separated CIDR ranges. Adds to loopback, private and link-local defaults. Allows `X-Forwarded-*` and HA ingress headers; does not grant client access. See [Browser request protection](server.md#browser-request-protection). |
 | `TESSERAE_TRUSTED_NETWORKS` | unset | Extra client networks treated as local, in comma-separated CIDR ranges, such as `2001:db8:abcd::/48` for IPv6. Clients can fetch `/renders/` without login and access admin pages if the password is disabled. Adds to the fixed private ranges and Settings → System → Authentication → Trusted networks. |
+| `TESSERAE_SETUP_TOKEN` | generated | Token that first-run password setup asks for when the browser is not on a local or trusted network. If unset, Tesserae generates one and prints it in the log while no password is set. Not used once a password exists. |
 | `TESSERAE_VISIONECT_PORT` | `11113` | TCP port the Visionect listener binds, shared by all Visionect signs. Wins over the port set in Settings, which then can't be changed there. Must be 1024 to 65535 and not the web port. |
 
 ### Storage and secrets

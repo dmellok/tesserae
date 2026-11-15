@@ -31,6 +31,19 @@ Open `http://<host-ip>:8765` (or
 `http://tesserae.local:8765` once mDNS comes up). The first request
 opens password setup and the onboarding wizard.
 
+Set the password from a browser on the same network as the server.
+From any other address, such as a VPS reached over the internet, setup
+also asks for a **setup token**. Tesserae prints it in the log while no
+password is set:
+
+```bash
+docker logs tesserae 2>&1 | grep "setup token"
+```
+
+To choose the token yourself, set `TESSERAE_SETUP_TOKEN` in the compose
+`environment:` block. Set the password as soon as the server is up:
+until then, anyone on your local network can set it.
+
 ## Pin the secret key before you store any credentials
 
 Set `TESSERAE_SECRET_KEY` before saving API keys, broker passwords or the Home Assistant token.

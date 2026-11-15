@@ -2,6 +2,7 @@
 
 * ``GET/POST /setup``, first-run password set, only reachable while no
   password is configured (otherwise it's a silent admin-takeover hole).
+  A client outside the local network must also present the setup token.
 * ``GET/POST /login``, sign-in form. Redirects to ``/setup`` if no
   password is set yet; honours a ``?next=`` query param bounded by
   :func:`safe_next` so the post-login redirect can't be used as an open
@@ -30,15 +31,29 @@ def setup() -> Response | str:
     # corner toast auto-dismisses after 5s and is easy to miss when the
     # re-rendered page otherwise looks unchanged (#265).
     error = None
+    # A browser on the local network sets the password as before. Anyone
+    # else must also present the setup token from the server log, so an
+    # internet-reachable install can't be claimed by the first stranger to
+    # find it. Resolved here, before the form renders, so the token is
+    # already in the log by the time the page asks for it.
+    needs_token = auth.setup_requires_token()
+    submitted_token = ""
+    if needs_token:
+        auth.setup_token(settings)
     if request.method == "POST":
         pw = request.form.get("password", "")
         pw2 = request.form.get("password_confirm", "")
-        if len(pw) < 8:
+        submitted_token = request.form.get("setup_token", "")
+        if needs_token and not auth.verify_setup_token(settings, submitted_token):
+            error = "That setup token is not correct. Copy it from the server log."
+            log_auth("setup", "denied", error="incorrect setup token")
+        elif len(pw) < 8:
             error = "Password must be at least 8 characters."
         elif pw != pw2:
             error = "Passwords do not match."
         else:
             auth.set_password(settings, pw)
+            auth.discard_setup_token(settings)
             auth.login()
             log_auth("setup", "ok")
             # First run drops into the setup wizard, not straight to
@@ -48,7 +63,9 @@ def setup() -> Response | str:
             if onboarding.is_onboarded(settings):
                 return redirect(url_for("index"))
             return redirect(url_for("onboarding.index"))
-    return render_template("setup.html", error=error)
+    return render_template(
+        "setup.html", error=error, needs_token=needs_token, setup_token_value=submitted_token
+    )
 
 
 @bp.route("/login", methods=["GET", "POST"], endpoint="login_view")

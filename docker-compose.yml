@@ -5,7 +5,9 @@
 #     docker compose up -d
 #
 # The admin UI lands at http://<host-ip>:8765, the first request
-# walks through password setup and the onboarding wizard.
+# walks through password setup and the onboarding wizard. Do that from
+# a browser on the same network straight away. From any other address,
+# setup also asks for the setup token in `docker logs tesserae`.
 #
 # Pin to a specific tag (not :latest) in any setup you care about so
 # `docker compose pull && up -d` is the deliberate upgrade step.

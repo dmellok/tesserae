@@ -197,7 +197,13 @@ def test_configured_proxy_origin_can_submit_a_same_origin_form(app, peer) -> Non
             "X-Forwarded-Host": "paper.test:8443",
             "X-Forwarded-Proto": "https",
         },
-        data={"password": "test-password", "password_confirm": "test-password"},
+        # The peer is the proxy's own (non-private) address and no client
+        # address is forwarded, so first-run setup asks for the token.
+        data={
+            "password": "test-password",
+            "password_confirm": "test-password",
+            "setup_token": auth.setup_token(app.config["SETTINGS_STORE"]),
+        },
     )
     assert response.status_code == 302
     assert auth.password_is_set(app.config["SETTINGS_STORE"])
@@ -339,3 +345,34 @@ def test_public_url_unset_still_captures_real_port(app: Flask) -> None:
     client = app.test_client()
     client.get("/healthz", headers={"Host": "192.168.1.50:5050"})
     assert app.config.get("DETECTED_HTTP_PORT") == 5050
+
+
+def test_waitress_passes_forwarding_headers_through_to_the_app() -> None:
+    """The production server must not strip ``X-Forwarded-*`` before the
+    app's own trusted-proxy check sees them. Waitress does by default, which
+    made every visitor behind a reverse proxy look like the proxy itself (a
+    private address) to the auth gate. The test client never goes through
+    waitress, so this builds a real server with the options ``main`` uses
+    and calls the application exactly as waitress wrapped it."""
+    from waitress.server import create_server
+
+    from app.main import WAITRESS_OPTIONS
+
+    seen: dict[str, str] = {}
+
+    def echo(environ, start_response):  # type: ignore[no-untyped-def]
+        seen.update({k: v for k, v in environ.items() if k.startswith("HTTP_X_FORWARDED_")})
+        start_response("200 OK", [])
+        return [b""]
+
+    forwarded = {
+        "HTTP_X_FORWARDED_FOR": "203.0.113.9",
+        "HTTP_X_FORWARDED_PROTO": "https",
+        "HTTP_X_FORWARDED_HOST": "panel.example.org",
+    }
+    server = create_server(echo, host="127.0.0.1", port=0, _start=False, **WAITRESS_OPTIONS)
+    try:
+        server.application({"REMOTE_ADDR": "127.0.0.1", **forwarded}, lambda *a: None)
+    finally:
+        server.close()
+    assert seen == forwarded
