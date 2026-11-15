@@ -80,6 +80,7 @@
       "type": "boolean",
       "label": "Dashboard hides its own header",
       "default": false,
+      "advanced": true,
       "help": "Turn on when the dashboard already has no Home Assistant header (kiosk-mode, or a theme that hides it). Tesserae then keeps the top of the capture instead of cropping the header off, which would cut into your cards."
     },
     {
