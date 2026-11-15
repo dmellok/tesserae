@@ -170,7 +170,7 @@ def test_choose_kie_and_store_its_key_encrypted(app, tmp_path, monkeypatch):
 
     client = _signed_in(app)
     response = client.post(
-        "/settings/genai", data={"image_service": "kie", "kie_api_key_secret": "private-kie-key"}
+        "/settings/genai", data={"image_service": "kie", "kie_api_key": "private-kie-key"}
     )
     assert response.status_code == 302
     with app.app_context():
@@ -180,13 +180,13 @@ def test_choose_kie_and_store_its_key_encrypted(app, tmp_path, monkeypatch):
     html = client.get("/settings/genai").get_data(as_text=True)
     assert '<option value="kie" selected>' in html
     assert "private-kie-key" not in html
-    assert 'name="kie_api_key_secret"' in html
-    client.post("/settings/genai", data={"kie_api_key_secret": "********"})
+    assert 'name="kie_api_key"' in html
+    client.post("/settings/genai", data={"kie_api_key": "********"})
     with app.app_context():
         assert kie_images.configuration() == ("kie", "private-kie-key")
     monkeypatch.setattr(kie_images, "credits", lambda key: 42)
     response = client.post(
-        "/settings/genai/check-kie", data={"kie_api_key_secret": "********"}, follow_redirects=True
+        "/settings/genai/check-kie", data={"kie_api_key": "********"}, follow_redirects=True
     )
     assert "42 credits available" in response.get_data(as_text=True)
 
@@ -196,7 +196,7 @@ def test_explicit_service_overrides_automatic_model_routing(app, service):
     from app import kie_images
 
     store = app.config["SETTINGS_STORE"]
-    genai.save(store, {"image_service": service, "kie_api_key_secret": "kie"})
+    genai.save(store, {"image_service": service, "kie_api_key": "kie"})
     with app.app_context():
         c = fal.FalClient("fal", gemini_key="gemini", openai_key="openai")
         assert kie_images.configuration()[0] == service
@@ -209,7 +209,7 @@ def test_explicit_service_overrides_automatic_model_routing(app, service):
 def test_selected_service_keeps_fal_key_for_background_masks(app):
     genai.save(
         app.config["SETTINGS_STORE"],
-        {"image_service": "kie", "kie_api_key_secret": "kie", "api_key": "fal-mask-key"},
+        {"image_service": "kie", "kie_api_key": "kie", "api_key": "fal-mask-key"},
     )
     with app.app_context():
         assert fal.painting_key({}) == "fal-mask-key"

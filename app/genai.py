@@ -73,8 +73,8 @@ def for_admin(store: Any) -> dict[str, Any]:
     image_masked = store.get_for_admin("app", "images", kie_images.FIELDS)
     return {
         "image_service": str(image_vals.get("image_service") or "auto"),
-        "kie_api_key_secret": str(image_masked.get("kie_api_key_secret") or ""),
-        "has_kie_key": bool(image_vals.get("kie_api_key_secret")),
+        "kie_api_key": str(image_masked.get("kie_api_key") or ""),
+        "has_kie_key": bool(image_vals.get("kie_api_key")),
         "api_key": str(masked.get("api_key") or ""),
         "has_key": bool(str(vals.get("api_key") or "").strip()),
         "openai_api_key": str(o_masked.get("api_key") or ""),
@@ -96,8 +96,8 @@ def save(store: Any, form: dict[str, Any]) -> None:
         service = str(form.get("image_service") or "auto")
         if service in kie_images.SERVICES:
             image_values["image_service"] = service
-    if "kie_api_key_secret" in form:
-        image_values["kie_api_key_secret"] = str(form.get("kie_api_key_secret") or "").strip()
+    if "kie_api_key" in form:
+        image_values["kie_api_key"] = str(form.get("kie_api_key") or "").strip()
     if image_values:
         store.update_for_namespace("app", "images", image_values, kie_images.FIELDS)
     values: dict[str, Any] = {}

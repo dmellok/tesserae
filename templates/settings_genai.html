@@ -34,7 +34,7 @@
     <div class="field">
       <label for="genai-kie-key">kie.ai API key</label>
       <div class="dx-genai-keyrow">
-        <input id="genai-kie-key" type="password" name="kie_api_key_secret" value="{{ form.kie_api_key_secret }}" autocomplete="off" spellcheck="false">
+        <input id="genai-kie-key" type="password" name="kie_api_key" value="{{ form.kie_api_key }}" autocomplete="off" spellcheck="false">
         <button type="submit" class="btn" formaction="{{ url_for('auth.genai_check_kie') }}">Check credits</button>
         <button type="submit" class="btn btn-primary">Save</button>
       </div>

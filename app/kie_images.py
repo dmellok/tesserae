@@ -27,7 +27,7 @@ UPLOAD_URLS = (
 )
 POLL_S = 4.0
 FIELDS = [
-    {"name": "kie_api_key_secret", "secret": True},
+    {"name": "kie_api_key", "secret": True},
     {"name": "image_service", "type": "string", "default": "auto"},
 ]
 SERVICES = ("auto", "fal", "gemini", "openai", "kie")
@@ -52,7 +52,7 @@ def configuration() -> tuple[str, str]:
         store = current_app.config.get("SETTINGS_STORE") or store
     vals = store.get_for_runtime("app", "images", FIELDS) if store is not None else {}
     service = str(vals.get("image_service") or "auto")
-    key = str(vals.get("kie_api_key_secret") or os.environ.get("KIE_API_KEY") or "").strip()
+    key = str(vals.get("kie_api_key") or os.environ.get("KIE_API_KEY") or "").strip()
     return service if service in SERVICES else "auto", key
 
 

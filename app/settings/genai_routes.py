@@ -210,11 +210,11 @@ def genai_reset() -> Response:
 
 @bp.post("/settings/genai/check-kie")
 def genai_check_kie() -> Response:
-    posted = str(request.form.get("kie_api_key_secret") or "").strip()
+    posted = str(request.form.get("kie_api_key") or "").strip()
     fresh = bool(posted) and posted != SECRET_MASK
     key = posted if fresh else kie_images.configuration()[1]
     ok, note = kie_images.check_key(key)
     if ok and fresh:
-        genai.save(settings_store(), {"kie_api_key_secret": posted})
+        genai.save(settings_store(), {"kie_api_key": posted})
         note += " Saved."
     return redirect(url_for("auth.genai_index", checked_kie=note))
