@@ -205,10 +205,16 @@ class Params(NamedTuple):
     settle_s: float
     theme: str = ""
     fit: bool = False
+    # The dashboard already hides Home Assistant's header (kiosk-mode, a theme):
+    # nothing to crop, or the crop would cut the top of the dashboard off.
+    header_hidden: bool = False
+
+    def header_at(self, zoom: float) -> int:
+        return 0 if self.header_hidden else round(HEADER_PX * zoom)
 
     @property
     def header_px(self) -> int:
-        return round(HEADER_PX * self.zoom)
+        return self.header_at(self.zoom)
 
 
 class Frame(NamedTuple):
@@ -310,6 +316,7 @@ def _params(options: dict[str, Any], ctx: dict[str, Any]) -> Params:
         settle_s=_float_option(options, "settle_seconds", DEFAULT_SETTLE_S, 0.0, 12.0),
         theme=normalise_theme(options.get("theme")),
         fit=options.get("fit") is True,
+        header_hidden=options.get("header_hidden") is True,
     )
 
 
@@ -396,7 +403,7 @@ def ready_script(params: Params) -> str:
         "max": params.zoom,
         "min": min(FIT_MIN_ZOOM, params.zoom),
         "height": params.h,
-        "header": HEADER_PX,
+        "header": 0 if params.header_hidden else HEADER_PX,
         "firstMs": FIT_FIRST_STABLE_MS,
         "stepMs": FIT_STEP_STABLE_MS,
         "maxSteps": FIT_MAX_STEPS,
@@ -417,7 +424,7 @@ def crop_header(png: bytes, params: Params, zoom: float | None = None) -> bytes:
     from PIL import Image
 
     with Image.open(io.BytesIO(png)) as im:
-        top = params.header_px if zoom is None else round(HEADER_PX * zoom)
+        top = params.header_px if zoom is None else params.header_at(zoom)
         frame = im.convert("RGB").crop((0, top, params.w, top + params.h))
         out = io.BytesIO()
         frame.save(out, format="PNG", optimize=True)

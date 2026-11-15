@@ -8,6 +8,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Home Assistant, Dashboard widget: **Dashboard hides its own header** skips the header crop for dashboards that have no header (kiosk-mode, or a theme that hides it), so their top row is no longer cut off.
 - Home Assistant, Dashboard widget: a **Fit to cell** option shrinks the dashboard until all of it fits, so a view taller than the cell is no longer cut off at the bottom. **Zoom** then sets the largest size it may be drawn at.
 - Home Assistant, Dashboard widget: a **Theme** option, listing the themes installed in Home Assistant, captures the dashboard in the one you pick, so a panel can use a high-contrast or e-ink theme without changing the theme anyone sees in their browser. Blank keeps Home Assistant's default theme.
 - OpenDisplay via Home Assistant: **Add device → OpenDisplay** lists the tags Home Assistant knows under **Found in Home Assistant**, each with a one-click **Add** that takes the tag's size and colour palette from the tag itself.
