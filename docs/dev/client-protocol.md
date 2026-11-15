@@ -7,8 +7,8 @@ PCs, and matches the current `main` branch.
 - For battery or embedded firmware (CircuitPython, MicroPython, custom
   MCUs), see [REST transport](../install/rest-transport.md) to work
   without a broker. Use MQTT if your stack already supports it.
-  [Discovery & pairing](#discovery-and-pairing) lets devices re-pair
-  after firmware updates by matching their MAC address.
+  [Discovery & pairing](#discovery-and-pairing) lets a device that lost its settings pair
+  again by its MAC address, once its owner allows it.
 - For an always-on Pi or kiosk, MQTT is simpler. The
   `tesserae/<id>/frame/<fmt>` topic delivers a JSON envelope with a
   download URL whenever a new frame ships.
@@ -75,7 +75,7 @@ Users never type tokens. There are three pairing paths:
 - A (default): firmware announces itself. The admin clicks Register,
   and the next discover poll returns the token.
 - B: the admin issues a pairing code before the device boots.
-- C: a re-flashed device recovers its token by MAC address.
+- C: a re-flashed device asks for its token by MAC address, and the owner allows it.
 
 !!! note "`kind` is a server-side plugin id"
     The `kind` field in every discover / register payload must match
@@ -287,7 +287,8 @@ server URL.
 
    The returned `device_id` wins. The server identifies the device by
    MAC and returns its stored id and token, ignoring the announced id.
-   This lets a re-flashed board recover its token after losing settings.
+   This lets a re-flashed board recover its token after losing settings
+   (path C, once the owner allows it).
 
    Continuing with the announced id may address a device the server
    doesn't have. Adopt the returned value.
@@ -358,11 +359,44 @@ If the `device_id` already exists, the response is idempotent
 (`status: 200`, `reused_existing: true`) with the **existing** token
 returned.
 
-### C. MAC auto-claim after re-flash
+### C. Pairing again after a re-flash
 
-After losing its token, a registered device can call `/discover` with
-its MAC. A known MAC returns the existing token immediately, without
-admin approval.
+A MAC address is not a secret, so it collects a token only once. The
+MAC match in path A works until the device makes its first request
+*with* the token. After that, a `/discover` from the same MAC without
+the token gets no token:
+
+```json
+{
+  "status": 200,
+  "registered": false,
+  "discovered": true,
+  "repair_required": true,
+  "retry_after_s": 30
+}
+```
+
+This is the same shape as "not registered yet", so a client keeps
+polling as it does while it waits for Register. `repair_required` is
+there for a client that wants to show a different message.
+
+The owner sees "This display is asking to pair again" on the device's
+page and on Settings → Devices, and chooses **Allow re-pair**. The next
+`/discover` returns the existing token and config, and the device keeps
+its id, its pages and its history. The claim closes again on the
+device's next authenticated request.
+
+A device that has not yet used its token (a lost `/discover` response,
+say) can ask again as often as it needs to.
+
+A client that still holds its token and re-announces to change its
+`kind` or `format` must send the token on `/discover`
+(`Authorization: Bearer <token>`). It is then answered as in path A.
+Without the token, a device whose claim has closed gets the response
+above and nothing changes.
+
+Servers before 0.514.0 returned the token to any `/discover` with a
+known MAC.
 
 ### Rate limiting
 

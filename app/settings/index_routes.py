@@ -1088,6 +1088,19 @@ def _stamp_label(moment: datetime) -> str:
     return f"{moment:%Y-%m-%d} {clock_of(moment, seconds=True)} {moment:%Z}"
 
 
+def _repair_request_view(device: Device) -> dict[str, Any] | None:
+    from app import mac_claim
+
+    entry = mac_claim.pending_request(current_app, device.id)
+    if entry is None:
+        return None
+    return {
+        "relative": format_relative(max(0.0, time.time() - float(entry["at"]))),
+        "ip": entry.get("ip") or "",
+        "endpoint": url_for("auth.devices_allow_repair", instance_id=device.id),
+    }
+
+
 def _build_device_section(store: Any, device: Device) -> dict[str, Any] | None:
     """Build the view-model for one device instance: the dict the
     Devices table row, the quick panel, the device page and the
@@ -1198,6 +1211,9 @@ def _build_device_section(store: Any, device: Device) -> dict[str, Any] | None:
         "delete_endpoint": (
             url_for("auth.devices_delete", instance_id=device.id) if is_instance else None
         ),
+        # A registered device that lost its token and is asking for it
+        # by MAC again (#515); None when there is no live request.
+        "repair_request": _repair_request_view(device) if is_instance else None,
         # Counts for the delete-confirm modal (v0.69.2, issue
         # #48): what a checked "Also wipe" tickbox would drop.
         # Zero everywhere means the delete is already clean and
