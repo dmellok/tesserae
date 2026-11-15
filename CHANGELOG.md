@@ -6,6 +6,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- News, Wikipedia On This Day: the date follows your timezone setting. It used UTC, so west of Greenwich it showed tomorrow's entries from the early evening until local midnight.
+
 ## [0.513.0], 2026-11-15
 
 ### Security
