@@ -848,15 +848,21 @@ def _editor_lineups(page: Page) -> list[dict[str, Any]]:
     for deck in store.all():
         device_ids = _lineup_displays(deck)
         schedule = is_timed_view_deck(deck) and len(deck.pages) == 1
-        with using_time_cycle(_time_cycle()):
-            when = window_label(_lineup_input(deck, with_urls=False))
-            if deck.advance != "manual":
-                cadence = (
-                    f"every {dur_short(deck.advance_interval_minutes)} · "
-                    if deck.advance_trigger == "interval"
-                    else ""
-                )
-                when = f"{days_label(deck.advance_days_of_week)} {cadence}{when}"
+        try:
+            with using_time_cycle(_time_cycle()):
+                when = window_label(_lineup_input(deck, with_urls=False))
+                if deck.advance != "manual":
+                    cadence = (
+                        f"every {dur_short(deck.advance_interval_minutes)} · "
+                        if deck.advance_trigger == "interval"
+                        else ""
+                    )
+                    when = f"{days_label(deck.advance_days_of_week)} {cadence}{when}"
+        except Exception:
+            # This list is in both editors' context: one lineup whose times
+            # can't be worded must not take the dashboard's editor down.
+            logger.exception("editor: could not describe lineup %s", deck.id)
+            when = ""
         rows.append(
             {
                 "id": deck.id,
@@ -1332,7 +1338,7 @@ def editor_version() -> Response:
     version = request.form.get("version")
     if version not in {"new", "classic"}:
         abort(400)
-    _settings_store().update_section("ui", {"dashboard_editor": version})
+    _settings_store().patch_section("ui", {"dashboard_editor": version})
     target = local_return_path(request.form.get("next"))
     if target is None and request.referrer:
         try:
@@ -1360,6 +1366,17 @@ def edit(page_id: str) -> Response | str:
     return render_template(template, **_editor_context(page))
 
 
+def _resync_cycle(deck: Deck) -> None:
+    """A rotation mid-window keeps its step number, which names another
+    dashboard once its page list changes: let the next tick send it rather
+    than wait for the boundary (as the lineup editor does on a reorder)."""
+    if deck.advance == "manual" or deck.advance_trigger != "cycle":
+        return
+    resync = getattr(current_app.config.get("SCHEDULER"), "resync_cycle", None)
+    if callable(resync):
+        resync(deck.id)
+
+
 @bp.post("/<page_id>/lineups/<deck_id>/join")
 def join_lineup(page_id: str, deck_id: str) -> Response:
     """Append a dashboard once, adding the lineup's displays when approved."""
@@ -1383,10 +1400,20 @@ def join_lineup(page_id: str, deck_id: str) -> Response:
         page = page.model_copy(update={"device_ids": [*page.device_ids, *missing]})
         _store().save(page)
         current_app.config.get("PREVIEW_CACHE", {}).pop(page_id, None)
-    if page_id not in deck.page_ids:
-        deck = _merged_deck(deck, pages=[*deck.pages, DeckPage(page_id=page_id)])
-        deck_store.upsert(deck)
-        _invalidate(deck)
+
+    def plan(decks: dict[str, Deck]) -> tuple[list[Deck], Deck | None]:
+        # Read and write under the store's lock, as the lineup editor does: an
+        # edit made there since this request read the deck is kept.
+        current = decks.get(deck_id)
+        if current is None or page_id in current.page_ids:
+            return [], None
+        joined = _merged_deck(current, pages=[*current.pages, DeckPage(page_id=page_id)])
+        return [joined], joined
+
+    joined = deck_store.transaction(plan)
+    if joined is not None:
+        _invalidate(joined)
+        _resync_cycle(joined)
     elif missing:
         _invalidate(deck)
     return jsonify({"ok": True, "lineups": _editor_lineups(page), "device_ids": page.device_ids})
@@ -1402,13 +1429,38 @@ def leave_lineup(page_id: str, deck_id: str) -> Response:
     deck = deck_store.get(deck_id)
     if page is None or deck is None:
         abort(404)
-    if page_id in deck.page_ids:
-        updated = deck_without_page(deck, page_id)
+    body = request.get_json(silent=True)
+    delete_ok = isinstance(body, dict) and body.get("delete_lineup") is True
+
+    def plan(decks: dict[str, Deck]) -> tuple[list[Deck], tuple[str, Deck | None]]:
+        current = decks.get(deck_id)
+        if current is None or page_id not in current.page_ids:
+            return [], ("unchanged", None)
+        updated = deck_without_page(current, page_id)
         if updated is None:
-            deck_store.delete(deck_id)
-        else:
-            deck_store.upsert(updated)
+            return [], ("empty", current)
+        return [updated], ("left", updated)
+
+    outcome, changed = deck_store.transaction(plan)
+    if outcome == "empty":
+        # Leaving deletes the lineup, which the page only asks about in the
+        # browser. The request has to say so too, so a stale page or a script
+        # can't delete one by leaving it.
+        if not delete_ok:
+            response = jsonify(
+                {
+                    "ok": False,
+                    "deletes_lineup": True,
+                    "message": "Leaving deletes this lineup, as it has no other dashboard.",
+                }
+            )
+            response.status_code = 409
+            return response
+        deck_store.delete(deck_id)
         _invalidate(deck)
+    elif changed is not None:
+        _invalidate(deck)
+        _resync_cycle(changed)
     return jsonify({"ok": True, "lineups": _editor_lineups(page), "device_ids": page.device_ids})
 
 

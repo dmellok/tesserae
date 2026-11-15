@@ -100,7 +100,8 @@
       const rm = ev.target.closest("[data-ev2-lremove]");
       if (rm) {
         const name = rm.closest("li")?.querySelector("b")?.textContent || "this lineup";
-        if (rm.dataset.deletes === "1" || emptied.includes(name)) {
+        const deletes = rm.dataset.deletes === "1" || emptied.includes(name);
+        if (deletes) {
           const message =
             rm.dataset.schedule === "1"
               ? `Remove ${name}? This deletes this dashboard's schedule.`
@@ -111,7 +112,9 @@
           .then(() =>
             EV2.post(
               `${base}/${encodeURIComponent(rm.dataset.ev2Lremove)}/leave`,
-              {},
+              // The server deletes a lineup on leave only when told the
+              // person agreed to it.
+              deletes ? { delete_lineup: true } : {},
               { json: true }
             )
           )
