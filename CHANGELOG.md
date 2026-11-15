@@ -6,6 +6,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- GTFS: when the agency publishes a new timetable, a pushed board now updates once the rebuild lands instead of keeping the old times. The stop list and the timetable also no longer download the same feed twice at once.
+
 ## [0.513.0], 2026-11-15
 
 ### Security
