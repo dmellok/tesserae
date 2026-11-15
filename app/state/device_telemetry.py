@@ -81,6 +81,13 @@ LEAD_SAMPLE_MAX_S: int = 180
 # info) but the confidence counter doesn't move.
 WAKE_DEBOUNCE_S: float = 10.0
 
+# A wake caused by a button press (the firmware's button event counter moved) is
+# not the sleep timer firing, so it says nothing about whether the timer's
+# prediction was right: it is not scored. The same goes for the next beats within
+# this window, which the device sends while it is still awake after the press and
+# would otherwise read as wildly early wakes.
+BUTTON_WAKE_WINDOW_S: float = 300.0
+
 
 @dataclass
 class DeviceTelemetry:
@@ -116,6 +123,10 @@ class DeviceTelemetry:
     # no wake to predict: it is reachable continuously, so smart sync has
     # nothing to wait for and must not hold a fire on its behalf.
     always_on: bool = False
+    # The firmware's last seen button event counter, and when a press last woke
+    # the device (see BUTTON_WAKE_WINDOW_S).
+    last_button_event_id: int | None = None
+    button_wake_at: float | None = None
 
     @property
     def is_trusted(self) -> bool:
@@ -204,6 +215,8 @@ class TelemetryStore:
                 prediction_source="configured",
                 wake_lead_ewma_s=prev.wake_lead_ewma_s,
                 always_on=prev.always_on,
+                last_button_event_id=prev.last_button_event_id,
+                button_wake_at=prev.button_wake_at,
             )
             self._state.devices[device_id] = entry
             self._flush_locked()
@@ -284,7 +297,20 @@ class TelemetryStore:
             # reset its confidence over and over. Nothing consumes the
             # prediction for such a device either (the scheduler's smart-sync
             # hold returns early on always_on), so there is nothing to score.
-            if always_on:
+            # A press moves the firmware's button event counter; the first
+            # heartbeat of a device has nothing to compare with.
+            button_event_id = _coerce_int(parsed.get("button_event_id"))
+            button_wake_at = prev.button_wake_at
+            if (
+                button_event_id is not None
+                and prev.last_button_event_id is not None
+                and button_event_id != prev.last_button_event_id
+            ):
+                button_wake_at = received_at
+            unscheduled = (
+                button_wake_at is not None and (received_at - button_wake_at) < BUTTON_WAKE_WINDOW_S
+            )
+            if always_on or unscheduled:
                 pass
             elif not is_same_wake and prev.predicted_next_wake_at is not None:
                 offset_s = round(received_at - prev.predicted_next_wake_at)
@@ -373,6 +399,10 @@ class TelemetryStore:
                 prediction_source=source,
                 wake_lead_ewma_s=lead_ewma,
                 always_on=always_on,
+                last_button_event_id=(
+                    button_event_id if button_event_id is not None else prev.last_button_event_id
+                ),
+                button_wake_at=button_wake_at,
             )
             self._state.devices[device_id] = entry
             self._flush_locked()
@@ -480,6 +510,8 @@ class TelemetryStore:
                     ),
                     wake_lead_ewma_s=_coerce_float(raw_entry.get("wake_lead_ewma_s")),
                     always_on=bool(raw_entry.get("always_on")),
+                    last_button_event_id=_coerce_int(raw_entry.get("last_button_event_id")),
+                    button_wake_at=_coerce_float(raw_entry.get("button_wake_at")),
                 )
             except (TypeError, ValueError) as err:
                 logger.warning(
