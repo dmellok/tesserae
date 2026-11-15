@@ -10,7 +10,7 @@ from typing import Any
 from flask import current_app, flash, redirect, render_template, request, url_for
 from werkzeug.wrappers import Response
 
-from app import artwork, commons, fal, gemini_images, genai, openai_images
+from app import artwork, commons, fal, gemini_images, genai, kie_images, openai_images
 from app.state.settings_store import SECRET_MASK
 
 from ._shared import bp, plugins, settings_store
@@ -135,6 +135,7 @@ def genai_index() -> str:
         env_gemini=env_gemini,
         checked_gemini=request.args.get("checked_gemini", ""),
         check_gemini_ok=request.args.get("ok_gemini") == "1",
+        checked_kie=request.args.get("checked_kie", ""),
         daily=daily,
         monthly=monthly,
         summary=summary,
@@ -205,3 +206,15 @@ def genai_reset() -> Response:
     _ledger().reset_today()
     flash("To-day's spend against the ceiling counts from now.", "ok")
     return redirect(url_for("auth.genai_index"))
+
+
+@bp.post("/settings/genai/check-kie")
+def genai_check_kie() -> Response:
+    posted = str(request.form.get("kie_api_key") or "").strip()
+    fresh = bool(posted) and posted != SECRET_MASK
+    key = posted if fresh else kie_images.configuration()[1]
+    ok, note = kie_images.check_key(key)
+    if ok and fresh:
+        genai.save(settings_store(), {"kie_api_key": posted})
+        note += " Saved."
+    return redirect(url_for("auth.genai_index", checked_kie=note))

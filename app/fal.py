@@ -31,6 +31,7 @@ import threading
 import urllib.error
 import urllib.request
 from collections.abc import Callable, Sequence
+from pathlib import Path
 from typing import Any
 
 API_BASE = "https://fal.run"
@@ -161,6 +162,35 @@ MODELS: dict[str, dict[str, Any]] = {
         "refs": 1,
     },
 }
+# Direct kie.ai models are ledger identities, not extra widget picker entries.
+MODELS.update(
+    {
+        "nano_banana_kie": {
+            "endpoint": "kie:google/nano-banana-edit",
+            "label": "Nano Banana (kie.ai)",
+            "cents": 2,
+            "kind": "edit",
+            "refs": 10,
+            "direct": "kie",
+        },
+        "nano_banana_kie_t2i": {
+            "endpoint": "kie:google/nano-banana",
+            "label": "Nano Banana (kie.ai)",
+            "cents": 2,
+            "kind": "t2i",
+            "refs": 0,
+            "direct": "kie",
+        },
+        "nano_banana_pro_kie": {
+            "endpoint": "kie:nano-banana-pro",
+            "label": "Nano Banana Pro (kie.ai)",
+            "cents": 9,
+            "kind": "edit",
+            "refs": 8,
+            "direct": "kie",
+        },
+    }
+)
 DEFAULT_EDIT_MODEL = "nano_banana"
 EDIT_MODELS = tuple(k for k, v in MODELS.items() if v["kind"] == "edit" and not v.get("direct"))
 # What :func:`painting_key` answers when there is no fal.ai key but an OpenAI
@@ -236,7 +266,19 @@ def painting_key(settings: dict[str, Any] | None = None) -> str:
     """What a painting is started with: the fal.ai key from
     :func:`resolve_key`, else :data:`DIRECT_ONLY` when an OpenAI or Gemini
     key is set (every picture then goes straight to one of them), else empty."""
+    from app import kie_images
+
+    service, kie_key = kie_images.configuration()
+    if service == "kie":
+        return (resolve_key(settings) or DIRECT_ONLY) if kie_key else ""
+    if service in ("gemini", "openai"):
+        from app import gemini_images, openai_images
+
+        module = gemini_images if service == "gemini" else openai_images
+        return (resolve_key(settings) or DIRECT_ONLY) if module.resolve_key() else ""
     key = resolve_key(settings)
+    if service == "fal":
+        return key
     if key:
         return key
     from app import gemini_images, openai_images
@@ -401,7 +443,20 @@ class FalClient:
         timeout: float = TIMEOUT_S,
         openai_key: str | None = None,
         gemini_key: str | None = None,
+        refund: Callable[[int, str], None] | None = None,
+        image_service: str | None = None,
+        kie_key: str | None = None,
+        task_dir: Path | None = None,
     ) -> None:
+        from app import kie_images
+
+        service, stored_kie_key = kie_images.configuration()
+        self.image_service = image_service if image_service is not None else service
+        self.kie_key = kie_key if kie_key is not None else stored_kie_key
+        self.task_dir = task_dir
+        self._refund = refund
+        self._image_call = 0
+        self._kie_failure = ""
         self.key = "" if key == DIRECT_ONLY else key
         if openai_key is None:
             from app import openai_images
@@ -438,8 +493,57 @@ class FalClient:
         and ``size`` (width, height) reach the models that take them (GPT
         Image) and are ignored by the rest; the budget is charged the price
         of the quality asked for."""
+        if self._kie_failure:
+            raise FalError(self._kie_failure)
         model = model_of(model)
         spec = MODELS[model]
+        slot = self._image_call
+        self._image_call += 1
+        # A paid task keeps its provider even if the account choice changes.
+        saved = self.task_dir is not None and (self.task_dir / f"{slot}.json").exists()
+        if (self.image_service == "kie" or saved or spec.get("direct") == "kie") and spec[
+            "kind"
+        ] != "mask":
+            from app import kie_images
+
+            folder = self.task_dir
+            if folder is None:
+                import hashlib
+
+                folder = (
+                    kie_images.task_root()
+                    / hashlib.sha256(
+                        json.dumps([model, prompt, list(refs), aspect]).encode()
+                    ).hexdigest()
+                )
+
+            def charge(cents: int, charged_model: str) -> None:
+                if self._charge is not None:
+                    self._charge(cents, charged_model)
+                self.spent_cents += cents
+
+            def refund(cents: int, charged_model: str) -> None:
+                if self._refund is not None:
+                    self._refund(cents, charged_model)
+                self.spent_cents -= cents
+
+            try:
+                return kie_images.generate(
+                    self.kie_key,
+                    prompt,
+                    refs=refs,
+                    aspect=aspect,
+                    pro="pro" in model,
+                    folder=folder,
+                    slot=slot,
+                    charge=charge,
+                    timeout=self._timeout,
+                    stop=self._stop,
+                    refund=refund,
+                )
+            except kie_images.KieError as err:
+                self._kie_failure = str(err)
+                raise FalError(str(err)) from err
         if spec["kind"] != "t2i" and not refs:
             raise FalError("no reference picture to paint from")
         direct = self.direct_model(model)
@@ -499,6 +603,12 @@ class FalClient:
         first, else OpenAI)."""
         model = model_of(model)
         spec = MODELS[model]
+        if self.image_service == "fal":
+            return None
+        if self.image_service in ("gemini", "openai") and spec["kind"] != "mask":
+            return _SAME_ON[self.image_service].get(model) or _FALLBACK[self.image_service].get(
+                spec["kind"]
+            )
         if spec.get("direct"):
             return model
         for provider, same in _SAME_ON.items():
@@ -524,6 +634,8 @@ class FalClient:
         spec = MODELS[model]
         provider = str(spec["direct"])
         key = self._direct_key(provider)
+        if not key:
+            raise FalError(f"no {provider} key")
         refs = list(refs)[: int(spec["refs"])] if spec["refs"] else []
         cents = cents_of(model, quality if provider == "openai" else "medium")
         last = "no answer"

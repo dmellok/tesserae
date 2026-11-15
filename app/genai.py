@@ -63,13 +63,18 @@ def for_admin(store: Any) -> dict[str, Any]:
     """The same with the key masked, for the form."""
     vals = store.get_for_runtime("app", "fal", FIELDS)
     masked = store.get_for_admin("app", "fal", FIELDS)
-    from app import gemini_images, openai_images
+    from app import gemini_images, kie_images, openai_images
 
     o_vals = store.get_for_runtime("app", "openai", openai_images.FIELDS)
     o_masked = store.get_for_admin("app", "openai", openai_images.FIELDS)
     g_vals = store.get_for_runtime("app", "gemini", gemini_images.FIELDS)
     g_masked = store.get_for_admin("app", "gemini", gemini_images.FIELDS)
+    image_vals = store.get_for_runtime("app", "images", kie_images.FIELDS)
+    image_masked = store.get_for_admin("app", "images", kie_images.FIELDS)
     return {
+        "image_service": str(image_vals.get("image_service") or "auto"),
+        "kie_api_key": str(image_masked.get("kie_api_key") or ""),
+        "has_kie_key": bool(image_vals.get("kie_api_key")),
         "api_key": str(masked.get("api_key") or ""),
         "has_key": bool(str(vals.get("api_key") or "").strip()),
         "openai_api_key": str(o_masked.get("api_key") or ""),
@@ -84,6 +89,17 @@ def for_admin(store: Any) -> dict[str, Any]:
 
 def save(store: Any, form: dict[str, Any]) -> None:
     """Keep what the form sent: a key left masked stays, an empty one clears."""
+    from app import kie_images
+
+    image_values = {}
+    if "image_service" in form:
+        service = str(form.get("image_service") or "auto")
+        if service in kie_images.SERVICES:
+            image_values["image_service"] = service
+    if "kie_api_key" in form:
+        image_values["kie_api_key"] = str(form.get("kie_api_key") or "").strip()
+    if image_values:
+        store.update_for_namespace("app", "images", image_values, kie_images.FIELDS)
     values: dict[str, Any] = {}
     if "api_key" in form:
         values["api_key"] = str(form.get("api_key") or "").strip()

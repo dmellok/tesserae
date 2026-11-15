@@ -60,6 +60,15 @@ def _guarded_urlopen(req: Any, *args: Any, **kwargs: Any) -> Any:
 
 
 @pytest.fixture(autouse=True)
+def _fresh_kie_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app import kie_images
+
+    monkeypatch.setattr(kie_images, "_BOUND_STORE", None)
+    monkeypatch.setattr(kie_images, "_TASK_ROOT", None)
+    monkeypatch.delenv("KIE_API_KEY", raising=False)
+
+
+@pytest.fixture(autouse=True)
 def _clear_ephemeral_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Drop the ephemeral-env markers for each test so ``online.online_enabled``
     logic is exercised as if on a normal install. In CI ``GITHUB_ACTIONS`` is

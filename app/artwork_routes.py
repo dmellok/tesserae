@@ -164,7 +164,7 @@ def render_now(plugin_id: str, name: str) -> WerkzeugResponse:
     key = fal.painting_key(settings)
     if not key:
         flash(
-            "No AI key: add a fal.ai, OpenAI or Gemini key under Settings › Generative AI, or a fal.ai key to this widget's settings.",
+            "No AI key: add a key for the selected image service under Settings › Generative AI, or a fal.ai key to this widget's settings.",
             "warn",
         )
         return _back(plugin_id, name)
@@ -187,7 +187,7 @@ def paint_held(plugin_id: str, name: str) -> WerkzeugResponse:
     key = fal.painting_key(settings)
     if not key:
         flash(
-            "No AI key yet: add a fal.ai, OpenAI or Gemini key under Settings › Generative AI.",
+            "No AI key yet: add a key for the selected image service under Settings › Generative AI.",
             "warn",
         )
         return _back(plugin_id, name)
@@ -226,7 +226,7 @@ def repaint(plugin_id: str, name: str, key: str) -> WerkzeugResponse:
     fal_key = fal.painting_key(settings)
     if not fal_key:
         flash(
-            "No AI key yet: add a fal.ai, OpenAI or Gemini key under Settings › Generative AI.",
+            "No AI key yet: add a key for the selected image service under Settings › Generative AI.",
             "warn",
         )
     elif c.repaint(key, data_dir, fal_key, settings):

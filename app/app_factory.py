@@ -1275,10 +1275,13 @@ def create_app(
     deck_routes.register(app)
     send_routes.register(app)
     history_routes.register(app)
-    from app import gemini_images, openai_images
+    from app import gemini_images, kie_images, openai_images
 
     openai_images.bind_store(app.config.get("SETTINGS_STORE"))
     gemini_images.bind_store(app.config.get("SETTINGS_STORE"))
+    kie_images.bind_store(
+        app.config.get("SETTINGS_STORE"), Path(app.config["DATA_ROOT"]) / "artwork" / "kie_tasks"
+    )
     artwork_routes.register(app)
     artwork.host_configure(
         ledger=genai.Ledger(Path(app.config["DATA_ROOT"]) / "artwork"),

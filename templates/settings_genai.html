@@ -6,7 +6,7 @@
 <header class="page-head">
   <h1><i class="ph ph-sparkle" aria-hidden="true"></i> Generative AI</h1>
   <p class="lede">
-    The fal.ai, OpenAI and Gemini accounts every widget that paints shares, a ceiling over all of them together,
+    The fal.ai, OpenAI, Gemini and kie.ai accounts every widget that paints shares, a ceiling over all of them together,
     and what the paintings cost. A widget may still carry a key and a budget of its own;
     its budget applies inside the ceiling.
   </p>
@@ -22,6 +22,24 @@
   <div id="genai-account-body" data-collapsible-body>
   <p class="lede">Keys are kept on this server and sent only to the service they belong to. Widgets without a key of their own use them.</p>
   <form method="post" action="{{ url_for('auth.genai_save') }}" class="form" id="genai-form">
+    <div class="field">
+      <label for="genai-service">Image service</label>
+      <select id="genai-service" name="image_service">
+        {% for value, label in [('auto', 'Automatic (existing routing)'), ('fal', 'fal.ai'), ('gemini', 'Gemini'), ('openai', 'OpenAI'), ('kie', 'kie.ai (Nano Banana)')] %}
+        <option value="{{ value }}" {{ 'selected' if form.image_service == value else '' }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <p class="help">Applies to new paintings in every widget. Existing pictures stay cached. Background masks use fal.ai.</p>
+    </div>
+    <div class="field">
+      <label for="genai-kie-key">kie.ai API key</label>
+      <div class="dx-genai-keyrow">
+        <input id="genai-kie-key" type="password" name="kie_api_key" value="{{ form.kie_api_key }}" autocomplete="off" spellcheck="false">
+        <button type="submit" class="btn" formaction="{{ url_for('auth.genai_check_kie') }}">Check credits</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+      <p class="help">{% if checked_kie %}{{ checked_kie }}{% elif form.has_kie_key %}Key set.{% else %}Add a key from <a href="https://kie.ai/api-key" target="_blank" rel="noopener">kie.ai</a>.{% endif %} Nano Banana costs about US$0.02 per picture, Pro about US$0.09. Paid tasks are collected on retry after a timeout.</p>
+    </div>
     <div class="field">
       <label for="genai-key">fal.ai API key</label>
       <div class="dx-genai-keyrow">

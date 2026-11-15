@@ -32,7 +32,7 @@
   <div class="aw-today">
     <div><strong>{{ progress.used_text }}{% if progress.cap < 1000000 %} of {{ progress.cap_text }}{% endif %}</strong> spent to-day
       {% if progress.used %}<form method="post" action="{{ url_for('artwork.budget_reset', plugin_id=plugin.id, name=c.name) }}" class="aw-inline" onsubmit="return confirm('Reset to-day\'s spend to US$0?');"><button type="submit" class="ghost aw-link">Reset</button></form>{% endif %}
-      {% if not has_key %}<span class="aw-warn"><i class="ph ph-warning" aria-hidden="true"></i> No fal.ai key yet: add one under <a href="{{ url_for('auth.genai_index') }}">Settings › Generative AI</a>, or to this widget's settings.</span>{% endif %}
+      {% if not has_key %}<span class="aw-warn"><i class="ph ph-warning" aria-hidden="true"></i> No image service key yet: add one under <a href="{{ url_for('auth.genai_index') }}">Settings › Generative AI</a>, or to this widget's settings.</span>{% endif %}
     </div>
     <div class="aw-row">
       <form method="post" action="{{ url_for('artwork.purge', plugin_id=plugin.id, name=c.name) }}" class="aw-inline aw-purge" onsubmit="return confirm('Delete every picture and every earlier version? Nothing comes back; the pages make them again as they are shown, within the budget.');"><button type="submit" class="ghost danger"><i class="ph ph-trash" aria-hidden="true"></i> Purge everything</button></form>
