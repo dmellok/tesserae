@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 import pytest
 from flask import Flask
@@ -37,7 +38,7 @@ def _store(tmp_path: Path) -> PageStore:
 
 def _new(client: Any) -> str:
     resp = client.post("/pages/new", data={"name": "Home", "layout": "1_cell"})
-    return str(resp.headers["Location"].rstrip("/").rsplit("/", 1)[-1])
+    return urlsplit(resp.headers["Location"]).path.rstrip("/").rsplit("/", 1)[-1]
 
 
 def _save_cell(client: Any, pid: str, cell_id: str, touch: dict[str, Any]) -> Any:

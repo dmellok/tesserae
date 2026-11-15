@@ -41,18 +41,25 @@
     },
     {
       "name": "latitude",
+      "help": "Latitude in decimal degrees. 0 uses the app's home location.",
+      "placeholder": "33.4484",
       "type": "number",
       "label": "Latitude",
+      "step": "any",
       "default": 0
     },
     {
       "name": "longitude",
+      "help": "Longitude in decimal degrees. 0 uses the app's home location.",
+      "placeholder": "-112.0740",
       "type": "number",
       "label": "Longitude",
+      "step": "any",
       "default": 0
     },
     {
       "name": "variables",
+      "placeholder": "temperature_2m",
       "type": "string",
       "label": "Variables",
       "default": "",
@@ -72,6 +79,7 @@
     },
     {
       "name": "timezone",
+      "placeholder": "America/Phoenix",
       "type": "string",
       "label": "Timezone",
       "default": "auto",

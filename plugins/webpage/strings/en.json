@@ -1,4 +1,6 @@
 {
   "webpage": "Webpage",
-  "set_a_url": "Set a URL in the cell options (must start with http/https)."
+  "set_a_url": "Set a URL in the cell options (must start with http/https).",
+  "cell_options.url.placeholder": "https://example.com",
+  "cell_options.headers.placeholder": "{\"Accept-Language\": \"en\"}"
 }

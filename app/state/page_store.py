@@ -211,9 +211,9 @@ def clean_custom_css(value: Any) -> str:
 class Page(BaseModel):
     """A saved dashboard.
 
-    ``panel`` is optional: when None, the page renders at the panel
-    dims from the app settings (see ``app.panel.resolve_page_panel``),
-    OR at the panel dims of the device(s) it targets (multi-head).
+    Bound devices supply the rendering dimensions (multi-head). Without
+    one, explicit test-display dimensions override the legacy ``panel``
+    size, or the virtual panel in app settings when no override is stored.
 
     ``device_ids`` ties the page to one or more devices. When non-empty:
 
@@ -222,8 +222,8 @@ class Page(BaseModel):
     * the push pipeline renders once per distinct panel and fans out
       each frame only to that panel's devices' renderers
 
-    Empty means "no specific home", the page uses the global settings
-    panel and fans out to every loaded renderer (legacy single-head).
+    Empty means "no specific home", the page uses that fallback panel
+    and fans out to every loaded renderer (legacy single-head).
     """
 
     id: str
@@ -235,6 +235,10 @@ class Page(BaseModel):
     layout_kind: str = "grid"
     canvas: CanvasLayout | None = None
     panel: Panel | None = None
+    # Per-dashboard test display. Unset dimensions inherit the virtual panel;
+    # bounds match the existing dashboard design-size picker.
+    test_display_w: int | None = Field(default=None, ge=100, le=4000)
+    test_display_h: int | None = Field(default=None, ge=100, le=4000)
     device_ids: list[str] = Field(default_factory=list)
     # Content-update cadence ("Updates" in the UI): how often this
     # page's content is worth re-rendering, in minutes. 0 (default) =

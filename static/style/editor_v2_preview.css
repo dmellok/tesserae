@@ -1,0 +1,650 @@
+/* Dashboard editor v2: the live preview pane
+   (templates/partials/page_editor_v2_preview.html, static/pages/editor_v2/preview.js).
+
+   Uses the shared --t-* tokens, so it follows Classic and Paper, light and
+   dark. Paper-only tokens (--p-*) always carry a fallback. */
+
+.ev2pv {
+  --ev2pv-bezel-eink: #dedad2;
+  --ev2pv-bezel-tv: #23211e;
+  --ev2pv-line: var(--t-accent);
+  /* Badge and readout text sit on these: darker than the accent so white
+     text keeps AA contrast in every theme. */
+  --ev2pv-badge-bg: color-mix(in oklab, var(--t-accent) 62%, black);
+  --ev2pv-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  /* The tallest the display may get: the pane is sticky beside the steps,
+     so keep the whole display plus its controls on screen. */
+  --ev2pv-max-h: max(220px, calc(100vh - 300px));
+  min-width: 0;
+}
+:root[data-theme="dark"] .ev2pv {
+  --ev2pv-bezel-eink: #4a4741;
+  --ev2pv-bezel-tv: #0b0a09;
+}
+
+/* ---------- per-shape tabs ---------- */
+.ev2pv-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--t-space-1, 4px) var(--ev2-gap, 16px);
+  border-bottom: 1px solid var(--t-border);
+  margin-bottom: var(--t-space-3, 12px);
+}
+.ev2pv-tabs[hidden] {
+  display: none;
+}
+.ev2pv-tabs button {
+  border: 0;
+  background: none;
+  padding: 0 0 var(--ev2-gap-tight, 8px);
+  color: var(--t-fg-soft);
+  font: inherit;
+  font-size: var(--ev2-fs-label, 13px);
+  cursor: pointer;
+  box-shadow: inset 0 -2px 0 transparent;
+}
+.ev2pv-tabs button:hover {
+  color: var(--t-fg);
+}
+.ev2pv-tabs button[aria-pressed="true"] {
+  color: var(--t-fg);
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--t-fg);
+}
+.ev2pv-tab-dims {
+  color: var(--t-muted);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Live / As the panel shows it, reload, 100% ---------- */
+/* One row: the mode toggle, then the icon buttons beside it. */
+.ev2pv-tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--t-space-1, 4px) var(--ev2-gap-tight, 8px);
+  margin-bottom: var(--ev2-gap-tight, 8px);
+}
+.ev2pv-seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  border: 1px solid var(--ev2-field-border, var(--t-border-strong));
+  border-radius: var(--t-radius, 2px);
+  overflow: hidden;
+}
+/* The same compact segmented control as the steps column. */
+.ev2pv-seg button {
+  border: 0;
+  background: var(--t-surface);
+  color: var(--t-fg-soft);
+  font: inherit;
+  font-size: var(--ev2-fs-label, 13px);
+  height: calc(var(--ev2-control-sm, 32px) - 2px);
+  padding: 0 var(--t-space-3, 12px);
+  cursor: pointer;
+}
+.ev2pv-seg button + button {
+  border-left: 1px solid var(--ev2-field-border, var(--t-border-strong));
+}
+.ev2pv-seg button:hover {
+  color: var(--t-fg);
+}
+.ev2pv-seg button[aria-pressed="true"] {
+  background: var(--t-fg);
+  color: var(--t-surface);
+  font-weight: 600;
+}
+.ev2pv-icons {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.ev2pv-iconbtn {
+  width: var(--ev2-control-sm, 32px);
+  height: var(--ev2-control-sm, 32px);
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--t-radius, 2px);
+  background: transparent;
+  color: var(--t-fg-soft);
+  font-size: var(--ev2-icon, 16px);
+  cursor: pointer;
+}
+/* Before a layout is picked on a new dashboard: a screen-sized placeholder,
+   not the panel-pixel render (which is unreadable at 1920x1080). */
+.ev2pv-ph {
+  position: absolute;
+  inset: 0;
+  display: none;
+  place-items: center;
+  padding: var(--t-space-3, 12px);
+  background: var(--t-surface-sunk);
+  color: var(--t-muted);
+  font-size: var(--ev2-fs-label, 13px);
+  text-align: center;
+}
+.ev2pv-group.is-placeholder .ev2pv-ph {
+  display: grid;
+}
+.ev2pv-group.is-placeholder .ev2pv-iframe,
+.ev2pv-group.is-placeholder .ev2pv-panel-img,
+.ev2pv-group.is-placeholder .ev2pv-throbber,
+.ev2pv-group.is-placeholder .ev2pv-overlay {
+  visibility: hidden;
+}
+.ev2pv-iconbtn:hover {
+  background: var(--p-hover, var(--t-surface-sunk));
+  color: var(--t-fg);
+}
+.ev2pv :focus-visible {
+  outline: none;
+  box-shadow: var(--ev2-ring, var(--t-ring));
+}
+
+/* ---------- the display ---------- */
+.ev2pv-group[hidden] {
+  display: none;
+}
+.ev2pv-stage {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: var(--t-surface-sunk);
+  padding: var(--ev2-gap-section, 24px);
+  min-height: 240px;
+}
+.ev2pv-bezel {
+  --ev2pv-pad-x: 18px;
+  box-sizing: border-box;
+  width: min(100%, calc(var(--ev2pv-max-h) * var(--ev2pv-ar, 1.6667) + var(--ev2pv-pad-x)));
+  background: var(--ev2pv-bezel-eink);
+  padding: 9px 9px 14px;
+  border-radius: 3px;
+  box-shadow: 0 10px 28px -14px rgba(0, 0, 0, 0.45);
+}
+.ev2pv-bezel--tv {
+  --ev2pv-pad-x: 14px;
+  background: var(--ev2pv-bezel-tv);
+  padding: 7px;
+}
+/* No hardware yet: a dashed outline instead of a frame. */
+.ev2pv-bezel--test {
+  --ev2pv-pad-x: 0px;
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
+  outline: 1.5px dashed var(--t-fg-soft);
+  outline-offset: 6px;
+}
+.ev2pv-canvas {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  background: var(--t-surface-soft);
+  /* The overlay owns gestures on the lines; let the page scroll elsewhere. */
+  touch-action: manipulation;
+}
+.ev2pv-iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 0;
+  display: block;
+  background: var(--t-surface-soft);
+  transform-origin: 0 0;
+  transition: opacity 140ms ease;
+}
+.ev2pv-iframe[hidden],
+.ev2pv-panel-img[hidden] {
+  display: none !important;
+}
+.ev2pv-iframe.is-loading {
+  opacity: 0.35;
+}
+/* Nothing to show until the first panel render lands (no broken-image box). */
+.ev2pv-panel-img.is-pending {
+  visibility: hidden;
+}
+.ev2pv-panel-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  /* Smooth downsampling keeps a dither pattern's average tone. */
+  image-rendering: auto;
+}
+.ev2pv-throbber {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  animation: ev2pv-fade-in 180ms ease 100ms both;
+}
+.ev2pv-throbber[hidden] {
+  display: none;
+}
+.ev2pv-throbber > i {
+  font-size: 36px;
+  color: var(--ev2-acc, var(--t-accent));
+  filter: drop-shadow(0 1px 2px rgba(20, 20, 15, 0.28));
+  animation: ev2pv-spin 0.9s linear infinite;
+}
+@keyframes ev2pv-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes ev2pv-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.ev2pv-cap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ev2-gap-tight, 8px);
+  align-items: baseline;
+  margin: var(--ev2-gap-tight, 8px) 0 0;
+  color: var(--t-muted);
+  font-size: var(--ev2-fs-help, 12px);
+}
+.ev2pv-cap b {
+  color: var(--t-fg-soft);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.ev2pv-hint {
+  margin: var(--ev2-gap-tight, 8px) 0 0;
+  color: var(--t-muted);
+  font-size: var(--ev2-fs-help, 12px);
+}
+.ev2pv-status {
+  margin: var(--t-space-1, 4px) 0 0;
+  min-height: 1.5em;
+  color: var(--t-fg-soft);
+  font-size: var(--ev2-fs-help, 12px);
+}
+.ev2pv-status.is-error {
+  color: var(--t-danger, var(--t-accent));
+  font-weight: 600;
+}
+
+/* ---------- the overlay: cells and lines over the render ---------- */
+.ev2pv-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+.ev2pv-cell,
+.ev2pv-cell:hover,
+.ev2pv-cell:active,
+.ev2pv-cell:focus-visible {
+  /* The shell paints every button's :hover/:active; here that would cover
+     the dashboard. Only the outline below changes. */
+  background: transparent;
+  box-shadow: none;
+}
+.ev2pv-cell {
+  position: absolute;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.ev2pv-cell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: box-shadow 0.15s var(--ev2pv-ease);
+}
+.ev2pv-cell:hover::after {
+  box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--ev2pv-line) 70%, transparent);
+}
+.ev2pv-cell.is-selected::after {
+  box-shadow: inset 0 0 0 3px var(--ev2pv-line);
+}
+.ev2pv-cell:focus-visible {
+  box-shadow: none;
+}
+.ev2pv-cell:focus-visible::after {
+  box-shadow:
+    inset 0 0 0 3px var(--ev2pv-line),
+    inset 0 0 0 5px var(--t-surface);
+}
+.ev2pv-badge {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  z-index: 1;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: none;
+  place-items: center;
+  background: var(--ev2pv-badge-bg);
+  color: #fff;
+  font: 700 var(--ev2-fs-tag, 11px) / 18px var(--t-font-mono, ui-monospace, monospace);
+  border-radius: 2px;
+  pointer-events: none;
+}
+.ev2pv-cell:hover .ev2pv-badge,
+.ev2pv-cell:focus-visible .ev2pv-badge,
+.ev2pv-cell.is-selected .ev2pv-badge,
+.ev2pv-overlay.is-edit .ev2pv-badge {
+  display: grid;
+}
+/* The status bar is pinned: clickable, never resized or split. */
+.ev2pv-cell.is-statusbar .ev2pv-badge {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* Edit on preview: every cell outlined so the split is readable. */
+.ev2pv-overlay.is-edit .ev2pv-cell::after {
+  box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--ev2pv-line) 60%, transparent);
+}
+.ev2pv-overlay.is-edit .ev2pv-cell.is-selected::after,
+.ev2pv-overlay.is-edit .ev2pv-cell:focus-visible::after {
+  box-shadow: inset 0 0 0 3px var(--ev2pv-line);
+}
+.ev2pv-overlay.is-edit .ev2pv-cell.is-statusbar {
+  cursor: default;
+}
+.ev2pv-overlay.has-grid::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--ev2pv-grid-top, 0);
+  bottom: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(
+      to right,
+      color-mix(in oklab, var(--ev2pv-line) 35%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in oklab, var(--ev2pv-line) 35%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: var(--ev2pv-grid-x) var(--ev2pv-grid-y);
+}
+
+/* A line between cells. The hit area is wider than the drawn line. */
+.ev2pv-edge {
+  --ev2pv-hit: 14px;
+  position: absolute;
+  z-index: 4;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.ev2pv-edge--v {
+  width: var(--ev2pv-hit);
+  margin-left: calc(var(--ev2pv-hit) / -2);
+  cursor: col-resize;
+}
+.ev2pv-edge--h {
+  height: var(--ev2pv-hit);
+  margin-top: calc(var(--ev2pv-hit) / -2);
+  cursor: row-resize;
+}
+.ev2pv-edge::after {
+  content: "";
+  position: absolute;
+  background: var(--ev2pv-line);
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.ev2pv-edge--v::after {
+  left: calc(50% - 1px);
+  width: 2px;
+  top: 0;
+  bottom: 0;
+}
+.ev2pv-edge--h::after {
+  top: calc(50% - 1px);
+  height: 2px;
+  left: 0;
+  right: 0;
+}
+.ev2pv-edge:hover::after,
+.ev2pv-edge.is-active::after,
+.ev2pv-edge:focus-visible::after {
+  opacity: 1;
+}
+.ev2pv-edge:focus-visible {
+  box-shadow: none;
+}
+.ev2pv-edge:focus-visible::after {
+  box-shadow: 0 0 0 2px var(--t-surface);
+}
+.ev2pv-px {
+  position: absolute;
+  display: none;
+  background: var(--t-fg);
+  color: var(--t-surface);
+  font: 700 var(--ev2-fs-tag, 11px) / 1 var(--t-font-mono, ui-monospace, monospace);
+  font-variant-numeric: tabular-nums;
+  padding: 4px 5px;
+  white-space: nowrap;
+  border-radius: 2px;
+  pointer-events: none;
+}
+.ev2pv-edge.is-active .ev2pv-px,
+.ev2pv-edge:focus-visible .ev2pv-px {
+  display: block;
+}
+.ev2pv-edge--v .ev2pv-px {
+  top: 50%;
+  left: calc(50% + 6px);
+  transform: translateY(-50%);
+}
+.ev2pv-edge--h .ev2pv-px {
+  left: 50%;
+  top: calc(50% + 6px);
+  transform: translateX(-50%);
+}
+/* While dragging, only the dragged line and the moving cells matter. */
+.ev2pv-overlay.is-dragging .ev2pv-edge:not(.is-active) {
+  opacity: 0;
+  pointer-events: none;
+}
+.ev2pv-overlay.is-dragging .ev2pv-cell {
+  pointer-events: none;
+}
+.ev2pv-overlay.is-dragging .ev2pv-cell::after {
+  transition: none;
+}
+.ev2pv.is-dragging[data-drag-dir="v"],
+.ev2pv.is-dragging[data-drag-dir="v"] * {
+  cursor: col-resize !important;
+}
+.ev2pv.is-dragging[data-drag-dir="h"],
+.ev2pv.is-dragging[data-drag-dir="h"] * {
+  cursor: row-resize !important;
+}
+.ev2pv.is-dragging {
+  user-select: none;
+  -webkit-user-select: none;
+}
+.ev2pv.is-saving .ev2pv-edge {
+  pointer-events: none;
+}
+
+/* Split / Split / Remove, centred on the selected cell. */
+.ev2pv-tools-bar {
+  position: absolute;
+  z-index: 5;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--t-fg);
+  border-radius: 3px;
+  box-shadow: 0 6px 16px -8px rgba(0, 0, 0, 0.6);
+  transform: translate(-50%, -50%);
+}
+.ev2pv-tools-bar button {
+  height: var(--ev2-control-sm, 32px);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--t-space-1, 4px);
+  padding: 0 var(--ev2-gap-tight, 8px);
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--t-surface);
+  font: inherit;
+  font-size: var(--ev2-fs-help, 12px);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ev2pv-tools-bar button i {
+  font-size: var(--ev2-icon, 16px);
+}
+.ev2pv-tools-bar button:hover:not([aria-disabled="true"]) {
+  background: color-mix(in oklab, var(--t-surface) 18%, transparent);
+}
+.ev2pv-tools-bar button:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--t-surface);
+}
+.ev2pv-tools-bar button[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ---------- 100% dialog ---------- */
+.ev2pv-native {
+  width: min(96vw, 1400px);
+  max-height: 92vh;
+  padding: var(--ev2-gap, 16px);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius, 2px);
+  background: var(--t-surface);
+  color: var(--t-fg);
+}
+.ev2pv-native::backdrop {
+  background: rgba(10, 10, 8, 0.55);
+}
+.ev2pv-native-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--t-space-3, 12px);
+}
+.ev2pv-native-head h2 {
+  margin: 0;
+  font-size: var(--ev2-fs-step, 18px);
+  font-weight: 700;
+}
+.ev2pv-native-help {
+  margin: var(--t-space-1, 4px) 0 var(--t-space-3, 12px);
+  color: var(--t-fg-soft);
+  font-size: var(--ev2-fs-help, 12px);
+}
+.ev2pv-native-scroll {
+  overflow: auto;
+  max-height: calc(92vh - 110px);
+  background: var(--t-surface-sunk);
+}
+.ev2pv-native-scroll > div {
+  width: max-content;
+}
+.ev2pv-native-scroll iframe,
+.ev2pv-native-scroll img {
+  display: block;
+  border: 0;
+}
+
+/* ---------- narrow screens and touch ---------- */
+/* Stacked above the steps (editor_v2.css, same container width). */
+@container ev2 (max-width: 820px) {
+  .ev2pv {
+    --ev2pv-max-h: 48vh;
+  }
+}
+@media (max-width: 640px) {
+  /* 44px hit areas on the preview controls. */
+  .ev2pv-seg button {
+    height: 44px;
+    min-width: 44px;
+  }
+  .ev2pv-iconbtn {
+    width: 44px;
+    height: 44px;
+  }
+}
+@media (max-width: 560px) {
+  .ev2pv-stage {
+    padding: var(--t-space-3, 12px);
+    min-height: 0;
+  }
+}
+@media (pointer: coarse) {
+  .ev2pv-edge {
+    --ev2pv-hit: 36px;
+  }
+  /* No hover on touch: show the lines faintly so they can be found. */
+  .ev2pv-edge::after {
+    opacity: 0.45;
+  }
+  .ev2pv-seg button {
+    height: 44px;
+  }
+  .ev2pv-iconbtn {
+    width: 44px;
+    height: 44px;
+  }
+  .ev2pv-tools-bar button {
+    min-height: 44px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ev2pv-iframe,
+  .ev2pv-cell::after,
+  .ev2pv-edge::after {
+    transition: none;
+  }
+  .ev2pv-throbber,
+  .ev2pv-throbber > i {
+    animation: none;
+  }
+}
+
+/* Done drawing, next to the preview's other controls (shown in edit mode). */
+.ev2pv-done {
+  height: var(--ev2-control-sm, 32px);
+  margin: 0 0 0 var(--ev2-gap-tight, 8px);
+  padding: 0 var(--t-space-3, 12px);
+  border: 1px solid var(--t-fg);
+  border-radius: var(--t-radius, 2px);
+  background: var(--t-fg);
+  color: var(--t-surface);
+  font: inherit;
+  font-size: var(--ev2-fs-label, 13px);
+  font-weight: 600;
+  cursor: pointer;
+}
+.ev2pv-done[hidden] {
+  display: none;
+}
+@media (max-width: 640px), (pointer: coarse) {
+  .ev2pv-done {
+    min-height: 44px;
+  }
+}
+#ev2-preview {
+  scroll-margin-top: calc(var(--ev2-app-header, 0px) + var(--ev2-gap, 16px));
+}

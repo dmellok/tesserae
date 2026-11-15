@@ -31,6 +31,7 @@ from flask.testing import FlaskClient
 
 from app import plugin_loader
 from app.main import REPO_ROOT, create_app
+from app.widget_options import localized_option_specs
 
 PLUGIN_DIR = REPO_ROOT / "plugins" / "weather_forecast"
 CLIENT_JS = (PLUGIN_DIR / "client.js").read_text(encoding="utf-8")
@@ -92,14 +93,32 @@ def test_literal_t_call_fallback_text_matches_shipped_english() -> None:
         )
 
 
-def test_every_shipped_key_is_actually_referenced() -> None:
+def test_every_shipped_key_is_actually_referenced(app: Flask) -> None:
     """The flip side of the check above: a key shipped in strings/en.json
-    that client.js never asks for is dead weight (or a rename that
-    forgot to update the call site). day_today/day_tomorrow are read
-    through dayLabel()'s literal t() calls, so this still holds for
-    the whole file even though that function isn't the render() body."""
+    must be used by client.js or a declared editor field. Editor keys
+    are checked through the real resolver with distinct values, so a
+    manifest fallback cannot hide a broken lookup. Unknown option names,
+    unknown metadata fields and unused panel keys still fail equality."""
+    english = _strings("en")
     referenced = {key for key, _fallback in _LITERAL_T_CALLS.findall(CLIENT_JS)}
-    assert referenced == set(_strings("en"))
+    plugin = app.config["PLUGIN_REGISTRY"].plugins["weather_forecast"]
+    app.config["SETTINGS_STORE"].patch_section("app", {"locale": "en"})
+    for group in ("cell_options", "settings"):
+        editor_keys = {
+            f"{group}.{option['name']}.{field}": (option["name"], field)
+            for option in plugin.manifest.get(group, [])
+            for field in ("label", "help", "placeholder")
+        }
+        used_keys = english.keys() & editor_keys.keys()
+        for key in used_keys:
+            plugin.strings["en"][key] = f"Editor text for {key}"
+        with app.app_context():
+            resolved = {spec["name"]: spec for spec in localized_option_specs(plugin, group)}
+        for key in used_keys:
+            name, field = editor_keys[key]
+            assert resolved[name][field] == f"Editor text for {key}"
+        referenced.update(used_keys)
+    assert referenced == set(english)
 
 
 # -- discovery: the real plugin loads clean with these strings files -----

@@ -122,6 +122,15 @@ Lowercase `[a-z0-9_]` is a convention, not a requirement. Name it
     Don't ship a `variant` option for visual direction. Page-level `data-style` controls shapes across widgets.
     For layout choices such as `stack` vs `side`, use an option named `layout` with values that describe the shape.
 
+* `overrides_look` accepts a plain-text description such as
+  `"uses its own dark mode"`. Add it to a cell option that changes
+  appearance independently of the dashboard look. The editor warns when
+  that option is visible and differs from its default. Put it on the
+  widget manifest itself to warn whenever the widget is used, as with an
+  embedded website. Warning links open the relevant settings. Resetting
+  cell look overrides clears cell theme, style, font and padding; widget
+  options stay unchanged.
+
 * A `select` choice may carry `image`: a server path or an `https` URL.
     For example, `/plugins/<plugin_id>/static/styles/poster.jpg` comes from the plugin's `static/` folder.
 
@@ -284,6 +293,16 @@ def choices(name: str) -> list[dict[str, str]]:
 
 Return a list of `{value, label}` dicts. The host catches and logs errors, then shows an empty dropdown.
 Prefer returning `[]` over raising.
+
+When there is nothing to list yet and the user has to do something
+first (connect an account, add a library), return one blank row that
+says so, marked `"note": true`. The dashboard editor shows that label
+once, above the widget's options, instead of squeezing it into the
+dropdown:
+
+```python
+return [{"value": "", "label": "Add an Immich library under Settings → Widgets.", "note": True}]
+```
 
 The host calls `choices()` on the manifest's plugin, never a sibling.
 For a companion `_core` plugin, expose `choices()` on the widget and delegate through the plugin registry:
@@ -611,6 +630,15 @@ Missing tags fall back to the base language (`fr-CA` → `fr`), then English.
 For dates and numbers, use `Intl.DateTimeFormat(ctx.locale, {...})` /
 `Intl.NumberFormat(ctx.locale, {...})` directly.
 The browser supplies day names, ordering and separators; don't maintain your own month/weekday table.
+
+Editor fields accept a `placeholder` containing a plain example value, such
+as `Home` or `0.00`. It appears only while the field
+is empty and is never saved. Translate option metadata in the same strings
+files with keys such as `cell_options.path.placeholder`,
+`cell_options.path.help`, or `settings.base_url.label`. Editors use the
+app locale (or its base language), then English for any missing metadata
+key, then the manifest text. These editor keys are optional in other locales; panel text keys
+remain required in every locale.
 
 To add a language, contribute `strings/<locale>.json` to the widget:
 

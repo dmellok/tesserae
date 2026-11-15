@@ -1,4 +1,5 @@
 {
   "dashboard": "Dashboard",
-  "rendering": "Rendering dashboard…"
+  "rendering": "Rendering dashboard…",
+  "cell_options.path.placeholder": "dashboard-kitchen/overview"
 }

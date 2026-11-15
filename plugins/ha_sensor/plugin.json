@@ -48,6 +48,7 @@
     },
     {
       "name": "title",
+      "placeholder": "Living room sensors",
       "type": "string",
       "label": "Title",
       "default": "",
@@ -63,7 +64,7 @@
       "label": "Number format",
       "default": "",
       "advanced": true,
-      "placeholder": "auto (e.g. 0, 0.0, 0.00)",
+      "placeholder": "0.00",
       "help": "How numeric values are shown. Blank rounds to 2 decimals and trims trailing zeros (21.00 → 21). Use 0 for whole numbers, 0.0 for one decimal, 0.00 for two, and so on. Per-entity formats live in Names, icons and formats."
     },
     {

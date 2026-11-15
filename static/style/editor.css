@@ -642,9 +642,10 @@
     text-align: center;
   }
 
-  /* Two-row header. Row 1: back · icon · name input (takes the rest).
-     Row 2: save-status (left) · actions (right). page-id-tag and the
-     flex spacer drop out, the row layout supplies the spacing. */
+  /* Three-row header. Row 1: back · icon · name input (takes the rest).
+     Row 2: "Try the new editor" link (links above buttons). Row 3:
+     save-status (left) · actions (right). page-id-tag and the flex spacer
+     drop out, the row layout supplies the spacing. */
   .editor-header {
     display: grid;
     grid-template-columns: auto auto 1fr auto;
@@ -666,7 +667,7 @@
     max-width: none;
   }
   .save-status {
-    grid-row: 2;
+    grid-row: 3;
     grid-column: 1 / span 2;
     justify-self: start;
   }
@@ -677,10 +678,15 @@
     display: none;
   }
   .editor-actions {
-    grid-row: 2;
+    grid-row: 3;
     grid-column: 3 / span 2;
     justify-self: end;
     flex-wrap: nowrap;
+  }
+  .editor-try-new {
+    grid-row: 2;
+    grid-column: 1 / -1;
+    justify-self: start;
   }
   /* Action button labels collapse, icons only at this width. */
   .editor-actions button > span:not(.icon) {
@@ -1575,4 +1581,9 @@
 }
 .preview-frame > img.preview-panel-img[hidden] {
   display: none !important;
+}
+
+/* Link back to the new editor. */
+.editor-try-new button {
+  white-space: nowrap;
 }

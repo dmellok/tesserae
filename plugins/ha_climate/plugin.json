@@ -24,6 +24,7 @@
     },
     {
       "name": "title",
+      "placeholder": "Living room climate",
       "type": "string",
       "label": "Title",
       "default": "",

@@ -59,7 +59,7 @@ from urllib.parse import urlencode
 from flask import Blueprint, Flask, current_app, jsonify, request
 from werkzeug.wrappers import Response
 
-from app import device_poll
+from app import device_poll, mac_claim
 from app.button_service import ButtonService, TouchStroke, menu_pages
 from app.device_loader import Device, DeviceRegistry
 from app.device_service import (
@@ -338,6 +338,8 @@ def _auth_device(
         if target is None or target.kind_of is None:
             return None, _error(404, f"no device with id {device_id!r}")
         return None, _error(403, "token not valid for this device")
+    # It holds its token, so a MAC match has nothing left to hand out.
+    mac_claim.close_if_open(device)
     return device, None
 
 
@@ -3322,6 +3324,17 @@ def _claim_device_by_mac(mac: str) -> Device | None:
     return None
 
 
+def _mac_claim_refused(device: Device, token: str) -> bool:
+    """True when a MAC-matched announce must not be given ``token``: the
+    device has used it before, and this request doesn't carry it. A client
+    that announces with its own token (to heal its kind or wire format)
+    is the device, so it is answered as before."""
+    if not mac_claim.is_closed(device):
+        return False
+    presented = _request_token()
+    return not (presented and secrets.compare_digest(presented, token))
+
+
 @bp.post("/discover")
 def post_discover() -> Response:
     resp = _discover()
@@ -3416,6 +3429,35 @@ def _discover() -> Response:
     claimed = _claim_device_by_mac(mac)
     if claimed is not None:
         token = claimed.manifest.get("access_token")
+        if isinstance(token, str) and token and _mac_claim_refused(claimed, token):
+            # A MAC can be read off the network, so it only collects the
+            # token until the device has used it once (#515). After that
+            # the owner allows the re-pair from the device's page. The
+            # body is the "not registered yet" shape, so a client that
+            # knows nothing about this keeps polling as it does while it
+            # waits for Register.
+            mac_claim.note_request(current_app, claimed.id, request.remote_addr)
+            logger.warning(
+                "rest discover: mac %s matched device=%s, which already holds its "
+                "token; no token returned. Allow the re-pair on the device's page "
+                "if this device was re-flashed or reset.",
+                mac,
+                claimed.id,
+            )
+            return jsonify(
+                {
+                    "status": 200,
+                    "registered": False,
+                    "discovered": True,
+                    "repair_required": True,
+                    "retry_after_s": 30,
+                    "next_step": (
+                        "This device is registered and has already collected its "
+                        "token. Open its page under Settings -> Devices and choose "
+                        "Allow re-pair; the next POST will return device_token."
+                    ),
+                }
+            )
         if isinstance(token, str) and token:
             # Honour a re-declared kind + wire format on reconnect,
             # same as /register. A re-flashed device whose NVS was

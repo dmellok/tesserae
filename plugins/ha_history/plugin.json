@@ -81,6 +81,7 @@
     },
     {
       "name": "title",
+      "placeholder": "Living room temperature",
       "type": "string",
       "label": "Title",
       "default": "",
@@ -93,11 +94,12 @@
       "label": "Number format",
       "default": "",
       "advanced": true,
-      "placeholder": "auto (e.g. 0, 0.0, 0.00)",
+      "placeholder": "0.00",
       "help": "How the current / min / max values are shown. Blank rounds to 2 decimals and trims trailing zeros (21.00 → 21). Use 0 for whole numbers, 0.0 for one decimal, 0.00 for two, and so on."
     },
     {
       "name": "threshold",
+      "placeholder": "18",
       "type": "number",
       "label": "Threshold",
       "default": "",
@@ -106,6 +108,7 @@
     },
     {
       "name": "y_min",
+      "placeholder": "0",
       "type": "number",
       "label": "Y-axis minimum",
       "default": "",
@@ -114,6 +117,7 @@
     },
     {
       "name": "y_max",
+      "placeholder": "40",
       "type": "number",
       "label": "Y-axis maximum",
       "default": "",

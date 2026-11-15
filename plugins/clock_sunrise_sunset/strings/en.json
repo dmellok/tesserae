@@ -4,5 +4,6 @@
   "minutes_abbr": "M",
   "daylight": "Daylight",
   "sunrise": "Sunrise",
-  "sunset": "Sunset"
+  "sunset": "Sunset",
+  "cell_options.label.placeholder": "Home"
 }

@@ -45,6 +45,8 @@
     },
     {
       "name": "entity_id",
+      "help": "The full Home Assistant entity ID, such as sensor.living_room_temperature, from Settings > Devices & services > Entities.",
+      "placeholder": "sensor.living_room_temperature",
       "type": "string",
       "label": "Entity id",
       "default": "",
@@ -67,6 +69,7 @@
     },
     {
       "name": "domain",
+      "placeholder": "light,sensor",
       "type": "string",
       "label": "Domain filter",
       "default": "",
@@ -77,6 +80,7 @@
     },
     {
       "name": "path",
+      "placeholder": "/api/states",
       "type": "string",
       "label": "API path",
       "default": "",

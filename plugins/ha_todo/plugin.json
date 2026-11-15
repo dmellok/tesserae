@@ -41,6 +41,7 @@
     },
     {
       "name": "title",
+      "placeholder": "Shopping list",
       "type": "string",
       "label": "Title",
       "default": "",

@@ -3,5 +3,6 @@
   "event": "event",
   "events": "events",
   "at": "at",
-  "n_events": "{n} events"
+  "n_events": "{n} events",
+  "cell_options.feeds_filter.placeholder": "a1b2c3d4e5f6,7a8b9c0d1e2f"
 }

@@ -1244,3 +1244,39 @@ def test_moving_a_lineup_clears_the_display_it_left(app: Flask) -> None:
     assert _stored(app).device_ids == ["study"]
     assert sorted(cleared) == ["hall", "study"]
     assert nav.get("hall") is None
+
+
+def test_a_grid_page_with_leftover_canvas_data_still_lists_its_items(
+    app: Flask, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A dashboard switched from canvas to grid keeps its canvas data. The
+    widget must count once (the grid cell), or the editor lists no items."""
+    from app.step_items import named_placements, step_choices
+
+    page = _gallery(app, monkeypatch, tmp_path, 3)
+    with_canvas = Page.model_validate(
+        {
+            **page.model_dump(),
+            "layout_kind": "grid",
+            "canvas": {
+                "els": [
+                    {
+                        "id": "e1",
+                        "kind": "widget",
+                        "widget": "picture_gallery",
+                        "x": 0,
+                        "y": 0,
+                        "w": 10,
+                        "h": 10,
+                        "options": {"folder": "trip"},
+                    }
+                ]
+            },
+        }
+    )
+    assert [pid for pid, _ in named_placements(with_canvas)] == ["picture_gallery"]
+    with app.test_request_context():
+        found = step_choices(with_canvas)
+    assert found is not None and found.count == 3 and found.cell_id == "c1"
+    as_canvas = with_canvas.model_copy(update={"layout_kind": "canvas"})
+    assert [p.id for _, p in named_placements(as_canvas)] == ["e1"]

@@ -13,7 +13,8 @@ The screen reports your touch; Tesserae runs the action on the server.
 2. Firmware or a client that reports touch through REST. See [Client side](#client-side-any-device).
    Display-only screens show the same dashboard, but touch actions do nothing.
 3. Turn on **Touch input** under **Settings → Devices**.
-   On battery devices, this keeps the touch controller powered during sleep and uses a few mA.
+   On battery devices, this keeps the touch controller powered during sleep and uses a few mA
+   (see the measurements below).
    It is off by default.
 
    **Touch linger** keeps the device awake briefly after a touch, so follow-up taps respond faster.
@@ -23,9 +24,22 @@ The screen reports your touch; Tesserae runs the action on the server.
    | Mode | Behaviour |
    |---|---|
    | Any tap | Keeps scanning; the first tap wakes the screen |
-   | Double tap or swipe | Uses about 1 mA instead of several; a single tap does nothing, but a double tap or swipe wakes it |
+   | Double tap or swipe | Uses less than half the power of Any tap in sleep; a single tap does nothing, but a double tap or swipe wakes it |
 
    Once awake, normal taps work in either mode.
+
+   Sleep current measured on a reTerminal E1003 at 3.6 V
+   ([#327](https://github.com/dmellok/tesserae/issues/327)):
+
+   | Touch setting | Sleep current |
+   |---|---|
+   | Touch input off | about 0.17 mA |
+   | Double tap or swipe | about 2.4 mA on average (1.1 mA, with brief peaks to 11 mA every 15 s or so) |
+   | Any tap | about 5.5 mA |
+
+   The peaks in Double tap or swipe come from the touch controller itself and can't be turned off.
+   For the longest battery life, leave Touch input off, or turn on **Touch off** under Quiet hours
+   so the touchscreen sleeps overnight.
 
 ## Audible feedback
 

@@ -26,6 +26,8 @@
     },
     {
       "name": "stale_hours",
+      "unit": "h",
+      "placeholder": "24",
       "type": "number",
       "label": "Stale after",
       "default": "",
@@ -33,6 +35,7 @@
     },
     {
       "name": "title",
+      "placeholder": "Evening routines",
       "type": "string",
       "label": "Title",
       "default": "",

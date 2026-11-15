@@ -65,18 +65,23 @@ macro here instead.
 </div>
 {%- endmacro -%}
 
-{%- macro number_input(field_id, name, label, value=0, min=None, max=None, step=1, help=None, form=None) -%}
-<div class="field">
+{#- ``unit`` (the manifest's unit hint: s, px, h, %) shows after the box,
+   so the label stays a plain name ("Settle delay", not "(seconds)"). -#}
+{%- macro number_input(field_id, name, label, value=0, min=None, max=None, step=1, help=None, form=None, placeholder='', unit='') -%}
+<div class="field{% if unit %} field--unit{% endif %}">
   <label for="{{ field_id }}">{{ label }}{{ info_pop(help) }}</label>
+  {% if unit %}<span class="field-unit-wrap">{% endif %}
   <input type="number" id="{{ field_id }}" name="{{ name }}" value="{{ value }}"
+         {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
          {% if form %}form="{{ form }}"{% endif %}
          {% if min is not none %}min="{{ min }}"{% endif %}
          {% if max is not none %}max="{{ max }}"{% endif %}
          step="{{ step }}">
+  {%- if unit %}<span class="field-unit">{{ unit }}</span></span>{% endif %}
 </div>
 {%- endmacro -%}
 
-{%- macro preset_or_number(field_id, name, label, value=0, presets=[], min=None, max=None, step=1, help=None, form=None) -%}
+{%- macro preset_or_number(field_id, name, label, value=0, presets=[], min=None, max=None, step=1, help=None, form=None, placeholder='') -%}
 {#- Numeric field with a preset dropdown. If the current value matches
    one of the presets, that preset is selected and the number input
    stays hidden. Otherwise the dropdown sits on "Custom…" and the
@@ -99,6 +104,7 @@ macro here instead.
   <input type="number" id="{{ field_id }}" name="{{ name }}"
          class="preset-custom-input" data-preset-custom
          value="{{ value }}"
+         {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
          {% if form %}form="{{ form }}"{% endif %}
          {% if min is not none %}min="{{ min }}"{% endif %}
          {% if max is not none %}max="{{ max }}"{% endif %}
@@ -708,6 +714,10 @@ macro here instead.
   {% set ftype = spec.get('type', 'string') %}
   {% set label = spec.get('label', name) %}
   {% set help_text = help if help is not none else spec.get('help') %}
+  {% set placeholder = spec.get('placeholder', '') %}
+  {% if not placeholder and value in (none, '') and spec.get('default') is string and not spec.get('secret') %}
+    {% set placeholder = spec.get('default', '') %}
+  {% endif %}
   {% if ftype in ('boolean', 'switch') %}
     {{ switch(field_id, name, label, checked=value, help=help_text, form=form) }}
   {% elif ftype == 'select' %}
@@ -717,12 +727,12 @@ macro here instead.
   {% elif ftype == 'textarea' %}
     {{ textarea_field(field_id, name, label, value=value,
                       rows=spec.get('rows', 3),
-                      placeholder=spec.get('placeholder', ''),
+                      placeholder=placeholder,
                       help=help_text, presets=spec.get('presets')) }}
   {% elif ftype == 'variables_textarea' %}
     {{ variables_textarea_field(field_id, name, label, value=value,
                                 rows=spec.get('rows', 6),
-                                placeholder=spec.get('placeholder', ''),
+                                placeholder=placeholder,
                                 variables=spec.get('variables', []),
                                 help=help_text) }}
   {% elif ftype == 'entity_overrides' %}
@@ -743,10 +753,11 @@ macro here instead.
                           value=value if value is not none else spec.get('default', 0),
                           presets=spec.get('presets'),
                           min=spec.get('min'), max=spec.get('max'),
-                          step=spec.get('step', 1), help=help_text, form=form) }}
+                          step=spec.get('step', 1), help=help_text, form=form, placeholder=placeholder) }}
     {% else %}
       {{ number_input(field_id, name, label, value=value if value is not none else spec.get('default', 0),
-                      min=spec.get('min'), max=spec.get('max'), step=spec.get('step', 1), help=help_text, form=form) }}
+                      min=spec.get('min'), max=spec.get('max'), step=spec.get('step', 1), help=help_text, form=form, placeholder=placeholder,
+                      unit=spec.get('unit', '')) }}
     {% endif %}
   {% elif ftype == 'server_colour' %}
     {{ server_colour_field(field_id, name, label, value=value or '', help=help_text) }}
@@ -782,7 +793,7 @@ macro here instead.
        A manifest can opt back in with "autocapitalize": "sentences". -#}
     {{ text_input(field_id, name, label, value=value or '',
                   placeholder='Re-enter to repair' if spec.get('secret_unreadable')
-                              else spec.get('placeholder', ''),
+                              else placeholder,
                   type='password' if mask else 'text',
                   autocomplete='new-password' if mask else None,
                   autocapitalize=spec.get('autocapitalize', 'off'),

@@ -24,6 +24,7 @@
     },
     {
       "name": "label",
+      "placeholder": "Home",
       "type": "string",
       "label": "Place name",
       "default": "",
