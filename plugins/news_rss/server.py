@@ -20,7 +20,6 @@ import json
 import logging
 import re
 import time
-import urllib.request
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from pathlib import Path
@@ -29,12 +28,16 @@ from xml.etree import ElementTree as ET
 
 from flask import current_app
 
+from app import net_guard
+from app.net_guard import BlockedURLError
 from app.plugin_http import decode_content_encoding
 
 logger = logging.getLogger(__name__)
 
 CACHE_TTL_S = 600
 HTTP_TIMEOUT_S = 15
+# Full-text and podcast feeds run to several MB; past this it isn't a feed.
+FEED_MAX_BYTES = 16 * 1024 * 1024
 # Browser-shaped UA: news sites behind bot protection 403 a transparently
 # bot-shaped UA outright, before TLS fingerprinting even enters into it.
 USER_AGENT = (
@@ -220,16 +223,19 @@ def _parse_feed(body: bytes, content_type: str = "") -> ET.Element:
 
 
 def _fetch_via_urllib(url: str) -> ET.Element:
-    req = urllib.request.Request(url, headers=URLLIB_HEADERS)
-    with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT_S) as resp:
-        body = resp.read()
-        content_type = resp.headers.get("Content-Type", "")
-        content_encoding = str(resp.headers.get("Content-Encoding", ""))
+    # A feed URL is chosen by the user (or an agent), so it goes through the
+    # SSRF guard like the REST widget's: http(s) only, public hosts only, each
+    # redirect hop re-checked, a pinned connection and a size cap. A bare
+    # urlopen would fetch file://, the server's own loopback API, a LAN
+    # service or cloud metadata.
+    body, headers = net_guard.fetch_response(
+        url, headers=URLLIB_HEADERS, timeout=HTTP_TIMEOUT_S, max_bytes=FEED_MAX_BYTES
+    )
     # Some CDNs compress regardless of what we asked for. Decoding here is
     # what separates "this feed is compressed" from "this feed is broken":
     # the parser can't tell the difference and blames the feed (#212).
-    body = decode_content_encoding(body, content_encoding)
-    return _parse_feed(body, content_type)
+    body = decode_content_encoding(body, str(headers.get("Content-Encoding", "")))
+    return _parse_feed(body, str(headers.get("Content-Type", "")))
 
 
 def _fetch_via_pool(url: str) -> ET.Element | None:
@@ -253,12 +259,22 @@ def _fetch_via_pool(url: str) -> ET.Element | None:
             timeout_ms=HTTP_TIMEOUT_S * 1000,
             user_agent=USER_AGENT,
             accept=ACCEPT,
+            # Chromium follows redirects on its own; public-only makes the
+            # pool check each hop the way the urllib path does.
+            allow_local=False,
         )
     )
     # Same treatment as the urllib path: Chromium clears more bot protection
     # but can still land on a challenge page, and the raw parser error would
     # be just as opaque.
     return _parse_feed(body.encode("utf-8") if isinstance(body, str) else body)
+
+
+def _blocked_msg(err: BlockedURLError) -> str:
+    return (
+        f"This feed address isn't allowed ({err}). Feeds are fetched from public "
+        "http(s) addresses only, not this server or the local network."
+    )
 
 
 def _fetch_feed(url: str, *, allow_pool: bool) -> ET.Element | str:
@@ -271,8 +287,19 @@ def _fetch_feed(url: str, *, allow_pool: bool) -> ET.Element | str:
     screenshot that's hydrating this very widget, so submitting a fetch
     would deadlock. There urllib is the only option, and on failure the
     composer's last-good fallback serves the prior payload."""
+    # Refused before either fetcher runs, so a blocked URL never reaches the
+    # pool as "urllib failed, try Chromium".
+    try:
+        net_guard.assert_public_url(url)
+    except BlockedURLError as err:
+        return _blocked_msg(err)
+
     try:
         return _fetch_via_urllib(url)
+    except BlockedURLError as err:
+        # A redirect to a private host. Chromium would be refused the same
+        # hop, so don't spend a pool fetch finding that out.
+        return _blocked_msg(err)
     except FeedNotXML as err:
         # Already phrased for the operator; don't bury it behind a type name.
         urllib_error = str(err)
@@ -285,6 +312,8 @@ def _fetch_feed(url: str, *, allow_pool: bool) -> ET.Element | str:
             pooled = _fetch_via_pool(url)
             if pooled is not None:
                 return pooled
+        except BlockedURLError as err:
+            return _blocked_msg(err)
         except Exception as err:
             logger.debug("news_rss: pool fetch failed (%s)", err)
     return urllib_error

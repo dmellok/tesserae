@@ -1,12 +1,15 @@
 """opendisplay_ha device contract.
 
 An OpenDisplay BLE tag driven through Home Assistant rather than a direct
-BLE bridge. Tesserae renders a full-colour PNG, writes it into HA's media
-folder, and calls the ``opendisplay.upload_image`` action (see
-``app.opendisplay_ha``); HA's OpenDisplay integration owns the Bluetooth.
+BLE bridge. Tesserae renders a full-colour PNG, puts it in HA's media
+folder (a shared-folder write as the add-on, an API upload otherwise), and
+calls the ``opendisplay.upload_image`` action (see ``app.opendisplay_ha``);
+HA's OpenDisplay integration owns the Bluetooth.
 
 The device carries two config values: ``ha_device_id`` (which HA device to
-target) and ``rotate``. Heartbeats are JSON, the same lenient shape the Pi
+target) and ``rotate``, a turn applied by HA's upload action. ``rotate`` is
+kept for tags set up before Panel rotation turned the frame; new tags leave
+it at 0. Heartbeats are JSON, the same lenient shape the Pi
 PNG client uses. These devices are push-driven, not polled, so there's no
 sleep interval to honour.
 """

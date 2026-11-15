@@ -16,7 +16,10 @@ def choice_rows(plugin: Any, spec: dict[str, Any]) -> list[dict[str, Any]]:
         resolver = getattr(plugin.server_module, "choices", None) if plugin else None
         if not callable(resolver):
             raise LookupError("The widget choice provider is unavailable.")
-        return list(resolver(source))
+        from app.capabilities import capability_scope
+
+        with capability_scope(getattr(plugin, "capabilities", None)):
+            return list(resolver(source))
     return list(spec.get("choices", []))
 
 

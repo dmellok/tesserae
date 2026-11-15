@@ -162,7 +162,9 @@ frame on the physical panel yet. The per-renderer bench matrix lives at
 > **Some links below are affiliate links.** Seeed product links and the
 > Pimoroni Inky Frame and Inky Impression links carry a Tesserae affiliate tag:
 > buying through one pays a small commission that goes back into the project,
-> and a Seeed link also gets you a discount at checkout. Nothing is listed here because of it,
+> and a Seeed link also gets you a discount at checkout. The code **TESSERAE** gives a
+> discount at seeedstudio.com on the reTerminal E-Series, the reTerminal Sticky and the
+> OpenDisplay kits. Nothing is listed here because of it,
 > and a panel's ✅ / TBD status means exactly what it says above. Links without
 > the tag are plain product links.
 
@@ -183,6 +185,8 @@ The reTerminal E-Series and XIAO ePaper family run the [Tesserae-native firmware
 | [XIAO ePaper EE03](https://www.seeedstudio.com/XIAO-ePaper-DIY-Kit-EE03-for-10-3-Monochrome-ePaper-Display.html?sensecap_affiliate=YcT0R1h&referring_service=link) | 10.3" mono, 16-level grey, 1872×1404 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | TBD |
 | [XIAO 7.5" ePaper Panel](https://www.seeedstudio.com/XIAO-7-5-ePaper-Panel-p-6416.html) | 7.5" mono, 800×480 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | TBD |
 | [TRMNL 7.5" OG DIY Kit](https://www.seeedstudio.com/TRMNL-7-5-Inch-OG-DIY-Kit-p-6481.html?sensecap_affiliate=YcT0R1h&referring_service=link) | 7.5" mono, 800×480 | TRMNL firmware | ✅ via BYOS |
+| [OpenDisplay 4.26" Mono Kit](https://www.seeedstudio.com/OpenDisplay-4-26-Mono-Kit-p-7032.html?sensecap_affiliate=YcT0R1h&referring_service=link) | 4.26" mono, 800×480 | OpenDisplay firmware, over [Bluetooth LE](https://docs.tesserae.ink/install/opendisplay/) | ✅ |
+| [OpenDisplay 7.3" Color Kit](https://www.seeedstudio.com/OpenDisplay-7-3-Color-Kit-p-7031.html?sensecap_affiliate=YcT0R1h&referring_service=link) | 7.3" Spectra 6, 800×480 | OpenDisplay firmware, over [Bluetooth LE](https://docs.tesserae.ink/install/opendisplay/) | ✅ |
 
 ### M5Stack
 

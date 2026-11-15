@@ -442,6 +442,12 @@
         "2"
       ]
     },
+    "fit": {
+      "default": false
+    },
+    "theme": {
+      "default": ""
+    },
     "dark_mode": {
       "default": false
     },
