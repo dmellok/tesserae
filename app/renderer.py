@@ -34,7 +34,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Final, Literal, TypeVar, cast
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 from playwright.sync_api import Browser, Playwright, sync_playwright
 from playwright.sync_api import Error as PlaywrightError
@@ -284,6 +284,12 @@ class FetchRequest:
     timeout_ms: int = 15_000
     user_agent: str | None = None
     accept: str | None = None
+    # When False, the URL and every redirect hop must be a public host: the
+    # fetch follows redirects itself and checks each one, because Chromium
+    # would otherwise follow a public URL's 302 to a loopback / LAN / metadata
+    # address unseen. Set by a widget fetching a URL the user chose (RSS);
+    # a widget whose host is fixed (Reddit) leaves it True.
+    allow_local: bool = True
 
 
 @dataclass(frozen=True)
@@ -1082,6 +1088,35 @@ def _screenshot_attempt(browser: Browser, request: RenderRequest, attempt: int) 
             logger.debug("context close failed (continuing)", exc_info=True)
 
 
+# Redirect hops a public-only fetch follows before giving up; urllib's own
+# limit is 10, and a feed behind more than a handful is a loop.
+FETCH_MAX_REDIRECTS = 5
+
+
+def _get_public_only(context: Any, request: FetchRequest) -> Any:
+    """GET ``request.url`` with every hop checked against the SSRF guard.
+
+    ``context.request`` is Playwright's APIRequestContext, which page
+    interception does not see, so the redirect policy that guards a render
+    (:func:`_install_request_policy`) can't cover it. Redirects are turned off
+    and followed here instead, each target validated before it is requested.
+    Same guarantee level as the render interceptor: the host is resolved and
+    checked, with no IP pinning against DNS rebinding."""
+    from app.net_guard import BlockedURLError, assert_public_url
+
+    url = request.url
+    for _ in range(FETCH_MAX_REDIRECTS + 1):
+        assert_public_url(url)
+        response = context.request.get(url, timeout=request.timeout_ms, max_redirects=0)
+        if response.status not in (301, 302, 303, 307, 308):
+            return response
+        location = response.headers.get("location", "")
+        if not location:
+            return response
+        url = urljoin(url, location)
+    raise BlockedURLError("too many redirects")
+
+
 def _fetch_one(browser: Browser, request: FetchRequest) -> str:
     """One-shot fetch through a fresh incognito context's APIRequest
     pipeline. We don't navigate a page (Reddit serves RSS as XML, the
@@ -1104,7 +1139,10 @@ def _fetch_one(browser: Browser, request: FetchRequest) -> str:
         context_kwargs["extra_http_headers"] = extra_headers
     context = browser.new_context(**context_kwargs)
     try:
-        response = context.request.get(request.url, timeout=request.timeout_ms)
+        if request.allow_local:
+            response = context.request.get(request.url, timeout=request.timeout_ms)
+        else:
+            response = _get_public_only(context, request)
         if not response.ok:
             raise RuntimeError(f"HTTP {response.status} {response.status_text}")
         return response.text()

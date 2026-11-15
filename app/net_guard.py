@@ -44,6 +44,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Mapping
 from typing import Any
 from urllib.parse import urlparse
 
@@ -388,6 +389,27 @@ def fetch_bytes(
     ``Content-Type``, or ``""`` if the server didn't send one. ``allow_local``
     permits same-host loopback and RFC1918 LAN targets for operator-driven
     flows (still refuses link-local / cloud metadata)."""
+    raw, resp_headers = fetch_response(
+        url, headers=headers, timeout=timeout, max_bytes=max_bytes, allow_local=allow_local
+    )
+    content_type = str(resp_headers.get("Content-Type", "")).split(";", 1)[0].strip().lower()
+    return raw, content_type
+
+
+def fetch_response(
+    url: str,
+    *,
+    headers: dict[str, str] | None = None,
+    timeout: float = DEFAULT_TIMEOUT_S,
+    max_bytes: int = DEFAULT_MAX_BYTES,
+    allow_local: bool = False,
+) -> tuple[bytes, Mapping[str, str]]:
+    """GET a user-supplied ``url`` and return ``(body, response_headers)``.
+
+    :func:`fetch_bytes` for a caller that needs more of the response than its
+    content type (the RSS widget reads ``Content-Encoding``, since nothing on
+    this path decompresses). Same guard, redirect re-validation, pinned
+    connection and size cap. Header lookups are case-insensitive."""
     _validate_url(url, allow_local=allow_local)
     req_headers = {"User-Agent": _USER_AGENT}
     if headers:
@@ -396,7 +418,7 @@ def fetch_bytes(
     opener = guarded_opener(allow_local=allow_local)
     with opener.open(req, timeout=timeout) as resp:
         raw = resp.read(max_bytes + 1)
-        content_type = str(resp.headers.get("Content-Type", "")).split(";", 1)[0].strip().lower()
+        resp_headers: Mapping[str, str] = resp.headers
     if len(raw) > max_bytes:
         raise ValueError(f"response exceeds {max_bytes} byte cap")
-    return raw, content_type
+    return raw, resp_headers
