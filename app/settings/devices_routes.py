@@ -540,6 +540,32 @@ def devices_regenerate_token(instance_id: str) -> Response:
     return redirect_to
 
 
+@bp.post("/settings/devices/<instance_id>/allow-repair")
+def devices_allow_repair(instance_id: str) -> Response:
+    """Let a registered device collect its token by MAC once more.
+
+    ``/api/v1/device/discover`` hands a token to a matching MAC only until
+    the device has used it (:mod:`app.mac_claim`, #515). A device that was
+    re-flashed or reset has lost the token and asks again; this is the
+    owner saying that request is theirs."""
+    from app import mac_claim
+
+    redirect_to = _device_page_redirect(instance_id, "connection")
+    device = devices().get(instance_id)
+    if device is None or device.kind_of is None:
+        flash(f"Unknown device {instance_id!r}.", "error")
+        return redirect_to
+    if not mac_claim.reopen(current_app, device):
+        flash(f"Couldn't update {device.name!r}.", "error")
+        return redirect_to
+    flash(
+        f"{device.name!r} can pair again. It collects its token the next time it asks, "
+        "usually within a minute.",
+        "ok",
+    )
+    return redirect_to
+
+
 @bp.post("/settings/devices/<instance_id>/reveal-token")
 def devices_reveal_token(instance_id: str) -> Response:
     """Reveal the full access token for a device (issue #20). The

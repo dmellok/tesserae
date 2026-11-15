@@ -657,6 +657,22 @@
             {% endif %}
           </div>
 
+          {% if section.repair_request %}
+          {% set _rr = section.repair_request %}
+          <div class="dx-band is-warn" id="repair-request">
+            <i class="ph ph-key" aria-hidden="true"></i>
+            <div class="dx-band-text">
+              <p class="dx-band-title">This display is asking to pair again</p>
+              <p class="dx-help">It asked {{ _rr.relative }}{% if _rr.ip %} from {{ _rr.ip }}{% endif %} without its access token, which happens after a re-flash or a factory reset. Allow it only if that was you: anything on your network that knows this display's MAC address can ask.</p>
+            </div>
+            <div class="dx-band-actions">
+              <form method="post" action="{{ _rr.endpoint }}" class="form--inline">
+                <button type="submit" class="dx-btn is-sm">Allow re-pair</button>
+              </form>
+            </div>
+          </div>
+          {% endif %}
+
           {% for band in [section.opendisplay_setup, vs] if band and not band.ok %}
           <div class="dx-band is-warn">
             <i class="ph ph-warning" aria-hidden="true"></i>
