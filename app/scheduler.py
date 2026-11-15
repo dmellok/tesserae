@@ -2688,6 +2688,26 @@ class Scheduler:
             },
         )
 
+    def live_step_index(self, rotation: Rotation, now: datetime | None = None) -> int | None:
+        """The step a rotation shows now: its time step routed through the
+        conditions and its mode (priority order or the cycle), as the tick
+        fires it. ``None`` outside its window or when no step passes."""
+        now = now or datetime.now(UTC)
+        state = self.compute_step_state(rotation, now)
+        if state is None:
+            return None
+        return self._pick_eligible_step(rotation, state.step_index, now)
+
+    def step_conditions_pass(
+        self, rotation: Rotation, index: int, now: datetime | None = None
+    ) -> bool:
+        """Whether one step's conditions pass now (no evaluator: always)."""
+        if self._condition_evaluator is None or not 0 <= index < len(rotation.steps):
+            return True
+        return self._condition_evaluator.all_pass(
+            rotation.steps[index].conditions, when=now or datetime.now(UTC)
+        )
+
     def _pick_eligible_step(
         self,
         rotation: Rotation,
