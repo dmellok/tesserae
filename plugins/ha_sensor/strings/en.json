@@ -6,5 +6,7 @@
   "vs_24h": "vs 24h",
   "sensors": "Sensors",
   "no_sensors_selected": "No sensors selected.",
-  "no_history": "No history."
+  "no_history": "No history.",
+  "cell_options.title.placeholder": "Living room sensors",
+  "cell_options.number_format.placeholder": "0.00"
 }

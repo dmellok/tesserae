@@ -5,5 +5,10 @@
   "hours_abbr": "H",
   "history": "History",
   "no_sensors_selected": "No sensors selected.",
-  "no_chart_for_selection": "No chart for this selection."
+  "no_chart_for_selection": "No chart for this selection.",
+  "cell_options.title.placeholder": "Living room temperature",
+  "cell_options.number_format.placeholder": "0.00",
+  "cell_options.threshold.placeholder": "18",
+  "cell_options.y_min.placeholder": "0",
+  "cell_options.y_max.placeholder": "40"
 }

@@ -12,5 +12,6 @@
   "cond_snow": "Neige",
   "cond_snow_heavy": "Neige forte",
   "cond_showers": "Averses",
-  "cond_storm": "Orage"
+  "cond_storm": "Orage",
+  "cell_options.label.placeholder": "Maison"
 }

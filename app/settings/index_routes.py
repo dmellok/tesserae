@@ -42,6 +42,7 @@ from app.network import detect_local_ip, docker_bridge_ip_warning, is_docker_bri
 from app.online import online_enabled
 from app.panel import PANEL_PRESET_CHOICES, PANEL_PRESETS
 from app.state.settings_store import SECRET_MASK
+from app.widget_options import localized_option_specs
 
 from . import visionect_routes
 from ._shared import (
@@ -1034,7 +1035,7 @@ def _build_sections(kinds: set[str] | None = None) -> list[dict[str, Any]]:
 
     for plugin in plugins().plugins.values() if wanted("plugin") else ():
         fields = mark_unreadable_secrets(
-            list(plugin.manifest.get("settings", [])), "plugins", plugin.id
+            localized_option_specs(plugin, "settings"), "plugins", plugin.id
         )
         if not fields:
             continue
@@ -1085,6 +1086,19 @@ def _stamp_label(moment: datetime) -> str:
     """``2026-10-30 3:04:05 PM PDT`` / ``2026-10-30 15:04:05 PDT``: a dated
     reading in the app's clock style (display only)."""
     return f"{moment:%Y-%m-%d} {clock_of(moment, seconds=True)} {moment:%Z}"
+
+
+def _repair_request_view(device: Device) -> dict[str, Any] | None:
+    from app import mac_claim
+
+    entry = mac_claim.pending_request(current_app, device.id)
+    if entry is None:
+        return None
+    return {
+        "relative": format_relative(max(0.0, time.time() - float(entry["at"]))),
+        "ip": entry.get("ip") or "",
+        "endpoint": url_for("auth.devices_allow_repair", instance_id=device.id),
+    }
 
 
 def _build_device_section(store: Any, device: Device) -> dict[str, Any] | None:
@@ -1197,6 +1211,9 @@ def _build_device_section(store: Any, device: Device) -> dict[str, Any] | None:
         "delete_endpoint": (
             url_for("auth.devices_delete", instance_id=device.id) if is_instance else None
         ),
+        # A registered device that lost its token and is asking for it
+        # by MAC again (#515); None when there is no live request.
+        "repair_request": _repair_request_view(device) if is_instance else None,
         # Counts for the delete-confirm modal (v0.69.2, issue
         # #48): what a checked "Also wipe" tickbox would drop.
         # Zero everywhere means the delete is already clean and

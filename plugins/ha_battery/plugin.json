@@ -31,6 +31,7 @@
     },
     {
       "name": "low_threshold",
+      "unit": "%",
       "type": "number",
       "label": "Low at",
       "default": 20,
@@ -38,6 +39,7 @@
     },
     {
       "name": "critical_threshold",
+      "unit": "%",
       "type": "number",
       "label": "Critical at",
       "default": 10,

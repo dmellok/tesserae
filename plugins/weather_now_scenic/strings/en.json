@@ -12,5 +12,6 @@
   "cond_snow": "Snow",
   "cond_snow_heavy": "Heavy Snow",
   "cond_showers": "Showers",
-  "cond_storm": "Storm"
+  "cond_storm": "Storm",
+  "cell_options.label.placeholder": "Home"
 }

@@ -441,6 +441,49 @@ def test_combined_save_redirects_to_the_device_page(app: Flask) -> None:
     assert resp.location.endswith(f"/settings/devices/{dev}")
 
 
+def test_own_quiet_hours_can_be_switched_off(app: Flask) -> None:
+    """#523: with Own hours off the browser posts none of the quiet-hours
+    fields (the switch is unchecked, the rest are disabled), so only the
+    form's marker says the section was saved."""
+    client = app.test_client()
+    _sign_in(client)
+    dev = _add(client)
+    body = client.get(f"/settings/devices/{dev}").get_data(as_text=True)
+    assert 'name="quiet_hours__present"' in body
+
+    def stored() -> dict:
+        return app.config["DEVICE_REGISTRY"].get(dev).manifest.get("quiet_hours") or {}
+
+    client.post(
+        f"/settings/devices/{dev}/save",
+        data={
+            "device_name": "Lounge",
+            "quiet_hours__present": "1",
+            "quiet_hours_enabled": "on",
+            "quiet_hours_start": "22:00",
+            "quiet_hours_end": "07:00",
+            "quiet_hours_days__present": "1",
+            "quiet_hours_days": ["mon", "tue"],
+        },
+    )
+    assert stored()["enabled"] is True
+
+    # What a browser sends once the switch is off.
+    client.post(
+        f"/settings/devices/{dev}/save",
+        data={"device_name": "Lounge", "quiet_hours__present": "1"},
+    )
+    assert stored()["enabled"] is False
+    # The window survives, so switching back on restores it.
+    assert (stored()["start"], stored()["end"]) == ("22:00", "07:00")
+    assert stored()["days"] == ["mon", "tue"]
+
+    # A form without the section (an older client) leaves it alone.
+    client.post(f"/settings/devices/{dev}/save", data={"device_name": "Lounge"})
+    assert stored()["enabled"] is False
+    assert stored()["start"] == "22:00"
+
+
 def test_card_era_posts_redirect_to_their_section(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)

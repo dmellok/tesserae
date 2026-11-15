@@ -203,18 +203,6 @@ def resolve_settings_panel(settings: SettingsStore) -> Panel:
     return Panel(w=max(1, w), h=max(1, h), native_w=native_w, native_h=native_h)
 
 
-def resolve_page_panel(page_panel: Panel | None, settings: SettingsStore) -> Panel:
-    """Resolve the panel from raw page-panel dims + settings.
-
-    Multi-head dispatch lives in ``resolve_panel_for_page``, use that
-    when you have the full Page (it can look up the device's declared
-    panel). This entry point is kept for callers that only have the
-    optional Panel field handy."""
-    if page_panel is not None:
-        return page_panel
-    return resolve_settings_panel(settings)
-
-
 def device_panel(device: Device) -> Panel | None:
     """Panel for a single device, or None if it declares no panel block.
 
@@ -306,8 +294,8 @@ def resolve_panel_for_page(
       layout. It also gives the editor the most pixels to work with.
       Ties (two panels with identical area) break by panel id /
       ``(w, h)`` tuple for stability.
-    * Otherwise fall back to ``page.panel``, else the global settings
-      panel.
+    * Otherwise use the page's test display, with unset axes inherited
+      from its legacy panel override or the virtual panel in settings.
 
     Previously this returned ``panels[0]`` (first targeted device),
     which meant a layout designed against device A would get
@@ -321,7 +309,15 @@ def resolve_panel_for_page(
     panels = _selected_device_panels(page, devices)
     if panels:
         return max(panels, key=lambda dp: (dp[1].w * dp[1].h, dp[1].w, dp[1].h, dp[0].id))[1]
-    return resolve_page_panel(page.panel, settings)
+    return resolve_test_display(page, settings)
+
+
+def resolve_test_display(page: Page, settings: SettingsStore) -> Panel:
+    """Override only explicit test dimensions, keeping the inherited panel metadata."""
+    panel = page.panel or resolve_settings_panel(settings)
+    return panel.model_copy(
+        update={"w": page.test_display_w or panel.w, "h": page.test_display_h or panel.h}
+    )
 
 
 def panel_groups_for_push(
@@ -336,7 +332,7 @@ def panel_groups_for_push(
     , render at the virtual panel and fan out to every renderer."""
     panels = _selected_device_panels(page, devices)
     if not panels:
-        return [(resolve_page_panel(page.panel, settings), [])]
+        return [(resolve_panel_for_page(page, devices, settings), [])]
     # Key includes gamut + underscan: same-size panels that pack to a
     # different palette (E6 vs 7-colour Inky) or inset by a different mat
     # margin must render as separate groups, so each group's Panel carries
@@ -361,7 +357,7 @@ def preview_groups_for_page(
     No targeted device → a single virtual-panel card."""
     panels = _selected_device_panels(page, devices)
     if not panels:
-        p = resolve_page_panel(page.panel, settings)
+        p = resolve_panel_for_page(page, devices, settings)
         return [
             {"w": p.w, "h": p.h, "label": "Virtual panel", "devices": [], "gamut": "waveshare_e6"}
         ]

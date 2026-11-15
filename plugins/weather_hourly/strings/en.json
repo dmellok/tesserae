@@ -14,5 +14,6 @@
   "cond_showers": "Showers",
   "cond_snow": "Snow",
   "cond_thunderstorm": "Thunderstorm",
-  "cond_fog": "Fog"
+  "cond_fog": "Fog",
+  "cell_options.label.placeholder": "Home"
 }

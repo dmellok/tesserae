@@ -35,6 +35,7 @@ from werkzeug.wrappers import Response
 
 from app.clock_text import clock_of
 from app.lineup_binding import Consent, apply_consent, flash_text, guard_change, refusal
+from app.redirects import local_return_path
 from app.scheduler import Scheduler
 from app.state.page_store import PageStore
 from app.state.schedule_model import Schedule
@@ -501,10 +502,7 @@ def _next_url() -> str | None:
     of the Lineups page (the dashboard editor's schedule dialog passes
     itself, #280). Anything that isn't a same-site path is ignored, the
     same rule ``dismiss_migration_notice`` applies to ``back``."""
-    nxt = (request.form.get("next") or "").strip()
-    if not nxt.startswith("/") or nxt.startswith("//"):
-        return None
-    return nxt
+    return local_return_path(request.form.get("next"))
 
 
 def _next_with_error(nxt: str, edit_id: str) -> str:

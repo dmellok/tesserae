@@ -11,20 +11,18 @@ Only the latest minor release is supported. Pre-1.0, that means the
 most recent `0.x` tag receives security fixes; older minors do not.
 When 1.0 ships, this policy moves to "current + previous minor".
 
-| Version | Latest patch | Supported |
-|---|---|---|
-| 0.44.x (current) | v0.44.5 | ✅ |
-| 0.43.x | v0.43.7 | ❌ |
-| 0.42.x | v0.42.3 | ❌ |
-| 0.41.x | v0.41.2 | ❌ |
-| 0.40.x | v0.40.0 | ❌ |
-| 0.39.x | v0.39.0 | ❌ |
-| < 0.39 | varies | ❌ |
+Releases are listed on the
+[releases page](https://github.com/dmellok/tesserae/releases). A fix
+ships in a new release; it is not backported.
 
 ## Reporting a vulnerability
 
-**Preferred:** use [GitHub's private security advisory flow](https://github.com/dmellok/tesserae/security/advisories/new).
+**Preferred:** use [GitHub's private vulnerability reporting](https://github.com/dmellok/tesserae/security/advisories/new)
+(the **Report a vulnerability** button on the repository's Security tab).
 It's private, auditable, and assigns a CVE if warranted.
+
+Please don't open a public issue for a vulnerability. A public report
+puts every install at risk until a fix has shipped.
 
 **Alternative:** if you can't use GitHub, email **tesserae@dmello.io**
 with "Tesserae security" in the subject line. PGP isn't set up;
@@ -75,6 +73,20 @@ Please include:
 - **Unconfigured deployments.** Tesserae's onboarding wizard walks you
   through setting a password and broker creds on first run; deployments
   that skip that aren't supported.
+
+### Known limits of device pairing
+
+Devices pair on a network the owner trusts, and two paths identify a
+device by its MAC address, which anything on that network can read:
+
+- **Zero-touch pairing** (`POST /api/v1/device/discover`) returns a
+  device's token to a matching MAC only until the device has used the
+  token once. After that the owner has to allow a re-pair from the
+  device's page.
+- **TRMNL (BYOS) devices** authenticate by MAC on `/api/setup` and
+  `/api/display`. That is TRMNL's own protocol and Tesserae follows it
+  so stock TRMNL firmware works. Something on your network that knows a
+  TRMNL device's MAC can fetch that device's picture.
 
 ### Always in scope (even if "out" above)
 

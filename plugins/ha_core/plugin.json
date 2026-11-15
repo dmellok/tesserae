@@ -7,7 +7,7 @@
   "icon": "ph-house-line",
   "supports": { "sizes": ["xs", "sm", "md", "lg"] },
   "settings": [
-    { "name": "base_url", "type": "string", "label": "Home Assistant URL (e.g. http://homeassistant.local:8123)", "default": "" },
+    { "name": "base_url", "placeholder": "http://homeassistant.local:8123", "type": "string", "label": "Home Assistant URL (e.g. http://homeassistant.local:8123)", "default": "" },
     { "name": "token", "type": "string", "label": "Long-Lived Access Token", "secret": true, "default": "" },
     { "name": "verify_tls", "type": "boolean", "label": "Verify TLS certificate (uncheck for self-signed HTTPS)", "default": true }
   ],

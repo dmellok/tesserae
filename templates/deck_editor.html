@@ -18,10 +18,11 @@
   <script type="application/json" id="dxe-data">{{ editor_state|tojson }}</script>
   <form method="post" action="{{ url_for('decks.editor_save') }}" id="deck-form" novalidate>
     <input type="hidden" name="deck_id" value="{{ deck.id if deck else '' }}">
+    {% if editor_state.returnTo %}<input type="hidden" name="return" value="{{ editor_state.returnTo }}">{% endif %}
 
     <div class="dxe-top">
       <nav class="dxe-crumb" aria-label="Breadcrumb">
-        <a href="{{ url_for('decks.index') }}">Lineups</a>
+        <a href="{{ editor_state.urls.back }}">{{ 'Back to dashboard' if editor_state.returnTo else 'Lineups' }}</a>
         <span aria-hidden="true">/</span>
         <span id="dxe-crumb-here">{{ 'New lineup' if not deck else '' }}</span>
       </nav>

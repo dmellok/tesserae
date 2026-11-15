@@ -10,5 +10,7 @@
   "week_to_go": "{n} week to go",
   "weeks_to_go": "{n} weeks to go",
   "through_the_year": "through the year",
-  "of_expected_life": "of expected life"
+  "of_expected_life": "of expected life",
+  "cell_options.birth_year.placeholder": "1985",
+  "cell_options.birth_year.help": "Your four-digit birth year, used in Life in weeks mode."
 }

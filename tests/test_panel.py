@@ -22,6 +22,8 @@ from app.panel import (
     panel_groups_for_push,
     preview_groups_for_page,
     resolve_panel_for_page,
+    resolve_settings_panel,
+    resolve_test_display,
 )
 from app.state.page_store import Page
 from app.state.settings_store import SettingsStore
@@ -94,6 +96,20 @@ def test_unbound_page_falls_back_to_virtual_panel(env) -> None:
     assert len(previews) == 1
     assert previews[0]["label"] == "Virtual panel"
     assert previews[0]["devices"] == []
+
+
+def test_inherited_test_display_preserves_native_panel_dimensions_for_push(env) -> None:
+    devices, settings, _make = env
+    settings.update_section("app", {"panel_preset": "waveshare_e6_13_3"})
+    page = Page(id="p", name="P")
+    inherited = resolve_settings_panel(settings)
+    assert (inherited.w, inherited.h) == (1600, 1200)
+    assert (inherited.native_w, inherited.native_h) == (1200, 1600)
+    assert resolve_test_display(page, settings) == inherited
+    assert resolve_panel_for_page(page, devices, settings) == inherited
+    panel, device_ids = panel_groups_for_push(page, devices, settings)[0]
+    assert panel == inherited
+    assert device_ids == []
 
 
 def test_push_groups_by_dims_then_flip(env) -> None:
