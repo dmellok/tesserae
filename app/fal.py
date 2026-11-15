@@ -443,6 +443,7 @@ class FalClient:
         timeout: float = TIMEOUT_S,
         openai_key: str | None = None,
         gemini_key: str | None = None,
+        refund: Callable[[int, str], None] | None = None,
         image_service: str | None = None,
         kie_key: str | None = None,
         task_dir: Path | None = None,
@@ -453,6 +454,7 @@ class FalClient:
         self.image_service = image_service if image_service is not None else service
         self.kie_key = kie_key if kie_key is not None else stored_kie_key
         self.task_dir = task_dir
+        self._refund = refund
         self._image_call = 0
         self._kie_failure = ""
         self.key = "" if key == DIRECT_ONLY else key
@@ -520,6 +522,11 @@ class FalClient:
                     self._charge(cents, charged_model)
                 self.spent_cents += cents
 
+            def refund(cents: int, charged_model: str) -> None:
+                if self._refund is not None:
+                    self._refund(cents, charged_model)
+                self.spent_cents -= cents
+
             try:
                 return kie_images.generate(
                     self.kie_key,
@@ -532,6 +539,7 @@ class FalClient:
                     charge=charge,
                     timeout=self._timeout,
                     stop=self._stop,
+                    refund=refund,
                 )
             except kie_images.KieError as err:
                 self._kie_failure = str(err)

@@ -123,18 +123,16 @@ def host_configure(
 _CHARGE_LOCK = threading.RLock()
 
 
-def ceiling_spent(cents: int = 0) -> str:
+def ceiling_spent() -> str:
     """Why nothing more may be painted server-wide, or empty."""
     ledger, ceilings = _HOST.get("ledger"), _HOST.get("ceilings")
     if ledger is None or ceilings is None:
         return ""
     try:
         daily, monthly = ceilings()
-        today = ledger.today_cents()
-        month = ledger.month_cents()
-        if daily < UNLIMITED and (today >= daily or today + cents > daily):
+        if daily < UNLIMITED and ledger.today_cents() >= daily:
             return "the server's daily ceiling for paintings is reached"
-        if monthly < UNLIMITED and (month >= monthly or month + cents > monthly):
+        if monthly < UNLIMITED and ledger.month_cents() >= monthly:
             return "the server's monthly ceiling for paintings is reached"
     except Exception:
         logger.exception("artwork: the ceiling could not be read")
@@ -154,13 +152,38 @@ def charge(
     ``debit`` checks and updates the widget's own daily allowance.
     """
     with _CHARGE_LOCK:
-        why = ceiling_spent(cents)
+        why = ceiling_spent()
         if why:
             raise ArtworkError(why)
         debit()
-        ledger = _HOST.get("ledger")
-        if ledger is not None:
-            ledger.append(plugin_id, collection, model, int(cents))
+        _ledger_line(plugin_id, collection, model, int(cents))
+
+
+def refund(
+    plugin_id: str,
+    collection: str,
+    cents: int,
+    model: str,
+    credit: Callable[[], None],
+) -> None:
+    """Hand back a charge for a request the provider definitely refused, so
+    it does not count against the ceilings or the widget's day. ``credit``
+    undoes the widget's own debit. The ledger keeps both lines."""
+    with _CHARGE_LOCK:
+        credit()
+        _ledger_line(plugin_id, collection, model, -int(cents))
+
+
+def _ledger_line(plugin_id: str, collection: str, model: str, cents: int) -> None:
+    # The budget is already debited by now, so a ledger that can't be
+    # written must not abort the painting it was counting.
+    ledger = _HOST.get("ledger")
+    if ledger is None:
+        return
+    try:
+        ledger.append(plugin_id, collection, model, cents)
+    except Exception:
+        logger.exception("artwork: the ledger could not be written")
 
 
 def cell_id_of(plugin_id: str, options: dict[str, Any]) -> str:
@@ -674,6 +697,11 @@ class Collection:
                         if sub == "archive" and p.suffix in (".jpg", ".png"):
                             out["versions"] += 1
                         p.unlink()
+        # Saved kie.ai tasks go too, or a picture purged while its task was
+        # stuck could never be painted again.
+        import shutil
+
+        shutil.rmtree(f / "kie_tasks", ignore_errors=True)
         self.unhold(data_dir)
         for child in self.children:
             child.purge(data_dir)
@@ -811,17 +839,29 @@ class Collection:
     def _fal_for(self, data_dir: Path, key: str, stop: threading.Event, cap: int) -> fal.FalClient:
         def pay(cents: int, model: str = "") -> None:
             def debit() -> None:
-                if cap < UNLIMITED and self.budget_used(data_dir) + cents > cap:
+                if cap < UNLIMITED and self.budget_used(data_dir) >= cap:
                     raise ArtworkError("the day's budget is spent")
-                with self._q.lock:
-                    _write(
-                        self.folder(data_dir) / "budget.json",
-                        json.dumps({_today(): self.budget_used(data_dir) + cents}).encode(),
-                    )
+                self._budget_add(data_dir, cents)
 
             charge(self.plugin_id, self.name, cents, model, debit)
 
-        return fal.FalClient(key, charge=pay, stop=stop)
+        def unpay(cents: int, model: str = "") -> None:
+            refund(
+                self.plugin_id,
+                self.name,
+                cents,
+                model,
+                lambda: self._budget_add(data_dir, -cents),
+            )
+
+        return fal.FalClient(key, charge=pay, refund=unpay, stop=stop)
+
+    def _budget_add(self, data_dir: Path, cents: int) -> None:
+        with self._q.lock:
+            _write(
+                self.folder(data_dir) / "budget.json",
+                json.dumps({_today(): max(0, self.budget_used(data_dir) + int(cents))}).encode(),
+            )
 
     def start(self, job: Job, cap: int) -> bool:
         """Queue a job; False when its key is already queued or under way."""
@@ -1052,6 +1092,11 @@ class Collection:
             ):
                 continue
             if self.path(str(r["key"]), data_dir) is not None:
+                continue
+            # A job that was under way has already been charged. It is only
+            # worth starting again when a saved task can be collected for
+            # free; otherwise the restart would buy the picture a second time.
+            if r.get("running") and not self.has_paid_task(str(r["key"]), data_dir):
                 continue
             job = self.job(
                 str(r["key"]),
@@ -1294,6 +1339,11 @@ class Collection:
         if not isinstance(payload, dict) or not payload:
             return False
         self.clear_error(key, data_dir)
+        # Asking again by hand gives up on a submission with nothing to
+        # collect; a task kie.ai is still working on is kept and collected.
+        from app import kie_images
+
+        kie_images.clear_unfinished(self.folder(data_dir) / "kie_tasks" / key)
         job = self.job(key, dict(payload), str(meta.get("title") or key), data_dir, fal_key)
         return self.start(job, self.cap(settings))
 
