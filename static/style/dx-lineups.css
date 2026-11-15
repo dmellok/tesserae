@@ -4082,3 +4082,155 @@ main.page.lu-page {
     animation: none;
   }
 }
+
+/* ----- Phones ------------------------------------------------------------ */
+/* The Filters button only exists for phones; elsewhere the selects sit inline. */
+.lu .lu-tb-filters {
+  display: contents;
+}
+.lu .lu-tb-ftog {
+  display: none;
+}
+.lu .lu-tb-ftog b {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--lu-acc);
+  color: var(--lu-acc-fg);
+  font: 700 11px/1 var(--t-font);
+}
+.lu .lu-tb-ftog b[hidden] {
+  display: none;
+}
+.lu .lu-tb-ftog[aria-expanded="true"] {
+  color: var(--lu-acc-text);
+}
+@container lu-page (max-width: 560px) {
+  /* Head: the link on its own line at the left, the buttons under it at the
+     right with the primary last, instead of three ragged rows. */
+  .lu .lu-head .lu-hint-link {
+    flex: none;
+    margin-right: 100%;
+    white-space: nowrap;
+  }
+  .lu .lu-head > .lu-btn-line {
+    margin-left: auto;
+  }
+  /* Toolbar: search and a Filters button; the selects open under them. */
+  .lu .lu-tb-search {
+    flex: 1 1 0;
+  }
+  .lu .lu-tb-ftog {
+    display: inline-flex;
+    flex: none;
+  }
+  .lu .lu-tb:not(.filters-open) .lu-tb-filters {
+    display: none;
+  }
+  .lu .lu-tb.filters-open .lu-tb-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    flex: 1 1 100%;
+  }
+  .lu .lu-tb-filters .lu-tb-select {
+    flex: 1 1 calc(50% - 4px);
+    min-width: 0;
+  }
+}
+/* Rows on a narrow card: the name leads with its buttons beside it, then the
+   status tag and the time on one line; the day tiles and counts only show
+   once the row is open. */
+@container lu-ds (max-width: 560px) {
+  .lu .lu-row-head {
+    grid-template-columns: auto minmax(0, 1fr) auto var(--lu-fold-w);
+    grid-template-areas:
+      "name name actions fold"
+      "tag state state state"
+      "meta meta meta meta";
+    row-gap: 4px;
+    column-gap: 10px;
+  }
+  .lu .lu-row-title {
+    display: contents;
+  }
+  .lu .lu-row-name {
+    grid-area: name;
+    min-width: 0;
+  }
+  .lu .lu-row-tag {
+    grid-area: tag;
+    align-self: center;
+  }
+  .lu .lu-row-state {
+    align-self: center;
+  }
+  .lu .lu-row-meta {
+    grid-area: meta;
+    margin-top: 6px;
+  }
+  .lu .lu-row.is-folded .lu-row-meta {
+    display: none;
+  }
+  .lu .lu-row-head :is(.lu-row-warning, .lu-row-err) {
+    grid-column: 1 / -1;
+  }
+  /* The time keeps its clock icon, so a gap separates it from "next Mon"; a
+     dot left at the end of a wrapped line read as a stray mark. */
+  .lu .lu-row-head .lu-hs-line {
+    column-gap: 10px;
+  }
+  .lu .lu-row-head .lu-sep-dot {
+    display: none;
+  }
+  /* Seven 44px day tiles fit a 360px phone. */
+  @media (pointer: coarse) {
+    .lu .lu-sched {
+      padding-right: 2px;
+      padding-left: 2px;
+    }
+    .lu .lu-row-head {
+      padding-left: 6px;
+    }
+    .lu .lu-days {
+      gap: 1px;
+    }
+  }
+}
+/* "Show 12 lineups" under a collapsed card: phones only, where the cards start
+   collapsed. Before the script runs, decks.html marks the page so the cards
+   already paint collapsed. */
+.lu .lu-ds-more {
+  display: none;
+}
+.lu[data-lu-boot-collapse] .lu-ds-body[id] {
+  display: none;
+}
+@container lu-ds (max-width: 560px) {
+  .lu .lu-ds.is-collapsed .lu-ds-more,
+  .lu[data-lu-boot-collapse] .lu-ds-more {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: calc(100% - 12px);
+    min-height: 44px;
+    margin: 0 6px 6px;
+    border-radius: var(--lu-r);
+    background: var(--lu-sched-bg);
+    color: var(--t-fg-soft);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .lu .lu-ds-more:hover {
+    color: var(--lu-acc-text);
+  }
+  .lu .lu-ds-more:focus-visible {
+    outline: 2px solid var(--lu-acc);
+    outline-offset: -2px;
+  }
+}
