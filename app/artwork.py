@@ -120,20 +120,47 @@ def host_configure(
     _HOST["ceilings"] = ceilings
 
 
-def ceiling_spent() -> str:
+_CHARGE_LOCK = threading.RLock()
+
+
+def ceiling_spent(cents: int = 0) -> str:
     """Why nothing more may be painted server-wide, or empty."""
     ledger, ceilings = _HOST.get("ledger"), _HOST.get("ceilings")
     if ledger is None or ceilings is None:
         return ""
     try:
         daily, monthly = ceilings()
-        if daily < UNLIMITED and ledger.today_cents() >= daily:
+        today = ledger.today_cents()
+        month = ledger.month_cents()
+        if daily < UNLIMITED and (today >= daily or today + cents > daily):
             return "the server's daily ceiling for paintings is reached"
-        if monthly < UNLIMITED and ledger.month_cents() >= monthly:
+        if monthly < UNLIMITED and (month >= monthly or month + cents > monthly):
             return "the server's monthly ceiling for paintings is reached"
     except Exception:
         logger.exception("artwork: the ceiling could not be read")
     return ""
+
+
+def charge(
+    plugin_id: str,
+    collection: str,
+    cents: int,
+    model: str,
+    debit: Callable[[], None],
+) -> None:
+    """Reserve one paid request against the shared ceilings and widget budget.
+
+    Legacy painters can use this with FalClient without moving their image cache.
+    ``debit`` checks and updates the widget's own daily allowance.
+    """
+    with _CHARGE_LOCK:
+        why = ceiling_spent(cents)
+        if why:
+            raise ArtworkError(why)
+        debit()
+        ledger = _HOST.get("ledger")
+        if ledger is not None:
+            ledger.append(plugin_id, collection, model, int(cents))
 
 
 def cell_id_of(plugin_id: str, options: dict[str, Any]) -> str:
@@ -306,6 +333,7 @@ class _Queue:
         self.queue: list[tuple[Job, int]] = []  # (job, cap cents)
         self.queued: set[str] = set()
         self.running: dict[str, tuple[float, str]] = {}
+        self.active: dict[str, tuple[Job, int]] = {}
         self.stops: dict[str, threading.Event] = {}
         self.finished: list[tuple[str, float]] = []
         self.workers = 0
@@ -777,16 +805,23 @@ class Collection:
 
     # -- the queue -----------------------------------------------------------
 
-    def _fal_for(self, data_dir: Path, key: str, stop: threading.Event, cap: int) -> fal.FalClient:
-        def charge(cents: int, model: str = "") -> None:
-            if cap < UNLIMITED and self.budget_used(data_dir) >= cap:
-                raise ArtworkError("the day's budget is spent")
-            why = ceiling_spent()
-            if why:
-                raise ArtworkError(why)
-            self.spend(data_dir, cents, model)
+    def has_paid_task(self, key: str, data_dir: Path) -> bool:
+        return any((self.folder(data_dir) / "kie_tasks" / key).glob("*.json"))
 
-        return fal.FalClient(key, charge=charge, stop=stop)
+    def _fal_for(self, data_dir: Path, key: str, stop: threading.Event, cap: int) -> fal.FalClient:
+        def pay(cents: int, model: str = "") -> None:
+            def debit() -> None:
+                if cap < UNLIMITED and self.budget_used(data_dir) + cents > cap:
+                    raise ArtworkError("the day's budget is spent")
+                with self._q.lock:
+                    _write(
+                        self.folder(data_dir) / "budget.json",
+                        json.dumps({_today(): self.budget_used(data_dir) + cents}).encode(),
+                    )
+
+            charge(self.plugin_id, self.name, cents, model, debit)
+
+        return fal.FalClient(key, charge=pay, stop=stop)
 
     def start(self, job: Job, cap: int) -> bool:
         """Queue a job; False when its key is already queued or under way."""
@@ -808,8 +843,12 @@ class Collection:
     def start_batch(self, jobs: list[Job], data_dir: Path, cap: int) -> int:
         n = 0
         for job in jobs:
-            if cap < UNLIMITED and self.budget_used(data_dir) >= cap:
-                break
+            if (
+                cap < UNLIMITED
+                and self.budget_used(data_dir) >= cap
+                and not self.has_paid_task(job.key, data_dir)
+            ):
+                continue
             if self.start(job, cap):
                 n += 1
         return n
@@ -824,19 +863,25 @@ class Collection:
                 self._q.queued.discard(job.key)
                 self._q.stops[job.key] = job.stop
                 self._q.running[job.key] = (time.time(), job.title)
+                self._q.active[job.key] = (job, cap)
                 self._persist_locked(job.data_dir)
             try:
-                if cap < UNLIMITED and self.budget_used(job.data_dir) >= cap:
+                if (
+                    not self.has_paid_task(job.key, job.data_dir)
+                    and cap < UNLIMITED
+                    and self.budget_used(job.data_dir) >= cap
+                ):
                     self._note_error(job, "the day's budget is spent")
                     continue
                 why = ceiling_spent()
-                if why:
+                if why and not self.has_paid_task(job.key, job.data_dir):
                     self._note_error(job, why)
                     continue
                 self._run_one(job, cap)
             finally:
                 with self._q.lock:
                     self._q.running.pop(job.key, None)
+                    self._q.active.pop(job.key, None)
                     self._q.stops.pop(job.key, None)
                     self._q.finished.append((job.key, time.time()))
                     del self._q.finished[:-20]
@@ -847,6 +892,7 @@ class Collection:
         call to fal.ai cannot be recalled, so it finishes on its own and the
         result is dropped."""
         job.fal = self._fal_for(job.data_dir, job.fal.key, job.stop, cap)
+        job.fal.task_dir = self.folder(job.data_dir) / "kie_tasks" / job.key
         done = threading.Event()
         result: dict[str, Any] = {}
 
@@ -874,6 +920,10 @@ class Collection:
             raw, meta = result["ok"]
             full = {"title": job.title, "payload": job.payload, **meta}
             self.keep(job.key, job.data_dir, raw, full)
+            # Only discard intermediate paid-task results after the whole job is kept.
+            import shutil
+
+            shutil.rmtree(job.fal.task_dir, ignore_errors=True)
         else:
             self._note_error(job, result.get("why") or "failed")
 
@@ -964,16 +1014,17 @@ class Collection:
             if j.data_dir == data_dir
         ] + [
             {
-                "key": k,
-                "payload": {},
-                "title": t,
-                "origin": "panel",
-                "subject": "",
-                "cell": "",
-                "cap": UNLIMITED,
+                "key": j.key,
+                "payload": j.payload,
+                "title": j.title,
+                "origin": j.origin,
+                "subject": j.subject,
+                "cell": j.cell,
+                "cap": cap,
                 "running": True,
             }
-            for k, (_s, t) in self._q.running.items()
+            for j, cap in self._q.active.values()
+            if j.data_dir == data_dir
         ]
         with contextlib.suppress(OSError):
             _write(
@@ -1105,7 +1156,9 @@ class Collection:
         ]
         self.unhold(data_dir, [str(j["key"]) for j in rows])
         ready = [j for j in rows if self.state(str(j["key"]), data_dir) == "none"]
-        begin = ready[: self.room(data_dir, cap)]
+        begin = [j for j in ready if self.has_paid_task(str(j["key"]), data_dir)] + [
+            j for j in ready if not self.has_paid_task(str(j["key"]), data_dir)
+        ][: self.room(data_dir, cap)]
         jobs = [
             self.job(
                 str(j["key"]),
@@ -1210,9 +1263,10 @@ class Collection:
                 if isinstance(j, dict) and j.get("payload"):
                     wanted.setdefault(key, {**j, "subject": str(d.get("subject") or "")})
         ready = [(k, j) for k, j in wanted.items() if self.path(k, data_dir) is None]
-        begin = [(k, j) for k, j in ready if self.state(k, data_dir) == "none"][
-            : self.room(data_dir, cap)
-        ]
+        available = [(k, j) for k, j in ready if self.state(k, data_dir) == "none"]
+        begin = [(k, j) for k, j in available if self.has_paid_task(k, data_dir)] + [
+            (k, j) for k, j in available if not self.has_paid_task(k, data_dir)
+        ][: self.room(data_dir, cap)]
         jobs = [
             self.job(
                 k,
@@ -1437,7 +1491,9 @@ class Art:
         if not self.key:
             self._count("no_key")
             return Got(key, "no_key")
-        if (self.cap < UNLIMITED and c.budget_used(self.data_dir) >= self.cap) or ceiling_spent():
+        if not c.has_paid_task(key, self.data_dir) and (
+            (self.cap < UNLIMITED and c.budget_used(self.data_dir) >= self.cap) or ceiling_spent()
+        ):
             self._count("capped")
             return Got(key, "capped")
         job = c.job(
