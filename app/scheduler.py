@@ -3433,6 +3433,36 @@ class Scheduler:
             limit=limit,
         )
 
+    def lineup_gate(self, deck: Deck, now: datetime | None = None) -> tuple[bool, list[Any]]:
+        """Whether the condition gate lets ``deck`` put a step on its displays
+        now, decided the way the tick decides it: the cycle picker
+        (``_pick_eligible_step``: at least one step's conditions pass) for a
+        rotation, the record's own gate (its conditions, or a fallback page)
+        for a timed lineup. Returns ``(ready, failing)``, ``failing`` being the
+        ``ConditionResult`` rows that do not pass (the first step's for a
+        rotation), for saying what it waits for. No evaluator: always ready.
+        For the Lineups page; it records no event."""
+        now = now or datetime.now(UTC)
+        evaluator = self._condition_evaluator
+        if evaluator is None or deck.advance == "manual" or not deck.pages:
+            return True, []
+        if deck.advance_trigger == "cycle":
+            rotation = _deck_to_rotation(deck)
+            if rotation is None or not rotation.steps:
+                return True, []
+            if self._pick_eligible_step(rotation, 0, now) is not None:
+                return True, []
+            for step in rotation.steps:
+                failing = [r for r in evaluator.evaluate(step.conditions, when=now) if not r.passed]
+                if failing:
+                    return False, failing
+            return False, []
+        schedule = deck_to_schedule(deck)
+        if not schedule.conditions:
+            return True, []
+        failing = [r for r in evaluator.evaluate(schedule.conditions, when=now) if not r.passed]
+        return (not failing or bool(schedule.fallback_page_id)), failing
+
     def rotation_status(self) -> dict[str, dict[str, Any]]:
         """Snapshot of per-rotation runtime state, mirroring ``status``.
         Used by the Rotations index to surface ``held`` (no step's

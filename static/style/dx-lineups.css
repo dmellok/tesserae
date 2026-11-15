@@ -904,6 +904,9 @@ main.page.lu-page {
   position: relative;
   height: 24px;
   --rod: 8px;
+  --trk-h: 24px;
+  --lane-h: 6px;
+  --lane-step: 8px;
 }
 .lu .lu-trk::before {
   content: "";
@@ -918,6 +921,7 @@ main.page.lu-page {
 .lu .lu-trk.tall {
   height: 34px;
   --rod: 10px;
+  --trk-h: 34px;
 }
 .lu .lu-blk {
   position: absolute;
@@ -1029,6 +1033,49 @@ main.page.lu-page {
 .lu .lu-blk-side.gone,
 .lu .lu-blk-l.gone {
   visibility: hidden;
+}
+/* Today's open windows that are not on the glass: queued in amber (the
+   header's Queued colour), waiting on its conditions in a quiet grey. */
+.lu .lu-blk.st-queued {
+  background: color-mix(in oklab, var(--t-warn) 22%, var(--t-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--t-warn) 55%, transparent);
+}
+.lu .lu-blk.st-queued .lu-blk-l {
+  color: var(--lu-warn-text);
+}
+.lu .lu-blk.st-waiting {
+  background: color-mix(in oklab, var(--t-fg) 9%, var(--t-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--t-fg) 14%, transparent);
+}
+.lu .lu-blk.st-waiting .lu-blk-l {
+  color: var(--t-muted);
+}
+/* Overlapping windows (lineups_view.assign_lanes): the main row keeps the
+   bar's height, each extra window is a thin lane under it, so every one shows
+   and the track grows 8px a lane. The rod, holds and Quiet hours stay on the
+   main row; the now mark runs through all of them. */
+.lu .lu-trk.laned {
+  height: calc(var(--trk-h) + (var(--lanes) - 1) * var(--lane-step));
+}
+.lu .lu-trk.laned::before,
+.lu .lu-trk.laned :is(.lu-blk.hold, .lu-pz) {
+  top: calc(var(--trk-h) / 2 - var(--rod) / 2);
+}
+.lu .lu-trk.laned .lu-blk:not(.hold) {
+  bottom: auto;
+  height: calc(var(--trk-h) - 4px);
+}
+.lu .lu-trk.laned .lu-pz-over {
+  bottom: auto;
+  top: calc(var(--trk-h) - 8px);
+}
+.lu .lu-trk.laned .lu-blk.ln {
+  top: calc(var(--trk-h) + (var(--lane) - 1) * var(--lane-step));
+  height: var(--lane-h);
+  border-radius: calc(var(--lane-h) / 2);
+}
+.lu .lu-trk.laned .lu-blk.ln :is(.lu-blk-l, .lu-tick, .lu-h) {
+  display: none;
 }
 /* Advance ticks: hairlines from both edges, leaving the label band clear;
    the next one is the same line, only stronger and 2px. The element is a 9px
@@ -1735,6 +1782,32 @@ main.page.lu-page {
 .lu .lu-tag-st.off {
   padding: 0;
   color: var(--t-muted);
+}
+.lu .lu-tag-st.queued {
+  background: color-mix(in oklab, var(--t-warn) 18%, var(--t-surface));
+  color: color-mix(in oklab, var(--t-warn) 75%, var(--t-fg));
+}
+/* Waiting: greyed like a row that is off, with a ring rather than a dot. */
+.lu .lu-tag-st.wait {
+  padding: 0;
+  color: var(--t-muted);
+}
+.lu .lu-tag-st.wait::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--t-muted) 80%, transparent);
+}
+/* Why a row is queued or waiting, after its window; a long condition wraps
+   rather than losing its end. */
+.lu .lu-hs-why {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.lu .lu-hs-why.q {
+  color: var(--lu-warn-text);
 }
 .lu .lu-tag-st.off::before {
   content: "";
@@ -2792,6 +2865,45 @@ main.page.lu-page {
   font-size: 16px;
   opacity: 0.85;
 }
+/* A priority lineup's choices: the first that passes shows, so "otherwise"
+   between them rather than an arrow through them. */
+.lu .lu-sep.else {
+  width: auto;
+  padding-inline: 8px;
+  font: italic 11px var(--t-font);
+  white-space: nowrap;
+}
+/* When a step shows: a chip under its name, in words. "ok" its conditions pass
+   now, "no" they do not; "fb" the fallback of a priority lineup. */
+.lu .lu-cond {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 4px;
+  max-width: 100%;
+  margin-top: 4px;
+  padding: 2px 6px;
+  border-radius: var(--lu-r);
+  background: color-mix(in oklab, var(--t-fg) 7%, transparent);
+  color: var(--t-fg-soft);
+  font: 11px/1.3 var(--t-font);
+  overflow-wrap: anywhere;
+  cursor: default;
+}
+.lu .lu-cond .lu-ico {
+  flex: none;
+  margin-top: 1px;
+  font-size: 11px;
+}
+.lu .lu-cond.ok {
+  background: color-mix(in oklab, var(--lu-acc) 14%, transparent);
+  color: var(--lu-acc-text);
+}
+.lu .lu-cond.no {
+  color: var(--t-muted);
+}
+.lu .lu-cond.fb {
+  font-weight: 600;
+}
 
 /* Peek popover: a mini grid of a step's items. */
 .lu .lu-peek {
@@ -3429,11 +3541,25 @@ main.page.lu-page {
   }
   .lu .lu-trk.tall {
     height: 44px;
+    --trk-h: 44px;
+    --lane-h: 8px;
+    --lane-step: 10px;
     --rod: 12px;
   }
   .lu .lu-trk.tall .lu-blk:not(.hold) {
     top: 0;
     bottom: 0;
+  }
+  .lu .lu-trk.tall.laned {
+    height: calc(var(--trk-h) + (var(--lanes) - 1) * var(--lane-step));
+  }
+  .lu .lu-trk.tall.laned .lu-blk:not(.hold) {
+    bottom: auto;
+    height: var(--trk-h);
+  }
+  .lu .lu-trk.tall.laned .lu-blk.ln:not(.hold) {
+    top: calc(var(--trk-h) + 2px + (var(--lane) - 1) * var(--lane-step));
+    height: var(--lane-h);
   }
   /* A sliver for a single push is hard to hit; widen its target. */
   .lu .lu-blk.push[data-edit]::after {
@@ -3690,7 +3816,7 @@ main.page.lu-page {
    (by the day the bar shows, which this rule cannot know). Mirrors the
    default "today" rule: only live and later-today rows stay, so every muted
    row (finished today, not today, switched off) goes; by-hand rows aside. */
-.lu[data-lu-boot-scope="today"] .lu-row.is-off:not([data-kind="manual"]) {
+.lu[data-lu-boot-scope="today"] .lu-row.is-off:not([data-kind="manual"], .is-waiting) {
   display: none;
 }
 .lu .lu-scope-empty {

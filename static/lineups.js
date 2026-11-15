@@ -154,7 +154,7 @@
   const runsOn = (l, day) =>
     l.kind === "manual" ||
     (day === vm.now.weekday
-      ? l.status === "live" || !!l.holding || l.status === "later_today"
+      ? ["live", "queued", "waiting", "later_today"].includes(l.status) || !!l.holding
       : !!(l.days && l.days[day]));
   const inScope = (l, d) =>
     st.scope !== "today" || st.view === "timeline" || runsOn(l, d ? dayOf(d) : vm.now.weekday);

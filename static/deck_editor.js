@@ -613,12 +613,18 @@
     )
       return line(`<b>Skipped: ${esc(clockOf(S.when.start))} is in ${esc(pauseWhere())}.</b>`);
     if (l.status === "live") {
-      const cur = l.steps.find((s) => s.current) || l.steps.find((s) => s.on_screen);
-      const nx = l.steps.find((s) => s.next);
+      // What is on the glass first (the Lineups page's Now), then the step due.
+      const cur = l.steps.find((s) => s.on_screen) || l.steps.find((s) => s.current);
+      const queued = l.steps.find((s) => s.queued);
+      const nx = queued ? null : l.steps.find((s) => s.next);
       const nl = d.next_line || {};
-      const pos = cur ? cur.position.replace("/", " of ") : "";
+      const pos = !cur
+        ? ""
+        : l.priority_mode
+          ? `${cur.name}, ${cur.fallback ? "the fallback" : cur.position}`
+          : `dashboard ${cur.position.replace("/", " of ")}, ${cur.name}`;
       const first = cur
-        ? `Live: dashboard ${pos}, ${cur.name}`
+        ? `Live: ${pos}`
         : `Live: ${l.live_now && l.live_now.on_screen_name ? l.live_now.on_screen_name : "on screen"}`;
       const nextAt =
         nx && nx.pill && /\d/.test(nx.pill.label) ? nx.pill.label.replace(/^Next\s*/, "") : "";
@@ -984,6 +990,13 @@
     }
     if (k === "daily") return n > 1 ? "Only the first dashboard is sent." : "Sent once, then held.";
     if (k === "interval") return `Sent again every ${mins(st.interval)}.`;
+    if (ranked()) {
+      // Priority mode never takes them in turn: the first whose conditions pass shows.
+      const last = st.steps[n - 1];
+      return hasConditions(last)
+        ? "Shows the first one whose conditions pass. When none do, the screen stays as it is."
+        : `Shows the first one whose conditions pass, else ${pageOf(last.id).name}.`;
+    }
     const same = st.steps.every((s) => dwellOf(s) === st.interval);
     // Rules can skip a dashboard, so the loop is only the plan.
     const loop = st.steps.some(hasConditions) ? "planned loop" : "full loop";
@@ -998,8 +1011,15 @@
     if (!l || dirtySteps()) return {};
     const s = l.steps.find((x) => x.dashboard_id === id);
     if (!s) return {};
-    if (timingDirty()) return { now: !!s.current };
-    return { now: !!s.current, next: !!s.next, nextLabel: s.pill && s.next ? s.pill.label : "" };
+    // Now is what is on the glass; the step due but not landed yet is queued.
+    const now = !!s.on_screen || (!!s.current && !s.queued && !l.steps.some((x) => x.on_screen));
+    if (timingDirty()) return { now };
+    return {
+      now,
+      queued: s.queued && s.pill ? s.pill : null,
+      next: !!s.next,
+      nextLabel: s.pill && s.next ? s.pill.label : "",
+    };
   }
   const savedIds = S.steps.map((s) => s.id).join(",");
   const dirtySteps = () => st.steps.map((s) => s.id).join(",") !== savedIds;
@@ -1055,11 +1075,28 @@
       aspect: `${w}/${h}`,
     };
   }
+  // Priority mode on a rotation: a ranked list of choices, not a loop.
+  const ranked = () => st.mode === "priority" && kind() === "cycle" && st.steps.length > 1;
+  const ordinal = (k) =>
+    k + (k % 100 >= 10 && k % 100 <= 20 ? "th" : { 1: "st", 2: "nd", 3: "rd" }[k % 10] || "th");
+  function condsOf(s) {
+    try {
+      const v = JSON.parse(s.conditions || "[]");
+      return Array.isArray(v) ? v : [];
+    } catch {
+      return [];
+    }
+  }
   function stepModel(s, i, d) {
     const p = pageOf(s.id);
     const it = p.items || {};
     const n = st.steps.length;
     const f = liveFlags(s.id);
+    const rank = ranked();
+    const chip = R.condChip(condsOf(s), S.entityNames || {});
+    // Whether its conditions pass now: the Lineups view's answer, while they are as saved.
+    const saved = S.lineup && !dirtySteps() && S.lineup.steps.find((x) => x.dashboard_id === s.id);
+    const condOk = saved && saved.cond_label === chip.label ? saved.cond_ok : null;
     const pick = it.mode === "pick" && it.count > 1;
     return {
       index: i,
@@ -1075,13 +1112,19 @@
       items: { length: Number(it.count) || 0 },
       item_noun: String(it.noun || "items").replace(/s$/, ""),
       draw_label: "Draw another",
-      position: `${i + 1}/${n}`,
-      separator: i < n - 1 ? "arrow" : "",
+      position: rank ? `${ordinal(i + 1)} choice` : `${i + 1}/${n}`,
+      separator: i < n - 1 ? (rank ? "else" : "arrow") : "",
+      cond_label: chip.label,
+      cond_title: chip.title,
+      cond_ok: condOk === undefined ? null : condOk,
+      fallback: rank && i === n - 1 && !hasConditions(s),
       pill: f.now
         ? { kind: "now", label: "Now", title: "On screen now" }
-        : f.next
-          ? { kind: "next", label: "Next", title: f.nextLabel || "Next" }
-          : null,
+        : f.queued
+          ? f.queued
+          : f.next
+            ? { kind: "next", label: "Next", title: f.nextLabel || "Next" }
+            : null,
       on_screen: !!f.now,
       current: !!f.now,
       next: !!f.next,

@@ -30,7 +30,9 @@ from app.lineups_view import (
     LineupInput,
     LineupsView,
     LineupView,
+    OnScreenInput,
     PauseInput,
+    PublishedInput,
     StepInput,
     build_view,
     clock,
@@ -592,7 +594,14 @@ def test_mixed_dwells_and_interval_steps() -> None:
         days=(3,),
     )
     displays, dashboards = sample_inputs()
-    d = replace(displays[1], id="other", lineups=(mixed, every))
+    # Its own step is on the glass, so it is the live row.
+    d = replace(
+        displays[1],
+        id="other",
+        lineups=(mixed, every),
+        on_screen=OnScreenInput("y"),
+        published=PublishedInput("y"),
+    )
     view = build_view([d], dashboards, now=SAMPLE_NOW)
     out = view.displays[0]
     m = _lineup(out, "m")

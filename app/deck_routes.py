@@ -349,11 +349,28 @@ def _frame_origin(
     the newest successful push row for the page on this display; a rotation
     or schedule fire is named through the engine row that links to that
     push."""
+    src = _frame_source(device_id, page_id, nav_rec=nav_rec, lineup_names=lineup_names)
+    if src is None:
+        return None
+    phrase, record_id = src
+    if record_id is not None and record_id == own_id:
+        return "an earlier step"
+    return phrase
+
+
+def _frame_source(
+    device_id: str,
+    page_id: str,
+    *,
+    nav_rec: dict[str, Any] | None,
+    lineup_names: dict[str, str],
+) -> tuple[str, str | None] | None:
+    """:func:`_frame_origin` as ``(phrase, lineup id)``: the lineup (deck) that
+    put the frame up when one did, else ``None`` beside the phrase (a manual
+    push, a tap). ``None`` overall when the source is unknown."""
     if nav_rec and nav_rec.get("page_id") == page_id and nav_rec.get("deck_id"):
         deck_id = str(nav_rec["deck_id"])
-        if deck_id == own_id:
-            return "an earlier step"
-        return lineup_names.get(deck_id) or "another lineup"
+        return lineup_names.get(deck_id) or "another lineup", deck_id
     events = current_app.config.get("EVENT_LOG")
     if events is None:
         return None
@@ -369,17 +386,17 @@ def _frame_origin(
         return None
     source = push.source
     if source in _MANUAL_PUSH_SOURCES:
-        return "a manual push"
+        return "a manual push", None
     if source == "button":
-        return "a tap"
+        return "a tap", None
     if source == "home_assistant":
-        return "Home Assistant"
+        return "Home Assistant", None
     if source == "webhook":
-        return "a webhook"
+        return "a webhook", None
     if source == "page_refresh":
-        return "an auto update"
+        return "an auto update", None
     if source in ("deck", "deck_init"):
-        return "another lineup"
+        return "another lineup", None
     if source in ("rotation", "scheduler"):
         # The engine row that caused this push names the record.
         try:
@@ -389,14 +406,13 @@ def _frame_origin(
         for row in engine_rows:
             if row.extra.get("push_event_id") != push.id:
                 continue
+            target = str(row.target) if row.target else None
             if source == "scheduler":
                 name = row.extra.get("schedule_name")
-                return f"the {name} schedule" if name else "a schedule"
-            if row.target == own_id:
-                return "an earlier step"
+                return (f"the {name} schedule" if name else "a schedule"), target
             name = row.extra.get("rotation_name")
-            return str(name) if name else "another rotation"
-        return "a schedule" if source == "scheduler" else "another rotation"
+            return (str(name) if name else "another rotation"), target
+        return ("a schedule" if source == "scheduler" else "another rotation"), None
     return None
 
 
@@ -1225,6 +1241,7 @@ def _lineup_input(
     playing: bool = False,
     with_urls: bool = True,
     last_fired: float | None = None,
+    gate: tuple[bool, str, str] = (True, "", ""),
 ) -> LineupInput:
     """A deck as the view-model's lineup: its window, days and steps in the
     shape its trigger runs them (see ``app.lineups_view``)."""
@@ -1239,11 +1256,20 @@ def _lineup_input(
         start, end = deck.advance_fires_at, None
     else:
         start = end = None
+    scheduler = current_app.config.get("SCHEDULER") if with_urls else None
+    evaluator = getattr(scheduler, "_condition_evaluator", None)
     steps = tuple(
         StepInput(
             dashboard_id=p.page_id,
             dwell_minutes=p.effective_dwell_minutes(deck.advance_interval_minutes),
             conditional=bool(p.conditions),
+            cond_label=(chip := _condition_chip(p.conditions, evaluator))[0],
+            cond_title=chip[1],
+            cond_ok=(
+                bool(evaluator.all_pass(list(p.conditions)))
+                if p.conditions and evaluator is not None
+                else None
+            ),
         )
         for p in deck.pages
     )
@@ -1287,7 +1313,99 @@ def _lineup_input(
         last_fired=last_fired,
         explicit_display=bool(deck.device_ids),
         end_hint=deck.advance_end_at if kind == "daily" else None,
+        ready=gate[0],
+        waits_for=gate[1],
+        waits_title=gate[2],
+        priority_mode=kind == "cycle" and deck.advance_mode == "priority" and len(steps) > 1,
     )
+
+
+def _entity_name(entity_id: str) -> str:
+    """``sensor.printer_status`` -> ``Printer status``: an entity's id read
+    as words, for when Home Assistant gives no friendly name."""
+    words = entity_id.split(".", 1)[-1].replace("_", " ").strip()
+    return words[:1].upper() + words[1:] if words else entity_id
+
+
+def _entity_names(conditions: Any, evaluator: Any) -> dict[str, str]:
+    """Home Assistant's friendly names for the entities ``conditions`` read."""
+    out: dict[str, str] = {}
+    for cond in conditions:
+        if cond.source_kind != "ha_entity" or cond.source_id in out:
+            continue
+        state = evaluator.ha_state(cond.source_id) if evaluator is not None else None
+        name = ((state or {}).get("attributes") or {}).get("friendly_name")
+        if name:
+            out[cond.source_id] = str(name)
+    return out
+
+
+def _condition_words(cond: Any, evaluator: Any) -> str:
+    """One condition as what it waits for: "Printer status is running",
+    "the time is 07:00–09:00", "it is after sunset". Mirrored by condWords in
+    static/lineups_render.js (the lineup editor's unsaved conditions)."""
+    op = cond.operator
+    value = cond.value
+    if cond.source_kind == "ha_entity":
+        name = _entity_names([cond], evaluator).get(cond.source_id) or _entity_name(cond.source_id)
+        if op == "in":
+            vals = [str(v) for v in (value or [])]
+            listed = ", ".join(vals[:-1]) + f" or {vals[-1]}" if len(vals) > 1 else "".join(vals)
+            return f"{name} is {listed}"
+        if op == "present_within_seconds":
+            return f"{name} has changed recently"
+        verb = {
+            "==": "is",
+            "!=": "is not",
+            ">": "is above",
+            "<": "is below",
+            ">=": "is at least",
+            "<=": "is at most",
+        }.get(op, op)
+        return f"{name} {verb} {value}"
+    if cond.source_kind == "time_window":
+        v = value if isinstance(value, dict) else {}
+        return f"the time is {v.get('start_local', '?')}–{v.get('end_local', '?')}"
+    if cond.source_kind == "sun":
+        return {
+            "before_sunrise": "it is before sunrise",
+            "after_sunset": "it is after sunset",
+            "is_day": "it is daytime",
+            "is_night": "it is night",
+        }.get(op, "the sun condition passes")
+    return "its conditions pass"
+
+
+def _condition_chip(conditions: Any, evaluator: Any) -> tuple[str, str]:
+    """``(chip, title)`` for a step's conditions: "Only while Printer status
+    is running" (and "+1 more" past the first), and every one for the title."""
+    words = [_condition_words(c, evaluator) for c in conditions]
+    if not words:
+        return "", ""
+    more = f" +{len(words) - 1} more" if len(words) > 1 else ""
+    return f"Only while {words[0]}{more}", "Shows only while " + " and ".join(words) + "."
+
+
+def _lineup_gate(deck: Deck, scheduler: Any, now: datetime) -> tuple[bool, str, str]:
+    """``(ready, waits for, tooltip)`` from the scheduler's own condition gate
+    (``Scheduler.lineup_gate``): a lineup whose conditions fail now cannot put
+    a step on its display, so the Lineups page shows it waiting."""
+    fn = getattr(scheduler, "lineup_gate", None)
+    if not callable(fn):
+        return True, "", ""
+    try:
+        ready, failing = fn(deck, now)
+    except Exception:
+        current_app.logger.exception("lineups: condition gate failed for %s", deck.id)
+        return True, "", ""
+    if ready:
+        return True, "", ""
+    evaluator = getattr(scheduler, "_condition_evaluator", None)
+    words = [_condition_words(r.condition, evaluator) for r in failing]
+    if not words:
+        return False, "", "Its window is open, but none of its conditions pass right now."
+    title = "Its window is open, but it waits until " + "; and ".join(words) + "."
+    return False, words[0], title
 
 
 def _display_label(devices_reg: Any, device_id: str) -> str:
@@ -1558,6 +1676,7 @@ def _build_lineups_view(
         fired = last_fired_map.get(deck.id)
         last_fired = float(fired) if isinstance(fired, (int, float)) else None
         cur = current.get(deck.id) or {}
+        gate = _lineup_gate(deck, scheduler, now) if deck.enabled else (True, "", "")
         runtime = None
         if cur.get("active") and isinstance(cur.get("step_index"), int):
             since = cur.get("step_started_epoch")
@@ -1570,13 +1689,33 @@ def _build_lineups_view(
         targets = [t for t in _deck_displays(deck, page_devices) if t in known]
         if not targets:
             if not display_id:
-                unassigned.append(_lineup_input(deck, runtime=runtime, last_fired=last_fired))
+                unassigned.append(
+                    _lineup_input(deck, runtime=runtime, last_fired=last_fired, gate=gate)
+                )
             continue
         for did in targets:
             playing = in_control.get(did) == deck.id
             by_display[did].append(
-                _lineup_input(deck, runtime=runtime, playing=playing, last_fired=last_fired)
+                _lineup_input(
+                    deck, runtime=runtime, playing=playing, last_fired=last_fired, gate=gate
+                )
             )
+
+    nav = _nav_store()
+    lineup_names = {deck.id: deck.name for deck in decks}
+    origins: dict[tuple[str, str], tuple[str, str | None] | None] = {}
+
+    def _origin_of(device_id: str, page_id: str) -> tuple[str, str | None] | None:
+        key = (device_id, page_id)
+        if key not in origins:
+            try:
+                nav_rec = nav.get(device_id) if nav is not None else None
+            except Exception:
+                nav_rec = None
+            origins[key] = _frame_source(
+                device_id, page_id, nav_rec=nav_rec, lineup_names=lineup_names
+            )
+        return origins[key]
 
     inputs: list[DisplayInput] = []
     for d in devices:
@@ -1602,10 +1741,15 @@ def _build_lineups_view(
             rec = live.get(d.id)
             on_pid = rec[1] if rec else None
         if on_pid:
+            # Where the frame came from, the same answer the header gives
+            # ("from ..."): that lineup is the one live row.
+            src = _origin_of(d.id, on_pid)
             on_screen = OnScreenInput(
                 dashboard_id=on_pid,
                 since=state.get("at"),
                 verb=str(state.get("verb") or "sent"),
+                lineup_id=src[1] if src is not None else None,
+                origin_known=src is not None,
             )
         frame, nothing_sent = _frame_state(d) if not on_pid else (None, False)
         last_seen, heard = _heard_from(d)
@@ -1670,8 +1814,6 @@ def _build_lineups_view(
         )
         if deck.advance == "both":
             lineup.mode_label += " + by hand"
-    nav = _nav_store()
-    lineup_names = {deck.id: deck.name for deck in decks}
     for display in view.displays:
         state = panel_states.get(display.id) or {}
         live_lineup = next(
@@ -1688,14 +1830,9 @@ def _build_lineups_view(
             and display.scheduled.dashboard_id != display.on_screen.dashboard_id
         )
         if display.on_screen:
-            nav_rec = nav.get(display.id) if nav is not None else None
-            origin = _frame_origin(
-                display.id,
-                display.on_screen.dashboard_id,
-                own_id="",  # The header names the source, rather than comparing one row to another.
-                nav_rec=nav_rec,
-                lineup_names=lineup_names,
-            )
+            # The header names the source, rather than comparing one row to another.
+            src = _origin_of(display.id, display.on_screen.dashboard_id)
+            origin = src[0] if src is not None else None
             if origin:
                 display.show_suffix = f"from {origin}"
                 live_runtime = current.get(live_lineup.id, {}) if live_lineup else {}
@@ -3388,6 +3525,12 @@ def _editor_state(deck: Deck | None) -> dict[str, Any]:
         }
         for p in (deck.pages if deck is not None else [])
     ]
+    # Friendly names for the entities the steps' conditions read, so the strip's
+    # condition chips name them the way the Lineups page does.
+    evaluator = getattr(current_app.config.get("SCHEDULER"), "_condition_evaluator", None)
+    entity_names = _entity_names(
+        [c for p in (deck.pages if deck is not None else []) for c in p.conditions], evaluator
+    )
     if deck is None:
         page_id = request.args.get("page_id") or ""
         if page_id in page_meta:
@@ -3403,6 +3546,7 @@ def _editor_state(deck: Deck | None) -> dict[str, Any]:
         "isNew": deck is None,
         "returnTo": return_to,
         "revision": _deck_revision(deck) if deck is not None else "",
+        "entityNames": entity_names,
         "name": deck.name if deck is not None else "",
         "enabled": deck.enabled if deck is not None else True,
         "when": _when_of(deck),

@@ -77,12 +77,14 @@
    (static/lineups_render.js dayTrack draws the same). -#}
 {%- set nx = namespace(s=none, t=none) -%}
 {%- if tall %}{% for s in day.segments if s.kind == 'window' %}{% for t in s.ticks if t.next and t.in_label %}{% set nx.s = s %}{% set nx.t = t %}{% endfor %}{% endfor %}{% endif -%}
-<div class="lu-trk{% if tall %} tall{% endif %}{% if nx.t %} flagged{% endif %}" role="group" aria-label="{{ day.aria_label }}" data-day="{{ day.weekday }}">
+{#- Overlapping windows each get a row (assign_lanes): the main bar, then a thin
+    lane per extra one under it. -#}
+<div class="lu-trk{% if tall %} tall{% endif %}{% if day.lanes > 1 %} laned{% endif %}{% if nx.t %} flagged{% endif %}"{% if day.lanes > 1 %} style="--lanes:{{ day.lanes }}"{% endif %} role="group" aria-label="{{ day.aria_label }}" data-day="{{ day.weekday }}">
 {%- for s in day.segments %}
 {%- set hold = s.kind == 'hold' -%}
 {%- set push = s.kind == 'push' -%}
 {%- set ed = tall and not hold and s.lineup_id in editable_ids -%}
-<div class="lu-blk{% if hold %} hold{% endif %}{% if push %} push{% endif %}{% if s.live %} live{% endif %}{% if s.planned and tall %} plan{% endif %}{% if push or (not hold and s.width_pct < 1) %} is-thin{% if loop.previtem and loop.previtem.kind != 'hold' and loop.previtem.end_min >= s.start_min %} grow-r{% endif %}{% endif %}" style="left:{{ s.left_pct }}%;width:{{ s.width_pct }}%;--w:{{ s.width_pct }}" data-lineup="{{ s.lineup_id }}" data-display="{{ d.id }}" title="{{ s.title }}"
+<div class="lu-blk{% if hold %} hold{% endif %}{% if push %} push{% endif %}{% if s.live %} live{% endif %}{% if s.lane %} ln{% endif %}{% if s.state and not s.live %} st-{{ s.state }}{% endif %}{% if s.planned and tall %} plan{% endif %}{% if push or (not hold and s.width_pct < 1) %} is-thin{% if loop.previtem and loop.previtem.kind != 'hold' and loop.previtem.end_min >= s.start_min %} grow-r{% endif %}{% endif %}" style="left:{{ s.left_pct }}%;width:{{ s.width_pct }}%;--w:{{ s.width_pct }}{% if s.lane %};--lane:{{ s.lane }}{% endif %}" data-lineup="{{ s.lineup_id }}" data-display="{{ d.id }}" title="{{ s.title }}"
 {%- if ed %} data-edit tabindex="0" role="button" aria-label="{{ s.title }}. Drag or use arrow keys to move{% if not push %}, Shift+arrows to resize the end, Alt+Shift+arrows the start{% endif %}. Click to open."{% else %} role="group" aria-label="{{ s.title }}"{% endif %}>
 {%- if ed and not push %}<i class="lu-h" data-h="l" aria-hidden="true"></i><i class="lu-h" data-h="r" aria-hidden="true"></i>{% endif -%}
 {%- if not hold and not push %}{% for t in s.ticks if t.next or not (day.is_today and day.now_min is not none) or t.minute > day.now_min %}{% if t.next %}<i class="lu-tick next" style="left:{{ t.pct }}%" data-tip="Next refresh {{ t.label }}" aria-hidden="true"></i>{% else %}<i class="lu-tick" style="left:{{ t.pct }}%" data-tip="Refresh {{ t.label }}" aria-hidden="true"></i>{% endif %}{% endfor %}<span class="lu-blk-l">{{ s.label }}</span>{% endif -%}
@@ -142,6 +144,8 @@
 </div>
 {%- elif l.status == 'live' -%}
 <div class="lu-hs"><span class="lu-hs-line">{{ win_button(l) }}{% if l.window %}{{ sep }}{% endif %}<span>{{ 'playing now' if l.kind == 'manual' else 'live' }}</span></span></div>
+{%- elif l.status in ('queued', 'waiting') -%}
+<div class="lu-hs" title="{{ l.status_title }}"><span class="lu-hs-line">{{ win_button(l) }}{% if l.status_reason %}{% if l.window %}{{ sep }}{% endif %}<span class="lu-hs-why {{ 'q' if l.status == 'queued' else 'w' }}">{{ l.status_reason }}</span>{% endif %}</span></div>
 {%- elif l.status == 'later_today' -%}
 <div class="lu-hs" title="{{ (l.progress.title if l.progress else '') or (l.next_run.note if l.next_run else '') }}"><span class="lu-hs-line">{{ win_button(l) }}{% if l.window %}{{ sep }}{% endif %}<span>in <b>{{ l.progress.starts_in_label if l.progress else '' }}</b></span></span></div>
 {%- elif l.status == 'off' -%}
@@ -164,8 +168,8 @@
 {{ im('layers', l.step_count, l.step_count ~ ' dashboard' ~ ('' if l.step_count == 1 else 's')) }}{{ missing_chip(l) }}{{ im('hand', 'by hand', 'Moves on a tap or by hand') }}
 {%- else -%}
 {{ im('layers', l.step_count, l.step_count ~ ' dashboard' ~ ('' if l.step_count == 1 else 's')) }}{{ missing_chip(l) }}
-{%- if l.step_label %}{{ im('timer', l.step_label, ('Advances every ' ~ l.step_minutes ~ ' min') if l.step_minutes else ('Advances every ' ~ l.step_label)) }}{% endif -%}
-{%- if l.kind == 'cycle' and l.cycle_label %}{{ im('span', l.cycle_label, 'Full cycle ' ~ l.cycle_label, 'opt') }}{% endif -%}
+{%- if l.step_label %}{{ im('timer', l.step_label, ('Checks its choices again every ' ~ l.step_label) if l.priority_mode else (('Advances every ' ~ l.step_minutes ~ ' min') if l.step_minutes else ('Advances every ' ~ l.step_label))) }}{% endif -%}
+{%- if l.kind == 'cycle' and l.cycle_label and not l.priority_mode %}{{ im('span', l.cycle_label, 'Full cycle ' ~ l.cycle_label, 'opt') }}{% endif -%}
 {%- endif -%}
 {%- endmacro %}
 
@@ -211,11 +215,14 @@
 <span class="lu-pushed-msg" aria-hidden="true"></span>
 {%- if s.draw_items %}<span class="lu-count is-draw" title="{{ ('Draws one of ' ~ s.draw_count ~ ' at random') if s.draw_count > 1 else 'A random one each time it is sent' }}">{{ ('×' ~ s.draw_count) if s.draw_count > 1 else 'random' }}</span>{% elif s.item_count > 1 %}<button type="button" class="lu-count" data-peek="{{ l.id }}:{{ s.index }}" aria-haspopup="dialog" aria-expanded="false" title="{{ s.item_count }} items in this step. Show them">×{{ s.item_count }}</button>{% endif -%}
 </span>
-<figcaption><span class="lu-step-name">{{ s.name }}</span><span class="lu-step-meta">{{ s.position }}{% if s.conditional %} <span title="Shows only while its conditions pass">{{ ico('funnel') }}</span>{% endif %}</span>
+<figcaption><span class="lu-step-name">{{ s.name }}</span><span class="lu-step-meta">{{ s.position }}{% if s.conditional and not s.cond_label %} <span title="Shows only while its conditions pass">{{ ico('funnel') }}</span>{% endif %}</span>
+{%- if s.cond_label %}<span class="lu-cond{% if s.cond_ok == true %} ok{% elif s.cond_ok == false %} no{% endif %}" title="{{ s.cond_title or s.cond_label }}">{{ ico('funnel') }}<span>{{ s.cond_label }}</span></span>
+{%- elif s.fallback %}<span class="lu-cond fb" title="Shows when none of the dashboards before it can">Fallback</span>{% endif %}
 {%- if s.off_display %}<span class="lu-step-off" title="{{ s.off_display_note }}">Not on this display</span>{% if d.id and l.actions.bind_url %}<button type="button" class="lu-bind" data-bind="{{ l.id }}:{{ s.index }}" title="{{ s.off_display_note }}. Bind it to {{ d.name }} too so it can show here.">Bind to {{ d.name }}</button>{% endif %}{% endif -%}
 </figcaption></figure>
 {%- if s.separator == 'arrow' %}<span class="lu-sep" aria-hidden="true">{{ ico('chev') }}</span>
-{%- elif s.separator == 'loop' %}<span class="lu-sep loop" title="Loops back to {{ l.steps[0].name }}">{{ ico('loop') }}</span>{% endif -%}
+{%- elif s.separator == 'loop' %}<span class="lu-sep loop" title="Loops back to {{ l.steps[0].name }}">{{ ico('loop') }}</span>
+{%- elif s.separator == 'else' %}<span class="lu-sep else" title="If it can't show, the next one">otherwise</span>{% endif -%}
 </li>
 {%- endmacro %}
 
@@ -224,8 +231,8 @@
 {% macro row(d, l, seen=none) -%}
 {%- set uid = l.id if seen is none or l.id not in seen.ids else l.id ~ '--' ~ d.id -%}
 {%- if seen is not none %}{% set seen.ids = seen.ids + [l.id] %}{% endif -%}
-{%- set state_cls = {'live': 'is-live', 'later_today': 'is-later', 'not_today': 'is-off', 'off': 'is-off is-disabled'}[l.status] -%}
-{%- set tag_cls = {'live': 'live', 'later_today': 'later', 'not_today': 'off', 'off': 'off'}[l.status] -%}
+{%- set state_cls = {'live': 'is-live', 'queued': 'is-queued', 'waiting': 'is-off is-waiting', 'later_today': 'is-later', 'not_today': 'is-off', 'off': 'is-off is-disabled'}[l.status] -%}
+{%- set tag_cls = {'live': 'live', 'queued': 'queued', 'waiting': 'wait', 'later_today': 'later', 'not_today': 'off', 'off': 'off'}[l.status] -%}
 {%- set is_new = request and request.args.get('hl') == l.id -%}
 <li class="lu-row {{ state_cls }}{% if l.folded and not is_new %} is-folded{% endif %}{% if is_new %} is-new{% endif %}" id="lu-row-{{ uid }}" data-lineup="{{ l.id }}" data-display="{{ d.id }}" data-kind="{{ l.kind }}" data-status="{{ l.status }}">
 <div class="lu-row-head">
