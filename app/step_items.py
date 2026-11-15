@@ -402,10 +402,20 @@ def named_placements(page: Any) -> list[tuple[str, Any]]:
     """Every widget on ``page`` as ``(plugin id, placement)``. Both a grid cell
     and a canvas element carry the ``id`` and ``options`` a provider reads; a
     canvas's other element kinds only borrow a widget's data."""
-    named = [
-        (str(c.plugin), c) for c in getattr(page, "cells", None) or [] if getattr(c, "plugin", None)
-    ]
-    canvas = getattr(page, "canvas", None)
+    # Only the layout the page draws: a page switched from canvas to grid (or
+    # back) keeps the other layout's data, and counting both made one widget
+    # look like two, so the lineup editor listed none of its items.
+    kind = getattr(page, "layout_kind", None)
+    named = (
+        []
+        if kind == "canvas"
+        else [
+            (str(c.plugin), c)
+            for c in getattr(page, "cells", None) or []
+            if getattr(c, "plugin", None)
+        ]
+    )
+    canvas = getattr(page, "canvas", None) if kind != "grid" else None
     named += [
         (str(e.widget), e)
         for e in getattr(canvas, "els", None) or []

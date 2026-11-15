@@ -540,6 +540,32 @@ def devices_regenerate_token(instance_id: str) -> Response:
     return redirect_to
 
 
+@bp.post("/settings/devices/<instance_id>/allow-repair")
+def devices_allow_repair(instance_id: str) -> Response:
+    """Let a registered device collect its token by MAC once more.
+
+    ``/api/v1/device/discover`` hands a token to a matching MAC only until
+    the device has used it (:mod:`app.mac_claim`, #515). A device that was
+    re-flashed or reset has lost the token and asks again; this is the
+    owner saying that request is theirs."""
+    from app import mac_claim
+
+    redirect_to = _device_page_redirect(instance_id, "connection")
+    device = devices().get(instance_id)
+    if device is None or device.kind_of is None:
+        flash(f"Unknown device {instance_id!r}.", "error")
+        return redirect_to
+    if not mac_claim.reopen(current_app, device):
+        flash(f"Couldn't update {device.name!r}.", "error")
+        return redirect_to
+    flash(
+        f"{device.name!r} can pair again. It collects its token the next time it asks, "
+        "usually within a minute.",
+        "ok",
+    )
+    return redirect_to
+
+
 @bp.post("/settings/devices/<instance_id>/reveal-token")
 def devices_reveal_token(instance_id: str) -> Response:
     """Reveal the full access token for a device (issue #20). The
@@ -1657,18 +1683,27 @@ def devices_update_combined(instance_id: str) -> Response:
             ok_messages.append("panel updated")
             any_change = True
 
-    # 4. Quiet-hours override. The inputs always submit on the combined
-    # form (toggle, start, end). Empty start+end with toggle off clears
-    # the block; the service helper handles that.
-    if "quiet_hours_enabled" in form or "quiet_hours_start" in form or "quiet_hours_end" in form:
+    # 4. Quiet-hours override. With Own hours off, the page disables the
+    # times and the pickers, and an unchecked switch posts nothing, so the
+    # form's ``quiet_hours__present`` marker is the only sign the section
+    # was submitted (#523). The times it could not post are kept as
+    # stored, so switching the override back on restores the window.
+    if (
+        "quiet_hours__present" in form
+        or "quiet_hours_enabled" in form
+        or "quiet_hours_start" in form
+        or "quiet_hours_end" in form
+    ):
+        stored_dev = devices_registry.get(instance_id)
+        stored_qh = (stored_dev.manifest.get("quiet_hours") if stored_dev else None) or {}
         qh_result = device_service.update_instance_quiet_hours(
             devices=devices_registry,
             renderers=renderers(),
             data_root=device_data_root(),
             instance_id=instance_id,
             enabled=bool(form.get("quiet_hours_enabled")),
-            start=form.get("quiet_hours_start"),
-            end=form.get("quiet_hours_end"),
+            start=form.get("quiet_hours_start", stored_qh.get("start")),
+            end=form.get("quiet_hours_end", stored_qh.get("end")),
             **_quiet_days_from_form(form),
         )
         if not qh_result.ok:
