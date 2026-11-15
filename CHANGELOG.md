@@ -6,6 +6,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Security
+
+- RSS widget: the feed address is fetched through the same guard as the REST widget. It was fetched as given, so a feed address could point the server at itself, at a device on the local network, at a cloud metadata address or at a local file. Only public http(s) addresses are fetched now, each redirect is checked, and the browser fallback used for bot-protected feeds checks its redirects too. A feed served from the local network (a self-hosted reader at a 192.168 address, say) is refused and its cell says so. Reported and fixed by Peter Wilfahrt ([p-w](https://github.com/p-w)).
+
 ## [0.512.0], 2026-11-15
 
 ### Added

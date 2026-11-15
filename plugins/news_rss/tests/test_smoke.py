@@ -1,6 +1,6 @@
 """news_rss: parsing smoke test plus the #178 fetch-fallback ladder.
 
-The widget renders from a patched urllib response (no network), and the
+The widget renders from a patched guarded fetch (no network), and the
 fallback unit tests prove a bot-blocked feed reaches the BrowserPool's
 Chromium-fingerprint fetch, is skipped during push renders (deadlock
 guard), and reports the original urllib error when no pool exists.
@@ -10,13 +10,16 @@ from __future__ import annotations
 
 import importlib.util
 import urllib.error
+from collections.abc import Callable, Iterator
 from pathlib import Path
-from typing import ClassVar
+from typing import Any
 from unittest.mock import MagicMock, patch
 from xml.etree import ElementTree as ET
 
 import pytest
 from flask.testing import FlaskClient
+
+from app import net_guard
 
 _SPEC = importlib.util.spec_from_file_location(
     "news_rss_server", Path(__file__).resolve().parent.parent / "server.py"
@@ -43,24 +46,34 @@ _RSS = b"""<?xml version="1.0" encoding="UTF-8"?>
 </rss>"""
 
 
-class _FakeResp:
-    # ``headers`` mirrors a real urllib response: the fetcher reads
-    # Content-Type to tell a feed from a block page served with 200.
-    headers: ClassVar[dict[str, str]] = {"Content-Type": "application/rss+xml"}
+_REAL_ASSERT_PUBLIC_URL = net_guard.assert_public_url
 
-    def read(self) -> bytes:
-        return _RSS
 
-    def __enter__(self) -> _FakeResp:
-        return self
+@pytest.fixture(autouse=True)
+def _no_dns() -> Iterator[None]:
+    """The host check resolves the feed's name, and these tests use made-up
+    public names, so the lookup is skipped. The blocking tests put the real
+    check back (they use literal addresses, which need no lookup)."""
+    with patch("app.net_guard.assert_public_url", lambda url: None):
+        yield
 
-    def __exit__(self, *a: object) -> bool:
-        return False
+
+def _fake_fetch(
+    body: bytes = _RSS, seen: dict[str, Any] | None = None, **extra: str
+) -> Callable[..., tuple[bytes, dict[str, str]]]:
+    """Stands in for ``net_guard.fetch_response``: ``(body, headers)``."""
+
+    def _fetch(url: str, **kwargs: Any) -> tuple[bytes, dict[str, str]]:
+        if seen is not None:
+            seen.update(kwargs, url=url)
+        return body, {"Content-Type": "application/rss+xml", **extra}
+
+    return _fetch
 
 
 @pytest.mark.parametrize("size", ["xs", "sm", "md", "lg"])
 def test_widget_renders(client: FlaskClient, size: str) -> None:
-    with patch("urllib.request.urlopen", return_value=_FakeResp()):
+    with patch("app.net_guard.fetch_response", _fake_fetch()):
         resp = client.get(f"/_test/render?plugin=news_rss&size={size}")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
@@ -116,18 +129,10 @@ def test_missing_pool_reports_the_urllib_error() -> None:
 
 
 def test_urllib_request_is_browser_shaped() -> None:
-    seen: dict[str, str] = {}
-
-    class _Resp(_FakeResp):
-        pass
-
-    def _capture(req: object, timeout: int = 0) -> _Resp:
-        seen.update(dict(getattr(req, "headers", {})))
-        return _Resp()
-
-    with patch.object(srv.urllib.request, "urlopen", _capture):
+    seen: dict[str, Any] = {}
+    with patch("app.net_guard.fetch_response", _fake_fetch(seen=seen)):
         srv._fetch_via_urllib("https://example.com/rss")
-    ua = seen.get("User-agent", "")
+    ua = seen["headers"].get("User-Agent", "")
     assert ua.startswith("Mozilla/5.0")
     assert "tesserae" not in ua.lower()
 
@@ -253,35 +258,19 @@ def test_non_feed_body_surfaces_the_friendly_message_to_the_cell() -> None:
 # -- compressed responses (#212) -----------------------------------------
 
 
-class _GzipResp:
+def test_a_gzipped_feed_parses() -> None:
     """A CDN that gzips regardless of what the request asked for.
 
-    urllib does not transparently decompress, so before the fix the XML
-    parser was handed gzip bytes and blamed the feed: "not well-formed
-    (invalid token): line 1, column 0". The reporter's feed only rendered
-    when a preview happened to warm the cache through the Chromium
-    fallback, which decompresses natively.
+    Nothing on the fetch path decompresses, so before the fix the XML parser
+    was handed gzip bytes and blamed the feed: "not well-formed (invalid
+    token): line 1, column 0". The reporter's feed only rendered when a
+    preview happened to warm the cache through the Chromium fallback, which
+    decompresses natively.
     """
+    import gzip
 
-    headers: ClassVar[dict[str, str]] = {
-        "Content-Type": "application/rss+xml",
-        "Content-Encoding": "gzip",
-    }
-
-    def read(self) -> bytes:
-        import gzip
-
-        return gzip.compress(_RSS)
-
-    def __enter__(self) -> _GzipResp:
-        return self
-
-    def __exit__(self, *a: object) -> bool:
-        return False
-
-
-def test_a_gzipped_feed_parses() -> None:
-    with patch.object(srv.urllib.request, "urlopen", lambda *a, **k: _GzipResp()):
+    fetch = _fake_fetch(gzip.compress(_RSS), **{"Content-Encoding": "gzip"})
+    with patch("app.net_guard.fetch_response", fetch):
         root = srv._fetch_via_urllib("https://example.com/rss")
     assert root.tag == "rss"
     _title, items = srv._slim_rss(root, 2)
@@ -291,12 +280,73 @@ def test_a_gzipped_feed_parses() -> None:
 def test_the_request_asks_for_no_compression() -> None:
     """Decoding is the safety net; not being sent compression in the first
     place is the fix. A server that honours this hands back plain XML."""
-    seen: dict[str, str] = {}
-
-    def _capture(req: object, timeout: int = 0) -> _FakeResp:
-        seen.update(dict(getattr(req, "headers", {})))
-        return _FakeResp()
-
-    with patch.object(srv.urllib.request, "urlopen", _capture):
+    seen: dict[str, Any] = {}
+    with patch("app.net_guard.fetch_response", _fake_fetch(seen=seen)):
         srv._fetch_via_urllib("https://example.com/rss")
-    assert seen.get("Accept-encoding") == "identity"
+    assert seen["headers"].get("Accept-Encoding") == "identity"
+
+
+# -- the feed URL is user-chosen, so it goes through the SSRF guard --------
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://127.0.0.1:8765/api/pages",
+        "http://192.168.1.10/feed.xml",
+        "http://169.254.169.254/latest/meta-data/",
+        "http://[::1]/feed",
+        "file:///etc/passwd",
+        "ftp://198.51.100.7/feed.xml",
+    ],
+)
+def test_a_private_or_non_http_feed_url_is_refused_before_any_fetch(url: str) -> None:
+    urllib_fetch, pool = MagicMock(), MagicMock()
+    with (
+        patch("app.net_guard.assert_public_url", _REAL_ASSERT_PUBLIC_URL),
+        patch("app.net_guard.fetch_response", urllib_fetch),
+        patch.object(srv, "_fetch_via_pool", pool),
+    ):
+        result = srv._fetch_feed(url, allow_pool=True)
+    assert isinstance(result, str) and "isn't allowed" in result
+    urllib_fetch.assert_not_called()
+    pool.assert_not_called()
+
+
+def test_a_redirect_to_a_private_host_is_not_retried_through_the_pool() -> None:
+    from app.net_guard import BlockedURLError
+
+    pool = MagicMock()
+    with (
+        patch("app.net_guard.fetch_response", side_effect=BlockedURLError("blocked host")),
+        patch.object(srv, "_fetch_via_pool", pool),
+    ):
+        result = srv._fetch_feed("https://example.com/rss", allow_pool=True)
+    assert isinstance(result, str) and "isn't allowed" in result
+    pool.assert_not_called()
+
+
+def test_the_pool_fetch_is_public_only() -> None:
+    """Chromium follows redirects itself, so the request has to say that every
+    hop must be public; a refusal there reads the same as one from urllib."""
+    from flask import Flask
+
+    from app.net_guard import BlockedURLError
+
+    pool = MagicMock()
+    pool.fetch_text.side_effect = BlockedURLError("blocked host")
+    app = Flask(__name__)
+    app.config["BROWSER_POOL"] = pool
+    with app.app_context(), patch.object(srv, "_fetch_via_urllib", side_effect=_http_403):
+        result = srv._fetch_feed("https://example.com/rss", allow_pool=True)
+    (request,) = pool.fetch_text.call_args.args
+    assert request.allow_local is False
+    assert isinstance(result, str) and "isn't allowed" in result
+
+
+def test_the_feed_fetch_is_capped_and_guarded() -> None:
+    seen: dict[str, Any] = {}
+    with patch("app.net_guard.fetch_response", _fake_fetch(seen=seen)):
+        srv._fetch_via_urllib("https://example.com/rss")
+    assert seen["max_bytes"] == srv.FEED_MAX_BYTES
+    assert "allow_local" not in seen  # the guard's default is public-only

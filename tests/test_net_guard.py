@@ -310,3 +310,45 @@ def test_tls_stays_within_the_connect_deadline(
     assert now <= 10.0
     assert sock.closed
     assert connection.sock is None
+
+
+def test_fetch_response_hands_back_the_response_headers(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A caller that has to decode the body itself (the RSS widget, for a CDN
+    that gzips unasked) needs Content-Encoding, which fetch_bytes drops."""
+    monkeypatch.setattr(
+        net_guard.socket,
+        "getaddrinfo",
+        lambda host, *a, **k: [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))],
+    )
+
+    class _Sock:
+        def sendall(self, data: bytes) -> None:
+            pass
+
+        def makefile(self, *a: Any, **k: Any) -> Any:
+            import io
+
+            return io.BytesIO(
+                b"HTTP/1.1 200 OK\r\nContent-Type: Application/RSS+XML; charset=utf-8\r\n"
+                b"Content-Encoding: gzip\r\nContent-Length: 2\r\n\r\nok"
+            )
+
+        def close(self) -> None:
+            pass
+
+        def setsockopt(self, *a: Any) -> None:
+            pass
+
+    monkeypatch.setattr(net_guard.socket, "create_connection", lambda *a, **k: _Sock())
+    body, headers = net_guard.fetch_response("http://feeds.example/rss")
+    assert body == b"ok"
+    assert headers.get("content-encoding") == "gzip"
+    # fetch_bytes is the same fetch with the content type tidied.
+    assert net_guard.fetch_bytes("http://feeds.example/rss") == (b"ok", "application/rss+xml")
+
+
+def test_fetch_response_refuses_a_private_host() -> None:
+    with pytest.raises(BlockedURLError):
+        net_guard.fetch_response("http://127.0.0.1:8765/api/pages")
+    with pytest.raises(BlockedURLError):
+        net_guard.fetch_response("file:///etc/passwd")
