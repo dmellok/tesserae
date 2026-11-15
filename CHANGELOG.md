@@ -6,15 +6,25 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.513.0], 2026-11-15
+
 ### Security
 
 - RSS widget: the feed address is fetched through the same guard as the REST widget. It was fetched as given, so a feed address could point the server at itself, at a device on the local network, at a cloud metadata address or at a local file. Only public http(s) addresses are fetched now, each redirect is checked, and the browser fallback used for bot-protected feeds checks its redirects too. A feed served from the local network (a self-hosted reader at a 192.168 address, say) is refused and its cell says so. Reported and fixed by Peter Wilfahrt ([p-w](https://github.com/p-w)).
+- Widgets: a widget's dynamic editor choices (`choices()`) run inside its declared network allowlist, like its data fetch. They ran with no limit before.
+
+### Added
+
+- Home Assistant, Dashboard widget: **Dashboard hides its own header** skips the header crop for dashboards that have no header (kiosk-mode, or a theme that hides it), so their top row is no longer cut off.
+
+### Fixed
+
+- Widgets that declare `plugin:ha_core` can reach Home Assistant again. The delegate granted no host, so an entity picker or a data fetch in such a widget failed with a host permission error. The grant is the hostname in the current Home Assistant URL only, and follows the setting when it changes.
 
 ## [0.512.0], 2026-11-15
 
 ### Added
 
-- Home Assistant, Dashboard widget: **Dashboard hides its own header** skips the header crop for dashboards that have no header (kiosk-mode, or a theme that hides it), so their top row is no longer cut off.
 - Home Assistant, Dashboard widget: a **Fit to cell** option shrinks the dashboard until all of it fits, so a view taller than the cell is no longer cut off at the bottom. **Zoom** then sets the largest size it may be drawn at.
 - Home Assistant, Dashboard widget: a **Theme** option, listing the themes installed in Home Assistant, captures the dashboard in the one you pick, so a panel can use a high-contrast or e-ink theme without changing the theme anyone sees in their browser. Blank keeps Home Assistant's default theme.
 - OpenDisplay via Home Assistant: **Add device → OpenDisplay** lists the tags Home Assistant knows under **Found in Home Assistant**, each with a one-click **Add** that takes the tag's size and colour palette from the tag itself.
@@ -368,10 +378,6 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
-- Dashboard editor: dynamic widget configuration choices now run under the
-  widget's capability scope, preserving delegated access such as `plugin:ha_core`.
-- Widgets delegating to `ha_core` can reach only the hostname in the current
-  Home Assistant Core URL, without a direct network grant or access to other hosts.
 - Home Assistant, Entities: a door, window or motion sensor reads Closed / Open / Clear the way Home Assistant words it, instead of Off / On.
 - Visionect frames: a saved Wi-Fi password now reaches the frame, is masked on the device page instead of sent back to the browser, and is hidden in the frame log if the frame echoes it.
 - History: 12-hour times no longer overlap the thumbnail.
