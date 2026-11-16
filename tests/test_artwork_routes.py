@@ -137,3 +137,26 @@ def test_href_carries_the_ingress_prefix(app: Flask) -> None:
         assert c.href == "/api/hassio_ingress/abc123/plugins/some_widget/artwork/prefixed/"
     assert c.page_path == "/plugins/some_widget/artwork/prefixed/"
     assert c._tray.href == c.page_path
+
+
+def test_corrupt_budget_keeps_recovery_page_available(app, monkeypatch):
+    registry = app.config["PLUGIN_REGISTRY"]
+    plugin = next(p for p in registry.plugins.values() if p.kind == "widget")
+    data_dir = Path(plugin.data_dir)
+    c = artwork.Collection(plugin.id, "corrupt", make=lambda job: (b"", {}), label="Test art")
+    c.folder(data_dir).mkdir(parents=True)
+    (c.folder(data_dir) / "budget.json").write_text("partial record")
+    monkeypatch.setattr(fal, "resolve_key", lambda settings=None: "k")
+    client = app.test_client()
+    _sign_in(client)
+    url = f"/plugins/{plugin.id}/artwork/corrupt/"
+    response = client.get(url)
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "budget could not be read" in body
+    assert ">Reset</button>" in body
+    progress = client.get(url + "progress").get_json()
+    assert progress["used"] is None
+    assert progress["used_text"] == "Unavailable"
+    client.post(url + "budget-reset")
+    assert c.budget_used(data_dir) == 0
