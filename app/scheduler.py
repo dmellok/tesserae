@@ -471,6 +471,7 @@ class Scheduler:
         self._warm_ahead = WarmAhead(
             warm=lambda page_id: self._push_factory().warm_page(page_id),
             name=self._page_name,
+            eligible=self._page_can_warm,
         )
         self._warm_ahead_lock = threading.Lock()
         # "<deck_id>:<device_id>" -> the page last pushed by timer advance, so we
@@ -929,6 +930,88 @@ class Scheduler:
                 return True, until if until.tzinfo is not None else until.replace(tzinfo=UTC)
         return False, None
 
+    def automation_page_eligible(
+        self,
+        page_id: str | None,
+        device_id: str,
+        *,
+        now: datetime | None = None,
+    ) -> bool:
+        """Whether speculative work (a pre-render or warm) for ``page_id``
+        on ``device_id`` could be seen: the display is not paused or in
+        quiet hours, and some enabled automation would show the page there
+        with its conditions passing now. Real pushes never ask this.
+
+        A page no enabled automation names for the display is eligible
+        (nothing says otherwise). ``None`` is an album image, which has no
+        step conditions.
+        """
+        now = now or datetime.now(UTC)
+        if self.pause_hold_for_device(device_id, now)[0]:
+            return False
+        if device_id in self._quiet_device_ids({device_id}):
+            return False
+        if page_id is None:
+            return True
+        named = False
+        for rotation in self._cycle_records():
+            if not rotation.enabled or not self._cycle_reaches(rotation, device_id):
+                continue
+            for index, step in enumerate(rotation.steps):
+                if step.page_id != page_id:
+                    continue
+                named = True
+                if self.step_conditions_pass(rotation, index, now):
+                    return True
+        # Manual and daily/interval decks are not cycle records, but their
+        # individual page conditions still apply to speculative rendering.
+        if self._deck_store is not None:
+            for deck in self._deck_store.all():
+                if not deck.enabled or device_id not in deck.device_ids:
+                    continue
+                adapted = _deck_to_rotation(deck)
+                for index, page in enumerate(deck.pages):
+                    if page.page_id != page_id:
+                        continue
+                    named = True
+                    if adapted is not None and self.step_conditions_pass(adapted, index, now):
+                        return True
+        for schedule in self._timed_records():
+            if not schedule.enabled:
+                continue
+            if page_id not in (schedule.page_id, schedule.fallback_page_id):
+                continue
+            targets = set(
+                getattr(schedule, "device_ids", None) or self._page_devices(schedule.page_id)
+            )
+            if targets and device_id not in targets:
+                continue
+            named = True
+            passed = self._condition_evaluator is None or self._condition_evaluator.all_pass(
+                schedule.conditions, when=now
+            )
+            if (schedule.page_id if passed else schedule.fallback_page_id) == page_id:
+                return True
+        return not named
+
+    def _page_can_warm(self, page_id: str) -> bool:
+        """Whether a warm-ahead of ``page_id`` could be seen on any display
+        that gets it: its own bindings plus the displays of enabled lineups
+        that contain it. A page with no known display is left to warm."""
+        if self._page_store is None:
+            return False
+        page = self._page_store.get(page_id)
+        if page is None:
+            return False
+        devices = set(page.device_ids or ())
+        if self._deck_store is not None:
+            for deck in self._deck_store.all():
+                if deck.enabled and any(p.page_id == page_id for p in deck.pages):
+                    devices.update(deck.device_ids or ())
+        if not devices:
+            return True
+        return any(self.automation_page_eligible(page_id, device_id) for device_id in devices)
+
     def _release_lapsed_pauses(self, now: datetime, states: dict[str, Any]) -> None:
         """Clear pauses that ran out (or were set to zero) and queue each
         display's catch-up (``_run_pause_catchups``): the current step of
@@ -1188,7 +1271,14 @@ class Scheduler:
             # brings that one back) and keeps the lineup's own gates.
             held = self._held_device_ids(rotation.id, now)
             return self._fire_deck_advance(
-                deck, rotation, target, state, now, held=held, only_device=device_id
+                deck,
+                rotation,
+                target,
+                state,
+                now,
+                held=held,
+                only_device=device_id,
+                fresh=True,
             )
         with self._lock:
             fired_step = self._rotation_last_step.get(rotation.id)
@@ -1654,8 +1744,16 @@ class Scheduler:
                     continue
                 active_devices = showing.get(page_id) or set()
                 for device_id in deck.device_ids:
-                    if device_id not in active_devices:
-                        warm_targets.setdefault((page_id, device_id), set()).add(deck.id)
+                    if device_id in active_devices:
+                        continue
+                    if device_id in paused or not self.automation_page_eligible(
+                        page_id, device_id, now=now
+                    ):
+                        # Nobody would see this warm. The update still counts
+                        # as handled: leaving it open would re-send the page
+                        # to the displays showing it on every tick.
+                        continue
+                    warm_targets.setdefault((page_id, device_id), set()).add(deck.id)
         with self._deck_warm_lock:
             for (page_id, device_id), deck_ids in sorted(warm_targets.items()):
                 if page_id in deferred:
@@ -1963,6 +2061,7 @@ class Scheduler:
         paused: set[str] | None = None,
         only_device: str | None = None,
         failed: set[str] | None = None,
+        fresh: bool = False,
     ) -> bool:
         """Advance one bound timer deck's panels to the target page. Pushes
         only at a step transition (or a new dwell window, for a keep-fresh
@@ -2027,7 +2126,9 @@ class Scheduler:
                 # Delivery and the nav record happen together under the
                 # display's navigation lock, so a button press or Home
                 # Assistant's Next / Previous can't land in between.
-                if self._advance_device(deck, target, state, now, device_id, key, failed):
+                if self._advance_device(
+                    deck, target, state, now, device_id, key, failed, fresh=fresh
+                ):
                     fired_any = True
         return fired_any
 
@@ -2040,6 +2141,8 @@ class Scheduler:
         device_id: str,
         key: str,
         failed: set[str] | None = None,
+        *,
+        fresh: bool = False,
     ) -> bool:
         """Deliver one lineup advance to one display and record it (see
         :meth:`_fire_deck_advance`); the caller holds its navigation
@@ -2053,7 +2156,8 @@ class Scheduler:
             return False
         promoter = getattr(pusher, "promote_deck_page", None)
         promoted = (
-            callable(promoter)
+            not fresh
+            and callable(promoter)
             and not self._warm_frame_is_stale(pusher, deck, device_id, target, now)
             and promoter(device_id, target, extra={"deck_id": deck.id})
         )
@@ -2100,6 +2204,10 @@ class Scheduler:
             self._deck_last_advance[key] = target
             self._deck_last_advance_at[key] = now.timestamp()
             self._deck_last_advance_window[key] = state.step_started_at.timestamp()
+            if not promoted:
+                # A fresh delivery already paid for this render. Don't warm
+                # it again in the same tick, including after a pause catch-up.
+                self._deck_last_warm[f"{deck.id}\x00{device_id}\x00{target}"] = now.timestamp()
         logger.info(
             "deck timer advance: device=%s deck=%s -> %s (%s)",
             device_id,
@@ -2309,6 +2417,10 @@ class Scheduler:
                     key = f"{deck.id}\x00{device_id}\x00{page.page_id}"
                     last = self._deck_last_warm.get(key)
                     if last is not None and now_ts - last < interval * 60:
+                        continue
+                    if not self.automation_page_eligible(page.page_id, device_id, now=now):
+                        # Unseen for now; left unstamped so it warms as soon
+                        # as the display or its conditions come back.
                         continue
                     try:
                         warm(page.page_id, device_id)

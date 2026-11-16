@@ -280,6 +280,27 @@
   }
   const takesInput = () => !!capsOf(st.display).inputs;
   const sleeps = () => !!capsOf(st.display).sleeps;
+  // A display that sleeps takes the newest frame at each wake and nothing in
+  // between (static/lineup_wake.js has the words). Its wake: {name, min,
+  // next, url, learned}, min 0 when its interval isn't known; null when it
+  // doesn't sleep.
+  const W = window.TesseraeLineupWake;
+  function wakeOf() {
+    if (!sleeps() || !W) return null;
+    const c = capsOf(st.display);
+    const dev = deviceOf(st.display);
+    return {
+      name: dev ? dev.name : "",
+      min: Number(c.wake_minutes) || 0,
+      next: c.next_wake || "",
+      url: c.wake_url || "",
+      learned: !!c.wake_learned,
+    };
+  }
+  // The lineup's sends wait for a wake (smart sync on a repeat or rotation).
+  const sendsAtWake = () => showSmart() && st.smartSync;
+  // A dashboard in it has a widget that may pay on each render (an AI picture).
+  const paidIn = (list) => list.some((s) => (pageOf(s.id).paid || []).length > 0);
   // What flips it by hand: buttons always do; touch does too.
   function flipWord() {
     const c = capsOf(st.display);
@@ -989,7 +1010,10 @@
       return `${w.charAt(0).toUpperCase()}${w.slice(1)} step through them.`;
     }
     if (k === "daily") return n > 1 ? "Only the first dashboard is sent." : "Sent once, then held.";
-    if (k === "interval") return `Sent again every ${mins(st.interval)}.`;
+    if (k === "interval")
+      return sendsAtWake()
+        ? "Redrawn just before each wake."
+        : `Sent again every ${mins(st.interval)}.`;
     if (ranked()) {
       // Priority mode never takes them in turn: the first whose conditions pass shows.
       const last = st.steps[n - 1];
@@ -1405,7 +1429,7 @@
       );
     if (s.refresh) bits.push(`updates every ${mins(s.refresh)} while shown`);
     if (showKeepReady() && s.override !== null && s.override !== undefined)
-      bits.push(s.override ? `kept ready every ${mins(s.override)}` : "not kept ready");
+      bits.push(s.override ? `drawn ahead every ${mins(s.override)}` : "not drawn ahead");
     let nCond = 0;
     try {
       nCond = s.conditions.trim() ? JSON.parse(s.conditions).length : 0;
@@ -1434,17 +1458,21 @@
           ).join("") +
           `</select></label>`
         : "";
+      // A repeat on a sleeping display is redrawn on each send already:
+      // Updates while shown only shows here once it is set.
       const upd =
-        `<label class="dxe-mini"><span>Updates while shown</span><select class="dxe-in dxe-select" data-fk="upd-${esc(s.id)}" data-updates="${esc(s.id)}">` +
-        (UPDATES.includes(s.refresh)
+        kind() === "interval" && wakeOf() && !s.refresh
           ? ""
-          : `<option value="${s.refresh}" selected>every ${esc(mins(s.refresh))}</option>`) +
-        UPDATES.map(
-          (v) =>
-            `<option value="${v}"${s.refresh === v ? " selected" : ""}>${v ? `every ${esc(mins(v))}` : "no, only when sent"}</option>`
-        ).join("") +
-        `</select><small class="dxe-soft">Changes this dashboard everywhere.</small></label>`;
-      // Keep ready, for this dashboard: where the display flips by press.
+          : `<label class="dxe-mini"><span>Updates while shown</span><select class="dxe-in dxe-select" data-fk="upd-${esc(s.id)}" data-updates="${esc(s.id)}">` +
+            (UPDATES.includes(s.refresh)
+              ? ""
+              : `<option value="${s.refresh}" selected>every ${esc(mins(s.refresh))}</option>`) +
+            UPDATES.map(
+              (v) =>
+                `<option value="${v}"${s.refresh === v ? " selected" : ""}>${v ? `every ${esc(mins(v))}` : "no, only when sent"}</option>`
+            ).join("") +
+            `</select><small class="dxe-soft">Changes this dashboard everywhere.</small></label>`;
+      // Ready for presses, for this dashboard: where the display flips by press.
       let keep = "";
       if (showKeepReady()) {
         const cur = s.override === null || s.override === undefined ? "" : String(s.override);
@@ -1453,12 +1481,12 @@
           ...KEEP_READY.map((v) => [String(v), v ? `every ${mins(v)}` : "off"]),
         ];
         if (cur && !opts.some(([v]) => v === cur)) opts.push([cur, `every ${mins(Number(cur))}`]);
-        keep = `<label class="dxe-mini"><span>Keep ready</span><select class="dxe-in dxe-select" data-fk="ov-${esc(s.id)}" data-override="${esc(s.id)}">${opts.map(([v, l]) => `<option value="${v}"${v === cur ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></label>`;
+        keep = `<label class="dxe-mini"><span>${esc(readyLabel())}</span><select class="dxe-in dxe-select" data-fk="ov-${esc(s.id)}" data-override="${esc(s.id)}">${opts.map(([v, l]) => `<option value="${v}"${v === cur ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></label>`;
       }
       const cond = showConditions(s)
         ? `<div class="dxe-mini dxe-cond"><span>Conditions</span><div class="condition-picker" data-condition-picker><textarea rows="2" spellcheck="false" data-cond="${esc(s.id)}" data-fk="cond-${esc(s.id)}" placeholder="[]" aria-label="Conditions for ${esc(p.name)}">${esc(s.conditions)}</textarea></div><small class="dxe-soft">Skipped while they fail.</small></div>`
         : `<div class="dxe-mini dxe-cond"><span>Conditions</span><button type="button" class="dxe-link" data-add-cond="${esc(s.id)}" data-fk="addcond-${esc(s.id)}" aria-label="Add a condition for ${esc(p.name)}">Add a condition</button><small class="dxe-soft">Skips this dashboard while a condition fails.</small></div>`;
-      edit = `<div class="dxe-edit">${showFor}${upd}${keep}${cond}</div>`;
+      edit = `<div class="dxe-edit">${showFor}${upd}${keep}${cond}</div>${updatesWarning(s, "edit")}`;
     }
     return (
       `<div class="dxe-sum"><span class="dxe-soft dxe-sum-t">${esc(sum.charAt(0).toUpperCase() + sum.slice(1))}</span>` +
@@ -1534,6 +1562,9 @@
   function paceLead() {
     const k = kind();
     if (k === "manual") return `No timer; ${flipWord()} flip it.`;
+    // A sleeping display: its facts first, as the rest follows from them.
+    const w = wakeOf();
+    if (w) return W.header({ name: w.name, wake: w.min });
     if (k === "daily") return "Sent once, then held.";
     if (k === "interval") return `Sent again every ${mins(st.interval)}.`;
     const own = ownTime().length;
@@ -1585,6 +1616,132 @@
   const showMinHold = () => kind() === "cycle" && interrupters().length > 0;
   const holdWhy = (list) => `Stays at least ${mins(st.minHold)} before ${list} can replace it.`;
 
+  // "Ready for button presses": a warm frame for each flip by hand.
+  function readyLabel() {
+    const c = capsOf(st.display);
+    if (c.buttons && c.touch) return "Ready for presses and taps";
+    return c.touch && !c.buttons ? "Ready for taps" : "Ready for button presses";
+  }
+
+  // A warning with its fixes: the words (and a cost line for a widget that
+  // pays per render), then a link on the left and buttons on the right,
+  // the primary last. fixes: [{attr, label, primary}].
+  function wakeWarnHtml(warn, fixes, link) {
+    const acts =
+      (link
+        ? `<a class="dxe-link quiet" href="${esc(link.url)}">${esc(link.label)}</a>`
+        : "<span></span>") +
+      `<span class="dxe-wake-btns">` +
+      fixes
+        .map(
+          (f) =>
+            `<button type="button" class="${f.primary ? "lu-btn-primary" : "lu-btn-ghost lu-btn-line"} sm" ${f.attr} data-fk="${esc(f.fk)}">${esc(f.label)}</button>`
+        )
+        .join("") +
+      `</span>`;
+    return (
+      `<div class="dxe-warn dxe-wake-warn${warn.paid ? " is-paid" : ""}" role="note">${ico("warn")}` +
+      `<span>${esc(warn.text)}${warn.paid ? `<b class="dxe-wake-cost">${esc(warn.paid)}</b>` : ""}</span>` +
+      `<div class="dxe-wake-acts">${acts}</div></div>`
+    );
+  }
+  const wakeLink = (w) => (w.url ? { url: w.url, label: "Change wake interval" } : null);
+
+  // The Timing card's warning: a sleeping display that gets more sends than
+  // it wakes for, or a rotation whose dashboards can fall between two wakes.
+  function wakeCallout() {
+    const w = wakeOf();
+    if (!w || !w.min) return "";
+    const k = kind();
+    const paid = paidIn(st.steps);
+    if (k === "interval" && !st.smartSync) {
+      const warn = W.cadenceWarning({ name: w.name, wake: w.min, every: st.interval, paid });
+      if (warn)
+        return wakeWarnHtml(
+          warn,
+          [
+            {
+              attr: 'data-wake-fix="smart"',
+              fk: "wake-fix-smart",
+              label: "Send just before each wake",
+              primary: true,
+            },
+          ],
+          wakeLink(w)
+        );
+    }
+    if (k === "cycle") {
+      const dwells = st.steps.map(dwellOf);
+      const skip = W.skipWarning({ name: w.name, wake: w.min, dwells });
+      if (skip) {
+        const cost = st.smartSync
+          ? ""
+          : (
+              W.cadenceWarning({ name: w.name, wake: w.min, every: Math.min(...dwells), paid }) ||
+              {}
+            ).paid || "";
+        return wakeWarnHtml(
+          { text: skip.text, paid: cost },
+          [{ attr: 'data-wake-fix="dwell"', fk: "wake-fix-dwell", label: skip.fix, primary: true }],
+          wakeLink(w)
+        );
+      }
+    }
+    return "";
+  }
+
+  // A dashboard's Updates while shown, faster than the display wakes: the
+  // same warning, under its control and in the Timing card. On a repeat
+  // (redrawn on each send) the fix is to stop it; in a rotation, to match
+  // the wakes.
+  function updatesWarning(s, where) {
+    const w = wakeOf();
+    if (!w || !w.min || !s.refresh) return "";
+    const warn = W.cadenceWarning({
+      name: w.name,
+      wake: w.min,
+      every: s.refresh,
+      noun: "updates",
+      paid: paidIn([s]),
+    });
+    if (!warn) return "";
+    const stop = kind() === "interval";
+    const to = stop ? 0 : UPDATES.filter((v) => v >= w.min)[0] || 0;
+    return wakeWarnHtml(
+      {
+        text: `${pageOf(s.id).name} updates every ${mins(s.refresh)} while shown. ${warn.text}`,
+        paid: warn.paid,
+      },
+      [
+        {
+          attr: `data-wake-updates="${esc(s.id)}" data-to="${to}"`,
+          fk: `wake-upd-${where}-${s.id}`,
+          label: to ? `Update every ${W.wakeMins(to)}` : "Only when sent",
+          primary: true,
+        },
+      ],
+      wakeLink(w)
+    );
+  }
+
+  // How fresh a lineup that sends just before each wake is, with the way to
+  // the display's wake interval and the way back to a plain timer.
+  function freshHtml(w) {
+    const f = W.freshLine({
+      kind: kind(),
+      wake: w.min,
+      every: kind() === "cycle" ? Math.min(...st.steps.map(dwellOf)) : st.interval,
+      next: w.next,
+      learned: w.learned,
+    });
+    return (
+      `<p class="dxe-fresh">${ico("moon")}<span>${esc(f.line)}${f.until ? `<small class="dxe-soft">${esc(f.until)}</small>` : ""}</span></p>` +
+      `<p class="dxe-fresh-acts">` +
+      (w.url ? `<a class="dxe-link quiet" href="${esc(w.url)}">Change wake interval</a>` : "") +
+      `<button type="button" class="dxe-link quiet" data-wake-timer data-fk="wake-timer">Send on a timer anyway</button></p>`
+    );
+  }
+
   function optionsHtml() {
     const dev = deviceOf(st.display);
     if (!dev) return "";
@@ -1617,23 +1774,30 @@
         )
       );
     }
-    if (showSmart())
+    // Sending just before it wakes is chosen in the Timing card above; how
+    // far ahead is the fine-tuning left here.
+    if (sendsAtWake())
       rows.push(
         opt(
-          "Send just before it wakes",
+          "How far ahead of a wake",
           caps.wake_learned
             ? `${ico("check")}Wake times learned.`
             : "Learns wake times from check-ins.",
-          `<span class="dxe-opt-ctl"><label class="dxe-lead-s"><input type="number" class="dxe-in dxe-num" min="0" max="600" data-fk="lead" data-lead value="${esc(st.lead)}" aria-label="Seconds ahead"${st.smartSync ? "" : " disabled"}><span>s</span></label>${switchHtml("smart", "data-smart", st.smartSync, "Send just before it wakes")}</span>`
+          `<span class="dxe-opt-ctl"><label class="dxe-lead-s"><input type="number" class="dxe-in dxe-num" min="0" max="600" data-fk="lead" data-lead value="${esc(st.lead)}" aria-label="Seconds ahead of a wake"><span>s</span></label></span>`
         )
       );
     if (showKeepReady())
       rows.push(
         opt(
-          "Keep ready",
-          "Draws ahead, so a press shows at once.",
-          selectHtml("cadence", "data-cadence", KEEP_READY, st.cadence, "Keep ready every", (v) =>
-            v ? `every ${mins(v)}` : "off"
+          esc(readyLabel()),
+          `Draws ahead so a ${caps.buttons ? "press" : "tap"} shows at once. Doesn't wake the display.`,
+          selectHtml(
+            "cadence",
+            "data-cadence",
+            KEEP_READY,
+            st.cadence,
+            `${readyLabel()} every`,
+            (v) => (v ? `every ${mins(v)}` : "off")
           )
         )
       );
@@ -1666,7 +1830,21 @@
     const field = (label, ctl, forId) =>
       `<div class="dxe-field"><${forId ? `label for="${forId}"` : "span"} class="dxe-label">${label}</${forId ? "label" : "span"}><div class="dxe-ctl">${ctl}</div></div>`;
     const rows = [];
-    if (k === "cycle" || k === "interval") {
+    const w = wakeOf();
+    const atWake = !!w && sendsAtWake();
+    // A repeat that waits for each wake has one line instead of a timer; its
+    // timer stays only as a floor that is longer than the wake interval.
+    if (k === "interval" && atWake) {
+      rows.push(field("Sent", freshHtml(w)));
+      // ...or as what it runs on until the wake times are learned.
+      const floor = w.min && st.interval > w.min;
+      if (floor || !w.learned) {
+        const label = floor ? "At most every" : "Until then, every";
+        rows.push(
+          field(label, selectHtml("interval", "data-interval", SHOW_FOR, st.interval, label, mins))
+        );
+      }
+    } else if (k === "cycle" || k === "interval") {
       const label = k === "interval" ? "Sent again every" : "Each dashboard shows for";
       // Every dashboard has its own time: the default is unused (it is what
       // a dashboard added later starts with).
@@ -1685,6 +1863,12 @@
           ) + overriddenLine()
         )
       );
+      if (k === "cycle" && atWake) rows.push(field("Sent", freshHtml(w)));
+      // On a timer to a sleeping display: each send waits for its wake.
+      else if (w && showSmart() && !st.smartSync && !wakeCallout())
+        rows.push(
+          `<p class="dxe-note dxe-pace-note">${ico("moon")}<span>Each send waits for its next wake.</span><button type="button" class="dxe-link" data-wake-fix="smart" data-fk="wake-fix-smart">Send just before each wake</button></p>`
+        );
     }
     if (showMinHold()) {
       const who = interrupters();
@@ -1711,7 +1895,8 @@
       rows.push(
         `<p class="dxe-note dxe-pace-note">${ico("info")}<span><button type="button" class="dxe-link" data-end="add">Add end time</button> to show them in turn.</span></p>`
       );
-    return `<div class="dxe-card dxe-pace">${rows.join("")}${optionsHtml()}</div>`;
+    const warns = wakeCallout() + st.steps.map((s) => updatesWarning(s, "pace")).join("");
+    return `<div class="dxe-card dxe-pace">${rows.join("")}${warns ? `<div class="dxe-wake-warns">${warns}</div>` : ""}${optionsHtml()}</div>`;
   }
 
   /* ------------------------------------------------------------ the new-lineup flow */
@@ -2606,6 +2791,38 @@
       return;
     }
     if (d.when) return setWhen(d.when);
+    if (d.wakeFix === "smart") {
+      change(() => (st.smartSync = true));
+      live("Sends just before each wake.");
+      root.querySelector("[data-wake-timer]")?.focus();
+      return;
+    }
+    if (d.wakeFix === "dwell") {
+      const w = wakeOf();
+      if (!w || !w.min) return;
+      change(() => {
+        // Only ever up to a wake: a default already longer stays as it is.
+        st.interval = Math.max(st.interval, w.min);
+        st.steps.forEach((s) => s.dwell && s.dwell < w.min && (s.dwell = null));
+      });
+      live(`Each dashboard shows for ${mins(st.interval)}.`);
+      root.querySelector("[data-interval]")?.focus();
+      return;
+    }
+    if (d.wakeTimer !== undefined) {
+      change(() => (st.smartSync = false));
+      live(`Sent every ${mins(st.interval)} on a timer.`);
+      root.querySelector("[data-interval]")?.focus();
+      return;
+    }
+    if (d.wakeUpdates) {
+      const s = stepOf(d.wakeUpdates);
+      if (s) change(() => (s.refresh = Number(d.to) || 0));
+      live(
+        `${pageOf(d.wakeUpdates).name} updates ${Number(d.to) ? `every ${mins(Number(d.to))}` : "only when sent"}.`
+      );
+      return;
+    }
     if (d.end === "add") {
       setWhen("between");
       root.querySelector('[data-time="end"]')?.focus();
@@ -2872,7 +3089,6 @@
     if (d.interval !== undefined) return change(() => (st.interval = Number(t.value) || 30));
     if (d.taps !== undefined) return change(() => (st.taps = t.checked));
     if (d.timeout !== undefined) return change(() => (st.timeout = Number(t.value) || 0));
-    if (d.smart !== undefined) return change(() => (st.smartSync = t.checked));
     if (d.cadence !== undefined) return change(() => (st.cadence = Number(t.value) || 0));
     if (d.modeSel !== undefined) return change(() => (st.mode = t.value));
     // Nothing else is drawn from these: the footer alone, so tabbing on

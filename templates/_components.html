@@ -194,6 +194,12 @@ macro here instead.
 {% endfor %}
 {% set value_key = selected.key %}
 {% set has_value = value_key != '' %}
+{#- A choice may be ``disabled`` (it can't work for this setup) with a
+    ``reason``. It is listed greyed with the reason and can't be picked. A
+    saved value that is a disabled choice stays selected (and submitted, so a
+    save never changes it) with a warning under the field. -#}
+{% set off = namespace(on=false, reason='') %}
+{% for opt in options %}{% if opt is mapping and opt.get('disabled') is true and has_value and value_key == opt.value|string %}{% set off.on = true %}{% set off.reason = (opt.get('reason') or '')|string|trim %}{% endif %}{% endfor %}
 {#- A choice may carry an ``image`` (a style's sample picture, say). When any
     does, the select is drawn as a picture picker: a row with the chosen
     one's picture and name that opens a grid of every choice, with a filter
@@ -211,7 +217,7 @@ macro here instead.
     {% if opt is mapping %}{% set v = opt.value %}{% set l = opt.label %}{% else %}{% set v = opt[0] %}{% set l = opt[1] %}{% endif %}
     {% if value_key == v|string %}{% set cur.label = l %}{% set cur.image = choice_image(opt.get('image')) if opt is mapping else '' %}{% endif %}
   {% endfor %}
-  <button type="button" class="pic-trigger" data-pic-trigger aria-haspopup="listbox" aria-expanded="false" aria-labelledby="{{ field_id }}-label {{ field_id }}-current">
+  <button type="button" class="pic-trigger{% if off.on %} is-unavailable{% endif %}" data-pic-trigger aria-haspopup="listbox" aria-expanded="false" aria-labelledby="{{ field_id }}-label {{ field_id }}-current"{% if off.on %} aria-describedby="{{ field_id }}-warn"{% endif %}>
     <span class="pic-thumb{% if not cur.image %} is-blank{% endif %}" data-pic-current-thumb aria-hidden="true">{% if cur.image %}<img src="{{ cur.image }}" alt="" decoding="async">{% endif %}</span>
     <span class="pic-current" id="{{ field_id }}-current" data-pic-current-label>{{ cur.label }}</span>
     <span class="pic-caret" aria-hidden="true"></span>
@@ -224,10 +230,13 @@ macro here instead.
         {% if opt is mapping and choice_image(opt.get('image')) %}
           {% set g = opt.get('group', '') %}
           {% if g and g != pg.group %}<div class="pic-group" data-pic-group>{{ g }}</div>{% set pg.group = g %}{% endif %}
-          <div class="pic-cell">
-            <button type="button" class="pic-opt" role="option" aria-selected="{{ 'true' if value_key == opt.value|string else 'false' }}" data-pic-value="{{ opt.value }}" data-pic-image="{{ choice_image(opt.get('image')) }}" data-pic-large="{{ choice_image(opt.get('image_large')) or choice_image(opt.get('image')) }}">
+          {% set no = opt.get('disabled') is true %}
+          {% set why = (opt.get('reason') or '')|string|trim if no else '' %}
+          <div class="pic-cell{% if no %} is-disabled{% endif %}">
+            <button type="button" class="pic-opt{% if no %} is-disabled{% endif %}" role="option" aria-selected="{{ 'true' if value_key == opt.value|string else 'false' }}"{% if no %} aria-disabled="true" aria-describedby="{{ field_id }}-why-{{ loop.index }}"{% if why %} data-pic-why="{{ why }}"{% endif %}{% endif %} data-pic-value="{{ opt.value }}" data-pic-image="{{ choice_image(opt.get('image')) }}" data-pic-large="{{ choice_image(opt.get('image_large')) or choice_image(opt.get('image')) }}">
               <img src="{{ choice_image(opt.get('image')) }}" alt="" loading="lazy" decoding="async">
               <span>{{ opt.label }}</span>
+              {% if no %}<small class="pic-why"><i class="ph ph-prohibit" aria-hidden="true"></i>Not available</small>{% endif %}
             </button>
             <button type="button" class="pic-zoom" data-pic-zoom aria-label="Enlarge {{ opt.label }}" title="Enlarge"><i class="ph ph-arrows-out" aria-hidden="true"></i></button>
           </div>
@@ -241,16 +250,28 @@ macro here instead.
       {% for opt in options %}
         {% if not (opt is mapping and choice_image(opt.get('image'))) %}
           {% if opt is mapping %}{% set v = opt.value %}{% set l = opt.label %}{% else %}{% set v = opt[0] %}{% set l = opt[1] %}{% endif %}
-          <button type="button" class="pic-opt pic-opt-text" role="option" aria-selected="{{ 'true' if value_key == v|string else 'false' }}" data-pic-value="{{ v }}">{{ l }}</button>
+          {% set no = opt is mapping and opt.get('disabled') is true %}
+          {% set why = (opt.get('reason') or '')|string|trim if no else '' %}
+          <button type="button" class="pic-opt pic-opt-text{% if no %} is-disabled{% endif %}" role="option" aria-selected="{{ 'true' if value_key == v|string else 'false' }}"{% if no %} aria-disabled="true" aria-describedby="{{ field_id }}-why-{{ loop.index }}"{% if why %} data-pic-why="{{ why }}"{% endif %}{% endif %} data-pic-value="{{ v }}">{% if no %}<span>{{ l }}</span><small class="pic-why"><i class="ph ph-prohibit" aria-hidden="true"></i>Not available</small>{% else %}{{ l }}{% endif %}</button>
         {% endif %}
       {% endfor %}
     </div>
+    {% endif %}
+    {#- Why each greyed choice can't be picked, in full: a tile has no room for it. -#}
+    {% set offs = namespace(n=0) %}
+    {% for opt in options %}{% if opt is mapping and opt.get('disabled') is true %}{% set offs.n = offs.n + 1 %}{% endif %}{% endfor %}
+    {% if offs.n %}
+    <ul class="pic-whys">
+      {% for opt in options %}{% if opt is mapping and opt.get('disabled') is true %}
+      <li id="{{ field_id }}-why-{{ loop.index }}"><i class="ph ph-prohibit" aria-hidden="true"></i><span><b>{{ opt.label }}.</b> {{ (opt.get('reason') or '')|string|trim or 'Not available here.' }}</span></li>
+      {% endif %}{% endfor %}
+    </ul>
     {% endif %}
     <div class="pic-empty" data-pic-empty hidden>Nothing matches.</div>
   </div>
   {% endif %}
   <select id="{{ field_id }}" name="{{ name }}"{% if pics.any %} class="pic-native" hidden data-pic-native{% endif %}
-          {% if form %}form="{{ form }}"{% endif %}>
+          {% if form %}form="{{ form }}"{% endif %}{% if off.on and not pics.any %} aria-describedby="{{ field_id }}-warn"{% endif %}>
     {% if blank_label is not none %}
     <option value="" {% if not has_value %}selected{% endif %}>{{ blank_label }}</option>
     {% endif %}
@@ -267,15 +288,22 @@ macro here instead.
     {% for opt in options %}
       {% if opt is mapping %}{% set v = opt.value %}{% set l = opt.label %}{% set g = opt.get('group', '') %}
       {% else %}{% set v = opt[0] %}{% set l = opt[1] %}{% set g = '' %}{% endif %}
+      {% set no = opt is mapping and opt.get('disabled') is true %}
+      {% set why = (opt.get('reason') or '')|string|trim if no else '' %}
+      {% set mine = value_key == v|string %}
       {% if g != ns.group %}
         {% if ns.group %}</optgroup>{% endif %}
         {% if g %}<optgroup label="{{ g }}">{% endif %}
         {% set ns.group = g %}
       {% endif %}
-      <option value="{{ v }}" {% if value_key == v|string %}selected{% endif %}>{{ l }}</option>
+      {#- The saved disabled choice stays enabled: a disabled option isn't submitted. -#}
+      <option value="{{ v }}" {% if mine %}selected{% elif no %}disabled{% endif %}{% if no %} data-choice-disabled{% if why %} title="{{ why }}"{% endif %}{% endif %}>{{ l }}{% if no %} ({{ 'unavailable' if (mine or not why) else why.rstrip('.') }}){% endif %}</option>
     {% endfor %}
     {% if ns.group %}</optgroup>{% endif %}
   </select>
+  {% if off.on %}
+  <p class="field-warn" id="{{ field_id }}-warn" data-choice-warn><i class="ph ph-warning" aria-hidden="true"></i><span>{{ off.reason or 'This choice is not available here. Pick another one.' }}</span></p>
+  {% endif %}
 </div>
 {%- endmacro -%}
 

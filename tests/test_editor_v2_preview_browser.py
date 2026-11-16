@@ -483,7 +483,7 @@ def test_one_tab_per_shape_and_no_resizing_on_a_turned_display(
     assert page.locator(".ev2pv-group:not([hidden]) .ev2pv-edge").count() == 2
     page.evaluate("() => window.EV2Preview.setTab('480x800')")
     visible = page.locator(".ev2pv-group:not([hidden])")
-    assert visible.get_attribute("data-group-key") == "480x800"
+    assert visible.get_attribute("data-group-key") == "480x800-hall"
     assert visible.locator(".ev2pv-edge").count() == 0
     assert "turned the other way" in page.locator("[data-ev2pv-hint]").inner_text()
     # Cells stay clickable there, drawn where the composer draws them.
@@ -491,3 +491,67 @@ def test_one_tab_per_shape_and_no_resizing_on_a_turned_display(
     assert _events(page, "ev2:cell-select") == [{"cellId": "b"}]
     assert not errors
     browser.close()
+
+
+@pytest.mark.parametrize("width", [1200, 390])
+def test_panel_zoom_keeps_pixels_whole_and_scrolling_inside_preview(server, pw, width):
+    import io
+
+    from PIL import Image
+
+    base, _app = server
+    browser, page, errors = _open(pw, base, "tee")
+    try:
+        page.set_viewport_size({"width": width, "height": 900})
+        source = io.BytesIO()
+        Image.new("RGB", (800, 480), "white").save(source, "PNG")
+        page.route(
+            "**/compose/tee/panel.png?*",
+            lambda route: route.fulfill(
+                status=200, content_type="image/png", body=source.getvalue()
+            ),
+        )
+        page.locator('[data-ev2pv-mode="panel"]').click()
+        img = page.locator(".ev2pv-panel-img")
+        page.wait_for_function(
+            "() => document.querySelector('.ev2pv-panel-img').naturalWidth === 800"
+        )
+        assert img.bounding_box()["width"] == 800
+        assert img.evaluate("el => getComputedStyle(el).imageRendering") == "pixelated"
+        page.locator('[data-ev2pv-zoom="2"]').click()
+        assert img.bounding_box()["width"] == 1600
+        assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+        assert page.locator("[data-ev2pv-glass]").is_checked() is False
+        page.locator("[data-ev2pv-glass]").check()
+        assert "blur" in img.evaluate("el => getComputedStyle(el).filter")
+        page.locator('[data-ev2pv-zoom="fit"]').click()
+        assert img.bounding_box()["width"] <= 800
+        assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+        page.locator('[data-ev2pv-mode="live"]').click()
+        assert page.locator("[data-ev2pv-panel-controls]").is_visible() is False
+        assert not errors
+    finally:
+        browser.close()
+
+
+def test_test_display_type_picker_saves_and_reloads(server, pw):
+    base, app = server
+    browser = _launch(pw)
+    page = browser.new_page(viewport={"width": 1440, "height": 900})
+    try:
+        page.goto(f"{base}/pages/tee", wait_until="domcontentloaded")
+        page.evaluate("EV2.steps.open('display')")
+        picker = page.locator("[data-ev2-test-type]")
+        with page.expect_response(
+            lambda r: r.request.method == "POST" and r.url.endswith("/pages/tee")
+        ):
+            picker.select_option("gray_16")
+        page.wait_for_function(
+            "() => document.querySelector('[data-ev2-test-type]')?.value === 'gray_16'"
+        )
+        assert app.config["PAGE_STORE"].get("tee").test_display_gamut == "gray_16"
+        page.reload(wait_until="domcontentloaded")
+        page.evaluate("EV2.steps.open('display')")
+        assert picker.input_value() == "gray_16"
+    finally:
+        browser.close()

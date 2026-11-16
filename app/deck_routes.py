@@ -3108,6 +3108,22 @@ def create() -> Response:
     return redirect(url_for("decks.index") + f"#deck-{deck.id}")
 
 
+def _sleeps(device_id: str | None) -> bool:
+    """Whether display ``device_id`` sleeps between check-ins (the lineup
+    editor's ``display_caps``); False when unknown."""
+    from app.lineup_editor import display_caps
+
+    reg = current_app.config.get("DEVICE_REGISTRY")
+    device = reg.get(device_id) if reg is not None and device_id else None
+    if device is None:
+        return False
+    try:
+        return bool(display_caps(device)["sleeps"])
+    except Exception:
+        current_app.logger.exception("new lineup: could not tell whether %s sleeps", device_id)
+        return False
+
+
 @bp.post("/new/lineup")
 def create_lineup() -> Response:
     """Create a Lineup from an authoring intent, the one write path (#204).
@@ -3168,6 +3184,15 @@ def create_lineup() -> Response:
     except (ValidationError, ValueError) as exc:
         msg = _first_error(exc) if isinstance(exc, ValidationError) else str(exc)
         return _json_error(f"Invalid lineup: {msg}")
+    if "advance_smart_sync" in form:
+        # A create that says which it wants ("on" after a hidden "0", as
+        # on an edit) gets that; the default is only for one that doesn't.
+        smart = any(v in ("on", "true", "1") for v in form.getlist("advance_smart_sync"))
+        deck = _merged_deck(deck, advance_smart_sync=smart)
+    elif _sleeps(deck.device_ids[0] if deck.device_ids else None):
+        # A display that sleeps only shows the last send before each wake,
+        # so a new lineup on one sends just before it wakes (smart sync).
+        deck = _merged_deck(deck, advance_smart_sync=True)
     consent = Consent.from_form(form)
     stranded = guard_change(deck.device_ids, deck.page_ids, consent)
     if stranded:
@@ -3436,13 +3461,18 @@ def _recent_sent(page_id: str, limit: int = 8) -> list[dict[str, Any]]:
 def _editor_page(
     page: Any, dims: tuple[int, int], token: str, device_id: str | None = None
 ) -> dict[str, Any]:
-    from app.lineup_editor import dashboard_summary
+    from app.lineup_editor import dashboard_summary, paid_widgets
 
     try:
         summary = dashboard_summary(page, device_id)
     except Exception:
         current_app.logger.exception("lineup editor: summary of %s failed", page.id)
         summary = {"subtitle": "", "items": {"mode": "none", "count": 1}, "fresh": ""}
+    try:
+        paid = paid_widgets(page)
+    except Exception:
+        current_app.logger.exception("lineup editor: paid widgets of %s failed", page.id)
+        paid = []
     return {
         "id": page.id,
         "name": page.name,
@@ -3461,6 +3491,9 @@ def _editor_page(
         ),
         "fresh": summary.get("fresh", ""),
         "refresh": int(page.refresh_minutes or 0),
+        # Widgets that may pay on each render (an AI picture): a send nobody
+        # sees still costs.
+        "paid": paid,
         "missing": False,
     }
 
@@ -3511,6 +3544,7 @@ def _editor_state(deck: Deck | None) -> dict[str, Any]:
                 "items": {"mode": "none", "count": 1},
                 "fresh": "",
                 "refresh": 0,
+                "paid": [],
                 "missing": True,
                 "shared": 0,
             }
