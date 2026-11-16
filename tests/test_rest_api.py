@@ -2636,6 +2636,61 @@ def _set_sleep_interval(app: Flask, device_id: str, seconds: int) -> None:
     store.patch_section("devices", {device_id: entry})
 
 
+@pytest.mark.parametrize("firmware_s", [28800, 3600])
+def test_status_after_quiet_hours_predicts_the_issued_sleep(
+    app: Flask,
+    monkeypatch: pytest.MonkeyPatch,
+    firmware_s: int,
+) -> None:
+    import datetime as dt
+
+    now = dt.datetime(2026, 1, 15, 8, 30, 0, tzinfo=ZoneInfo("UTC"))
+
+    class FixedDateTime(dt.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return now.astimezone(tz)
+
+    client = app.test_client()
+    _sign_in(client)
+    device_id = "quiet_hours_panel"
+    response = _register_via_api(
+        client, code=_issue_pairing(app), device_id=device_id, kind="esp32_client"
+    )
+    assert response.status_code == 201
+    token = response.get_json()["device_token"]
+    _set_sleep_interval(app, device_id, 3600)
+    app.config["SETTINGS_STORE"].patch_section(
+        "app",
+        {
+            "timezone": "UTC",
+            "quiet_hours_enabled": True,
+            "quiet_hours_start": "23:00",
+            "quiet_hours_end": "08:00",
+            "quiet_hours_sleep": True,
+        },
+    )
+    monkeypatch.setattr(dt, "datetime", FixedDateTime)
+    monkeypatch.setattr(time, "time", lambda: now.timestamp())
+    response = client.post(
+        f"/api/v1/device/{device_id}/status",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "next_sleep_s": firmware_s,
+            "sleep_until": now.timestamp() + firmware_s,
+            "battery_pct": 80,
+        },
+    )
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["next_poll_s"] == 3600 and "wake_at" not in body
+    entry = app.config["DEVICE_TELEMETRY"].get(device_id)
+    assert entry is not None
+    assert entry.predicted_next_wake_at == now.replace(hour=9).timestamp()
+    assert entry.last_sleep_interval_s == 3600
+    assert entry.prediction_source == ("firmware" if firmware_s == 3600 else "issued")
+
+
 def test_next_poll_s_pulls_forward_to_a_projected_content_change(app: Flask) -> None:
     """#241: a dashboard change 120 s out beats the 900 s configured grid,
     plus the scheduler margin so the client doesn't race the tick and the

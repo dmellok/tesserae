@@ -261,11 +261,11 @@ def _configure(app: Flask, device_id: str, **fields) -> None:
     store.patch_section("devices", {device_id: entry})
 
 
-def _status(client, token: str, device_id: str = "grid_panel") -> dict:
+def _status(client, token: str, device_id: str = "grid_panel", **heartbeat) -> dict:
     resp = client.post(
         f"/api/v1/device/{device_id}/status",
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-        data=json.dumps({"battery_pct": 80}),
+        data=json.dumps({"battery_pct": 80, **heartbeat}),
     )
     assert resp.status_code == 200, resp.get_data(as_text=True)
     return resp.get_json()
@@ -350,7 +350,7 @@ def test_times_mode_sleeps_past_the_configured_interval(app: Flask) -> None:
 def test_aligned_status_records_a_server_prediction(app: Flask) -> None:
     client, token = _pair(app)
     _configure(app, "grid_panel", sleep_interval_s=900, wake_align_mode="interval")
-    body = _status(client, token)
+    body = _status(client, token, next_sleep_s=28800)
     entry = app.config["DEVICE_TELEMETRY"].get("grid_panel")
     assert entry is not None
     assert entry.prediction_source == "server"

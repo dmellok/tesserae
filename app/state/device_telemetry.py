@@ -112,8 +112,8 @@ class DeviceTelemetry:
     # next_poll_s, so the firmware's own sleep_until — computed before it
     # read that response — is stale and the server's answer outranks it).
     # Only the configured kind may be re-derived when an operator edits
-    # that setting (#246); a firmware value is the device's own statement
-    # and outranks the config.
+    # that setting (#246). An issued reply outranks a pre-reply firmware
+    # value; a matching firmware timestamp keeps its finer precision.
     prediction_source: str | None = None
     # Smoothed wake-to-checkin latency, learned from arrival offsets
     # against server-issued wake directives. The wake-alignment math
@@ -434,28 +434,32 @@ class TelemetryStore:
             return DeviceTelemetry(**prev.as_dict())
 
     def note_issued_poll(self, device_id: str, *, interval_s: int) -> DeviceTelemetry | None:
-        """Record the ``next_poll_s`` the /status response just handed out,
-        for a device that published no wake time of its own (#387).
+        """Predict from the ``next_poll_s`` the /status response issued.
 
-        ``record_heartbeat`` runs before the response exists, so a silent
-        firmware's prediction is derived from the configured
-        ``sleep_interval_s``. The device then sleeps for the ``next_poll_s``
-        it was given, which a lineup projection can make much shorter than
-        that setting, and every wake lands "early" against the stale
-        prediction: smart sync never earns trust. This replaces the
-        configured fallback with the interval the device is actually
-        sleeping on. A firmware-published wake time, or a wake-alignment
-        directive (``note_server_directive``), is left alone; an always-on
-        device has no wake to predict."""
+        The request's firmware timing was computed before reading this
+        reply. It can still carry last night's quiet-hours hold after the
+        first morning wake. Replace conflicting timing, including the
+        interval health checks use, without changing wake trust or button
+        state. A matching firmware timestamp keeps its finer precision.
+        Absolute server directives and always-on devices are left alone.
+        """
         if interval_s <= 0:
             return None
         with self._lock:
             prev = self._state.devices.get(device_id)
             if prev is None or prev.last_heartbeat_at is None or prev.always_on:
                 return None
-            if prev.prediction_source not in ("configured", "issued"):
+            if prev.prediction_source == "server":
                 return None
-            prev.predicted_next_wake_at = prev.last_heartbeat_at + interval_s
+            issued_wake = prev.last_heartbeat_at + interval_s
+            if (
+                prev.prediction_source == "firmware"
+                and prev.predicted_next_wake_at is not None
+                and abs(prev.predicted_next_wake_at - issued_wake)
+                <= SLEEP_UNTIL_VS_NEXT_SLEEP_MISMATCH_S
+            ):
+                return None
+            prev.predicted_next_wake_at = issued_wake
             prev.last_sleep_interval_s = int(interval_s)
             prev.prediction_source = "issued"
             self._flush_locked()

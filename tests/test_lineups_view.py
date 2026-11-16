@@ -1679,6 +1679,66 @@ def _next_ticks(out: Any) -> list[Any]:
     return [t for s in out.day.segments for t in s.ticks if t.next]
 
 
+def test_post_quiet_hours_timeline_uses_the_issued_poll(app: Flask, client: Any) -> None:
+    from zoneinfo import ZoneInfo
+
+    from app.lineups_view import UpcomingInput
+    from app.next_update import reach_for_device
+
+    now = datetime(2026, 1, 15, 9, 20, tzinfo=ZoneInfo("UTC"))
+    beat = now.replace(hour=8, minute=30, second=0).timestamp()
+    telemetry = app.config["DEVICE_TELEMETRY"]
+    telemetry.record_heartbeat(
+        "panel",
+        received_at=beat,
+        parsed={"next_sleep_s": 28800},
+        configured_sleep_s=3600,
+    )
+    telemetry.note_issued_poll("panel", interval_s=3600)
+    app.config["SETTINGS_STORE"].patch_section("devices", {"panel": {"sleep_interval_s": 3600}})
+    with app.app_context():
+        device = app.config["DEVICE_REGISTRY"].get("panel")
+        reach = reach_for_device(device, now=now.timestamp())
+    assert reach.next_checkin_at == now.replace(minute=30, second=0).timestamp()
+    lineup = LineupInput(
+        "hourly_art",
+        "Hourly art",
+        "interval",
+        (StepInput("art"),),
+        interval_minutes=60,
+    )
+    d, dashboards, _ = _one_display(
+        lineup,
+        reach=reach,
+        pause=PauseInput(23 * 60, 8 * 60),
+        published_known=True,
+        upcoming=(
+            UpcomingInput(
+                at=now.replace(hour=10, minute=0).timestamp(),
+                lineup_id="hourly_art",
+                dashboard_id="art",
+            ),
+        ),
+    )
+    out = build_view([d], dashboards, now=now, time_cycle="h23").displays[0]
+    assert out.next_update is not None
+    assert out.next_update.at_epoch == now.replace(hour=10, minute=30, second=0).timestamp()
+    assert [(t.minute, t.lands, t.in_label) for t in _next_ticks(out)] == [
+        (600, "10:30", "Update in 1 h 10 min"),
+    ]
+    # A frame already queued waits for the first wake, not another overnight hold.
+    d = replace(
+        d,
+        published=PublishedInput("art", at=beat),
+        on_screen=OnScreenInput("weather", since=beat - 3600, origin_known=True),
+    )
+    queued = build_view([d], dashboards, now=now, time_cycle="h23").displays[0]
+    assert queued.queued is not None and queued.queued.lands == "~09:30"
+    assert any("Queued, lands ~09:30" in s.title for s in queued.day.segments), [
+        s.title for s in queued.day.segments
+    ]
+
+
 def test_a_sleeping_display_counts_to_the_scheduler_s_first_step_after_quiet_hours() -> None:
     """The scheduler skips the 00:30 advance and everything else inside quiet
     hours and next fires at 09:30. The 09:01 wake has nothing new, so the
