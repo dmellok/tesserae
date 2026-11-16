@@ -1918,6 +1918,24 @@ def test_next_tick_flag_stays_inside_the_bar_at_its_right_end(live: str) -> None
         browser.close()
 
 
+def test_next_tick_tooltip_includes_delayed_landing(live: str) -> None:
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser, page, _ = _open(p, live)
+        page.evaluate("""() => {
+          const d = TesseraeLineups.vm.displays.find(x => x.id === 'frame');
+          d.day.segments.forEach(s => s.ticks.forEach(t => {
+            if (t.next) t.lands = 'Thu 09:01';
+          }));
+          TesseraeLineups.render();
+        }""")
+        tick = page.locator('.lu-ds[data-display="frame"] .lu-today .lu-tick.next')
+        assert tick.get_attribute("data-tip") == "Next refresh 18:30, lands Thu 09:01"
+        assert page._lu_errors == []
+        browser.close()
+
+
 def test_next_tick_flag_wording_and_visibility(live: str) -> None:
     from playwright.sync_api import sync_playwright
 
