@@ -14,6 +14,36 @@
   const rowFor = (id) => list.querySelector(`.ev2-cl[data-cell-id="${CSS.escape(id)}"]`);
   let openId = null;
 
+  async function refreshRow(id) {
+    const response = await fetch(location.href, { credentials: "same-origin" });
+    if (!response.ok) throw new Error("Could not refresh widget settings");
+    const doc = new DOMParser().parseFromString(await response.text(), "text/html");
+    const fresh = doc.querySelector(`.ev2-cl[data-cell-id="${CSS.escape(id)}"]`);
+    if (!fresh) throw new Error("Widget cell is missing");
+    rowFor(id).replaceWith(fresh);
+    const components = window.tesseraeComponents;
+    if (components) {
+      [
+        "attachSliders",
+        "attachPresetNumbers",
+        "attachLocationSearch",
+        "attachMultiSelect",
+        "attachShowIf",
+      ].forEach((name) => components[name](fresh));
+    }
+    fresh.querySelectorAll("[data-ev2-cell-form]").forEach(refreshSums);
+    EV2.cellStatus?.adopt(fresh);
+    ["sum", "vis"].forEach((part) => {
+      const selector = `[data-ev2-${part}="widgets"]`;
+      const from = doc.querySelector(selector);
+      const to = root.querySelector(selector);
+      if (from && to) to.replaceChildren(...from.childNodes);
+    });
+    EV2.look?.refreshOverrides();
+    EV2.steps.render();
+    EV2.emit("ev2:saved", {});
+  }
+
   function paintRow(li, isOpen) {
     li.classList.toggle("open", isOpen);
     const body = li.querySelector(".ev2-cl-b");
@@ -437,6 +467,7 @@
     rowFor,
     rows,
     refreshSums,
+    refreshRow,
   };
 
   // Back from a reload: reopen the row that was open.
