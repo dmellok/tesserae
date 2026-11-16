@@ -33,6 +33,14 @@
     <a class="dx-btn" href="{{ url_for('send.index') }}">
       <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Send now</span>
     </a>
+    <a class="dx-btn" href="{{ url_for('bundles.import_form') }}" title="Bring in dashboards and lineups exported from another Tesserae">
+      <i class="ph ph-upload-simple" aria-hidden="true"></i><span>Import</span>
+    </a>
+    {% if pages %}
+    <a class="dx-btn" href="{{ url_for('bundles.export', all=1) }}" download title="Download every active dashboard and every lineup as one file">
+      <i class="ph ph-download-simple" aria-hidden="true"></i><span>Export all</span>
+    </a>
+    {% endif %}
     {% if archived_tab %}
     <a class="dx-btn is-primary" href="{{ url_for('pages.index', create=1) }}">
       <i class="ph ph-plus" aria-hidden="true"></i><span>New dashboard</span>
@@ -457,6 +465,10 @@
             <i class="ph ph-copy" aria-hidden="true"></i>
           </button>
         </form>
+        <a class="dx-btn-ghost-sm dx-btn-icon-only" href="{{ url_for('bundles.export', page=page.id) }}" download
+           title="Export this dashboard to a file" aria-label="Export">
+          <i class="ph ph-download-simple" aria-hidden="true"></i>
+        </a>
         {% if not archived_tab %}
         {# A lineup member gets Archive disabled with the lineup named in the
            tooltip, rather than a post that only comes back with an error. #}

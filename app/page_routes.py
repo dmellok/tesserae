@@ -1891,11 +1891,19 @@ def duplicate(page_id: str) -> Response:
 
     # Fresh cell ids so the copy is independent: a cell-level update on
     # the copy must never reach into the source's pages.json entry.
-    new_cells = [c.model_copy(update={"id": uuid.uuid4().hex[:8]}) for c in src.cells]
+    cell_ids = {c.id: uuid.uuid4().hex[:8] for c in src.cells}
+    new_cells = [c.model_copy(update={"id": cell_ids[c.id]}) for c in src.cells]
     # A copy is a fresh start, so it lands in the working list even when the
     # source is archived (duplicating is the way to pick a parked design up).
     copy = src.model_copy(
-        update={"id": new_id, "name": new_name, "cells": new_cells, "archived": False}
+        update={
+            "id": new_id,
+            "name": new_name,
+            "cells": new_cells,
+            # The status bar is found by its cell id, which just changed.
+            "status_bar_cell_id": cell_ids.get(src.status_bar_cell_id or ""),
+            "archived": False,
+        }
     )
     _store().save(copy)
     flash(f"Duplicated as {new_name!r}.", "ok")

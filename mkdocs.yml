@@ -108,6 +108,7 @@ nav:
   - Touch interactions: install/touch.md
   - Dashboards:
       - Custom CSS: dashboards/custom-css.md
+      - Export and import: dashboards/export-import.md
   - REST transport (no broker): install/rest-transport.md
   - Remote panel (cloud relay): install/remote-panel.md
   - OpenDisplay tags: install/opendisplay.md
