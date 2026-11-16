@@ -2,8 +2,13 @@
 
 .editor-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--t-space-4);
+}
+
+.editor-grid .dx-section-card,
+.preview-group {
+  min-width: 0;
 }
 
 /* Fluid panel-shaped preview. The frame fills its column width up to
@@ -558,6 +563,7 @@
   .editor-column {
     grid-area: column;
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--t-space-4);
     min-width: 0;
   }
@@ -1573,17 +1579,100 @@
   color: var(--t-fg);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
-/* Panel-view raster: the full-resolution quantised PNG scales to fit the frame
-   instead of overflowing at its natural pixel size. ``pixelated`` keeps the
-   e-ink dither crisp rather than smoothed on downscale. */
+/* Panel-view raster: fit the full-resolution output into the preview frame. */
 .preview-frame > img.preview-panel-img {
-  image-rendering: pixelated;
+  /* Smooth downsampling preserves the average tone of a dither pattern.
+     Nearest-neighbour at a fractional scale drops dots and creates moire. */
+  image-rendering: auto;
 }
 .preview-frame > img.preview-panel-img[hidden] {
   display: none !important;
 }
 
-/* Link back to the new editor. */
+.preview-options {
+  margin-bottom: var(--t-space-3);
+  text-align: left;
+}
+.preview-options summary {
+  cursor: pointer;
+  color: var(--t-fg-soft);
+}
+.preview-options-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--t-space-3);
+  margin-top: var(--t-space-3);
+}
+.preview-options-fields label {
+  min-width: 0;
+}
+.preview-options-fields select {
+  width: 100%;
+}
+.preview-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--t-space-2);
+  margin-top: var(--t-space-2);
+}
+.preview-footer .preview-dims {
+  margin: 0;
+  text-align: left;
+}
+.preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--t-space-2);
+  margin-inline-start: auto;
+}
+.preview-card > [data-preview-status] {
+  text-align: left;
+}
+.capture-status[data-error="true"] {
+  color: var(--t-danger, var(--t-fg));
+}
+.native-preview-dialog {
+  width: max-content;
+  max-width: 95vw;
+  max-height: 90vh;
+  padding: var(--t-space-4);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-md);
+  background: var(--t-surface);
+  color: var(--t-fg);
+}
+.native-preview-dialog::backdrop {
+  background: rgb(0 0 0 / 55%);
+}
+.native-preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--t-space-3);
+}
+.native-preview-head h2 {
+  margin: 0;
+}
+.native-preview-scroll {
+  overflow: auto;
+  max-width: 85vw;
+  max-height: 65vh;
+}
+.native-preview-scroll > :is(img, iframe) {
+  display: block;
+  max-width: none;
+  border: 0;
+  transform: none;
+}
+@media (max-width: 480px) {
+  .preview-options-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* "Try the new editor": a quiet link in the editor header, left of the actions. */
 .editor-try-new button {
   white-space: nowrap;
 }

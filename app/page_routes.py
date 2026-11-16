@@ -2317,11 +2317,20 @@ def preview(page_id: str) -> Response:
         page_dict = draft.model_dump(mode="json", exclude_none=True)
         page_dict["panel"] = {"w": pw, "h": ph}
         try:
-            hydrated = _hydrate_page(page_dict, preview=True)
+            hydrated = _hydrate_page(page_dict, preview=True, fresh=form.get("fresh") == "1")
         except Exception:
             current_app.logger.exception("preview hydrate failed for %sx%s", pw, ph)
             continue
         hydrated_groups.append({"w": pw, "h": ph, "state": hydrated})
+
+    # Background widget data can change without changing the saved page.
+    if hydrated_groups:
+        import hashlib
+        import json
+
+        current_app.config.setdefault("PREVIEW_PANEL_VERSIONS", {})[page_id] = hashlib.sha256(
+            json.dumps(hydrated_groups, sort_keys=True, default=str).encode()
+        ).hexdigest()[:16]
 
     # AJAX caller (the editor) wants JSON; non-AJAX (rare, direct curl
     # for debugging) keeps the existing flash-redirect behaviour.

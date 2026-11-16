@@ -172,6 +172,7 @@
   // 202 briefly while the render lands; poll until it's ready.
   let _previewMode = "fit";
   const _panelPollTimers = new Map();
+  const _panelRequests = new WeakMap();
 
   function _panelImg(frame) {
     return frame.querySelector("[data-panel-preview]");
@@ -188,15 +189,27 @@
     const img = _panelImg(frame);
     if (!img || !img.dataset.panelSrc) return;
     _clearPanelPoll(frame);
-    const base = img.dataset.panelSrc;
-    const url = base + (base.includes("?") ? "&" : "?") + "_t=" + Date.now();
+    const generation = (_panelRequests.get(frame) || 0) + 1;
+    _panelRequests.set(frame, generation);
+    const target = new URL(img.dataset.panelSrc, location.origin);
+    const group = frame.closest(".preview-group");
+    [
+      ["gamut", "[data-preview-gamut]"],
+      ["dither", "[data-preview-dither]"],
+    ].forEach(([key, selector]) => {
+      const value = group?.querySelector(selector)?.value;
+      if (value) target.searchParams.set(key, value);
+    });
+    target.searchParams.set("_t", String(Date.now()));
+    const url = target.pathname + target.search;
     const iframe = frame.querySelector("[data-preview-iframe]");
     if (iframe) showPreviewThrobber(iframe);
     let tries = 0;
     const attempt = () => {
-      if (_previewMode !== "panel") return;
+      if (_previewMode !== "panel" || _panelRequests.get(frame) !== generation) return;
       fetch(url, { cache: "no-store" })
         .then((r) => {
+          if (_panelRequests.get(frame) !== generation || _previewMode !== "panel") return;
           if (r.status === 200) {
             img.onload = () => {
               if (iframe) hidePreviewThrobber(iframe);
@@ -209,7 +222,7 @@
           }
         })
         .catch(() => {
-          if (iframe) hidePreviewThrobber(iframe);
+          if (_panelRequests.get(frame) === generation && iframe) hidePreviewThrobber(iframe);
         });
     };
     attempt();
@@ -249,6 +262,42 @@
 
   document.querySelectorAll("[data-preview-mode]").forEach((btn) => {
     btn.addEventListener("click", () => setPreviewMode(btn.dataset.previewMode));
+  });
+
+  document.querySelectorAll("[data-preview-gamut], [data-preview-dither]").forEach((select) => {
+    select.addEventListener("change", () => {
+      if (_previewMode === "panel")
+        loadPanelPreview(select.closest(".preview-group").querySelector(".preview-frame"));
+    });
+  });
+
+  const nativeDialog = document.querySelector("[data-native-preview]");
+  const nativeMedia = document.querySelector("[data-native-media]");
+  document
+    .querySelector("[data-native-close]")
+    ?.addEventListener("click", () => nativeDialog.close());
+  nativeDialog?.addEventListener("close", () => nativeMedia.replaceChildren());
+  document.querySelectorAll("[data-preview-native]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const frame = button.closest(".preview-group").querySelector(".preview-frame");
+      const source = frame.querySelector(
+        _previewMode === "panel" ? "[data-panel-preview]" : "[data-preview-iframe]"
+      );
+      if (!source || !source.getAttribute("src")) return;
+      const media = document.createElement(_previewMode === "panel" ? "img" : "iframe");
+      media.src = source.src;
+      media.style.width = frame.dataset.panelW + "px";
+      media.style.height = frame.dataset.panelH + "px";
+      if (_previewMode === "panel") {
+        media.alt = "Panel preview at 100%";
+        media.dataset.deviceQuantised = "";
+      } else {
+        media.title = "HTML preview at 100%";
+        media.setAttribute("sandbox", "allow-scripts allow-same-origin");
+      }
+      nativeMedia.replaceChildren(media);
+      nativeDialog.showModal();
+    });
   });
 
   // Bounded-lifetime preview iframes.
@@ -490,39 +539,93 @@
 
   let previewTimer;
   let previewInFlight = null;
+  function updateCaptureStatus(groups) {
+    const cells = (groups || []).flatMap((group) => group.state?.cells || []);
+    document.querySelectorAll("[data-capture-status]").forEach((status) => {
+      const id = status.closest(".cell-card").dataset.cellId;
+      const data = cells.find((cell) => cell.id === id)?.data;
+      if (!data) return;
+      const error = data.error || data.capture_error;
+      status.dataset.error = error ? "true" : "false";
+      const last = data.rendered_at
+        ? "Last capture: " + new Date(data.rendered_at * 1000).toLocaleString()
+        : "";
+      status.textContent = error
+        ? [last, "Capture failed: " + error].filter(Boolean).join(". ")
+        : data.pending || data.capturing
+          ? [last, "Capturing dashboard..."].filter(Boolean).join(". ")
+          : last || "Waiting for a capture.";
+    });
+  }
+  async function updatePreview(fresh = false) {
+    if (!pageId || !previewFrames().length) return;
+    const previous = previewInFlight;
+    const pending = (async () => {
+      if (previous) await previous.catch(() => {});
+      const prefix = window.TESSERAE_URL_PREFIX || "";
+      const body = aggregateForms();
+      if (fresh) body.set("fresh", "1");
+      const resp = await fetch(`${prefix}/pages/${pageId}/preview`, {
+        method: "POST",
+        body,
+        headers: { "X-Requested-With": "fetch" },
+        credentials: "same-origin",
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const result = await resp.json();
+      applyPreviewGroups(result.groups);
+      updateCaptureStatus(result.groups);
+      armLive(liveWait(result.groups));
+      const status = document.querySelector("[data-preview-status]");
+      if (!fresh && status && !status.hidden) {
+        status.textContent = liveWait(result.groups)
+          ? "Capture in progress. Preview will update when ready."
+          : "Preview updated.";
+      }
+      if (_previewMode === "panel") refreshPanelPreviews();
+      return result;
+    })();
+    previewInFlight = pending;
+    try {
+      return await pending;
+    } finally {
+      if (previewInFlight === pending) previewInFlight = null;
+    }
+  }
   function schedulePreview() {
     if (!pageId || !previewFrames().length) return;
     clearTimeout(previewTimer);
     previewTimer = setTimeout(async () => {
-      // Coalesce: if one is already running, wait for it before issuing
-      // the next so the iframe doesn't thrash.
-      if (previewInFlight) await previewInFlight.catch(() => {});
-      previewInFlight = (async () => {
-        const prefix = window.TESSERAE_URL_PREFIX || "";
-        const resp = await fetch(`${prefix}/pages/${pageId}/preview`, {
-          method: "POST",
-          body: aggregateForms(),
-          headers: { "X-Requested-With": "fetch" },
-          credentials: "same-origin",
-        });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        // Server returns the hydrated state per requested panel size when
-        // the request was AJAX (it is here, see X-Requested-With). Hand
-        // each group to its matching iframe; the patch path postMessages
-        // CSS / cell updates in place, the fallback path full-reloads.
-        const body = await resp.json().catch(() => null);
-        applyPreviewGroups(body && body.groups);
-        armLive(liveWait(body && body.groups));
-      })();
       try {
-        await previewInFlight;
+        await updatePreview();
       } catch (err) {
         console.warn("[editor] preview update failed:", err);
-      } finally {
-        previewInFlight = null;
       }
     }, 250);
   }
+
+  document.querySelector("[data-preview-refresh]")?.addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    const status = document.querySelector("[data-preview-status]");
+    clearTimeout(previewTimer);
+    clearTimeout(liveTimer);
+    button.disabled = true;
+    button.setAttribute("aria-busy", "true");
+    status.hidden = false;
+    status.textContent = "Requesting fresh preview...";
+    try {
+      const result = await updatePreview(true);
+      status.textContent = liveWait(result?.groups)
+        ? "Capture in progress. Preview will update when ready."
+        : "Preview updated.";
+    } catch (err) {
+      status.textContent = "Could not refresh preview. Try again.";
+      console.warn("[editor] refresh failed:", err);
+    } finally {
+      button.disabled = false;
+      button.removeAttribute("aria-busy");
+    }
+  });
 
   async function submit(form) {
     const fd = new FormData(form);
@@ -984,4 +1087,5 @@
   // "Leave site?" prompt because ``current.size !== 0``. (v0.69.6,
   // issue #52 item 7.)
   setDirty(false);
+  if (document.querySelector("[data-capture-status]")) schedulePreview();
 })();
