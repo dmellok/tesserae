@@ -481,6 +481,7 @@
          hidden>
       <form method="post" action="{{ url_for('auth.devices_add') }}" class="form">
         <input type="hidden" name="kind" value="meural">
+        <input type="hidden" name="delivery_method" value="local">
         {{ text_input('add-meural-id', 'id', 'Device id', value='', placeholder='meural_frame', required=True,
                       help='Lowercase, no spaces.') }}
         {{ text_input('add-meural-name', 'name', 'Display name', value='', placeholder='Meural frame') }}
