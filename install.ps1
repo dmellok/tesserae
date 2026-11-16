@@ -19,7 +19,12 @@ function Step($msg)  { Write-Host ""; Write-Host "== $msg ==" -ForegroundColor W
 function Info($msg)  { Write-Host "  $msg" -ForegroundColor DarkGray }
 function Ok($msg)    { Write-Host "[OK] $msg" -ForegroundColor Green }
 function Warn($msg)  { Write-Host "[!] $msg"  -ForegroundColor Yellow }
-function Fail($msg)  { Write-Host "[X] $msg"  -ForegroundColor Red; exit 1 }
+# Fail throws instead of calling exit: pasted as `iwr ... | iex`, exit closes
+# the whole PowerShell window before the message can be read. The catch at the
+# bottom of this file prints the message and leaves the window open.
+function Fail($msg)  { throw "$msg" }
+
+try {
 
 $InstallDir = if ($env:TESSERAE_DIR) { $env:TESSERAE_DIR } else { Join-Path $HOME 'tesserae' }
 $RepoUrl    = if ($env:TESSERAE_REPO) { $env:TESSERAE_REPO } else { 'https://github.com/dmellok/tesserae.git' }
@@ -44,6 +49,10 @@ if (-not (Get-Command $Python -ErrorAction SilentlyContinue)) {
   Fail "$Python not found. Install Python 3.11+ from https://www.python.org/ (tick 'Add to PATH')."
 }
 $pyVer = & $Python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+if (-not $pyVer) {
+  # The Microsoft Store placeholder answers to "python" without being Python.
+  Fail "$Python is not a working Python. Install Python 3.11+ from https://www.python.org/ (tick 'Add to PATH'), then open a new PowerShell window."
+}
 $major, $minor = $pyVer.Split('.') | ForEach-Object { [int]$_ }
 if ($major -lt 3 -or ($major -eq 3 -and $minor -lt 11)) {
   Fail "Python 3.11+ required (found $pyVer)."
@@ -147,3 +156,11 @@ Write-Host ""
 Write-Host "Then visit http://localhost:$Port/" -ForegroundColor White
 Write-Host ""
 Write-Host "First-run: the app will prompt for an admin password at /setup."
+
+} catch {
+  Write-Host ""
+  Write-Host "[X] $($_.Exception.Message)" -ForegroundColor Red
+  Write-Host "    Tesserae was not installed. Fix the problem above and run the installer again." -ForegroundColor Red
+  # Run as a file, report failure to the caller; pasted into a window, keep it open.
+  if ($MyInvocation.MyCommand.Path) { exit 1 }
+}
