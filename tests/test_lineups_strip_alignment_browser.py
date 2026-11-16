@@ -4,9 +4,14 @@ lineup's strip sit level in one row, whether or not the strip is the live one.""
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 import pytest
+
+if TYPE_CHECKING:
+    from playwright.sync_api import Page
 
 _EXE = os.environ.get("PLAYWRIGHT_CHROMIUM_EXECUTABLE") or None
 _CSS = (Path(__file__).resolve().parents[1] / "static/style/dx-lineups.css").read_text()
@@ -18,19 +23,22 @@ _STEP = (
 )
 
 
-def _tops(page, strip_class: str, pills: list[str]) -> list[float]:
+def _tops(page: Page, strip_class: str, pills: list[str]) -> list[float]:
     page.set_content(
         f"<style>{_CSS}</style><div class='lu'><ol class='lu-strip {strip_class}'>"
         + "".join(_STEP.format(pill=p) for p in pills)
         + "</ol></div>"
     )
-    return page.evaluate(
-        "[...document.querySelectorAll('.lu-tile')].map(e => e.getBoundingClientRect().top)"
+    return cast(
+        list[float],
+        page.evaluate(
+            "[...document.querySelectorAll('.lu-tile')].map(e => e.getBoundingClientRect().top)"
+        ),
     )
 
 
 @pytest.fixture
-def page():
+def page() -> Iterator[Page]:
     pytest.importorskip("playwright")
     from playwright.sync_api import sync_playwright
 
@@ -44,13 +52,13 @@ def page():
 
 
 @pytest.mark.parametrize("strip_class", ["l", "l has-now"])
-def test_a_pill_on_one_tile_keeps_the_row_level(page, strip_class: str) -> None:
+def test_a_pill_on_one_tile_keeps_the_row_level(page: Page, strip_class: str) -> None:
     pill = '<span class="lu-pill p-next">NEXT 10 AM</span>'
     tops = _tops(page, strip_class, ["", pill, ""])
     assert max(tops) - min(tops) < 0.5, tops
 
 
-def test_a_strip_without_a_pill_adds_no_empty_row(page) -> None:
+def test_a_strip_without_a_pill_adds_no_empty_row(page: Page) -> None:
     with_pill = _tops(page, "l", ["", '<span class="lu-pill p-next">NEXT</span>', ""])
     without = _tops(page, "l", ["", "", ""])
     assert without[0] < with_pill[0], (without, with_pill)
