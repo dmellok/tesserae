@@ -22,7 +22,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- Font atlases for touch and overlay displays build in about a second instead of 25. Each build waited out a timeout and logged `composer mount wait timed out`, which on a fresh start looked like the server had hung.
+- Windows: the server starts again. The kie.ai image service used a file lock that only exists on Linux and macOS, so `run.ps1` stopped with `ModuleNotFoundError: No module named 'fcntl'`.
 - Fraimic closes HTTP error responses after reading the frame error.
+- Windows installer: a failed check (git or Python missing) now shows its message and leaves the PowerShell window open. Before, the window closed before the message could be read.
 - Lineups show the delivered, queued and waiting states, with separate lanes for overlapping windows.
 - Smart sync: button wakes no longer reset wake-time trust.
 - Pre-renders and warm-ahead runs are skipped for a display that is paused, in quiet hours, or whose lineup conditions for that dashboard fail, so background renders no longer spend money nobody can see. A dashboard on the glass keeps its refreshes and edits as before. An automated follow-up is dropped once a newer frame has reached the display, and a display coming back from a pause gets a fresh render instead of a frame drawn before it. (#535)

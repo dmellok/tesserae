@@ -7,18 +7,18 @@ Prices: https://kie.ai/nano-banana (November 2026), 2 cents, Pro 9 cents.
 from __future__ import annotations
 
 import contextlib
-import fcntl
 import hashlib
 import json
 import logging
 import os
 import socket
+import sys
 import threading
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -185,6 +185,39 @@ def _write(path: Path, raw: bytes) -> None:
     tmp.replace(path)
 
 
+@contextlib.contextmanager
+def _locked(folder: Path) -> Iterator[None]:
+    """Hold the folder's lock, so one caller at a time submits or collects.
+    ``fcntl`` does not exist on Windows, and importing it there stopped the
+    whole server from starting, so Windows locks a byte of the file instead.
+    """
+    with (folder / ".lock").open("ab") as lock:
+        if sys.platform == "win32":
+            import errno
+            import msvcrt
+
+            fd = lock.fileno()
+            while True:
+                os.lseek(fd, 0, os.SEEK_SET)
+                try:
+                    # Gives up after about ten seconds; a picture takes longer.
+                    msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
+                    break
+                except OSError as err:
+                    if err.errno not in (errno.EACCES, errno.EDEADLK):
+                        raise
+            try:
+                yield
+            finally:
+                os.lseek(fd, 0, os.SEEK_SET)
+                msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            yield
+
+
 def generate(
     key: str,
     prompt: str,
@@ -208,8 +241,7 @@ def generate(
     if not key:
         raise KieError("no kie.ai key")
     folder.mkdir(parents=True, exist_ok=True)
-    with (folder / ".lock").open("a") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+    with _locked(folder):
         return _generate(
             key,
             prompt,
