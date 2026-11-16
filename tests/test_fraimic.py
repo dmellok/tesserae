@@ -647,20 +647,25 @@ def test_schedule_helpers() -> None:
 
 
 def test_client_reports_frame_errors() -> None:
+    errors: list[urllib.error.HTTPError] = []
+
     def opener(req: Any, timeout: float) -> Any:
         assert req.full_url == "http://192.0.2.42/api/image"
         assert req.get_header("Content-type") == "application/octet-stream"
-        raise urllib.error.HTTPError(
+        error = urllib.error.HTTPError(
             req.full_url,
             400,
             "Bad Request",
             {},
             io.BytesIO(b'{"error": "invalid_image_size"}'),  # type: ignore[arg-type]
         )
+        errors.append(error)
+        raise error
 
     with pytest.raises(FraimicError) as exc:
         FraimicClient("192.0.2.42", opener=opener).upload(b"x")
     assert exc.value.code == "invalid_image_size" and exc.value.status == 400
+    assert errors[0].closed
 
     def asleep(req: Any, timeout: float) -> Any:
         raise urllib.error.URLError("timed out")
