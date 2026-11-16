@@ -5,25 +5,40 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Sign in to Meural - Tesserae</title>
   <style nonce="{{ nonce }}">
-    :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+    /* Tesserae's Classic tokens (static/style/base.css), inlined: this page's
+       CSP allows no other stylesheet. */
+    :root { color-scheme: light dark;
+      --bg: light-dark(#f1f0ec, #0e1015); --surface: light-dark(#ffffff, #181b22);
+      --sunk: light-dark(#f4f4f2, #13161c); --fg: light-dark(#18181b, #e7e9ee);
+      --soft: light-dark(#52524f, #b6bcc7); --border: light-dark(#d4d3cd, #3a4150);
+      --accent: light-dark(#0b8073, #2dd4bf); --accent-hover: light-dark(#0a6f63, #14b8a6);
+      --accent-fg: light-dark(#ffffff, #04241f); --link: light-dark(#064a42, #2dd4bf);
+      --err: light-dark(#a51c23, #ff9b9f);
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
     * { box-sizing: border-box; }
-    body { margin: 0; padding: 24px; background: Canvas; color: CanvasText; }
-    main { max-width: 440px; margin: 5vh auto; }
-    h1 { margin: 28px 0 12px; font-size: 1.5rem; }
-    p { line-height: 1.5; }
-    label { display: block; margin-top: 20px; font-weight: 600; }
-    input { width: 100%; margin-top: 8px; padding: 12px; border: 1px solid GrayText;
-            border-radius: 8px; background: Field; color: FieldText; font: inherit; }
-    button { width: 100%; margin-top: 24px; padding: 12px; border: 1px solid ButtonText;
-             border-radius: 8px; background: ButtonFace; color: ButtonText; font: inherit; cursor: pointer; }
-    button:hover { background: Highlight; color: HighlightText; }
-    button:disabled { opacity: .55; cursor: wait; }
-    :focus-visible { outline: 2px solid Highlight; outline-offset: 3px; }
-    a { color: LinkText; text-underline-offset: .15em; }
+    body { margin: 0; padding: 24px 16px; background: var(--bg); color: var(--fg); line-height: 1.5; }
+    main { max-width: 440px; margin: 4vh auto; overflow-wrap: anywhere; }
+    section { margin-top: 16px; padding: 24px; border: 1px solid var(--border); border-radius: 12px;
+              background: var(--surface); }
+    h1 { margin: 0 0 8px; font-size: 1.375rem; letter-spacing: -0.01em; }
+    p { margin: 0; }
+    label { display: block; margin-top: 18px; font-weight: 600; font-size: .9375rem; }
+    input { width: 100%; height: 44px; margin-top: 6px; padding: 0 12px; border: 1px solid var(--border);
+            border-radius: 8px; background: var(--sunk); color: var(--fg); font: inherit; }
+    input:focus { outline: none; border-color: var(--accent);
+                  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 25%, transparent); }
+    button { width: 100%; height: 44px; margin-top: 22px; padding: 0 14px; border: 1px solid var(--accent);
+             border-radius: 8px; background: var(--accent); color: var(--accent-fg);
+             font: inherit; font-weight: 700; font-size: .9375rem; cursor: pointer; }
+    button:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+    button:disabled { opacity: .7; cursor: progress; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    a { color: var(--link); font-weight: 600; text-underline-offset: .2em; }
     #code-form, #done { display: none; }
-    #status { min-height: 1.5em; margin-top: 20px; }
-    .hint { font-size: .9rem; }
-    .error { color: light-dark(#a51c23, #ff9b9f); }
+    #status { min-height: 1.5em; margin-top: 16px; font-size: .875rem; color: var(--soft); }
+    .hint { font-size: .8125rem; color: var(--soft); }
+    .foot { margin-top: 12px; }
+    .error { color: var(--err) !important; font-weight: 600; }
   </style>
 </head>
 <body>
@@ -42,13 +57,13 @@
       <button id="code-button" type="submit">Verify</button>
     </form>
     <p id="status" role="status" aria-live="polite"></p>
-    <p class="hint">If Netgear blocks this connection, open this page on a phone using mobile data.</p>
-    <a href="" id="restart-link" hidden>Start again</a>
+    <p class="hint foot">If Netgear blocks this connection, open this page on a phone using mobile data.</p>
+    <p class="foot"><a href="" id="restart-link" hidden>Start again</a></p>
   </section>
   <section id="done">
     <h1>Signed in</h1>
-    <p>Your Meural session is saved.</p>
-    <a href="{{ return_url }}" id="return-link">Return to display settings</a>
+    <p>Your Meural session is saved. The settings tab updates on its own, so you can close this tab.</p>
+    <p class="foot"><a href="{{ return_url }}" id="return-link">Return to display settings</a></p>
   </section>
 </main>
 <script id="meural-auth-config" type="application/json" nonce="{{ nonce }}">{{ auth_config|tojson }}</script>

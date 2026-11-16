@@ -311,6 +311,7 @@ def settings_area(area: str) -> str | Response:
         discovered_sig=discovered_sig,
         visionect_kinds=visionect_kinds,
         fraimic_kinds=fraimic_kinds,
+        meural_pending=_meural_pending_view() if area == "devices" else {},
         visionect_listener=visionect_listener,
         default_transport=default_transport,
         broker_configured=broker_configured,
@@ -2423,6 +2424,18 @@ def _device_meta_block(device: Device, is_instance: bool) -> dict[str, Any]:
 _TRANSPORT_BADGE = {"rest": "REST", "mqtt": "MQTT", "push": "HA"}
 
 
+def _meural_pending_view() -> dict[str, Any]:
+    from app.meural_pending import pending_state
+
+    return {
+        **pending_state(),
+        "login_url": url_for("auth.meural_login"),
+        "state_url": url_for("auth.meural_account"),
+        "frame_url": url_for("auth.meural_pending_frame"),
+        "logout_url": url_for("auth.meural_pending_logout"),
+    }
+
+
 def _meural_account_view(device: Device) -> dict[str, Any] | None:
     if device.kind_of != "meural":
         return None
@@ -2441,6 +2454,7 @@ def _meural_account_view(device: Device) -> dict[str, Any] | None:
         "login_url": url_for("auth.meural_login", instance_id=device.id),
         "logout_url": url_for("auth.meural_logout", instance_id=device.id),
         "frame_url": url_for("auth.meural_select_frame", instance_id=device.id),
+        "state_url": url_for("auth.meural_account", instance_id=device.id),
         "manage_url": url_for("auth.meural_manage", instance_id=device.id),
         "paused": bool(cfg.get("meural_management_paused")),
         "held": bool(delivery and delivery[0].held(delivery[1]))

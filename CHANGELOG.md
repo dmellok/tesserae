@@ -6,6 +6,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+- Share Meural account controls between device setup and settings.
+
 - Show a numeric address example for Meural frames.
 
 ### Security

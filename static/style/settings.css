@@ -6594,3 +6594,450 @@ a.dx-qtile--link:focus-visible {
     grid-column: 1 / -1;
   }
 }
+
+/* ---------- Meural account (templates/_meural_account.html) -------------
+   One block for the device page's Connection group and the Add device
+   card's Meural tab. A sunk band like the device page's .dx-band; the
+   button and select skins follow the device page's .dx-btn / .dx-in so the
+   block looks the same in both places. */
+.mx-acct {
+  --mx-r: var(--dp-ctrl-r, 8px);
+  --mx-btn-h: var(--dp-btn-h, 36px);
+  --mx-in-h: var(--dp-input-h, 40px);
+  --mx-ok-fg: var(--t-pill-ok-fg, #15846a);
+  --mx-err-fg: var(--t-pill-danger-fg, #c0392b);
+  --mx-warn-fg: var(--t-pill-warn-fg, #a06a1e);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  max-width: 100%;
+  margin: 8px 0 4px;
+  padding: 16px;
+  border-radius: var(--mx-r);
+  background: var(--t-surface-sunk);
+  color: var(--t-fg);
+  font-size: var(--t-type-control, 0.875rem);
+  line-height: 1.45;
+  overflow-wrap: break-word;
+}
+:root[data-theme="dark"] .mx-acct {
+  --mx-ok-fg: var(--t-ok, #4ade80);
+  --mx-err-fg: #ff9b9f;
+  --mx-warn-fg: #f5c26b;
+}
+:root[data-ui="paper"] .mx-acct {
+  --mx-r: 2px;
+}
+.mx-acct [hidden] {
+  display: none !important;
+}
+.mx-acct :is(p, h4, form) {
+  margin: 0;
+}
+.mx-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  min-width: 0;
+}
+.mx-title {
+  font-size: var(--t-type-body, 0.9375rem);
+  font-weight: 700;
+  color: var(--t-fg);
+}
+.mx-who,
+.mx-help {
+  color: var(--t-fg-soft);
+  font-size: var(--t-type-help, 0.75rem);
+  line-height: 1.5;
+}
+.mx-who {
+  min-width: 0;
+}
+.mx-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--t-fg);
+  max-width: 68ch;
+}
+.mx-line > .ph {
+  flex: none;
+  margin-top: 2px;
+  font-size: 16px;
+  color: var(--t-fg-soft);
+}
+.mx-acct .mx-line.is-warn {
+  background: none;
+  color: var(--t-fg);
+  font-weight: 400;
+}
+.mx-line.is-warn > .ph {
+  color: var(--mx-warn-fg);
+}
+
+/* Locked in: a confirmed line, the frame name truncates inside it. */
+.mx-locked {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.mx-locked-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  min-width: 0;
+  font-size: var(--t-type-body, 0.9375rem);
+  outline-offset: 4px;
+}
+.mx-locked-text {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3em;
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+}
+.mx-name {
+  display: inline-block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+  font-weight: 700;
+}
+.mx-locked-text .mx-name {
+  flex: 0 1 auto;
+}
+.mx-locked-text > .mx-ok {
+  align-self: center;
+  margin-right: 0.2em;
+}
+.mx-locked-text > :nth-child(2) {
+  flex: none;
+}
+.mx-ok {
+  flex: none;
+  font-size: 20px;
+  color: var(--mx-ok-fg);
+}
+.mx-saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 8px 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--mx-ok-fg) 14%, transparent);
+  color: var(--mx-ok-fg);
+  font-size: var(--t-type-help, 0.75rem);
+  font-weight: 700;
+  transition: opacity 400ms ease-out;
+}
+.mx-saved.is-fading {
+  opacity: 0;
+}
+
+/* The picker: select and its button share one row and one height. */
+.mx-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.mx-acct[data-mx-mode="device"] .mx-pick[data-mx-empty] {
+  display: none;
+}
+.mx-label {
+  font-size: var(--t-type-body, 0.9375rem);
+  color: var(--t-fg);
+  cursor: pointer;
+}
+.mx-pick-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.mx-pick-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+}
+.mx-acct .mx-select {
+  box-sizing: border-box;
+  flex: 0 1 320px;
+  min-width: 0;
+  max-width: 100%;
+  height: var(--mx-in-h);
+  margin: 0;
+  padding: 0 34px 0 12px;
+  border: 1px solid var(--dp-input-border, var(--t-border-strong));
+  border-radius: var(--mx-r);
+  background-color: var(--t-surface);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--t-fg-soft) 50%),
+    linear-gradient(135deg, var(--t-fg-soft) 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) 50%,
+    calc(100% - 12px) 50%;
+  background-size: 6px 6px;
+  background-repeat: no-repeat;
+  color: var(--t-fg);
+  font: 400 var(--t-type-control, 0.875rem) / 1.2 var(--t-font);
+  text-overflow: ellipsis;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+.mx-acct .mx-select:hover {
+  border-color: var(--t-border-strong);
+}
+.mx-acct .mx-select:focus-visible {
+  outline: none;
+  border-color: var(--t-accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--t-accent) 25%, transparent);
+}
+.mx-acct .mx-select[aria-invalid="true"] {
+  border-color: var(--mx-err-fg);
+}
+.mx-acct .mx-pick-row .mx-btn {
+  height: var(--mx-in-h);
+  min-height: var(--mx-in-h);
+}
+
+/* Buttons, matching the device page's raised .dx-btn. */
+.mx-acct .mx-btn {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: var(--mx-btn-h);
+  min-height: var(--mx-btn-h);
+  margin: 0;
+  padding: 0 14px;
+  border-radius: var(--mx-r);
+  border: 1px solid color-mix(in oklab, var(--t-fg) 16%, transparent);
+  background: color-mix(in oklab, var(--t-fg) 9%, var(--t-surface));
+  box-shadow:
+    0 1px 0 color-mix(in oklab, var(--t-fg) 8%, transparent),
+    0 1px 2px color-mix(in oklab, #000 18%, transparent);
+  color: var(--t-fg);
+  font: 700 var(--t-type-control, 0.875rem) / 1 var(--t-font);
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transform: none;
+}
+.mx-acct .mx-btn:hover {
+  background: color-mix(in oklab, var(--t-fg) 14%, var(--t-surface));
+  color: var(--t-fg);
+  transform: none;
+}
+.mx-acct .mx-btn.is-primary {
+  background: oklch(from var(--t-accent) calc(l - 0.04) c h);
+  border-color: oklch(from var(--t-accent) calc(l - 0.04) c h);
+  color: var(--t-accent-fg);
+}
+.mx-acct .mx-btn.is-primary:hover {
+  background: oklch(from var(--t-accent) calc(l - 0.09) c h);
+  border-color: oklch(from var(--t-accent) calc(l - 0.09) c h);
+}
+:root[data-theme="dark"] .mx-acct .mx-btn.is-primary {
+  background: var(--t-accent);
+  border-color: var(--t-accent);
+}
+:root[data-theme="dark"] .mx-acct .mx-btn.is-primary:hover {
+  background: var(--t-accent-hover);
+  border-color: var(--t-accent-hover);
+}
+.mx-acct .mx-btn:disabled,
+.mx-acct .mx-btn[aria-busy="true"] {
+  cursor: progress;
+  opacity: 0.75;
+}
+.mx-acct :is(.mx-btn, .mx-link, .mx-select, summary, .mx-locked-line):focus-visible {
+  outline: 2px solid var(--dp-focus, var(--t-accent));
+  outline-offset: 2px;
+}
+.mx-acct .mx-select:focus-visible {
+  outline-offset: 1px;
+}
+
+/* Quiet link-styled controls (Change, Cancel, Sign out). */
+.mx-acct .mx-link {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 0;
+  height: auto;
+  margin: 0;
+  padding: 2px 0;
+  border: 0;
+  border-radius: 2px;
+  background: none;
+  box-shadow: none;
+  color: var(--t-accent-ink, var(--t-accent));
+  font: 700 var(--t-type-control, 0.875rem) / 1.2 var(--t-font);
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transform: none;
+}
+:root[data-ui="paper"] .mx-acct .mx-link:not(.is-quiet) {
+  color: var(--t-fg);
+  text-decoration-color: var(--t-border-strong);
+}
+.mx-acct .mx-link:hover {
+  background: none;
+  box-shadow: none;
+  transform: none;
+  text-decoration-color: currentColor;
+}
+.mx-acct .mx-link.is-quiet {
+  color: var(--t-fg-soft);
+  font-weight: 400;
+}
+.mx-acct .mx-link.is-quiet:hover {
+  color: var(--t-fg);
+}
+
+/* Errors name the problem in words, with an icon, never colour alone. */
+.mx-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--mx-err-fg);
+  font-size: var(--t-type-help, 0.75rem);
+  font-weight: 600;
+  line-height: 1.5;
+}
+.mx-error::before {
+  content: "";
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  border-radius: 50%;
+  background:
+    linear-gradient(currentColor, currentColor) 50% 3px / 2px 5px no-repeat,
+    linear-gradient(currentColor, currentColor) 50% 9.5px / 2px 2px no-repeat;
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
+
+/* Details stay behind a toggle. */
+.mx-about > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--t-fg-soft);
+  font-size: var(--t-type-help, 0.75rem);
+  cursor: pointer;
+  list-style: none;
+}
+.mx-about > summary::-webkit-details-marker {
+  display: none;
+}
+.mx-about > summary:hover {
+  color: var(--t-fg);
+}
+.mx-about > .mx-help {
+  margin-top: 6px;
+  max-width: 68ch;
+}
+
+/* Actions: links left, buttons right, the primary last. */
+.mx-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  min-width: 0;
+}
+.mx-actions:not(:has(.mx-actions-start > :not([hidden]), .mx-actions-end > :not([hidden]))) {
+  display: none;
+}
+.mx-actions-start,
+.mx-actions-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.mx-actions-start {
+  gap: 8px 16px;
+}
+.mx-actions-end {
+  margin-left: auto;
+  justify-content: flex-end;
+}
+.mx-actions form {
+  display: inline-flex;
+  margin: 0;
+}
+
+.mx-spin {
+  animation: mx-spin 900ms linear infinite;
+}
+@keyframes mx-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mx-spin {
+    animation: none;
+  }
+  .mx-saved {
+    transition: none;
+  }
+}
+
+/* Phone: full-width rows and 44px targets. */
+@media (max-width: 640px) {
+  .mx-acct {
+    --mx-btn-h: 44px;
+    --mx-in-h: 44px;
+    padding: 14px;
+  }
+  .mx-pick-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .mx-acct .mx-select {
+    flex: none;
+    width: 100%;
+  }
+  .mx-pick-actions .mx-btn {
+    flex: 1 1 auto;
+  }
+  .mx-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .mx-actions-end {
+    flex-direction: column;
+    align-items: stretch;
+    margin-left: 0;
+  }
+  .mx-actions-end > :is(.mx-btn, form) {
+    width: 100%;
+  }
+  .mx-actions-end form .mx-btn {
+    flex: 1;
+  }
+  .mx-acct .mx-link {
+    min-height: 44px;
+  }
+}

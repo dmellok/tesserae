@@ -661,6 +661,10 @@
             {% endif %}
           </div>
 
+          {% if section.meural_account %}
+          {% with account=section.meural_account, meural_mode='device' %}{% include '_meural_account.html' %}{% endwith %}
+          {% endif %}
+
           {% if section.repair_request %}
           {% set _rr = section.repair_request %}
           <div class="dx-band is-warn" id="repair-request">
@@ -673,48 +677,6 @@
               <form method="post" action="{{ _rr.endpoint }}" class="form--inline">
                 <button type="submit" class="dx-btn is-sm">Allow re-pair</button>
               </form>
-            </div>
-          </div>
-          {% endif %}
-
-          {% if section.meural_account %}
-          {% set account = section.meural_account %}
-          <div class="dx-band" id="meural-account">
-            <div class="dx-band-text">
-              <p class="dx-band-title">Meural account</p>
-              {% if account.signed_in %}
-              <p class="dx-help">Signed in as {{ account.email }}.</p>
-              {% if account.frames %}
-              <form method="post" action="{{ account.frame_url }}" class="dx-fg">
-                <label class="dx-f"><span class="dx-f-label">Meural frame</span>
-                  <select name="cloud_device_id" required>
-                    <option value="">Choose a frame</option>
-                    {% for frame in account.frames %}
-                    <option value="{{ frame.id }}"{% if frame.id == account.selected %} selected{% endif %}>{{ frame.name }}</option>
-                    {% endfor %}
-                  </select>
-                </label>
-                <button class="dx-btn is-sm" type="submit">Use this frame</button>
-              </form>
-              {% else %}
-              <p class="dx-help">No frames were found. Add your frame in the Meural app, then sign in again.</p>
-              {% endif %}
-              {% else %}
-              <p class="dx-help">Sign in to Netgear to upload changed pages once and keep them on your frame.</p>
-              {% endif %}
-              <p class="dx-help">Tesserae displays one image at a time and creates no Meural galleries. Cloud delivery pauses Meural rotation and scheduling. Resume Meural gallery restores your previous gallery and rotation settings.</p>
-              {% if account.paused %}
-              <p class="dx-help">{{ 'Restoration is pending. Retry Resume Meural gallery.' if account.held else 'Tesserae delivery is paused.' }}</p>
-              {% endif %}
-            </div>
-            <div class="dx-band-actions">
-              <form method="post" action="{{ account.manage_url }}">
-                <button class="dx-btn is-sm" type="submit" name="action" value="{{ 'manage' if account.paused and not account.held else 'release' }}">{{ 'Let Tesserae manage' if account.paused and not account.held else 'Resume Meural gallery' }}</button>
-              </form>
-              <a class="dx-btn is-sm" href="{{ account.login_url }}" target="_blank" rel="noopener">{{ 'Sign in again' if account.signed_in else 'Sign in to Netgear' }}</a>
-              {% if account.signed_in %}
-              <form method="post" action="{{ account.logout_url }}"><button class="dx-btn is-sm is-ghost" type="submit">Sign out</button></form>
-              {% endif %}
             </div>
           </div>
           {% endif %}

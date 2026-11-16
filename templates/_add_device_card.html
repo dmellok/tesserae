@@ -109,7 +109,7 @@
         Fraimic colour e-paper canvases, sent new pictures over your local network when they wake.
       </p>
       <p class="dx-segmented-help" data-segmented-help-meural hidden>
-        Add it, then sign in with your Netgear account on its page and choose a frame.
+        Netgear Meural Canvas frames, sent pages through your Netgear account.
       </p>
       <p class="dx-segmented-help" data-segmented-help-visionect hidden>
         Visionect and Joan e-paper signs, over their own protocol on TCP {{ visionect_listener.port if visionect_listener and visionect_listener.port else 'the configured port' }}.
@@ -479,18 +479,23 @@
     <div class="dx-add-branch dx-add-branch--meural"
          data-transport-branch="meural"
          hidden>
-      <form method="post" action="{{ url_for('auth.devices_add') }}" class="form">
+      <form method="post" action="{{ url_for('auth.devices_add') }}" class="form" id="add-meural-form">
         <input type="hidden" name="kind" value="meural">
-        <input type="hidden" name="delivery_method" value="local">
+        {{ select_field('add-meural-delivery', 'delivery_method', 'Delivery', value='cloud',
+                        options=[{'value':'cloud','label':'Netgear account'}, {'value':'local','label':'Local preview (backup)'}]) }}
         {{ text_input('add-meural-id', 'id', 'Device id', value='', placeholder='meural_frame', required=True,
                       help='Lowercase, no spaces.') }}
         {{ text_input('add-meural-name', 'name', 'Display name', value='', placeholder='Meural frame') }}
-        {{ text_input('add-meural-host', 'host', 'Frame address', value='', placeholder='meural.local', required=True,
-                      help='The frame address on your local network.') }}
-        <div class="dx-actions-right">
-          <button type="submit" class="dx-btn-primary"><i class="ph ph-plus" aria-hidden="true"></i><span>Add Netgear Meural</span></button>
-        </div>
+        {{ text_input('add-meural-host', 'host', 'Frame address', value='', placeholder='meural.local',
+                      help='Optional for cloud delivery. Required for local preview.') }}
       </form>
+      {#- Outside the form (it holds its own picker form); its fields join the
+          Add form through form="add-meural-form". ``meural_pending`` is the
+          pending sign-in view from the server, when it offers one. -#}
+      {% with account=meural_pending, meural_mode='add', add_form_id='add-meural-form' %}{% include '_meural_account.html' %}{% endwith %}
+      <div class="dx-actions-right mx-add-actions">
+        <button type="submit" form="add-meural-form" class="dx-btn-primary"><i class="ph ph-plus" aria-hidden="true"></i><span>Add Netgear Meural</span></button>
+      </div>
     </div>
 
   </div>

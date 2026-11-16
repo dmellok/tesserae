@@ -1,0 +1,173 @@
+{#- Meural account block, shared by the device page (Connection) and the
+    Add device card (Netgear Meural tab) so the two cannot drift.
+
+    Include with:
+      account      dict from the server (see below); missing keys are fine.
+      meural_mode  "device" (an existing frame) or "add" (Add device card).
+      add_form_id  add mode only: the id of the Add device <form>.
+
+    account keys read here (backend contract; static/meural-account.js
+    reads the same names from JSON in ``normalize``):
+      state          signed_out | signing_in | signed_in | session_expired
+                     (older views send signed_in / expired booleans instead)
+      account|email  the Netgear account label
+      frames         [{id, name}]
+      chosen         {id, name}  (older views send ``selected``: the id)
+      paused, held   Tesserae paused / Meural playback not yet restored
+      login_url, logout_url, frame_url, manage_url, state_url
+
+    Every state's panel is rendered; ``hidden`` shows only the current
+    one, and the script flips ``data-mx-state`` without a reload. -#}
+{%- set a = account or {} -%}
+{%- set chosen = a.chosen_frame or a.chosen -%}
+{%- set mode = meural_mode or 'device' -%}
+{%- set frames = a.frames or [] -%}
+{%- set chosen_id = ((chosen.id if chosen else a.selected) or '')|string -%}
+{%- set pick = namespace(frame=none) -%}
+{%- for f in frames -%}{%- if f.id|string == chosen_id and chosen_id -%}{%- set pick.frame = f -%}{%- endif -%}{%- endfor -%}
+{%- set chosen_name = (pick.frame.name if pick.frame else (chosen.name if chosen else '')) or '' -%}
+{%- set backend_state = a.state or ('session_expired' if a.expired else ('signed_in' if a.signed_in else 'signed_out')) -%}
+{%- if backend_state == 'signed_in' -%}
+  {%- if a.paused and a.held -%}{%- set ui = 'held' -%}
+  {%- elif a.paused -%}{%- set ui = 'released' -%}
+  {%- elif chosen_name -%}{%- set ui = 'locked' -%}
+  {%- else -%}{%- set ui = 'pick' -%}{%- endif -%}
+{%- elif backend_state == 'session_expired' -%}{%- set ui = 'expired' -%}
+{%- elif backend_state == 'signing_in' -%}{%- set ui = 'signing_in' -%}
+{%- else -%}{%- set ui = 'signed_out' -%}{%- endif -%}
+{%- set label = a.account_label or a.account or a.email or '' -%}
+{%- set uid = 'mx-' ~ mode -%}
+{%- macro show(states) -%}data-mx-show="{{ states }}"{% if ui not in states.split(' ') %} hidden{% endif %}{%- endmacro -%}
+<div class="mx-acct" id="{{ 'meural-account' if mode == 'device' else 'meural-account-add' }}"
+     data-meural-account data-mx-mode="{{ mode }}" data-mx-state="{{ ui }}"
+     data-login-url="{{ a.login_url or '' }}" data-state-url="{{ a.state_url or '' }}"
+     data-frame-url="{{ a.frame_url or '' }}"{% if add_form_id %} data-add-form="{{ add_form_id }}"{% endif %}
+     aria-labelledby="{{ uid }}-title">
+  <div class="mx-head">
+    <h4 class="mx-title" id="{{ uid }}-title">Meural account</h4>
+    <p class="mx-who" {{ show('pick locked released held expired') }}>Signed in as <span data-mx-label>{{ label }}</span>.</p>
+  </div>
+
+  {#- One status line per state. -#}
+  <p class="mx-line" {{ show('signed_out') }}>
+    {%- if mode == 'add' and not a.login_url -%}
+    Tesserae adds the frame first, then opens Netgear sign-in on its page.
+    {%- elif mode == 'add' -%}
+    Sign in to Netgear to choose the frame now. You can also do it later on the frame's page.
+    {%- else -%}
+    Sign in to Netgear so Tesserae can send pages to this frame.
+    {%- endif -%}
+  </p>
+  <p class="mx-line" {{ show('signing_in') }}>
+    <i class="ph ph-circle-notch mx-spin" aria-hidden="true"></i>
+    <span>Finish signing in on the Netgear tab. This page updates when you're done.</span>
+  </p>
+  <p class="mx-line is-warn" {{ show('expired') }}>
+    <i class="ph ph-warning" aria-hidden="true"></i>
+    <span>Your Netgear sign-in expired. Tesserae can't update {% if chosen_name %}<span data-mx-frame-name>{{ chosen_name }}</span>{% else %}the frame{% endif %} until you sign in again.</span>
+  </p>
+  <p class="mx-line is-warn" {{ show('held') }}>
+    <i class="ph ph-warning" aria-hidden="true"></i>
+    <span>Your Meural gallery isn't restored yet. Tesserae has stopped sending pages; try Resume again.</span>
+  </p>
+  <p class="mx-line" {{ show('released') }}>
+    Tesserae is paused. {% if chosen_name %}<span class="mx-name" data-mx-frame-name title="{{ chosen_name }}">{{ chosen_name }}</span>{% else %}The frame{% endif %} is showing its Meural gallery.
+  </p>
+
+  {#- Locked in: the chosen frame, confirmed. Change re-opens the picker. -#}
+  <div class="mx-locked" {{ show('locked') }}>
+    <p class="mx-locked-line" tabindex="-1" data-mx-locked-line>
+      <span class="mx-locked-text"><i class="ph-fill ph-check-circle mx-ok" aria-hidden="true"></i><span>{{ 'Will show on' if mode == 'add' else 'Showing on' }}</span> <strong class="mx-name" data-mx-frame-name title="{{ chosen_name }}">{{ chosen_name }}</strong></span>
+      <span class="mx-saved" data-mx-saved hidden><i class="ph ph-check" aria-hidden="true"></i>Saved</span>
+      {% if frames|length > 1 or mode == 'add' %}
+      <button type="button" class="mx-link" data-mx-change aria-label="Change frame">Change</button>
+      {% endif %}
+    </p>
+    {% if mode == 'device' %}
+    <p class="mx-help">Meural rotation is paused while Tesserae sends pages. The frame's sleep schedule stays active.</p>
+    {% endif %}
+  </div>
+
+  {#- The picker: label, then select and its button on one row. -#}
+  <form class="mx-pick" method="post" action="{{ a.frame_url or '' }}" data-mx-pick
+        {{ show('pick') }}{% if not frames %} data-mx-empty{% endif %}>
+    {% if frames or mode == 'add' %}
+    <label class="mx-label" for="{{ uid }}-frame">Meural frame</label>
+    <div class="mx-pick-row">
+      <select class="mx-select" id="{{ uid }}-frame" name="cloud_device_id" required
+              aria-describedby="{{ uid }}-pick-error" data-mx-select>
+        <option value="">Choose a frame</option>
+        {% for frame in frames %}
+        <option value="{{ frame.id }}"{% if frame.id|string == chosen_id %} selected{% endif %}>{{ frame.name }}</option>
+        {% endfor %}
+      </select>
+      <div class="mx-pick-actions">
+        <button type="button" class="mx-link" data-mx-cancel-change hidden>Cancel</button>
+        <button type="submit" class="mx-btn is-primary" data-mx-use>
+          <i class="ph ph-circle-notch mx-spin" aria-hidden="true" hidden></i><span data-mx-use-label>Use this frame</span>
+        </button>
+      </div>
+    </div>
+    <p class="mx-error" id="{{ uid }}-pick-error" data-mx-pick-error hidden></p>
+    {% endif %}
+  </form>
+  {% if not frames and mode == 'device' %}
+  <p class="mx-line is-warn" {{ show('pick') }}>
+    <i class="ph ph-warning" aria-hidden="true"></i>
+    <span>No frames on this account. Add the frame in the Meural app, then sign in again.</span>
+  </p>
+  {% endif %}
+
+  {%- if mode == 'add' -%}
+  <input type="hidden" name="cloud_device_id" value="{{ chosen_id }}" form="{{ add_form_id }}" data-mx-chosen-input>
+  {%- endif -%}
+
+  <details class="mx-about">
+    <summary><i class="ph ph-info" aria-hidden="true"></i><span>What Tesserae changes on the frame</span></summary>
+    <p class="mx-help">Tesserae shows one image at a time and creates no Meural galleries. While it sends pages, Meural rotation is paused and the sleep schedule stays active. Resume Meural gallery restores your previous gallery and rotation settings.</p>
+  </details>
+
+  <p class="mx-error" data-mx-error role="alert" hidden></p>
+
+  {#- Actions: quiet links on the left, buttons on the right, the one
+      primary action for the state last. -#}
+  {%- set has_session = backend_state in ('signed_in', 'session_expired') -%}
+  <div class="mx-actions">
+    <div class="mx-actions-start">
+      <button type="button" class="mx-link" data-mx-cancel-signin {{ show('signing_in') }}>Cancel</button>
+      {% if mode == 'device' and a.logout_url and has_session %}
+      <form method="post" action="{{ a.logout_url }}" data-mx-post {{ show('pick locked released held expired') }}>
+        <button type="submit" class="mx-link is-quiet">Sign out</button>
+      </form>
+      {% endif %}
+    </div>
+    <div class="mx-actions-end">
+      {% if a.login_url %}
+      <a class="mx-btn" href="{{ a.login_url }}" target="_blank" rel="noopener" data-mx-signin {{ show('signing_in') }}>Open sign-in again</a>
+      {% endif %}
+      {% if mode == 'device' and a.manage_url %}
+      <form method="post" action="{{ a.manage_url }}" data-mx-post {{ show('locked') }}>
+        <button type="submit" class="mx-btn" name="action" value="release">Resume Meural gallery</button>
+      </form>
+      <form method="post" action="{{ a.manage_url }}" data-mx-post {{ show('held') }}>
+        <button type="submit" class="mx-btn is-primary" name="action" value="release">Resume Meural gallery</button>
+      </form>
+      <form method="post" action="{{ a.manage_url }}" data-mx-post {{ show('released') }}>
+        <button type="submit" class="mx-btn is-primary" name="action" value="manage">Let Tesserae manage</button>
+      </form>
+      {% endif %}
+      {% if a.login_url %}
+      <a class="mx-btn{{ '' if mode == 'add' else ' is-primary' }}" href="{{ a.login_url }}" target="_blank" rel="noopener" data-mx-signin {{ show('signed_out') }}>Sign in to Netgear</a>
+      <a class="mx-btn is-primary" href="{{ a.login_url }}" target="_blank" rel="noopener" data-mx-signin {{ show('expired') }}>Sign in again</a>
+      {% if not frames and mode == 'device' %}
+      <a class="mx-btn is-primary" href="{{ a.login_url }}" target="_blank" rel="noopener" data-mx-signin {{ show('pick') }}>Sign in again</a>
+      {% endif %}
+      {% elif mode == 'add' %}
+      {#- No pending sign-in endpoint yet: add the frame, then sign in on its page. -#}
+      <button type="submit" class="mx-btn" form="{{ add_form_id }}" name="meural_next" value="signin" data-mx-add-then-signin {{ show('signed_out') }}>Add and sign in</button>
+      {% endif %}
+    </div>
+  </div>
+  <p class="sr-only" role="status" aria-live="polite" data-mx-live></p>
+</div>
+<script src="{{ url_for('static', filename='meural-account.js') }}" defer></script>
