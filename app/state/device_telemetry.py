@@ -23,6 +23,7 @@ from __future__ import annotations
 import json
 import logging
 import threading
+import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -457,6 +458,24 @@ class TelemetryStore:
             prev.predicted_next_wake_at = prev.last_heartbeat_at + interval_s
             prev.last_sleep_interval_s = int(interval_s)
             prev.prediction_source = "issued"
+            self._flush_locked()
+            return DeviceTelemetry(**prev.as_dict())
+
+    def note_button_wake(
+        self, device_id: str, *, at: float | None = None
+    ) -> DeviceTelemetry | None:
+        """Record that a button press just woke this device.
+
+        The stock firmware reports a press on its frame request, which comes
+        before the wake's heartbeat and never reaches ``record_heartbeat``
+        (the heartbeat carries ``button_event_id`` only when that frame
+        request failed). Stamping the press here leaves that heartbeat, and
+        the others inside ``BUTTON_WAKE_WINDOW_S``, unscored."""
+        with self._lock:
+            prev = self._state.devices.get(device_id)
+            if prev is None:
+                return None
+            prev.button_wake_at = time.time() if at is None else at
             self._flush_locked()
             return DeviceTelemetry(**prev.as_dict())
 

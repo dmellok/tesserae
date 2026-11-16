@@ -522,3 +522,35 @@ def test_the_button_event_id_survives_a_restart(tmp_path: Path) -> None:
     again = _make_store(tmp_path)
     entry = again.get("x")
     assert entry is not None and entry.last_button_event_id == 5
+
+
+def test_a_press_reported_on_the_frame_request_does_not_reset_trust(tmp_path: Path) -> None:
+    """Stock firmware reports a press on its frame GET, ahead of the wake's
+    heartbeat, and that heartbeat carries no ``button_event_id``. The frame route
+    stamps the press with ``note_button_wake`` so the wake is still left unscored."""
+    store = _make_store(tmp_path)
+    t0 = 1_000_000.0
+    hb = {"next_sleep_s": 3600}
+    store.record_heartbeat("door", received_at=t0, parsed=hb, configured_sleep_s=None)
+    for n in range(1, CONFIDENCE_TRUSTED_AT + 1):
+        entry = store.record_heartbeat(
+            "door", received_at=t0 + n * 3600, parsed=hb, configured_sleep_s=None
+        )
+    assert entry.is_trusted
+    built = entry.consecutive_on_time_wakes
+    tp = t0 + CONFIDENCE_TRUSTED_AT * 3600 + 1200  # a press twenty minutes after a wake
+    noted = store.note_button_wake("door", at=tp)
+    assert noted is not None and noted.button_wake_at == tp
+    entry = store.record_heartbeat("door", received_at=tp + 4, parsed=hb, configured_sleep_s=None)
+    assert entry.consecutive_on_time_wakes == built  # the press wake is not scored
+    # The next timer wake is scored against the prediction made after the press.
+    entry = store.record_heartbeat(
+        "door", received_at=tp + 4 + 3600, parsed=hb, configured_sleep_s=None
+    )
+    assert entry.consecutive_on_time_wakes == built + 1 and entry.is_trusted
+
+
+def test_noting_a_button_wake_for_an_unknown_device_is_a_no_op(tmp_path: Path) -> None:
+    store = _make_store(tmp_path)
+    assert store.note_button_wake("nobody", at=1_000_000.0) is None
+    assert store.get("nobody") is None
