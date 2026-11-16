@@ -971,8 +971,8 @@ def _rebuild_transport(
         # the PushManager a direct accessor so fan-out stays correct on
         # those paths, not just on request-bound manual Sends.
         plugin_registry_fn=lambda: app.config.get("PLUGIN_REGISTRY"),
-        automation_eligible_fn=lambda page_id, device_id, live: (
-            app.config["SCHEDULER"].automation_page_eligible(page_id, device_id, live=live)
+        automation_eligible_fn=lambda page_id, device_id: (
+            app.config["SCHEDULER"].automation_page_eligible(page_id, device_id)
             if app.config.get("SCHEDULER") is not None
             else True
         ),

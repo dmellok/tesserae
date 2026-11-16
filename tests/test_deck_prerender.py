@@ -429,8 +429,8 @@ def _automation(wired, tmp_path, *, paused=False, quiet=False, printing=True):
         push_manager=lambda: wired,
         timezone_provider=lambda: UTC,
     )
-    wired._automation_eligible_fn = lambda page_id, device_id, live: (
-        scheduler.automation_page_eligible(page_id, device_id, live=live, now=now)
+    wired._automation_eligible_fn = lambda page_id, device_id: scheduler.automation_page_eligible(
+        page_id, device_id, now=now
     )
     wired.device_in_quiet_hours = lambda _did: quiet
     return scheduler, now, states, ha
@@ -451,7 +451,6 @@ def test_speculative_renders_skip_ineligible_targets(wired, tmp_path, blocked):
         assert render.call_count == (1 if blocked == "conditions" else 0)
         before = render.call_count
         assert wired.warm_deck_page("p_a", "panel") is False
-        assert wired.prewarm_page("p_a", device_id="panel") is False
         assert render.call_count == before
         if blocked == "paused":
             states.patch("panel", {"automation_pause_until": None})
@@ -464,10 +463,17 @@ def test_speculative_renders_skip_ineligible_targets(wired, tmp_path, blocked):
         assert render.call_count == 2  # both pages warmed once, with no skipped cadence consumed
 
 
+_SUPERSEDED = ("newer", "same_page", "unchanged_push")
+
+
 @pytest.mark.parametrize(
-    "changed", ["step", "removed", "paused", "quiet", "newer", "same_page", "unchanged_push"]
+    "changed", ["step", "removed", "paused", "newer", "same_page", "unchanged_push"]
 )
-def test_automated_followup_drops_obsolete_work(wired, tmp_path, changed):
+def test_automated_followup_is_dropped_only_when_superseded(wired, tmp_path, changed):
+    """A follow-up finishes the frame it follows. It is dropped when another
+    frame has landed on the display since. A change in the lineup or a pause
+    leaves the placeholder on the glass, so it still goes. (Quiet hours are
+    the push's own check, as for any automated push.)"""
     from datetime import timedelta
 
     from app.state.device_rotation_state_model import DeviceRotationState
@@ -497,8 +503,6 @@ def test_automated_followup_drops_obsolete_work(wired, tmp_path, changed):
                     device_id="panel", automation_pause_until=now + timedelta(minutes=30)
                 )
             )
-        elif changed == "quiet":
-            wired.device_in_quiet_hours = lambda _did: True
         else:
             with patch(
                 "app.push.capture_composed",
@@ -511,8 +515,42 @@ def test_automated_followup_drops_obsolete_work(wired, tmp_path, changed):
                     "p_b" if changed == "newer" else "p_a", device_ids={"panel"}, settle=False
                 )
         timer.function()
-        assert render.call_count == 1
-        assert wired.pending_followup("p_a") is None
+        assert render.call_count == (1 if changed in _SUPERSEDED else 2)
+        timer = wired.pending_followup("p_a")
+        if timer is not None:
+            timer.cancel()
+        assert (timer is None) == (changed in _SUPERSEDED)
+
+
+def test_followup_survives_a_lineup_that_does_not_hold_the_page(wired, tmp_path):
+    """A timed send of a page the display's lineup is not on (or does not
+    contain) still gets its follow-up, and a disabled lineup holding the
+    page blocks nothing."""
+    scheduler, now, _, _ = _automation(wired, tmp_path)
+    wired._page_store.save(Page(id="p_c", name="C", device_ids=["panel"], cells=[]))
+    deck = scheduler._deck_store.get("lineup")
+    with patch(
+        "app.push.capture_composed", return_value=(_png((1, 2, 3)), {"refresh_s": 10})
+    ) as render:
+        for page_id in ("p_c", "p_b"):
+            wired.push(
+                page_id,
+                device_ids={"panel"},
+                source="schedule",
+                respect_quiet_hours=True,
+                settle=False,
+            )
+            timer = wired.pending_followup(page_id)
+            assert timer is not None
+            timer.cancel()
+            before = render.call_count
+            timer.function()
+            assert render.call_count == before + 1
+            again = wired.pending_followup(page_id)
+            assert again is not None
+            again.cancel()
+    scheduler._deck_store.upsert(deck.model_copy(update={"enabled": False}))
+    assert scheduler.automation_page_eligible("p_a", "panel", now=now) is True
 
 
 def test_manual_followup_keeps_sending_while_automation_is_paused(wired, tmp_path):
@@ -564,7 +602,10 @@ def test_automated_followups_keep_context_across_multiple_timers(wired, tmp_path
         timer = wired.pending_followup("p_a")
         assert timer is not None
         timer.cancel()
-        wired.device_in_quiet_hours = lambda _did: True
+        # Still an automated follow-up three timers in: a newer frame on the
+        # display retires it.
+        with patch("app.push.capture_composed", return_value=(_png((9, 8, 7)), [])):
+            wired.push("p_b", device_ids={"panel"}, settle=False)
         timer.function()
         assert render.call_count == 3
 
@@ -621,6 +662,10 @@ def test_schedule_with_failed_conditions_is_not_warmed(wired, tmp_path):
     with patch("app.push.capture_composed", return_value=(_png((1, 2, 3)), [])) as render:
         assert wired.warm_deck_page("p_c", "panel") is False
         assert render.call_count == 0
+        # Disabled, the schedule says nothing about the page.
+        schedule = scheduler._store.get("conditional")
+        scheduler._store.upsert(schedule.model_copy(update={"enabled": False}))
+        assert wired.warm_deck_page("p_c", "panel") is True
 
 
 @pytest.mark.parametrize("blocked", ["paused", "quiet", "conditions"])
@@ -658,7 +703,10 @@ def test_album_warm_does_no_rendering_for_a_paused_or_quiet_display(wired, tmp_p
 
 
 @pytest.mark.parametrize("blocked", ["paused", "quiet", "conditions"])
-def test_update_warm_stays_due_when_ineligible(wired, tmp_path, blocked):
+def test_update_skips_an_unseen_warm_and_still_counts_as_handled(wired, tmp_path, blocked):
+    """A widget-schedule update whose only lineup target is paused, quiet or
+    failing its conditions is not warmed there, and the update is still done:
+    left open it would be sent again every tick to the displays showing it."""
     scheduler, now, _, _ = _automation(
         wired,
         tmp_path,
@@ -666,21 +714,62 @@ def test_update_warm_stays_due_when_ineligible(wired, tmp_path, blocked):
         quiet=blocked == "quiet",
         printing=blocked != "conditions",
     )
-    with patch("app.push.capture_composed", return_value=(_png((1, 2, 3)), [])) as render:
+    with (
+        patch.object(scheduler, "_devices_showing_pages", return_value={}),
+        patch("app.push.capture_composed", return_value=(_png((1, 2, 3)), [])) as render,
+    ):
         completed = scheduler.refresh_pages_for_update({"p_a"}, source="widget_schedule", now=now)
         assert render.call_count == 0
-        assert completed == set()
+        assert completed == {"p_a"}
 
 
-def test_page_refresh_skips_a_step_whose_conditions_just_failed(wired, tmp_path):
-    scheduler, now, _, ha = _automation(wired, tmp_path, printing=False)
+def test_update_reaches_the_showing_display_once_while_another_is_paused(wired, tmp_path):
+    """The page is on one display and also in a lineup on a paused one: the
+    showing display gets the update once, not on every tick."""
+    from datetime import timedelta
+
+    from app.state.device_rotation_state_model import DeviceRotationState
+
+    scheduler, now, states, _ = _automation(wired, tmp_path)
+    deck = scheduler._deck_store.get("lineup")
+    scheduler._deck_store.upsert(deck.model_copy(update={"device_ids": ["panel", "away"]}))
+    states.upsert(
+        DeviceRotationState(device_id="away", automation_pause_until=now + timedelta(minutes=30))
+    )
+    with (
+        patch.object(scheduler, "_devices_showing_pages", return_value={"p_a": {"panel"}}),
+        patch("app.push.capture_composed", return_value=(_png((1, 2, 3)), [])) as render,
+    ):
+        completed = scheduler.refresh_pages_for_update({"p_a"}, source="widget_schedule", now=now)
+        assert completed == {"p_a"}
+        assert render.call_count == 1
+        assert wired.latest_render_for("panel")["page_id"] == "p_a"
+
+
+def test_page_refresh_keeps_a_shown_page_fresh_when_its_step_stops_passing(wired, tmp_path):
+    """A page on the glass keeps its own refresh even while no step of its
+    lineup would pick it: only speculative renders are skipped."""
+    scheduler, now, _, _ = _automation(wired, tmp_path, printing=False)
     page = wired._page_store.get("p_a")
     wired._page_store.save(page.model_copy(update={"refresh_minutes": 1}))
     scheduler._deck_nav_store.set("panel", "lineup", "p_a")
     with patch("app.push.capture_composed", return_value=(_png((1, 2, 3)), [])) as render:
         scheduler._maybe_refresh_pages(now)
-        assert render.call_count == 0
-        ha[0]["state"] = "on"
-        scheduler._condition_evaluator.refresh_ha_states()
-        scheduler._maybe_refresh_pages(now)
         assert render.call_count == 1
+
+
+def test_button_prewarm_runs_while_automation_is_paused(wired, tmp_path):
+    """A button press is the user's, not automation: its prewarm is not gated."""
+    _automation(wired, tmp_path, paused=True, quiet=True, printing=False)
+    with patch("app.push.capture_composed", return_value=(_png((1, 2, 3)), [])) as render:
+        assert wired.prewarm_page("p_a", device_id="panel") is True
+        assert render.call_count == 1
+
+
+def test_warm_ahead_considers_displays_reached_through_a_lineup(wired, tmp_path):
+    scheduler, _, _, _ = _automation(wired, tmp_path)
+    page = wired._page_store.get("p_b")
+    wired._page_store.save(page.model_copy(update={"device_ids": []}))
+    assert scheduler._page_can_warm("p_b") is True
+    wired.device_in_quiet_hours = lambda _did: True
+    assert scheduler._page_can_warm("p_b") is False
