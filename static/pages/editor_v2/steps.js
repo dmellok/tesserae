@@ -9,7 +9,8 @@
   const cfg = EV2.cfg;
 
   const sections = [...root.querySelectorAll(".ev2-step[data-step]")];
-  const KEYS = sections.map((s) => s.dataset.step);
+  const ALL_KEYS = sections.map((s) => s.dataset.step);
+  const KEYS = sections.filter((s) => !s.hidden).map((s) => s.dataset.step);
   const WAIT = {
     layout: "Pick a display first.",
     widgets: "Choose a layout first.",
@@ -29,14 +30,20 @@
     }
   }
   const restored = EV2.restored || {};
-  const hashStep = KEYS.includes(location.hash.slice(1)) ? location.hash.slice(1) : null;
+  const requestedHash = location.hash.slice(1);
+  const hashStep = ALL_KEYS.includes(requestedHash)
+    ? KEYS.includes(requestedHash)
+      ? requestedHash
+      : "widgets"
+    : null;
   const initialStep =
-    hashStep || (EV2.isNew ? KEYS[Math.min(progress, KEYS.length) - 1] : "widgets");
+    hashStep || (EV2.isNew ? ALL_KEYS[Math.min(progress, ALL_KEYS.length) - 1] : "widgets");
   let open = restored.open !== undefined ? restored.open : initialStep;
-  if (EV2.isNew && hashStep) setProgress(KEYS.indexOf(hashStep) + 1);
+  if (open && !KEYS.includes(open)) open = "widgets";
+  if (EV2.isNew && hashStep) setProgress(ALL_KEYS.indexOf(hashStep) + 1);
 
   function stateOf(key) {
-    const idx = KEYS.indexOf(key) + 1;
+    const idx = ALL_KEYS.indexOf(key) + 1;
     if (key === open) return "open";
     if (!EV2.isNew) return "done";
     return idx <= progress ? "done" : "wait";
@@ -60,6 +67,7 @@
   function render() {
     sections.forEach((sec) => {
       const key = sec.dataset.step;
+      if (sec.hidden) return;
       const st = stateOf(key);
       sec.dataset.state = st;
       const done = completion(key);
@@ -96,8 +104,13 @@
     if (!EV2.isNew) return;
     const st = document.querySelector("[data-ev2-bar-st]");
     if (!st) return;
-    const step = progress;
-    const lead = step > 5 ? "All steps done" : step === 5 ? "Last step" : `Step ${step} of 5`;
+    const step = KEYS.filter((key) => ALL_KEYS.indexOf(key) + 1 < progress).length + 1;
+    const lead =
+      step > KEYS.length
+        ? "All steps done"
+        : step === KEYS.length
+          ? "Last step"
+          : `Step ${step} of ${KEYS.length}`;
     const rows = [...root.querySelectorAll(".ev2-cl[data-n]")];
     const filled = rows.filter((r) => r.dataset.widget).length;
     // The long line is for wide screens; the short one keeps a status in the
@@ -137,7 +150,7 @@
     const o = opts || {};
     if (!KEYS.includes(key) && key !== null) return;
     const was = open;
-    if (key && EV2.isNew) setProgress(KEYS.indexOf(key) + 1);
+    if (key && EV2.isNew) setProgress(ALL_KEYS.indexOf(key) + 1);
     open = key;
     if (was === "layout" && key !== "layout") setDraw(false);
     if (was === "widgets" && key !== "widgets" && EV2.widgets) EV2.widgets.closeAll();
@@ -179,11 +192,32 @@
     if (nx) {
       const idx = KEYS.indexOf(nx.dataset.ev2Next);
       const next = KEYS[idx + 1] || null;
-      setProgress(idx + 2);
+      setProgress(next ? ALL_KEYS.indexOf(next) + 1 : ALL_KEYS.length + 1);
       openStep(next, { scroll: true, block: "start" });
       if (next === "widgets" && EV2.widgets) EV2.widgets.openFirstEmpty();
       else if (next) focusStep(next);
     }
+  });
+
+  function setLookVisible(visible) {
+    const look = root.querySelector('[data-step="look"]');
+    look.hidden = !visible;
+    KEYS.splice(0, KEYS.length, ...sections.filter((s) => !s.hidden).map((s) => s.dataset.step));
+    sections
+      .filter((s) => !s.hidden)
+      .forEach((sec, i) => {
+        sec.dataset.index = String(i + 1);
+        sec.querySelector(".ev2-sn-n").textContent = String(i + 1);
+      });
+    const next = root.querySelector('[data-ev2-next="widgets"]');
+    if (next) next.textContent = visible ? "Next: style it" : "Next: add to a lineup";
+    if (!visible && open === "look") openStep("widgets", { focus: true });
+    else render();
+  }
+
+  window.addEventListener("hashchange", () => {
+    const key = location.hash.slice(1);
+    if (ALL_KEYS.includes(key)) openStep(KEYS.includes(key) ? key : "widgets", { focus: true });
   });
 
   // ---------------------------------------------------------- 1 · Display
@@ -433,6 +467,14 @@
     restoring = false;
   }
 
-  EV2.steps = { open: openStep, current: () => open, render, renderBar, setProgress, keys: KEYS };
+  EV2.steps = {
+    open: openStep,
+    current: () => open,
+    render,
+    renderBar,
+    setProgress,
+    setLookVisible,
+    keys: KEYS,
+  };
   render();
 })();

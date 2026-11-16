@@ -24,6 +24,7 @@
 {% set _sb_cell = (page.cells | selectattr('id', 'equalto', _sb_id) | list | first) if _sb_id else None %}
 {% set _cells = page.cells | rejectattr('id', 'equalto', _sb_id) | list if _sb_id else page.cells %}
 {% set _filled = _cells | selectattr('plugin') | list %}
+{% set _look_visible = look_visible | default(true) %}
 {% set _group = preview_groups[0] if preview_groups else {'w': panel.w, 'h': panel.h} %}
 {% set _wmap = {} %}{% for w in widget_picker.widgets %}{% set _ = _wmap.update({w.id: w}) %}{% endfor %}
 {% set _layout_name = ((layouts | selectattr('slug', 'equalto', active_layout) | list | first).name) if active_layout else 'Your own layout' %}
@@ -412,7 +413,7 @@
   </div>
   <p class="ev2-sub" data-ev2-sub>
     {%- if _is_new -%}
-    Four short steps: where it shows, how the screen is split, what goes in each part, and how it looks. Then, if you like, add it to a lineup.
+    Choose a display, a layout and widgets. Then, if you like, add it to a lineup.
     {%- else -%}
     Shows on {% if _using_test %}a {{ _td.w }}×{{ _td.h }} test display{% else %}{{ _bound | map(attribute='label') | join(' and ') }}{% endif %}. {{ _cells | length }} cell{{ '' if _cells | length == 1 else 's' }}, {{ _filled | length }} with widgets.
     {%- endif -%}
@@ -576,7 +577,7 @@
               {% endfor %}
             </ul>
             {% if not _cells %}<p class="ev2-help muted">Pick a layout first; each part of it becomes a cell here.</p>{% endif %}
-            {{ next_btn('widgets', 'Next: style it') }}
+            {{ next_btn('widgets', 'Next: style it' if _look_visible else 'Next: add to a lineup') }}
           </div>
         </div>
       </section>
@@ -587,7 +588,7 @@
       {% set _gap_max = [60, page.gap] | max %}{% set _rad_max = [40, page.corner_radius] | max %}
       {% set _overrides = look_overrides | default([]) %}
       {% set _look_summary %}{% if _overrides %}{{ ico('warning') }} {{ _overrides | length }} widget{{ 's' if _overrides | length != 1 }} override{{ 's' if _overrides | length == 1 }} it · {% endif %}{{ _theme_label }} · {{ _style_label }} · padding {{ page.gap }}{% endset %}
-      <section class="ev2-step" id="ev2-step-look" data-step="look" data-index="4">
+      <section class="ev2-step" id="ev2-step-look" data-step="look" data-index="4"{% if not _look_visible %} hidden{% endif %}>
         {{ step_head('look', 4, 'Look', _look_summary, warn=_overrides | length > 0, opt=_is_new) }}
         <p class="ev2-st-wait" data-ev2-wait></p>
         <div class="ev2-st-body" id="ev2-b-look" role="region" aria-labelledby="ev2-h-look" hidden>
@@ -691,9 +692,9 @@
       {% set _schedule_count = _joined | selectattr('is_schedule') | list | length %}
       {% set _lineup_summary = 'In ' ~ (_joined | length) ~ ' lineup' ~ ('' if _joined | length == 1 else 's') if _joined else 'Not in any lineup' %}
       {% if _schedule_count %}{% set _lineup_summary = _lineup_summary ~ ' · ' ~ _schedule_count ~ ' schedule' ~ ('' if _schedule_count == 1 else 's') %}{% endif %}
-      <section class="ev2-step ev2-lineups" id="ev2-step-{{ _lineup_step }}" data-step="{{ _lineup_step }}" data-index="5">
+      <section class="ev2-step ev2-lineups" id="ev2-step-{{ _lineup_step }}" data-step="{{ _lineup_step }}" data-index="{{ 5 if _look_visible else 4 }}">
         <span id="{{ _lineup_step }}" class="ev2-anchor"></span>
-        {{ step_head(_lineup_step, 5, 'Lineups', _lineup_summary, opt=_is_new) }}
+        {{ step_head(_lineup_step, 5 if _look_visible else 4, 'Lineups', _lineup_summary, opt=_is_new) }}
         {% if _is_new %}<p class="ev2-st-wait" data-ev2-wait></p>{% endif %}
         <div class="ev2-st-body" id="ev2-b-{{ _lineup_step }}" role="region" aria-labelledby="ev2-h-{{ _lineup_step }}" hidden>
           <p class="ev2-lead">Lineups decide when this dashboard shows: on its own schedule, or rotating with others.</p>

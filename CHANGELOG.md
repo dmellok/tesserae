@@ -12,6 +12,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Offer conditions when adding a dashboard and hide Look when no widget uses it.
+
 - Add kie.ai as a selectable image service, with saved tasks and shared spending limits.
 - Add a dashboard editor with guided steps, live preview and widget option examples. Switch back to classic from its help menu.
 

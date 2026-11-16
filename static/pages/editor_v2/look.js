@@ -105,6 +105,17 @@
   }
 
   function refreshOverrides() {
+    const content = EV2.widgets
+      ? EV2.widgets.rows().filter((li) => li.dataset.n && li.dataset.widget)
+      : [];
+    const effects = ["custom_css", "gap", "corner_radius"].some((name) => {
+      const value = form.elements[name].value;
+      return name === "custom_css" ? value.trim() : Number(value) !== 0;
+    });
+    const visible =
+      content.length > 0 &&
+      (effects || content.some((li) => !JSON.parse(li.dataset.ev2LookRules || "{}").always));
+    EV2.steps?.setLookVisible(visible);
     const o = overriders();
     refreshSummary();
     if (!box) return;
@@ -221,6 +232,8 @@
   const cells = root.querySelector("[data-ev2-cells]");
   ["input", "change"].forEach((name) => {
     cells?.addEventListener(name, () => queueMicrotask(refreshOverrides));
+    form.addEventListener(name, () => queueMicrotask(refreshOverrides));
   });
+  new MutationObserver(refreshOverrides).observe(cells, { childList: true });
   EV2.ready(refreshOverrides);
 })();

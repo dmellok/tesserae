@@ -4239,6 +4239,7 @@ def test_a_displays_plus_starts_a_lineup_for_that_display(real: tuple[str, Flask
         page.locator('[data-time="start"]').fill("10:00")
         page.locator("[data-goto='3']").click()
         page.locator('[data-add="free"]').click()
+        page.locator("[data-add-confirm]").click()
         with page.expect_navigation():
             page.locator("[data-create]").click()
         made = [d for d in app.config["DECK_STORE"].all() if d.id not in before]

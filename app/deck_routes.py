@@ -2951,6 +2951,19 @@ def create_lineup() -> Response:
             fires_at=(form.get("fires_at") or "").strip() or None,
             anchor=(form.get("anchor") or "00:00").strip() or "00:00",
         )
+        deck = _merged_deck(
+            deck,
+            advance_mode=form.get("advance_mode") or "scheduled",
+            pages=[
+                {
+                    **p.model_dump(),
+                    "conditions": json.loads(
+                        (form.get(f"conditions[{p.page_id}]") or "").strip() or "[]"
+                    ),
+                }
+                for p in deck.pages
+            ],
+        )
         if when:
             start = (form.get("start") or "").strip()
             deck = _apply_when(deck, "at", start, "", None)

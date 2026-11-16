@@ -143,6 +143,8 @@
     // {mode: "draw", hist: [{key, state, thumb, large, note, sig}], pos, n, note}
     choice: {},
     picker: false,
+    adding: null,
+    modePicked: false,
     elsewhere: false,
     step: S.isNew ? (S.display ? 2 : 1) : 0, // the new flow's open step
     saving: false,
@@ -158,9 +160,7 @@
   const stepHadConditions = new Set(
     S.steps.filter((s) => s.conditions && s.conditions.length).map((s) => s.id)
   );
-  // Conditions are a per-dashboard rule. A step that has some shows its
-  // editor; one that has none offers "Add a condition", which opens it. Only
-  // a step whose editor is showing posts its conditions.
+  // Keep the condition editor open after its last condition is removed.
   const hasConditions = (s) => stepHadConditions.has(s.id) || !!(s.conditions || "").trim();
   const showConditions = (s) => hasConditions(s) || ui.condOpen.has(s.id);
   let saved = snapshot();
@@ -1434,6 +1434,16 @@
     return { here, other };
   }
   function pickerHtml() {
+    if (ui.adding) {
+      const a = ui.adding;
+      return `<div class="dxe-picker" id="dxe-picker"><b>Add ${esc(pageOf(a.id).name)}</b>
+        <div class="dxe-cond"><label for="dxe-add-conditions">Only show while... <span class="dxe-soft">optional</span></label>
+          <div class="condition-picker" data-condition-picker data-empty-message="No conditions: this dashboard can show whenever the lineup runs."><textarea id="dxe-add-conditions" data-cond="__adding__" rows="2" aria-label="Conditions for new dashboard" spellcheck="false">${esc(a.conditions)}</textarea></div>
+          <p class="dxe-soft">Leave empty to show it without conditions. Skipped while conditions fail; if none pass, the display keeps its last image.</p>
+        </div>
+        ${st.when.mode === "between" ? `<label class="dxe-add-mode">Picks <select class="dxe-in dxe-select" data-add-mode aria-label="How to pick dashboards"><option value="scheduled"${a.mode === "scheduled" ? " selected" : ""}>Each in turn</option><option value="priority"${a.mode === "priority" ? " selected" : ""}>First whose conditions pass</option></select><span class="dxe-soft">First whose conditions pass uses list order instead of dashboard times.</span></label>` : ""}
+        <div class="dxe-add-actions"><button type="button" class="dxe-link quiet" data-add-cancel>Cancel</button><button type="button" class="lu-btn-primary" data-add-confirm>Add dashboard</button></div></div>`;
+    }
     const { here, other } = candidates();
     const dev = deviceOf(st.display);
     const cards = (list, elsewhere) =>
@@ -1524,8 +1534,12 @@
   };
   const showSmart = () => sleeps() && (kind() === "cycle" || kind() === "interval");
   const showKeepReady = () => takesInput() && kind() !== "daily";
-  // "First whose conditions pass" is a legacy mode: offered only where set.
-  const showMode = () => S.mode === "priority" && kind() === "cycle";
+  const showMode = () =>
+    kind() === "cycle" &&
+    (ui.modePicked ||
+      S.mode === "priority" ||
+      st.mode === "priority" ||
+      st.steps.some(hasConditions));
   // Min hold only gates a rotation, and only matters when something can cut
   // a dashboard short: a press, a rule, or another lineup.
   function interrupters() {
@@ -1973,10 +1987,14 @@
         id,
         dwell: null,
         override: null,
-        conditions: "",
+        conditions: ui.adding.conditions,
         refresh: pageOf(id).refresh || 0,
         pin: undefined,
       });
+      st.mode = ui.adding.mode;
+      if (st.mode === "priority") ui.modePicked = true;
+      if (ui.adding.conditions.trim()) stepHadConditions.add(id);
+      ui.adding = null;
       if (!st.home) st.home = "";
     });
     live(`Added ${pageOf(id).name}.`);
@@ -2471,7 +2489,11 @@
       st.when.days.forEach((on, i) => on && fd.append("days", String(i)));
     }
     fd.append("device_ids", st.display);
-    st.steps.forEach((s) => fd.append("page_ids", s.id));
+    st.steps.forEach((s) => {
+      fd.append("page_ids", s.id);
+      if (hasConditions(s)) fd.append(`conditions[${s.id}]`, s.conditions || "");
+    });
+    if (showMode()) fd.append("advance_mode", st.mode);
     fd.append("interval_minutes", String(st.interval));
     consentFields(fd);
     const sent = snapshot();
@@ -2498,6 +2520,7 @@
     ui.consent = {};
     ui.consentDisplay = S.display;
     ui.picker = false;
+    ui.adding = null;
     ui.elsewhere = false;
     const title = $("dxe-title");
     if (title) title.value = st.name;
@@ -2630,6 +2653,8 @@
     }
     if (d.picker !== undefined) {
       ui.picker = !ui.picker;
+      if (ui.adding) delete ui.consent[ui.adding.id];
+      ui.adding = null;
       if (ui.picker) ui.open.clear(); // one panel under the strip at a time
       draw();
       (ui.picker ? root.querySelector("[data-add]") : root.querySelector("[data-picker]"))?.focus();
@@ -2641,7 +2666,27 @@
       root.querySelector("[data-elsewhere-toggle]")?.focus();
       return;
     }
-    if (d.add) return addStep(d.add, d.elsewhere !== undefined);
+    if (d.add) {
+      if (d.elsewhere !== undefined && !(await confirmBind([d.add], st.display))) return;
+      ui.adding = {
+        id: d.add,
+        elsewhere: d.elsewhere !== undefined,
+        conditions: "",
+        mode: st.mode,
+      };
+      draw();
+      queueMicrotask(() => root.querySelector("#dxe-picker .cp-actions button")?.focus());
+      return;
+    }
+    if (d.addCancel !== undefined) {
+      const id = ui.adding.id;
+      delete ui.consent[id];
+      ui.adding = null;
+      draw();
+      root.querySelector(`[data-add="${CSS.escape(id)}"]`)?.focus();
+      return;
+    }
+    if (d.addConfirm !== undefined && ui.adding) return addStep(ui.adding.id, ui.adding.elsewhere);
     if (d.remove) return removeStep(d.remove);
     if (d.home) {
       if (t.getAttribute("aria-disabled") === "true") return; // already home
@@ -2777,6 +2822,10 @@
       return;
     }
     if (d.cond) {
+      if (d.cond === "__adding__" && ui.adding) {
+        ui.adding.conditions = t.value;
+        return;
+      }
       const s = stepOf(d.cond);
       if (s) change(() => (s.conditions = t.value), { draw: false });
       return;
@@ -2807,6 +2856,10 @@
     }
     if (d.time) return draw();
     if (d.cond) {
+      if (d.cond === "__adding__" && ui.adding) {
+        ui.adding.conditions = t.value;
+        return;
+      }
       const s = stepOf(d.cond);
       if (s) change(() => (s.conditions = t.value), { draw: false });
       return;
@@ -2831,7 +2884,12 @@
     if (d.timeout !== undefined) return change(() => (st.timeout = Number(t.value) || 0));
     if (d.smart !== undefined) return change(() => (st.smartSync = t.checked));
     if (d.cadence !== undefined) return change(() => (st.cadence = Number(t.value) || 0));
-    if (d.modeSel !== undefined) return change(() => (st.mode = t.value));
+    if (d.modeSel !== undefined)
+      return change(() => {
+        st.mode = t.value;
+        ui.modePicked = true;
+      });
+    if (d.addMode !== undefined && ui.adding) ui.adding.mode = t.value;
     // Nothing else is drawn from these: the footer alone, so tabbing on
     // keeps the next field in place.
     if (d.lead !== undefined || d.priority !== undefined || d.hold !== undefined)

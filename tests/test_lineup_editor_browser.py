@@ -47,6 +47,42 @@ pytestmark = pytest.mark.skipif(not _HAS_CHROMIUM, reason="Playwright Chromium n
 ALL_DAYS = [0, 1, 2, 3, 4, 5, 6]
 
 
+@pytest.mark.parametrize("conditional", [False, True])
+@pytest.mark.parametrize("width", [1280, 390])
+def test_add_dashboard_offers_optional_conditions(real, conditional, width):
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    pages = app.config["PAGE_STORE"]
+    pages.save(pages.get("clock").model_copy(update={"device_ids": ["hall"]}))
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/morning/edit", width=width)
+        page.locator("[data-picker]").click()
+        page.locator('[data-add="clock"]').click()
+        assert page.get_by_text("Only show while", exact=False).is_visible()
+        assert "Skipped while conditions fail" in page.locator("#dxe-picker").inner_text()
+        assert "clock" not in _steps(page)
+        if conditional:
+            page.locator("#dxe-picker").get_by_role(
+                "button", name="Add condition", exact=True
+            ).click()
+            page.locator("#dxe-picker .cp-row input[list]").fill("sensor.example_state")
+        page.locator("[data-add-confirm]").click()
+        assert "clock" in _steps(page)
+        if conditional:
+            assert page.locator("[data-mode-sel]").input_value() == "scheduled"
+            page.locator("[data-mode-sel]").select_option("priority")
+        _save(page)
+        saved = app.config["DECK_STORE"].get("morning")
+        step = next(s for s in saved.pages if s.page_id == "clock")
+        assert bool(step.conditions) is conditional
+        if conditional:
+            assert step.conditions[0].source_id == "sensor.example_state"
+        assert saved.advance_mode == ("priority" if conditional else "scheduled")
+        assert not errors
+        browser.close()
+
+
 @pytest.fixture
 def real(tmp_path: Path) -> Iterator[tuple[str, Flask]]:
     from PIL import Image
@@ -60,8 +96,9 @@ def real(tmp_path: Path) -> Iterator[tuple[str, Flask]]:
         devices_dir=REPO_ROOT / "devices",
     )
     app.config["TESTING"] = True
+    app.config["SCHEDULER"].stop()  # These browser tests drive the routes themselves.
     settings = app.config["SETTINGS_STORE"]
-    settings.patch_section("app", {"onboarded": True})
+    settings.patch_section("app", {"onboarded": True, "locale": "en-US"})
     settings.patch_section("auth", {"disabled": True})
     c = app.test_client()
     for dev, kind in (("hall", "esp32_client"), ("tv", "opendisplay_ha")):
@@ -362,6 +399,10 @@ def test_dashboards_reorder_items_add_remove_and_discard(real: tuple[str, Flask]
         page.locator("[data-picker]").click()
         assert page.locator('#dxe-picker [data-add="photos"]').count() == 1
         page.locator('#dxe-picker [data-add="photos"]').click()
+        page.locator("[data-add-cancel]").click()
+        assert _steps(page) == ["clock", "climate"]
+        page.locator('#dxe-picker [data-add="photos"]').click()
+        page.locator("[data-add-confirm]").click()
         assert _steps(page) == ["clock", "climate", "photos"]
         page.locator("[data-discard]").click()
         assert _steps(page) == ["photos", "clock", "climate"]
@@ -426,7 +467,14 @@ def test_new_lineup_steps_and_creates(real: tuple[str, Flask]) -> None:
         assert "No dashboards yet." in page.locator(".dxe-empty").first.inner_text()
         assert create.is_disabled()
         page.locator('[data-add="photos"]').click()
+        page.locator("[data-add-confirm]").click()
         page.locator('[data-add="clock"]').click()
+        page.locator("#dxe-picker").get_by_role("button", name="Add condition", exact=True).click()
+        page.locator("#dxe-picker .cp-row").get_by_role("combobox").first.select_option(
+            "time_window"
+        )
+        page.locator("[data-add-mode]").select_option("priority")
+        page.locator("[data-add-confirm]").click()
         assert create.is_enabled()
         page.locator("#dxe-title").fill("Day art")
         with page.expect_navigation():
@@ -437,6 +485,8 @@ def test_new_lineup_steps_and_creates(real: tuple[str, Flask]) -> None:
         d = made[0]
         assert page.url.endswith(f"/decks/{d.id}/edit")
         assert (d.name, d.device_ids, d.page_ids) == ("Day art", ["tv"], ["photos", "clock"])
+        assert d.advance_mode == "priority"
+        assert len(d.pages[1].conditions) == 1
         assert (d.advance_trigger, d.advance_anchor, d.advance_end_at) == (
             "cycle",
             "07:00",

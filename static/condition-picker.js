@@ -315,7 +315,8 @@ function init(picker) {
         el(
           "p",
           { class: "field-help" },
-          "No conditions yet — the schedule fires every time it's due."
+          picker.dataset.emptyMessage ||
+            "No conditions yet — the schedule fires every time it's due."
         )
       );
       return;
