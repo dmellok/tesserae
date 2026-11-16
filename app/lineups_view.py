@@ -191,6 +191,7 @@ class LineupUrls:
     name: str = ""
     order: str = ""
     bind: str = ""
+    export: str = ""
 
 
 @dataclass(frozen=True)
@@ -769,6 +770,7 @@ class ActionsView(_Dict):
     step_item_url: str = ""
     name_url: str = ""
     order_url: str = ""
+    export_url: str = ""
 
 
 @dataclass
@@ -3187,6 +3189,7 @@ def _lineup_view(
             step_item_url=u.step_item,
             name_url=u.name,
             order_url=u.order,
+            export_url=u.export,
         ),
         sort_minutes=sort_minutes,
         off_why=off_why,
@@ -3444,6 +3447,7 @@ def _sample_urls(lineup_id: str) -> LineupUrls:
         step_item=f"/decks/{lineup_id}/step-item",
         window=f"/decks/{lineup_id}/window",
         days=f"/decks/{lineup_id}/days",
+        export=f"/bundles/export?lineup={lineup_id}",
     )
 
 
