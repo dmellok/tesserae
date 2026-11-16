@@ -2886,8 +2886,8 @@ def test_pushing_a_step_from_a_lineup_marks_that_lineup_live_even_from_another_d
             for lu in d["lineups"]
         }
 
-    # The seeded weekend / night lineups follow the real clock and may be
-    # live by schedule; what matters is that the push changes none of them.
+    # The seeded lineups follow the real clock and one may be live by
+    # schedule; what matters is that the push makes none of them live.
     before = lineups()
     assert before["elsewhen"] != "live"
     resp = other_day.post("/decks/elsewhen/push-step", json={"index": 1, "display_id": "panel"})
@@ -2895,11 +2895,12 @@ def test_pushing_a_step_from_a_lineup_marks_that_lineup_live_even_from_another_d
     rec = app.config["DECK_NAV_STORE"].get("panel")
     assert rec and rec["deck_id"] == "elsewhen" and rec["page_id"] == "art"
     assert _status_of(other_day, "elsewhen") == "live"
-    # ... and only that lineup.
+    # ... and only that lineup. A display has one Live row, so a seeded lineup
+    # that was live by the real clock steps down to Queued; the rest stay put.
     after = lineups()
     assert after["elsewhen"] == "live"
     assert {k: v for k, v in after.items() if k != "elsewhen"} == {
-        k: v for k, v in before.items() if k != "elsewhen"
+        k: "queued" if v == "live" else v for k, v in before.items() if k != "elsewhen"
     }
 
 

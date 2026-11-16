@@ -51,6 +51,9 @@ def test_overlay_atlas_route_accepts_full_touch_charset(client: FlaskClient) -> 
     assert 'id="strip"' in body or "id='strip'" in body
     # Every requested glyph made it into the strip.
     assert body.count("<span") == len(TOUCH_CHARSET)
+    # The renderer waits for this flag; without it each atlas build sits out
+    # the 25 s compose timeout before it captures.
+    assert "window.__tesseraeComposed = true" in body
 
 
 def test_test_render_unknown_plugin_still_routes(client: FlaskClient) -> None:

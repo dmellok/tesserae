@@ -22,7 +22,9 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
-- Fix wake estimates after quiet hours to follow the interval sent to the display.
+- Font atlases for touch and overlay displays build in about a second instead of 25. Each build waited out a timeout and logged `composer mount wait timed out`, which on a fresh start looked like the server had hung.
+- Windows: the server starts again. The kie.ai image service used a file lock that only exists on Linux and macOS, so `run.ps1` stopped with `ModuleNotFoundError: No module named 'fcntl'`.
+- Windows installer: a failed check (git or Python missing) now shows its message and leaves the PowerShell window open. Before, the window closed before the message could be read.
 - Lineups show the delivered, queued and waiting states, with separate lanes for overlapping windows.
 - Smart sync: button wakes no longer reset wake-time trust.
 - Pre-renders and warm-ahead runs are skipped for a display that is paused, in quiet hours, or whose lineup conditions for that dashboard fail, so background renders no longer spend money nobody can see. A dashboard on the glass keeps its refreshes and edits as before. An automated follow-up is dropped once a newer frame has reached the display, and a display coming back from a pause gets a fresh render instead of a frame drawn before it. (#535)
@@ -30,6 +32,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - Show when a held update will land in the next refresh tooltip.
 - Buttons: a press on a lineup starts from the dashboard the lineup is showing, not its first one. Refresh re-sends that dashboard and Next goes to the one after it. This applies to every lineup that runs on a schedule, with or without conditions. Next and Previous also skip dashboards whose conditions fail, and History says where the press landed. A button set to a fixed step still goes to that step.
 - Device page: a display's **Own hours** switch under Quiet hours can be turned off again. Saving with it off left it on, because the page sent nothing for that section. The window you set is kept for when you switch it back on. (#523)
+- Fix wake estimates after quiet hours to follow the interval sent to the display.
 - Lineup editor: a dashboard switched from canvas to grid lists its items again (its leftover canvas data counted as a second widget).
 - New dashboard editor: adding a dashboard to a rotating lineup, or removing it, shows the right dashboard on the next tick instead of at the next boundary. A lineup is deleted by leaving it only when the request confirms it, and a lineup whose times can't be described no longer stops the editor from opening.
 - News, Wikipedia On This Day: the date follows your timezone setting. It used UTC, so west of Greenwich it showed tomorrow's entries from the early evening until local midnight.
