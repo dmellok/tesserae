@@ -416,3 +416,16 @@ def test_invalid_spending_total_blocks_payment(tmp_path, fake_fal, value):
     with pytest.raises(artwork.ArtworkError, match="budget"):
         client.generate("nano_banana_t2i", "bird")
     assert not fake_fal
+
+
+def test_corrupt_budget_reads_as_spent_where_nothing_is_paid(tmp_path):
+    """Asking how much room is left must not raise: the batch routes and a
+    dashboard render both ask, and only the payment needs to refuse."""
+    c = _collection("corrupt-gates")
+    c.folder(tmp_path).mkdir(parents=True)
+    (c.folder(tmp_path) / "budget.json").write_text("partial record")
+    assert c.room(tmp_path, 100) == 0
+    assert c.budget_spent(tmp_path, 100) is True
+    assert c.budget_spent(tmp_path, artwork.UNLIMITED) is False
+    assert c.start_batch([], tmp_path, 100) == 0
+    assert c.render_now(tmp_path, "k", {"daily_budget": 1}) == (0, 0)

@@ -529,7 +529,23 @@ class Collection:
             return 0
         if cap >= UNLIMITED:
             return 10**6
-        return max(0, cap - self.budget_used(data_dir)) // max(1, self.typical_cents)
+        try:
+            used = self.budget_used(data_dir)
+        except ArtworkError:
+            return 0
+        return max(0, cap - used) // max(1, self.typical_cents)
+
+    def budget_spent(self, data_dir: Path, cap: int) -> bool:
+        """Whether the day's budget has no room for another paid picture. A
+        budget that cannot be read counts as spent here, so the pages and
+        dashboards that only ask keep working; the payment itself still
+        refuses with the reason."""
+        if cap >= UNLIMITED:
+            return False
+        try:
+            return self.budget_used(data_dir) >= cap
+        except ArtworkError:
+            return True
 
     # -- the store ---------------------------------------------------------
 
@@ -893,11 +909,7 @@ class Collection:
     def start_batch(self, jobs: list[Job], data_dir: Path, cap: int) -> int:
         n = 0
         for job in jobs:
-            if (
-                cap < UNLIMITED
-                and self.budget_used(data_dir) >= cap
-                and not self.has_paid_task(job.key, data_dir)
-            ):
+            if self.budget_spent(data_dir, cap) and not self.has_paid_task(job.key, data_dir):
                 continue
             if self.start(job, cap):
                 n += 1
@@ -1560,7 +1572,7 @@ class Art:
             self._count("no_key")
             return Got(key, "no_key")
         if not c.has_paid_task(key, self.data_dir) and (
-            (self.cap < UNLIMITED and c.budget_used(self.data_dir) >= self.cap) or ceiling_spent()
+            c.budget_spent(self.data_dir, self.cap) or ceiling_spent()
         ):
             self._count("capped")
             return Got(key, "capped")
