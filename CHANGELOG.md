@@ -12,6 +12,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- The lineup editor shows display wake times and warns about renders between wakes.
 - Choose a test display panel type and preview each display at exact pixel sizes.
 - Lineups on phones start collapsed, with a filter toggle and compact rows.
 - Add kie.ai as a selectable image service, with saved tasks and shared spending limits.
