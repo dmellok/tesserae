@@ -37,7 +37,7 @@
 {%- macro overview_tiles(section, base=None) -%}
 <div class="dx-live" data-render-sync="tiles:{{ section.get('device_id') }}">
 {{ stat_tile('Showing', section.overview.showing, (base ~ '#lineups') if base is not none else '', "Open this display's lineups") }}
-{% if section.capabilities.battery %}{{ stat_tile(section.overview.battery.title or 'Battery', section.overview.battery, (base ~ '#power') if base is not none and section.battery_offset_endpoint else '', 'Open power settings') }}{% endif %}
+{% if section.capabilities.battery or section.overview.battery.title == 'Screen' %}{{ stat_tile(section.overview.battery.title or 'Battery', section.overview.battery, (base ~ '#power') if base is not none and section.battery_offset_endpoint else '', 'Open power settings') }}{% endif %}
 {%- set _fw_update = section.overview.firmware.has_update or ((section.status.firmware or {}).state == 'outdated' and (section.status.firmware or {}).latest) %}
 {% if section.capabilities.firmware_updates %}{{ stat_tile('Firmware', section.overview.firmware, url_for('auth.firmware_index') if _fw_update else ((base ~ '#connection') if base is not none else ''), 'Open the Firmware page' if _fw_update else 'Open firmware and connection details') }}{% endif %}
 {% if section.capabilities.wake_schedule %}{{ stat_tile('Next update', section.overview.next_wake, (base ~ '#timing') if base is not none else '', 'Open wake timing') }}{% endif %}
@@ -309,7 +309,7 @@
 {%- set ssh = st.smart_sync_header or {} -%}
 {%- set vs = section.visionect_setup -%}
 <ul class="dx-vitals" aria-label="Vital signs" data-render-sync="tiles:{{ section.get('device_id') }}">
-  {% if section.capabilities.battery %}
+  {% if section.capabilities.battery or ov.battery.title == 'Screen' %}
   {%- set bat_tip = ov.battery.sub or '' %}
   <li><a class="dx-vital" href="{{ '#power' if section.battery_offset_endpoint else '#connection' }}"{% if bat_tip %} title="{{ bat_tip }}"{% endif %}>
     <span class="dx-vital-k">{{ ov.battery.title or 'Battery' }}</span>

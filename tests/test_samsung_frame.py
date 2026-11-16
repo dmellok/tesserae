@@ -695,8 +695,9 @@ def test_device_card_shows_the_screen_not_a_battery(app: Flask) -> None:
     power = FakePower(tv, on=True)
     _powered(app, tv, power, [False]).poll_once()
     client = _admin(app)
-    html = client.get("/settings/devices/office_frame").get_data(as_text=True)
-    assert "Art Mode" in html and ">Screen<" in html
+    for url in ("/settings/devices/office_frame", "/settings/devices"):
+        html = client.get(url).get_data(as_text=True)
+        assert "Art Mode" in html and ">Screen<" in html
 
 
 @pytest.mark.parametrize(
