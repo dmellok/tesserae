@@ -1,9 +1,11 @@
 """Paid kie tasks survive a local timeout without submitting or charging twice."""
 
+import ast
 import hashlib
 import io
 import json
 import threading
+from pathlib import Path
 
 import pytest
 from PIL import Image
@@ -413,3 +415,47 @@ def test_render_now_collects_paid_task_when_daily_budget_is_spent(tmp_path, api,
         time.sleep(0.01)
     assert c.picture("robin", tmp_path)[0] == png
     assert len([u for u, _, _ in calls if u.endswith("createTask")]) == 1
+
+
+def test_the_task_lock_lets_one_caller_in_at_a_time(tmp_path):
+    inside = threading.Event()
+    release = threading.Event()
+    second = threading.Event()
+
+    def first():
+        with kie_images._locked(tmp_path):
+            inside.set()
+            release.wait(5)
+
+    def then():
+        with kie_images._locked(tmp_path):
+            second.set()
+
+    a = threading.Thread(target=first)
+    a.start()
+    assert inside.wait(5)
+    b = threading.Thread(target=then)
+    b.start()
+    assert not second.wait(0.2)
+    release.set()
+    assert second.wait(5)
+    a.join()
+    b.join()
+
+
+def test_no_module_needs_a_unix_only_import_to_load():
+    """Windows has no fcntl, pwd, grp, resource or termios. One of them
+    imported at the top of a module stops the server from starting there."""
+    unix_only = {"fcntl", "pwd", "grp", "resource", "termios", "tty", "pty", "syslog"}
+    root = Path(kie_images.__file__).resolve().parents[1]
+    found = []
+    for folder in ("app", "plugins", "transports", "renderers"):
+        for path in (root / folder).rglob("*.py"):
+            for node in ast.parse(path.read_text(encoding="utf-8")).body:
+                names = []
+                if isinstance(node, ast.Import):
+                    names = [a.name.split(".")[0] for a in node.names]
+                elif isinstance(node, ast.ImportFrom) and node.module:
+                    names = [node.module.split(".")[0]]
+                found += [f"{path.relative_to(root)}: {n}" for n in names if n in unix_only]
+    assert found == []
