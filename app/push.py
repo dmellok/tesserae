@@ -2193,7 +2193,7 @@ class PushManager:
         wait_s: int,
         followup: int,
         *,
-        respect_quiet_hours: bool = False,
+        automated: bool = False,
     ) -> None:
         """Send ``page_id`` again in ``wait_s`` seconds (within the window),
         because a widget on it said it was still working. One timer per
@@ -2206,7 +2206,6 @@ class PushManager:
             )
             return
         delay = float(min(FOLLOWUP_MAX_S, max(FOLLOWUP_MIN_S, wait_s)))
-        automated = respect_quiet_hours
         targets = self._page_push_targets(page_id, device_ids)
         original = {did: (self._latest_renders.get(did) or {}).get("timestamp") for did in targets}
 
@@ -2232,15 +2231,15 @@ class PushManager:
                     )
                     if automated and not current:
                         return
-                    # A Send ignores quiet hours and so do its follow-ups.
-                    # An automated push keeps respecting them (and stays
-                    # automated for the follow-ups after this one).
+                    # The first push already passed quiet hours (or was a
+                    # Send, which ignores them); a follow-up only finishes
+                    # that page. It stays automated for the ones after it.
                     result = self._push_page_locked(
                         page_id,
                         device_ids=current,
                         source="follow-up",
-                        respect_quiet_hours=automated,
                         followup=followup + 1,
+                        automated_followup=automated,
                     )
                 self._notify(result)
             except Exception:
@@ -2789,6 +2788,7 @@ class PushManager:
         followup: int = 0,
         waited: tuple[float, int] = (0.0, 0),
         exclude_device_ids: set[str] | None = None,
+        automated_followup: bool = False,
     ) -> PushResult:
         started = time.monotonic()
         refresh_wanted = 0
@@ -2985,7 +2985,7 @@ class PushManager:
                 {d for _panel, dids in groups for d in dids} or device_ids,
                 refresh_wanted,
                 followup,
-                respect_quiet_hours=respect_quiet_hours,
+                automated=respect_quiet_hours or automated_followup,
             )
         if not group_results:
             status: PushStatus = "failed"

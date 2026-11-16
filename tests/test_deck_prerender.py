@@ -773,3 +773,62 @@ def test_warm_ahead_considers_displays_reached_through_a_lineup(wired, tmp_path)
     assert scheduler._page_can_warm("p_b") is True
     wired.device_in_quiet_hours = lambda _did: True
     assert scheduler._page_can_warm("p_b") is False
+
+
+def test_followup_ignores_quiet_hours_that_began_after_its_push(wired, tmp_path):
+    """The follow-up replaces a placeholder already on the glass, so quiet
+    hours starting in between neither hold nor drop it, and the follow-up
+    after it is still automated (a newer frame retires it)."""
+    _automation(wired, tmp_path)
+    with patch(
+        "app.push.capture_composed", return_value=(_png((1, 2, 3)), {"refresh_s": 10})
+    ) as render:
+        wired.push("p_a", device_ids={"panel"}, respect_quiet_hours=True, settle=False)
+        timer = wired.pending_followup("p_a")
+        assert timer is not None
+        timer.cancel()
+        with (
+            patch.object(wired, "device_in_quiet_hours", return_value=True),
+            patch.object(wired, "_filter_quiet_devices", return_value=[]) as quiet_filter,
+        ):
+            timer.function()
+        assert quiet_filter.call_count == 0
+        assert render.call_count == 2
+        timer = wired.pending_followup("p_a")
+        assert timer is not None
+        timer.cancel()
+        with patch("app.push.capture_composed", return_value=(_png((9, 8, 7)), [])):
+            wired.push("p_b", device_ids={"panel"}, settle=False)
+        timer.function()
+        assert render.call_count == 2
+
+
+def test_widget_schedule_fire_is_recorded_when_a_lineup_display_is_paused(wired, tmp_path):
+    """Driven through the widget-schedule pass: the page is on one display
+    and in a lineup on a paused one. The fire is recorded, so the showing
+    display is sent the page once and not again on the next tick."""
+    from datetime import timedelta
+    from types import SimpleNamespace
+
+    from app.state.device_rotation_state_model import DeviceRotationState
+
+    scheduler, now, states, _ = _automation(wired, tmp_path)
+    deck = scheduler._deck_store.get("lineup")
+    scheduler._deck_store.upsert(deck.model_copy(update={"device_ids": ["panel", "away"]}))
+    states.upsert(
+        DeviceRotationState(device_id="away", automation_pause_until=now + timedelta(minutes=30))
+    )
+    record = SimpleNamespace(key="p_a:cell", page_id="p_a", schedule=SimpleNamespace(at=None))
+    with (
+        patch.object(scheduler, "_widget_schedule_records", return_value=[record]),
+        patch.object(scheduler, "_devices_showing_pages", return_value={"p_a": {"panel"}}),
+        patch(
+            "app.scheduler._daily_is_due", side_effect=lambda *_a, last_fired, **_k: not last_fired
+        ),
+        patch("app.push.capture_composed", return_value=(_png((1, 2, 3)), [])) as render,
+    ):
+        scheduler._maybe_refresh_scheduled_widgets(now)
+        assert render.call_count == 1
+        assert scheduler._widget_schedule_last_fired == {"p_a:cell": now.timestamp()}
+        scheduler._maybe_refresh_scheduled_widgets(now + timedelta(seconds=30))
+        assert render.call_count == 1
