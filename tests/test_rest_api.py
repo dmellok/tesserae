@@ -3333,3 +3333,29 @@ def test_other_kinds_are_never_touched(app: Flask) -> None:
     before = _panel(app, "esp_any")
     _post_status(client, "esp_any", token, {"fw_version": "1.63.0"})
     assert _panel(app, "esp_any") == before
+
+
+def test_a_button_frame_request_marks_the_wake_for_smart_sync(app: Flask) -> None:
+    """Stock firmware reports a press as ``GET /frame?button=…`` before the wake's
+    heartbeat. The route stamps telemetry so that wake is not scored against the
+    sleep timer; a plain timer-wake frame request leaves the stamp alone."""
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    resp = _register_via_api(client, code=code, device_id="bedroom_pico")
+    headers = {"Authorization": f"Bearer {resp.get_json()['device_token']}"}
+    telemetry = app.config["DEVICE_TELEMETRY"]
+
+    status = client.post(
+        "/api/v1/device/bedroom_pico/status", json={"next_sleep_s": 3600}, headers=headers
+    )
+    assert status.status_code == 200
+    client.get("/api/v1/device/bedroom_pico/frame", headers=headers)
+    assert telemetry.get("bedroom_pico").button_wake_at is None
+
+    before = time.time()
+    client.get(
+        "/api/v1/device/bedroom_pico/frame?button=refresh&button_event_id=3", headers=headers
+    )
+    stamped = telemetry.get("bedroom_pico").button_wake_at
+    assert stamped is not None and before <= stamped <= time.time()

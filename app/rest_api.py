@@ -414,6 +414,18 @@ def _wants_first_byte(range_header: str | None) -> bool:
     return range_header.replace(" ", "").lower() == "bytes=0-0"
 
 
+def _note_button_wake(device: Device) -> None:
+    """Tell telemetry a press woke this display, so smart sync does not score
+    the wake against the sleep timer's prediction. Best-effort."""
+    telemetry = current_app.config.get("DEVICE_TELEMETRY")
+    if telemetry is None:
+        return
+    try:
+        telemetry.note_button_wake(device.id)
+    except Exception:
+        current_app.logger.exception("rest: button wake note failed for device=%s", device.id)
+
+
 def _dispatch_query_button(device: Device, *, route: str) -> Any | None:
     """Dispatch a ``?button=`` wake through the button service, or None when
     there is no button on this request. ``?page=<id>`` without a button is a
@@ -435,6 +447,7 @@ def _dispatch_query_button(device: Device, *, route: str) -> Any | None:
     page_raw = request.args.get("page", "").strip()
     if svc is None or not (button_raw or page_raw):
         return None
+    _note_button_wake(device)
     if not button_raw:
         # A dashboard picked from the panel's own menu (frames.json items).
         try:

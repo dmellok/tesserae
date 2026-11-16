@@ -21,6 +21,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- Smart sync: button wakes no longer reset wake-time trust.
 - Pre-renders and warm-ahead runs are skipped for a display that is paused, in quiet hours, or whose lineup conditions for that dashboard fail, so background renders no longer spend money nobody can see. A dashboard on the glass keeps its refreshes and edits as before. An automated follow-up is dropped once a newer frame has reached the display, and a display coming back from a pause gets a fresh render instead of a frame drawn before it. (#535)
 - Hiding or closing the dashboard editor tab keeps the latest edit: an earlier autosave still on its way can no longer overwrite it, and closing the tab sends the edit at once.
 - Show when a held update will land in the next refresh tooltip.
