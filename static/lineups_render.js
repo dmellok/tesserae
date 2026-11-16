@@ -73,7 +73,7 @@
       .filter((t) => t.next || !after || t.minute > day.now_min)
       .map((t) =>
         t.next
-          ? `<i class="lu-tick next" style="left:${t.pct}%" data-tip="Next refresh ${clock(t.minute)}" aria-hidden="true"></i>`
+          ? `<i class="lu-tick next" style="left:${t.pct}%" data-tip="Next refresh ${clock(t.minute)}${t.lands ? `, lands ${esc(t.lands)}` : ""}" aria-hidden="true"></i>`
           : `<i class="lu-tick" style="left:${t.pct}%" data-tip="Refresh ${clock(t.minute)}" aria-hidden="true"></i>`
       )
       .join("");
