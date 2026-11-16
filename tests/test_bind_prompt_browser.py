@@ -127,12 +127,16 @@ def _steps(page: Any) -> list[str]:
 
 
 def _other(page: Any, page_id: str) -> Any:
-    """The Add button of a dashboard bound to another display, in the picker."""
+    """A dashboard bound to another display, in the picker (opened if closed)."""
     if not page.locator("#dxe-picker").count():
         page.locator("[data-picker]").click()
-    if not page.locator(".dxe-picks.is-other").count():
-        page.locator("[data-elsewhere-toggle]").click()
-    return page.locator(f'.dxe-picks.is-other [data-add="{page_id}"]')
+    return page.locator(f'#dxe-pg-other ~ [data-add="{page_id}"]')
+
+
+def _add_other(page: Any, page_id: str) -> None:
+    """Pick it and press Add: the bind prompt comes up over the picker."""
+    _other(page, page_id).click()
+    page.locator("#dxe-picker [data-add-confirm]").click()
 
 
 def test_adding_a_dashboard_from_another_display_asks_first(real: tuple[str, Flask]) -> None:
@@ -143,34 +147,35 @@ def test_adding_a_dashboard_from_another_display_asks_first(real: tuple[str, Fla
         browser, page, errors = _editor(p, base)
         chip = _other(page, "photos")
         assert chip.count() == 1
-        assert page.locator('.dxe-picks:not(.is-other) [data-add="weather"]').count() == 1
+        assert page.locator('#dxe-pg-here ~ [data-add="weather"]').count() == 1
 
-        # Cancel: the dialog closes, the step is not added, nothing is bound.
-        chip.click()
+        # Cancel: the prompt closes, the step is not added, nothing is bound; the
+        # picker stays open with the choice.
+        _add_other(page, "photos")
         dlg = page.locator("dialog.bind-dialog")
         assert dlg.get_by_role("heading").inner_text().startswith("Bind “Google Photos” to ")
         assert "currently bound to" in dlg.inner_text()
         _answer(page, "Cancel")
         assert _steps(page) == ["clock"]
+        assert page.locator("#dxe-picker").is_visible()
 
-        # Escape cancels too.
-        chip.click()
+        # Escape cancels the prompt only.
+        page.locator("#dxe-picker [data-add-confirm]").click()
+        dlg.wait_for()
         page.keyboard.press("Escape")
         page.locator("dialog.bind-dialog").wait_for(state="detached")
         assert _steps(page) == ["clock"]
+        assert page.locator("#dxe-picker").is_visible()
 
-        # Binding consent comes before adding; the pick then adds it at once
-        # (no second confirm), and the display binding waits for Save.
-        chip.click()
-        _answer(page, _BIND)
-        assert _steps(page) == ["clock", "photos"]
-        assert page.locator("[data-add-confirm]").count() == 0
-        # Removed before Save: nothing is bound. Added again: it asks again.
-        page.locator('[data-remove="photos"]').click()
+        # Closing the picker after all adds nothing.
+        page.locator("#dxe-picker .wizard-footer [data-add-cancel]").click()
         assert _steps(page) == ["clock"]
         assert _bound(app, "photos") == ["frame"]
-        _other(page, "photos").click()
+
+        # Bind agreed: added at once; the display binding waits for Save.
+        _add_other(page, "photos")
         _answer(page, _BIND)
+        page.locator("#dxe-picker").wait_for(state="detached")
         assert _steps(page) == ["clock", "photos"]
         assert _bound(app, "photos") == ["frame"]  # nothing changes until Save
         _save(page)
@@ -187,13 +192,14 @@ def test_bind_to_both_keeps_the_other_display(real: tuple[str, Flask]) -> None:
     with sync_playwright() as p:
         browser, page, errors = _editor(p, base)
         _other(page, "photos").click()
+        page.locator("#dxe-picker .dxe-pick-cond > summary").click()
+        page.locator("#dxe-picker").get_by_role("button", name="Add condition", exact=True).click()
+        page.locator("#dxe-picker .cp-row").get_by_role("combobox").first.select_option(
+            "time_window"
+        )
+        page.locator("#dxe-picker [data-add-confirm]").click()
         _answer(page, "Bind to both")
         assert _steps(page) == ["clock", "photos"]
-        page.locator('[data-edit="photos"]').click()
-        page.locator('[data-add-cond="photos"]').click()
-        picker = page.locator('[data-panel="photos"] [data-condition-picker]')
-        picker.get_by_role("button", name="Add condition", exact=True).click()
-        picker.locator(".cp-row").get_by_role("combobox").first.select_option("time_window")
         _save(page)
         assert _members(app) == ["clock", "photos"]
         assert _bound(app, "photos") == ["frame", "hallway"]

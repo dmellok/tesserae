@@ -142,8 +142,7 @@
     // {mode: "pick", idx, key, label, state, thumb, large, note} or
     // {mode: "draw", hist: [{key, state, thumb, large, note, sig}], pos, n, note}
     choice: {},
-    picker: false,
-    elsewhere: false,
+    picker: false, // the add-dashboard picker is open
     step: S.isNew ? (S.display ? 2 : 1) : 0, // the new flow's open step
     saving: false,
     pushing: false,
@@ -1198,7 +1197,7 @@
       .join("")
       .replaceAll(' loading="lazy"', ' loading="eager"');
     const addTile = st.display
-      ? `<li class="lu-step dxe-add-step"><figure><span class="lu-slot"></span><button type="button" class="dxe-add-tile" data-picker data-fk="picker" aria-expanded="${ui.picker}" aria-controls="dxe-picker">${ico(ui.picker ? "x" : "plus")}<span>${ui.picker ? "Close" : "Add dashboard"}</span></button></figure></li>`
+      ? `<li class="lu-step dxe-add-step"><figure><span class="lu-slot"></span><button type="button" class="dxe-add-tile" data-picker data-fk="picker" aria-haspopup="dialog">${ico("plus")}<span>Add dashboard</span></button></figure></li>`
       : "";
     const now = vms.some((x) => x.pill) ? " has-now" : "";
     return (
@@ -1511,64 +1510,260 @@
     );
   }
 
-  /* --- the add-dashboard picker */
+  /* --- the add-dashboard picker: a dialog over the page. Pick one, Add puts it in
+     the lineup at once (asking to bind it first when it is on another display);
+     Cancel, Esc or a click outside add nothing. */
+  // Every dashboard, those on this display (or on none) first; the ones already in
+  // the lineup stay listed, greyed, after the rest of their group.
   function candidates() {
     const inList = new Set(st.steps.map((s) => s.id));
-    const all = Object.values(S.pages).filter((p) => !p.missing && !inList.has(p.id));
-    const here = all.filter((p) => !strandedFor(p.id, st.display));
-    const other = all.filter((p) => strandedFor(p.id, st.display));
-    return { here, other };
+    const all = Object.values(S.pages).filter((p) => !p.missing);
+    const last = (a, b) => Number(inList.has(a.id)) - Number(inList.has(b.id));
+    const here = all.filter((p) => !strandedFor(p.id, st.display)).sort(last);
+    const other = all.filter((p) => strandedFor(p.id, st.display)).sort(last);
+    return { here, other, inList };
   }
-  function pickerHtml() {
-    const { here, other } = candidates();
-    const dev = deviceOf(st.display);
-    const cards = (list, elsewhere) =>
-      list
-        .map((p) => {
-          const where = elsewhere
-            ? `<span class="dxe-soft dxe-where">On ${esc(p.devices.map((d) => (deviceOf(d) || { name: d }).name).join(", "))}</span>`
-            : "";
-          return (
-            `<li class="dxe-pick"><span class="dxe-pick-th">${stackedThumb(p)}</span><span class="dxe-step-text"><b>${esc(p.name)}</b><span class="dxe-step-sub">${esc(p.subtitle || "")}</span>${where}</span>` +
-            `<button type="button" class="lu-btn-ghost lu-btn-line sm dxe-add-btn" data-add="${esc(p.id)}" data-fk="add-${esc(p.id)}"${elsewhere ? " data-elsewhere" : ""} aria-label="Add ${esc(p.name)}">${ico("plus")}<span>Add</span></button></li>`
-          );
-        })
-        .join("");
-    const none = !here.length
-      ? `<p class="dxe-empty">${ico("layers")}<span>${dev ? `No more dashboards for ${esc(dev.name)}.` : "Pick a display first."}</span></p>`
+  const PICK_SEARCH_FROM = 7; // a search field once the list is longer than a glance
+  function pickOption(p, inList, elsewhere) {
+    const taken = inList.has(p.id);
+    const where = elsewhere
+      ? `<span class="dxe-pick-note">${ico("screen")}<span>Not on this display (on ${esc(p.devices.map((d) => (deviceOf(d) || { name: d }).name).join(", "))})</span></span>`
       : "";
-    const more =
-      `<p class="dxe-soft dxe-pick-more">Not here? ` +
-      (S.urls.newDashboard
-        ? `<a href="${esc(S.urls.newDashboard)}">Make a new dashboard</a>`
-        : "") +
-      (other.length
-        ? `${S.urls.newDashboard ? " or " : ""}<button type="button" class="dxe-link" data-elsewhere-toggle data-fk="elsewhere" aria-expanded="${ui.elsewhere}">${ui.elsewhere ? "hide" : "show"} dashboards from other displays (${other.length})</button>`
-        : "") +
-      `</p>`;
+    const tag = taken ? `<span class="dxe-pick-tag">Already in this lineup</span>` : "";
+    const hay = `${p.name} ${p.subtitle || ""}`.toLowerCase();
     return (
-      `<div class="dxe-picker" id="dxe-picker"${shapeVars()}>${none}<ul class="dxe-picks">${cards(here, false)}</ul>${more}` +
-      (ui.elsewhere && other.length
-        ? `<ul class="dxe-picks is-other">${cards(other, true)}</ul>`
-        : "") +
-      `</div>`
+      `<div class="dxe-pick-opt${taken ? " is-taken" : ""}" role="option" id="dxe-opt-${esc(p.id)}" tabindex="-1" data-add="${esc(p.id)}"${elsewhere ? " data-elsewhere" : ""} data-hay="${esc(hay)}" aria-selected="false"${taken ? ' aria-disabled="true"' : ""}>` +
+      `<span class="dxe-pick-th">${stackedThumb(p)}</span>` +
+      `<span class="dxe-pick-text"><b>${esc(p.name)}</b>${p.subtitle && p.subtitle !== p.name ? `<span class="dxe-pick-sub">${esc(p.subtitle)}</span>` : ""}${where}${tag}</span>` +
+      `<span class="dxe-pick-mark" aria-hidden="true">${ico("check")}</span></div>`
     );
+  }
+  function pickerDialogHtml() {
+    const { here, other, inList } = candidates();
+    const dev = deviceOf(st.display) || { name: st.display };
+    const total = here.length + other.length;
+    const free = total - inList.size;
+    const group = (id, title, list, elsewhere) =>
+      list.length
+        ? `<div class="dxe-pick-g" role="group" aria-labelledby="${id}"><p class="dxe-pick-gh" id="${id}">${esc(title)}</p>${list.map((p) => pickOption(p, inList, elsewhere)).join("")}</div>`
+        : "";
+    const search =
+      total >= PICK_SEARCH_FROM
+        ? `<div class="dxe-pick-find"><label class="lu-tb-search dxe-search">${ico("search")}<input type="search" data-pick-q placeholder="Search dashboards" aria-label="Search dashboards" aria-controls="dxe-pick-list" autocomplete="off" spellcheck="false"></label></div>`
+        : "";
+    const empty = !total
+      ? `<p class="dxe-empty">${ico("layers")}<span>No dashboards yet.</span></p>`
+      : !free
+        ? `<p class="dxe-soft dxe-pick-allin">Every dashboard is in this lineup already.</p>`
+        : "";
+    const make = S.urls.newDashboard
+      ? `<a class="dxe-pick-make" href="${esc(S.urls.newDashboard)}">Make a new dashboard</a>`
+      : "";
+    return (
+      `<div class="wizard-head"><div class="wizard-head-text"><h2 id="dxe-pick-title">Add a dashboard</h2><p class="wizard-progress">To ${esc(dev.name)}</p></div>` +
+      `<button type="button" class="wizard-close" data-add-cancel aria-label="Close">${ico("x")}</button></div>` +
+      search +
+      `<div class="wizard-body dxe-pick-body">${empty}` +
+      (total
+        ? `<div class="dxe-pick-list" id="dxe-pick-list" role="listbox" aria-labelledby="dxe-pick-title">` +
+          group("dxe-pg-here", `On ${dev.name}`, here, false) +
+          group("dxe-pg-other", "On other displays", other, true) +
+          `</div><p class="dxe-soft dxe-pick-none" data-pick-none hidden>No dashboards match.</p>`
+        : "") +
+      `</div>` +
+      `<details class="dxe-pick-cond"><summary>Only show while… <span class="dxe-soft">optional</span></summary>` +
+      `<div class="condition-picker" data-condition-picker data-empty-message="No conditions: it can show whenever the lineup runs."><textarea id="dxe-add-conditions" rows="2" aria-label="Conditions for the new dashboard" spellcheck="false"></textarea></div>` +
+      `<p class="dxe-soft">Skipped while a condition fails; if none pass, the display keeps its last image.</p></details>` +
+      `<div class="wizard-footer">${make}<span class="wizard-footer-spacer"></span>` +
+      `<button type="button" class="lu-btn-ghost" data-add-cancel>Cancel</button>` +
+      `<button type="button" class="lu-btn-primary" data-add-confirm disabled>Add</button></div>`
+    );
+  }
+  // Opens the picker; resolves when it closes (added or not).
+  function openPicker() {
+    if (!st.display || typeof HTMLDialogElement === "undefined") return;
+    const old = document.getElementById("dxe-picker");
+    if (old && old.open) return;
+    if (old) old.remove(); // closed, its close event still to come
+    const opener = document.activeElement;
+    const dlg = document.createElement("dialog");
+    dlg.id = "dxe-picker";
+    dlg.className = "wizard-dialog dxe-pick-dlg";
+    dlg.setAttribute("aria-labelledby", "dxe-pick-title");
+    const v = viewOf(st.display) || {};
+    dlg.style.cssText = `--dxe-arw:${Number(v.width) || 16};--dxe-arh:${Number(v.height) || 10}`;
+    dlg.innerHTML = pickerDialogHtml();
+    ui.picker = true;
+    let sel = null;
+    let busy = false;
+    let added = false;
+    const q = dlg.querySelector("[data-pick-q]");
+    const ok = dlg.querySelector("[data-add-confirm]");
+    const opts = () => [...dlg.querySelectorAll(".dxe-pick-opt:not([hidden])")];
+    const usable = () => opts().filter((o) => o.getAttribute("aria-disabled") !== "true");
+    const choose = (o, focus) => {
+      if (!o) return;
+      dlg.querySelectorAll(".dxe-pick-opt").forEach((x) => {
+        x.setAttribute("aria-selected", String(x === o));
+        x.tabIndex = x === o ? 0 : -1;
+      });
+      if (o.getAttribute("aria-disabled") === "true") {
+        sel = null;
+        ok.disabled = true;
+        ok.textContent = "Add";
+      } else {
+        sel = o.dataset.add;
+        ok.disabled = false;
+        ok.textContent = `Add ${pageOf(sel).name}`;
+      }
+      if (focus) {
+        o.focus();
+        o.scrollIntoView({ block: "nearest" });
+      }
+    };
+    const filter = () => {
+      const words = (q ? q.value : "").trim().toLowerCase().split(/\s+/).filter(Boolean);
+      dlg.querySelectorAll(".dxe-pick-opt").forEach((o) => {
+        o.hidden = !words.every((w) => o.dataset.hay.includes(w));
+      });
+      dlg.querySelectorAll(".dxe-pick-g").forEach((g) => {
+        g.hidden = !g.querySelector(".dxe-pick-opt:not([hidden])");
+      });
+      const none = dlg.querySelector("[data-pick-none]");
+      if (none) none.hidden = !!opts().length;
+      // A choice the search hid is no choice.
+      const cur = sel && dlg.querySelector(`[data-add="${CSS.escape(sel)}"]`);
+      if (cur && cur.hidden) {
+        sel = null;
+        cur.setAttribute("aria-selected", "false");
+        ok.disabled = true;
+        ok.textContent = "Add";
+      }
+      const first = usable()[0] || opts()[0];
+      if (first && !opts().some((o) => o.tabIndex === 0)) first.tabIndex = 0;
+    };
+    const confirm = async () => {
+      if (!sel || busy) return;
+      busy = true;
+      const id = sel;
+      // Bound to another display: the bind prompt comes over the picker; its Cancel
+      // goes back to the picker with the choice kept.
+      const yes = await confirmBind([id], st.display);
+      busy = false;
+      if (!yes) {
+        dlg.querySelector(`[data-add="${CSS.escape(id)}"]`)?.focus();
+        return;
+      }
+      const ta = dlg.querySelector("#dxe-add-conditions");
+      added = true;
+      shut();
+      addStep(id, ta ? ta.value.trim() : "");
+    };
+    // The page's own handlers never see what happens in here.
+    ["click", "keydown", "input", "change", "dblclick"].forEach((type) =>
+      dlg.addEventListener(type, (e) => e.stopPropagation())
+    );
+    // Closed is gone: nothing half-open is left in the page.
+    const shut = () => {
+      if (dlg.open) dlg.close();
+      dlg.remove();
+    };
+    dlg.addEventListener("cancel", (e) => {
+      e.preventDefault(); // Esc
+      shut();
+    });
+    dlg.addEventListener("click", (e) => {
+      if (e.target === dlg) return shut(); // the backdrop
+      const t = e.target.closest("[data-add-cancel], [data-add-confirm], .dxe-pick-opt");
+      if (!t) return;
+      if (t.matches("[data-add-cancel]")) return shut();
+      if (t.matches("[data-add-confirm]")) return confirm();
+      choose(t, true);
+      if (t.getAttribute("aria-disabled") === "true")
+        live(`${pageOf(t.dataset.add).name} is already in this lineup.`);
+    });
+    dlg.addEventListener("dblclick", (e) => {
+      const o = e.target.closest(".dxe-pick-opt");
+      if (o && o.dataset.add === sel) confirm();
+    });
+    dlg.addEventListener("keydown", (e) => {
+      const o = e.target.closest && e.target.closest(".dxe-pick-opt");
+      const inQ = e.target === q;
+      if (!o && !inQ) return;
+      const all = opts();
+      const at = o ? all.indexOf(o) : -1;
+      const go = (i) => {
+        if (!all.length) return;
+        e.preventDefault();
+        choose(all[Math.max(0, Math.min(all.length - 1, i))], true);
+      };
+      if (e.key === "ArrowDown") {
+        if (inQ) {
+          const cur = all.find((x) => x.dataset.add === sel);
+          return go(cur ? all.indexOf(cur) : 0);
+        }
+        return go(at + 1);
+      }
+      if (e.key === "ArrowUp") {
+        if (o && at === 0 && q) {
+          e.preventDefault();
+          return q.focus();
+        }
+        return o ? go(at - 1) : undefined;
+      }
+      if (o && e.key === "Home") return go(0);
+      if (o && e.key === "End") return go(all.length - 1);
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (o) {
+          choose(o, false);
+          return confirm();
+        }
+        // In the search: Enter adds the choice when one shows, else picks the first match.
+        const cur = all.find((x) => x.dataset.add === sel);
+        if (cur) return confirm();
+        const first = usable()[0];
+        if (first) choose(first, true);
+        return;
+      }
+      if (o && e.key === " ") {
+        e.preventDefault();
+        return choose(o, true);
+      }
+      // Typing on the list searches.
+      if (o && q && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) q.focus();
+    });
+    if (q) q.addEventListener("input", filter);
+    dlg.addEventListener("close", () => {
+      dlg.remove();
+      ui.picker = false;
+      if (added) return; // the new tile takes the focus
+      window.setTimeout(() => {
+        const back =
+          opener && document.contains(opener) && opener.matches("[data-picker]")
+            ? opener
+            : root.querySelector("[data-picker]");
+        back?.focus({ preventScroll: true });
+      }, 0);
+    });
+    root.append(dlg);
+    filter();
+    dlg.showModal();
+    // Search first on a long list; else the first dashboard that can be added.
+    if (q) q.focus();
+    else {
+      const first = usable()[0];
+      if (first) first.focus();
+      else ok.closest(".wizard-footer").querySelector("[data-add-cancel]").focus();
+    }
   }
 
-  // No dashboards: the add tile where the first one will go, and a line.
   function emptyHtml() {
-    return (
-      `<div class="dxe-none"><button type="button" class="dxe-add-tile dxe-add-first" data-picker data-fk="picker" aria-expanded="${ui.picker}" aria-controls="dxe-picker"${st.display ? "" : " disabled"}>${ico(ui.picker ? "x" : "plus")}<span>${ui.picker ? "Close" : "Add a dashboard"}</span></button>` +
-      `<p class="dxe-none-t"><b>No dashboards yet</b><span class="dxe-soft">${st.display ? "Add one or more. They show in the order you add them." : "Pick a display first."}</span></p></div>`
-    );
+    return `<div class="dxe-none"><button type="button" class="dxe-add-tile dxe-add-first" data-picker data-fk="picker" aria-haspopup="dialog"${st.display ? "" : " disabled"}>${ico("plus")}<span>Add a dashboard</span></button><p class="dxe-none-t"><b>No dashboards yet</b><span class="dxe-soft">${st.display ? "Add one or more. They show in the order you add them." : "Pick a display first."}</span></p></div>`;
   }
   function stepsCard() {
     const n = st.steps.length;
-    // Picking one adds it: the picker says so, so nobody looks for a second button.
-    const picker = ui.picker
-      ? `<div class="dxe-pick-wrap"><p class="dxe-pick-head"><b>Pick a dashboard</b><span class="dxe-soft">It's added as you pick it.</span></p>${pickerHtml()}</div>`
-      : "";
-    return `<div class="dxe-card dxe-steps-card${n ? "" : " is-empty"}"${shapeVars()}>${n ? stripHtml() : emptyHtml()}${picker}</div>`;
+    return `<div class="dxe-card dxe-steps-card${n ? "" : " is-empty"}"${shapeVars()}>${n ? stripHtml() : emptyHtml()}</div>`;
   }
 
   /* ------------------------------------------------------------ 3 Timing */
@@ -2227,19 +2422,19 @@
     live(`Moved ${pageOf(id).name} to ${j + 1} of ${st.steps.length}.`);
   }
 
-  // Picking a dashboard adds it: no second confirm. It opens selected, with
-  // its optional condition one link away.
-  async function addStep(id, elsewhere) {
-    if (elsewhere && !(await confirmBind([id], st.display))) return;
+  // A dashboard picked in the picker (its bind already agreed): it joins the end of
+  // the lineup, and its tile takes the focus.
+  function addStep(id, conditions) {
     change(() => {
       st.steps.push({
         id,
         dwell: null,
         override: null,
-        conditions: "",
+        conditions: conditions || "",
         refresh: pageOf(id).refresh || 0,
         pin: undefined,
       });
+      if ((conditions || "").trim()) stepHadConditions.add(id);
       if (!st.home) st.home = "";
       ui.picker = false;
       ui.elsewhere = false;
@@ -2248,11 +2443,15 @@
     });
     if (!S.isNew) loadStrip(id);
     live(`Added ${pageOf(id).name}.`);
-    const sel = root.querySelector(`[data-step="${CSS.escape(id)}"] .dxe-sel`);
-    if (sel) {
-      sel.focus();
-      sel.closest("[data-step]").scrollIntoView({ block: "nearest", inline: "nearest" });
-    }
+    // After the closing dialog hands the focus back to what opened it.
+    window.setTimeout(() => {
+      const tile = root.querySelector(`[data-step="${CSS.escape(id)}"]`);
+      if (!tile) return root.querySelector("[data-picker]")?.focus();
+      tile.querySelector(".dxe-sel")?.focus({ preventScroll: true });
+      tile.scrollIntoView({ block: "nearest", inline: "nearest" });
+      tile.classList.add("is-flash");
+      window.setTimeout(() => tile.classList.remove("is-flash"), 1800);
+    }, 0);
   }
 
   function removeStep(id) {
@@ -2772,8 +2971,6 @@
     st = initial();
     ui.consent = {};
     ui.consentDisplay = S.display;
-    ui.picker = false;
-    ui.elsewhere = false;
     const title = $("dxe-title");
     if (title) title.value = st.name;
     const on = $("dxe-enabled");
@@ -2797,7 +2994,6 @@
     ui.open.clear();
     if (!open) {
       ui.open.add(id);
-      ui.picker = false;
       loadStrip(id);
     }
     draw();
@@ -2935,20 +3131,7 @@
       ).focus();
       return;
     }
-    if (d.picker !== undefined) {
-      ui.picker = !ui.picker;
-      if (ui.picker) ui.open.clear(); // one panel under the strip at a time
-      draw();
-      (ui.picker ? root.querySelector("[data-add]") : root.querySelector("[data-picker]"))?.focus();
-      return;
-    }
-    if (d.elsewhereToggle !== undefined) {
-      ui.elsewhere = !ui.elsewhere;
-      draw();
-      root.querySelector("[data-elsewhere-toggle]")?.focus();
-      return;
-    }
-    if (d.add) return addStep(d.add, d.elsewhere !== undefined);
+    if (d.picker !== undefined) return openPicker();
     if (d.remove) return removeStep(d.remove);
     if (d.home) {
       if (t.getAttribute("aria-disabled") === "true") return; // already home

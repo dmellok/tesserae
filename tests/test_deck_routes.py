@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from html import unescape
 from pathlib import Path
+from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -877,3 +878,39 @@ def test_saving_the_editor_unchanged_keeps_a_deleted_step_and_remove_persists(
         follow_redirects=True,
     )  # fmt: skip
     assert [p.page_id for p in app.config["DECK_STORE"].get("rot").pages] == ["overview"]
+
+
+def test_editor_tile_shows_the_lineups_display_its_own_picture(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A dashboard on displays of different shapes has one shared preview at the
+    largest panel's ratio (a landscape picture cropped into a portrait tile). The
+    editor swaps in the lineup display's own picture and size, as Lineups does."""
+    import app.deck_routes as routes
+    from app.lineups_view import DisplayShot
+    from app.state.page_store import Page as PageModel
+
+    app.config["PAGE_STORE"].save(PageModel(id="photos", name="Photos"))
+    shot = DisplayShot(
+        thumb_url="/compose/thumbs/portrait.png", width=1200, height=1600, composition_digest="d"
+    )
+    seen: dict[str, Any] = {}
+
+    def fake_shots(device: Any, w: int, h: int, pages: list[Any]) -> dict[str, Any]:
+        seen.update(device=device.id, size=(w, h), pages={p.id for p in pages})
+        return {"photos": shot}
+
+    class Door:
+        id = "door"
+
+    registry = app.config["DEVICE_REGISTRY"]
+    monkeypatch.setattr(registry, "get", lambda did: Door() if did == "door" else None)
+    monkeypatch.setattr(routes, "_device_size", lambda d: (1200, 1600, "1200×1600"))
+    monkeypatch.setattr(routes, "_display_shots", fake_shots)
+    client = app.test_client()
+    _sign_in(client)
+    state = _state(client.get("/decks/new", query_string={"display": "door"}).text)
+    assert seen["device"] == "door" and seen["size"] == (1200, 1600)
+    page = state["pages"]["photos"]
+    assert (page["thumb"], page["w"], page["h"]) == ("/compose/thumbs/portrait.png", 1200, 1600)
+    assert state["pages"]["overview"]["thumb"] != "/compose/thumbs/portrait.png"

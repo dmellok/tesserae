@@ -3442,9 +3442,15 @@ def _when_of(deck: Deck | None) -> dict[str, Any]:
     return {"mode": "between", "start": start, "end": end, "days": days, "kind": kind}
 
 
-def _recent_sent(page_id: str, limit: int = 8) -> list[dict[str, Any]]:
+def _recent_sent(
+    page_id: str, limit: int = 8, device_id: str | None = None
+) -> list[dict[str, Any]]:
     """The pictures this dashboard last sent, newest first (``[{thumb, at}]``):
-    a draw widget's recent photos, from the push log. Only frames still on disk."""
+    a draw widget's recent photos, from the push log. Only frames still on disk.
+
+    ``device_id`` keeps the frames sent to that display when there are any: a
+    dashboard also shown on a display of another shape sent pictures of that
+    shape too (a landscape TV's frames in a portrait frame's strip)."""
     from app.lineup_thumbs import sent_thumb_url
 
     events = current_app.config.get("EVENT_LOG")
@@ -3454,6 +3460,9 @@ def _recent_sent(page_id: str, limit: int = 8) -> list[dict[str, Any]]:
         rows = events.list(type="push", target=page_id, statuses=("sent", "ok"), limit=40)
     except Exception:
         return []
+    if device_id:
+        mine = [r for r in rows if device_id in (r.extra.get("device_ids") or [])]
+        rows = mine or rows
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
     for row in rows:
@@ -3496,7 +3505,7 @@ def _editor_page(
         "icon": summary.get("icon", ""),
         "items": summary.get("items", {}),
         "recent": (
-            _recent_sent(page.id)
+            _recent_sent(page.id, device_id=device_id)
             if (summary.get("items") or {}).get("mode") == "draw"
             or (summary.get("items") or {}).get("empty")
             else []
@@ -3541,6 +3550,19 @@ def _editor_state(deck: Deck | None) -> dict[str, Any]:
             ),
             "shared": shared.get(p.id, 0),
         }
+    # A dashboard shared by displays of different shapes has one preview, drawn at its
+    # largest panel (a 16:9 TV's landscape picture cropped into a portrait frame's
+    # tile). Show the lineup's own display what it shows, as the Lineups page does.
+    shot_device_id = (
+        deck.device_ids[0] if deck is not None and deck.device_ids else request.args.get("display")
+    )
+    shot_device = devices_reg.get(shot_device_id) if devices_reg and shot_device_id else None
+    if shot_device is not None:
+        sw, sh, _spec = _device_size(shot_device)
+        for pid, shot in _display_shots(
+            shot_device, sw, sh, [p for p in pages if p.id in page_meta]
+        ).items():
+            page_meta[pid].update(thumb=shot.thumb_url, w=shot.width, h=shot.height)
     # A step whose dashboard was deleted still belongs to the lineup: list it,
     # flagged, so it can be seen and removed rather than kept on every save.
     for dp in deck.pages if deck is not None else []:

@@ -6,6 +6,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+- Pick dashboards in a popup with previews shaped for the display.
+
 - Add dashboards to a new lineup in one click.
 
 ### Security
