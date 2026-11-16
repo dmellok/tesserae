@@ -180,6 +180,10 @@ For **custom**, enter the interval and press **Set**.
 
 Choose **device's own interval** to let the device decide when to wake.
 
+### Unreadable Home Assistant conditions
+
+In a lineup's Home Assistant condition, select **Not met when it can't be read** to keep it from running when Home Assistant is unreachable, the entity is missing, or its state is `unknown` or `unavailable`. In saved conditions this is `if_unknown: "fail"`; omitted or `"pass"` keeps the existing behavior.
+
 ## Multiple panels
 
 For multiple displays, repeat with a distinct `device-id` per client.
