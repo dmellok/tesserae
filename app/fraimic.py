@@ -137,6 +137,8 @@ class FraimicClient:
                 code = str(json.loads(exc.read().decode("utf-8")).get("error") or exc.reason)
             except (ValueError, AttributeError, OSError):
                 code = str(exc.reason)
+            finally:
+                exc.close()
             raise FraimicError(exc.code, code) from exc
         try:
             decoded = json.loads(raw.decode("utf-8")) if raw else {}
