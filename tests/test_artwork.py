@@ -380,3 +380,52 @@ def test_an_older_installs_folder_is_adopted_once(tmp_path):
         and d[0]["subject"] == "s1"
     )
     assert not c.adopt(tmp_path, "gen"), "once"
+
+
+@pytest.mark.parametrize("raw", ["partial record", "null", "[]", "42"])
+@pytest.mark.parametrize("cap", [100, artwork.UNLIMITED])
+def test_corrupt_budget_blocks_payment(tmp_path, fake_fal, raw, cap):
+    c = _collection("corrupt-budget")
+    c.folder(tmp_path).mkdir(parents=True)
+    budget = c.folder(tmp_path) / "budget.json"
+    budget.write_text(raw)
+    client = c._fal_for(tmp_path, "k", threading.Event(), cap)
+    with pytest.raises(artwork.ArtworkError, match="budget"):
+        client.generate("nano_banana_t2i", "bird")
+    assert not fake_fal
+    assert budget.read_text() == raw
+
+
+def test_missing_budget_starts_at_zero_and_reset_recovers_corrupt_budget(tmp_path):
+    c = _collection("reset-budget")
+    assert c.budget_used(tmp_path) == 0
+    c.folder(tmp_path).mkdir(parents=True)
+    (c.folder(tmp_path) / "budget.json").write_text("partial record")
+    c.budget_reset(tmp_path)
+    assert c.budget_used(tmp_path) == 0
+    c.spend(tmp_path, 4)
+    assert c.budget_used(tmp_path) == 4
+
+
+@pytest.mark.parametrize("value", [-1, True, "4", 1.5])
+def test_invalid_spending_total_blocks_payment(tmp_path, fake_fal, value):
+    c = _collection("invalid-total")
+    c.folder(tmp_path).mkdir(parents=True)
+    (c.folder(tmp_path) / "budget.json").write_text(json.dumps({artwork._today(): value}))
+    client = c._fal_for(tmp_path, "k", threading.Event(), 100)
+    with pytest.raises(artwork.ArtworkError, match="budget"):
+        client.generate("nano_banana_t2i", "bird")
+    assert not fake_fal
+
+
+def test_corrupt_budget_reads_as_spent_where_nothing_is_paid(tmp_path):
+    """Asking how much room is left must not raise: the batch routes and a
+    dashboard render both ask, and only the payment needs to refuse."""
+    c = _collection("corrupt-gates")
+    c.folder(tmp_path).mkdir(parents=True)
+    (c.folder(tmp_path) / "budget.json").write_text("partial record")
+    assert c.room(tmp_path, 100) == 0
+    assert c.budget_spent(tmp_path, 100) is True
+    assert c.budget_spent(tmp_path, artwork.UNLIMITED) is False
+    assert c.start_batch([], tmp_path, 100) == 0
+    assert c.render_now(tmp_path, "k", {"daily_budget": 1}) == (0, 0)

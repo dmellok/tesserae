@@ -496,8 +496,18 @@ class Collection:
     # -- budget ------------------------------------------------------------
 
     def budget_used(self, data_dir: Path) -> int:
-        got = _read_json(self.folder(data_dir) / "budget.json", {})
-        return int(got.get(_today(), 0)) if isinstance(got, dict) else 0
+        try:
+            got = json.loads((self.folder(data_dir) / "budget.json").read_text())
+            if not isinstance(got, dict):
+                raise ValueError("invalid budget")
+            used = got.get(_today(), 0)
+            if type(used) is not int or used < 0:
+                raise ValueError("invalid spending total")
+        except FileNotFoundError:
+            return 0
+        except (OSError, ValueError) as err:
+            raise ArtworkError("the painting budget could not be read; payment is blocked") from err
+        return used
 
     def spend(self, data_dir: Path, cents: int, model: str = "") -> None:
         with self._q.lock:
@@ -519,7 +529,23 @@ class Collection:
             return 0
         if cap >= UNLIMITED:
             return 10**6
-        return max(0, cap - self.budget_used(data_dir)) // max(1, self.typical_cents)
+        try:
+            used = self.budget_used(data_dir)
+        except ArtworkError:
+            return 0
+        return max(0, cap - used) // max(1, self.typical_cents)
+
+    def budget_spent(self, data_dir: Path, cap: int) -> bool:
+        """Whether the day's budget has no room for another paid picture. A
+        budget that cannot be read counts as spent here, so the pages and
+        dashboards that only ask keep working; the payment itself still
+        refuses with the reason."""
+        if cap >= UNLIMITED:
+            return False
+        try:
+            return self.budget_used(data_dir) >= cap
+        except ArtworkError:
+            return True
 
     # -- the store ---------------------------------------------------------
 
@@ -883,11 +909,7 @@ class Collection:
     def start_batch(self, jobs: list[Job], data_dir: Path, cap: int) -> int:
         n = 0
         for job in jobs:
-            if (
-                cap < UNLIMITED
-                and self.budget_used(data_dir) >= cap
-                and not self.has_paid_task(job.key, data_dir)
-            ):
+            if self.budget_spent(data_dir, cap) and not self.has_paid_task(job.key, data_dir):
                 continue
             if self.start(job, cap):
                 n += 1
@@ -918,6 +940,8 @@ class Collection:
                     self._note_error(job, why)
                     continue
                 self._run_one(job, cap)
+            except ArtworkError as err:
+                self._note_error(job, str(err))
             finally:
                 with self._q.lock:
                     self._q.running.pop(job.key, None)
@@ -1025,14 +1049,20 @@ class Collection:
             queued = [{"key": j.key, "title": j.title} for j, _c in self._q.queue]
             finished = [{"key": k, "at": int(at)} for k, at in self._q.finished]
         cap = self.cap(settings)
-        used = self.budget_used(data_dir)
+        used: int | None = None
+        budget_error = ""
+        try:
+            used = self.budget_used(data_dir)
+        except ArtworkError as err:
+            budget_error = str(err)
         return {
             "running": running,
             "queued": queued,
             "finished": finished,
             "used": used,
             "cap": cap,
-            "used_text": dollars(used),
+            "used_text": dollars(used) if used is not None else "Unavailable",
+            "budget_error": budget_error,
             "cap_text": dollars(cap),
             "held": len(self.held(data_dir)),
         }
@@ -1542,7 +1572,7 @@ class Art:
             self._count("no_key")
             return Got(key, "no_key")
         if not c.has_paid_task(key, self.data_dir) and (
-            (self.cap < UNLIMITED and c.budget_used(self.data_dir) >= self.cap) or ceiling_spent()
+            c.budget_spent(self.data_dir, self.cap) or ceiling_spent()
         ):
             self._count("capped")
             return Got(key, "capped")

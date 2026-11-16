@@ -31,6 +31,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - The dashboard editor warns when a Home Assistant theme overrides the dashboard appearance.
 - Smart sync: button wakes no longer reset wake-time trust.
 - Pre-renders and warm-ahead runs are skipped for a display that is paused, in quiet hours, or whose lineup conditions for that dashboard fail, so background renders no longer spend money nobody can see. A dashboard on the glass keeps its refreshes and edits as before. An automated follow-up is dropped once a newer frame has reached the display, and a display coming back from a pause gets a fresh render instead of a frame drawn before it. (#535)
+- Unreadable painting budgets block new paid requests instead of resetting the daily allowance.
 - Hiding or closing the dashboard editor tab keeps the latest edit: an earlier autosave still on its way can no longer overwrite it, and closing the tab sends the edit at once.
 - Show when a held update will land in the next refresh tooltip.
 - Buttons: a press on a lineup starts from the dashboard the lineup is showing, not its first one. Refresh re-sends that dashboard and Next goes to the one after it. This applies to every lineup that runs on a schedule, with or without conditions. Next and Previous also skip dashboards whose conditions fail, and History says where the press landed. A button set to a fixed step still goes to that step.
