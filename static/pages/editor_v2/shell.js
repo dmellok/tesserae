@@ -64,6 +64,7 @@
       headers,
       credentials: "same-origin",
       keepalive: Boolean(o.keepalive),
+      signal: o.signal,
     });
     const out = await resp.json().catch(() => ({ ok: resp.ok }));
     if (!resp.ok || (out && out.ok === false)) {
@@ -79,13 +80,19 @@
   const failedForms = new Set(); // forms whose last save failed; they still hold the edit
 
   // Queue a POST. Resolves with the JSON body; rejects (and shows the error
-  // in the Saved indicator) when the server refuses.
+  // in the Saved indicator) when the server refuses. ``now`` skips the queue
+  // (a closing tab can't wait for it); later saves still wait for this one.
   function post(url, data, opts) {
     const o = opts || {};
     inFlight++;
     setStatus("saving");
-    const p = chain.then(() => send(url, data, opts));
-    chain = p.catch(() => {});
+    const run = () => {
+      if (o.onStart) o.onStart();
+      return send(url, data, opts);
+    };
+    const before = chain;
+    const p = o.now ? run() : before.then(run);
+    chain = o.now ? Promise.allSettled([before, p]) : p.catch(() => {});
     const tracked = p.then(
       (out) => {
         inFlight--;
@@ -116,11 +123,37 @@
   const formSaved = new Map();
   // Save a form now. A failure keeps the form on the retry list: its fields
   // still hold what the user typed, and the next flush sends them again.
+  // ``live`` holds each form's saves that haven't settled, so a closing tab
+  // can tell what is already on the wire and call off what it replaces.
+  const live = new Map();
+  const aborted = (err) => Boolean(err && err.name === "AbortError");
   function postForm(form, opts) {
-    const p = post(form.action, new FormData(form), opts);
+    const rec = { ctrl: new AbortController(), started: false };
+    const recs = live.get(form) || new Set();
+    live.set(form, recs.add(rec));
+    const p = post(
+      form.action,
+      new FormData(form),
+      Object.assign({}, opts, {
+        signal: rec.ctrl.signal,
+        quiet: aborted,
+        onStart: () => (rec.started = true),
+      })
+    );
+    const done = () => {
+      recs.delete(rec);
+      if (!recs.size && live.get(form) === recs) live.delete(form);
+    };
     p.then(
-      () => failedForms.delete(form),
-      () => failedForms.add(form)
+      () => {
+        done();
+        failedForms.delete(form);
+      },
+      (err) => {
+        done();
+        // A save called off for a newer one didn't fail: the newer one decides.
+        if (!aborted(err)) failedForms.add(form);
+      }
     );
     return p;
   }
@@ -175,17 +208,30 @@
     return timers.size > 0 || inFlight > 0;
   }
 
-  function flushOnLeave() {
+  // Hiding the tab (the page lives on): pending edits join the queue, so an
+  // earlier autosave still on its way can't land after them. Leaving the page
+  // (``leaving``): the queue may never run again, so each form's latest state
+  // goes out at once and its earlier saves are called off instead. Either
+  // way a form whose latest state is already being sent isn't sent twice
+  // (a navigation fires visibilitychange, then pagehide).
+  function flushOnLeave(leaving) {
     const forms = new Set([...timers.keys(), ...failedForms]);
-    timers.forEach((t) => clearTimeout(t));
+    if (leaving) live.forEach((_recs, form) => forms.add(form));
     forms.forEach((form) => {
-      postForm(form, { keepalive: true }).catch(() => {});
+      // A save just called off settles a moment later; it no longer counts.
+      const recs = [...(live.get(form) || [])].filter((r) => !r.ctrl.signal.aborted);
+      const edited = timers.has(form);
+      clearTimeout(timers.get(form));
+      timers.delete(form);
+      const waiting = recs.some((r) => !r.started);
+      if (!edited && recs.length && !(leaving && waiting)) return;
+      if (leaving) recs.forEach((r) => r.ctrl.abort());
+      postForm(form, { keepalive: true, now: leaving }).catch(() => {});
     });
-    timers.clear();
   }
-  window.addEventListener("pagehide", flushOnLeave);
+  window.addEventListener("pagehide", () => flushOnLeave(true));
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") flushOnLeave();
+    if (document.visibilityState === "hidden") flushOnLeave(false);
   });
 
   // ---------------------------------------------------------------- events

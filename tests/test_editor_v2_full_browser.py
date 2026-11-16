@@ -148,7 +148,7 @@ def _type_zoom(page: Any, cell_id: str, value: str) -> None:
 
 
 @pytest.mark.parametrize("event", ["visibilitychange", "pagehide"])
-def test_leaving_queues_latest_edit_after_in_flight_autosave(
+def test_leaving_keeps_latest_edit_over_in_flight_autosave(
     server: tuple[str, Flask], pw: Any, event: str
 ) -> None:
     base, app = server
@@ -189,17 +189,72 @@ def test_leaving_queues_latest_edit_after_in_flight_autosave(
             }""",
             event,
         )
-        # If the latest request bypassed the chain, let its real write finish
-        # before releasing Older. If it was queued, it cannot have been sent.
-        if page.evaluate("() => window.__latestSent"):
+        if event == "pagehide":
+            # A closing tab can't wait for the older save: the latest goes out
+            # while that one is still pending, and the older one is called off.
+            assert page.evaluate("() => window.__latestSent")
             _wait_for(
                 lambda: _cell(app, PAGE_ID, "c1").options.get("label") == "Latest",
-                "the parallel leave-save to land",
+                "the leave-save to land",
                 page=page,
             )
+        else:
+            # The page lives on, so the latest waits its turn behind the older.
+            assert not page.evaluate("() => window.__latestSent")
         page.evaluate("() => window.__releaseOlder()")
         page.wait_for_function("() => window.__latestSent", timeout=5000)
         page.evaluate("() => EV2.flush()")
+        assert _cell(app, PAGE_ID, "c1").options.get("label") == "Latest"
+        assert not errors
+    finally:
+        browser.close()
+
+
+def test_navigating_away_sends_a_pending_edit_once(server: tuple[str, Flask], pw: Any) -> None:
+    """A navigation fires visibilitychange, then pagehide. The edit queued by
+    the first goes out at once on the second (it sat behind an older save),
+    and a form already being sent isn't sent again."""
+    base, app = server
+    browser, page, errors = _open(pw, base)
+    try:
+        page.locator('.ev2-cl[data-cell-id="c1"] [data-ev2-row]').click()
+        page.evaluate(
+            """() => {
+              const send = window.fetch;
+              window.__sent = [];
+              window.fetch = async (url, opts) => {
+                if (url.endsWith('/cells/c1') && opts?.body instanceof FormData) {
+                  const label = opts.body.get('opt_label');
+                  if (label === 'Older') {
+                    await new Promise(resolve => { window.__releaseOlder = resolve; });
+                  } else if (!opts.signal?.aborted) window.__sent.push(label);
+                }
+                return send(url, opts);
+              };
+              const input = document.getElementById('ev2-c1-opt-label');
+              input.value = 'Older';
+              EV2.saveForm(input.form, 0).catch(() => {});
+            }"""
+        )
+        page.wait_for_function("() => !!window.__releaseOlder")
+        sent = page.evaluate(
+            """() => {
+              const input = document.getElementById('ev2-c1-opt-label');
+              input.value = 'Latest';
+              EV2.saveForm(input.form, 10000).catch(() => {});
+              Object.defineProperty(document, 'visibilityState', {value: 'hidden'});
+              document.dispatchEvent(new Event('visibilitychange'));
+              const queued = window.__sent.length;
+              window.dispatchEvent(new Event('pagehide'));
+              const atOnce = window.__sent.length;
+              window.dispatchEvent(new Event('pagehide'));
+              return [queued, atOnce, window.__sent.length];
+            }"""
+        )
+        assert sent == [0, 1, 1]
+        page.evaluate("() => window.__releaseOlder()")
+        page.evaluate("() => EV2.flush()")
+        assert page.evaluate("() => window.__sent") == ["Latest"]
         assert _cell(app, PAGE_ID, "c1").options.get("label") == "Latest"
         assert not errors
     finally:
