@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import logging
 import re
 import tempfile
@@ -234,9 +235,13 @@ def serve(kind: str, key: str, ext: str, large: bool = False) -> Response:
                     finally:
                         if tmp_path is not None:
                             tmp_path.unlink(missing_ok=True)
+    # Keep the bounded thumbnail in memory so a disconnected client cannot
+    # leave its disk file waiting for the WSGI server's response cleanup.
     response = send_file(
-        cached,
+        io.BytesIO(cached.read_bytes()),
         mimetype=f"image/{_EXT}",
+        download_name=cached.name,
+        last_modified=cached.stat().st_mtime,
         conditional=True,
         etag=f"lu-v2-{dim}-{kind}-{key}-{_EXT}",
         max_age=31536000,

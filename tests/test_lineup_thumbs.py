@@ -230,3 +230,33 @@ def test_batched_pushes_keep_latest_success_for_each_target(tmp_path: Path) -> N
     assert {k: v.digest for k, v in rows.items()} == {"news": "new", "art": "art"}
     assert rows["news"].extra["composition_digest"] == "composition"
     assert log.latest_pushes([]) == {}
+
+
+@pytest.mark.parametrize("large", [False, True])
+def test_thumbnail_disk_file_is_closed_before_streaming(app, monkeypatch, large):
+    import builtins
+
+    _push(app)
+    url = _url(app) + ("?lg=1" if large else "")
+    client = app.test_client()
+    with client.get(url, buffered=True) as warm:
+        assert warm.status_code == 200
+    opened = []
+
+    def track(fn):
+        def open_file(file, *args, **kwargs):
+            handle = fn(file, *args, **kwargs)
+            if ".thumbs" in str(file):
+                opened.append(handle)
+            return handle
+
+        return open_file
+
+    monkeypatch.setattr(builtins, "open", track(builtins.open))
+    monkeypatch.setattr(io, "open", track(io.open))
+    with client.get(url, buffered=False) as response:
+        assert response.status_code == 200
+        assert opened
+        # Disconnects can skip the WSGI server's iterable cleanup. The disk
+        # file must already be closed before the response starts streaming.
+        assert all(handle.closed for handle in opened)
