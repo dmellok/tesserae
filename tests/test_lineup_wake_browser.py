@@ -155,7 +155,8 @@ def test_a_timer_faster_than_the_wakes_warns_and_fixes_in_one_click(
         assert page.locator(".dxe-wake-warn").count() == 0
         fresh = page.locator(".dxe-fresh").inner_text()
         assert fresh.startswith("Redrawn just before each wake (every 60 min)")
-        assert page.locator("[data-interval]").count() == 0  # one line, no timer
+        # Its wake times aren't learned yet: the timer it runs on until then stays.
+        assert page.locator("[data-interval]").input_value() == "5"
         assert page.locator("#dxe-save-state").inner_text() == "Unsaved changes"
         _save(page)
         assert app.config["DECK_STORE"].get("print").advance_smart_sync is True
@@ -270,5 +271,58 @@ def test_a_rotation_shorter_than_a_wake_says_dashboards_can_be_skipped(
         d = app.config["DECK_STORE"].get("day")
         assert d.advance_interval_minutes == 60
         assert [x.dwell_minutes for x in d.pages] == [None, 90]
+        assert errors == []
+        browser.close()
+
+
+def test_the_timer_shows_while_the_wake_times_are_unlearned(real: tuple[str, Flask]) -> None:
+    """Until the wakes are learned the lineup runs on its timer, so the
+    timer is there to set, and is saved."""
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    decks = app.config["DECK_STORE"]
+    decks.upsert(decks.get("print").model_copy(update={"advance_smart_sync": True}))
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/print/edit", 1280)
+        assert "Until its wake times are learned, sent every 5 min." in (
+            page.locator(".dxe-fresh").inner_text()
+        )
+        timer = page.locator("[data-interval]")
+        assert timer.input_value() == "5"
+        assert "Until then, every" in page.locator(".dxe-pace").inner_text()
+        timer.select_option("30")
+        assert "sent every 30 min." in page.locator(".dxe-fresh").inner_text()
+        _save(page)
+        d = decks.get("print")
+        assert (d.advance_smart_sync, d.advance_interval_minutes) == (True, 30)
+        assert errors == []
+        browser.close()
+
+
+def test_the_dwell_fix_keeps_a_default_already_longer_than_a_wake(
+    real: tuple[str, Flask],
+) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    app.config["DECK_STORE"].upsert(
+        Deck(
+            id="day", name="Day", device_ids=["door"], advance="timer",
+            advance_trigger="cycle", advance_anchor="06:00", advance_end_at="12:00",
+            advance_interval_minutes=120, advance_days_of_week=[5],
+            advance_smart_sync=True,
+            pages=[DeckPage(page_id="notes"), DeckPage(page_id="todo", dwell_minutes=30)],
+        )
+    )  # fmt: skip
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/day/edit", 1280)
+        page.locator('.dxe-wake-warn [data-wake-fix="dwell"]').click()
+        assert page.locator(".dxe-wake-warn").count() == 0
+        assert page.locator("[data-interval]").input_value() == "120"
+        _save(page)
+        d = app.config["DECK_STORE"].get("day")
+        assert d.advance_interval_minutes == 120
+        assert [x.dwell_minutes for x in d.pages] == [None, None]
         assert errors == []
         browser.close()

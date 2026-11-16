@@ -1793,13 +1793,14 @@
     // timer stays only as a floor that is longer than the wake interval.
     if (k === "interval" && atWake) {
       rows.push(field("Sent", freshHtml(w)));
-      if (w.min && st.interval > w.min)
+      // ...or as what it runs on until the wake times are learned.
+      const floor = w.min && st.interval > w.min;
+      if (floor || !w.learned) {
+        const label = floor ? "At most every" : "Until then, every";
         rows.push(
-          field(
-            "At most every",
-            selectHtml("interval", "data-interval", SHOW_FOR, st.interval, "At most every", mins)
-          )
+          field(label, selectHtml("interval", "data-interval", SHOW_FOR, st.interval, label, mins))
         );
+      }
     } else if (k === "cycle" || k === "interval") {
       const label = k === "interval" ? "Sent again every" : "Each dashboard shows for";
       // Every dashboard has its own time: the default is unused (it is what
@@ -2757,10 +2758,11 @@
       const w = wakeOf();
       if (!w || !w.min) return;
       change(() => {
-        st.interval = w.min;
+        // Only ever up to a wake: a default already longer stays as it is.
+        st.interval = Math.max(st.interval, w.min);
         st.steps.forEach((s) => s.dwell && s.dwell < w.min && (s.dwell = null));
       });
-      live(`Each dashboard shows for ${mins(w.min)}.`);
+      live(`Each dashboard shows for ${mins(st.interval)}.`);
       root.querySelector("[data-interval]")?.focus();
       return;
     }

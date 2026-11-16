@@ -2984,7 +2984,12 @@ def create_lineup() -> Response:
     except (ValidationError, ValueError) as exc:
         msg = _first_error(exc) if isinstance(exc, ValidationError) else str(exc)
         return _json_error(f"Invalid lineup: {msg}")
-    if _sleeps(deck.device_ids[0] if deck.device_ids else None):
+    if "advance_smart_sync" in form:
+        # A create that says which it wants ("on" after a hidden "0", as
+        # on an edit) gets that; the default is only for one that doesn't.
+        smart = any(v in ("on", "true", "1") for v in form.getlist("advance_smart_sync"))
+        deck = _merged_deck(deck, advance_smart_sync=smart)
+    elif _sleeps(deck.device_ids[0] if deck.device_ids else None):
         # A display that sleeps only shows the last send before each wake,
         # so a new lineup on one sends just before it wakes (smart sync).
         deck = _merged_deck(deck, advance_smart_sync=True)
