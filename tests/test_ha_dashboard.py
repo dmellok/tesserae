@@ -383,6 +383,9 @@ def test_stale_frame_goes_out_while_the_next_render_runs(
         waited = time.monotonic() - t0
     assert second["stale"] is True
     assert second["frame"] == first["frame"]
+    # the page is asked for again once the new capture has had time to land
+    assert 0 < second["next_change_at"] - time.time() <= widget.PENDING_RETRY_S
+    assert "next_change_at" not in first
     assert waited < 0.4  # did not block on the in-flight render
     # Let the background render land, then the fresh frame is served.
     job = widget._jobs.get(params)
@@ -455,6 +458,18 @@ def test_render_failure_keeps_the_last_good_frame(
     with app.app_context():
         after = widget.fetch({"refresh_seconds": 30}, {}, ctx=_ctx())
     assert after["frame"] == good["frame"]  # error recorded, frame kept
+    # A failing capture does not ask for the page again in 30 s, and is not
+    # tried again on every fetch: it waits out the error pace.
+    assert after["stale"] is True and "next_change_at" not in after
+    assert len(browser.requests) == 2
+    failed_at, why = widget._errors[params]
+    widget._errors[params] = (failed_at - widget.ERROR_RETRY_S, why)
+    with app.app_context():
+        retried = widget.fetch({"refresh_seconds": 30}, {}, ctx=_ctx())
+    for job in list(widget._jobs.values()):
+        job.done.wait(3.0)
+    assert "next_change_at" not in retried
+    assert len(browser.requests) == 3
 
 
 def test_concurrent_fetches_share_one_render(

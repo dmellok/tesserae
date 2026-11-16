@@ -572,12 +572,27 @@ def fetch(
         "verify_tls": _verify_tls(core),
         "timezone_id": _timezone_id(),
     }
-    job = _start_render(params, render_kwargs)
     if frame is not None:
-        # Stale-while-revalidate: the previous frame goes out now, the one
-        # rendering lands for the next refresh.
-        return _shape(frame, params, stale=True)
+        if error is not None and not ctx.get("fresh"):
+            # The last capture failed (Home Assistant down, say). The old
+            # frame stays up and the capture is tried again at the error
+            # pace, on the page's ordinary refreshes: asking for the page
+            # again in 30 s here would wake a sleeping display every 30 s
+            # for as long as the fault lasted.
+            if time.monotonic() - error[0] >= ERROR_RETRY_S:
+                _start_render(params, render_kwargs)
+            return _shape(frame, params, stale=True)
+        _start_render(params, render_kwargs)
+        # Stale-while-revalidate: the previous frame goes out now, and the
+        # page is asked for again once the new one has had time to land, as a
+        # pending first render is. Otherwise an old capture (a display back
+        # from days of pause) stayed on glass until something else redrew it.
+        return {
+            **_shape(frame, params, stale=True),
+            "next_change_at": time.time() + PENDING_RETRY_S,
+        }
 
+    job = _start_render(params, render_kwargs)
     job.done.wait(FIRST_WAIT_S)
     with _state_lock:
         frame = _frames.get(params)
