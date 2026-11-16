@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import re
+from html import unescape
 from unittest.mock import Mock
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from flask import template_rendered
@@ -533,9 +535,12 @@ def test_classic_panel_view_names_each_groups_display(app, monkeypatch):
     monkeypatch.setattr("app.page_routes.preview_groups_for_page", lambda *a, **kw: groups)
     app.config["SETTINGS_STORE"].update_section("ui", {"dashboard_editor": "classic"})
     body = app.test_client().get("/pages/home").text
-    assert (
-        "gamut=waveshare_e6&amp;dither=floyd-steinberg&amp;w=800&amp;h=480&amp;device=desk" in body
-    )
-    assert "gamut=mono&amp;dither=floyd-steinberg&amp;w=296&amp;h=128&amp;device=tag%201" in body
-    assert "gamut=gray_4&amp;dither=floyd-steinberg&amp;w=400&amp;h=300&quot;" not in body
-    assert 'w=400&amp;h=300"' in body
+    targets = [
+        parse_qs(urlsplit(unescape(src)).query)
+        for src in re.findall(r'data-panel-src="([^"]+)"', body)
+    ]
+    assert targets == [
+        {"device": ["desk"], "w": ["800"], "h": ["480"]},
+        {"device": ["tag 1"], "w": ["296"], "h": ["128"]},
+        {"w": ["400"], "h": ["300"]},
+    ]

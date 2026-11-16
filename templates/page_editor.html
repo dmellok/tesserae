@@ -89,9 +89,14 @@
        paints the widget into a smaller virtual container then scales it
        up so text/icons grow without breaking layout. Persisted on the
        cell so the zoom rides through to the panel push. #}
+    {% if cell.plugin == 'ha_dashboard' %}
+    <input type="hidden" name="zoom" value="{{ cell.zoom }}">
+    <p class="field-help">Use Dashboard zoom below to resize Home Assistant cards. Content zoom is for native Tesserae widget layouts.</p>
+    {% else %}
     {{ slider('cell-' ~ cell.id ~ '-zoom', 'zoom', 'Content zoom',
               value=cell.zoom, min=0.25, max=2.0, step=0.05, unit='×',
-              help='Pretends the cell is smaller, then scales the widget back up, text and icons grow without breaking layout. Persists through to the panel.') }}
+              help='Scales this widget inside its cell. Above 1 makes text and icons larger; below 1 fits more content. The saved value also applies on the display.') }}
+    {% endif %}
 
     {# v0.71.x per-cell padding override (r/eink launch DM feedback,
        flinkazoid). Hidden behind a <details> disclosure so the cell
@@ -222,6 +227,9 @@
       {% endfor %}
       {% if opt_sections.advanced %}{{ options_more_close() }}{% endif %}
       {{ query_preview_button(plugin, cell.w, cell.h) }}
+      {% if cell.plugin == 'ha_dashboard' %}
+      <p class="field-help capture-status" data-capture-status role="status">Checking capture status...</p>
+      {% endif %}
     </fieldset>
     {% endif %}
 
@@ -301,7 +309,7 @@
 <div class="editor-grid" data-page-id="{{ page.id }}" data-cell-count="{{ page.cells|length }}">
 
   <section class="dx-section-card preview-card">
-    {{ card_head('Live preview', icon_name='monitor-play', blurb='Click a cell to edit it. Updates after every change.') }}
+    {{ card_head('Live preview', icon_name='monitor-play', blurb='Click a cell to edit it. Updates after every change. Refresh preview requests new widget data without saving or sending to a display.') }}
     {# HTML view = the live full-colour HTML render; Panel view = that render
        quantised + dithered to the panel's palette, the exact per-pixel e-ink
        output (#45). Editor JS swaps the iframe for the panel <img> per group. #}
@@ -320,6 +328,39 @@
     <div class="preview-group">
       {% if preview_groups|length > 1 %}
       <p class="preview-group-label">{{ g.label }}</p>
+      {% endif %}
+      {% if not g.devices %}
+      <details class="preview-options">
+        <summary>Preview options</summary>
+        <div class="preview-options-fields">
+          <label>Preview palette
+            <select data-preview-gamut>
+              <option value="">Virtual panel (6 colors)</option>
+              <option value="mono">Black and white</option>
+              <option value="gray_4">4 grays</option>
+              <option value="gray_16">16 grays</option>
+              <option value="waveshare_e6">6 colors (Spectra)</option>
+              <option value="acep_7colour">7 colors (ACeP)</option>
+            </select>
+          </label>
+          <label>Preview dithering
+            <select data-preview-dither>
+              <option value="">Floyd-Steinberg (default)</option>
+              <option value="none">None</option>
+              <option value="floyd-steinberg">Floyd-Steinberg</option>
+              <option value="atkinson">Atkinson</option>
+              <option value="jarvis">Jarvis</option>
+              <option value="stucki">Stucki</option>
+              <option value="bayer-8x8">Ordered (Bayer)</option>
+              <option value="halftone">Halftone</option>
+              <option value="crosshatch">Crosshatch</option>
+            </select>
+          </label>
+        </div>
+        <p class="field-help">These choices affect Panel view only. Assign a display to use its palette and dither setting. Your display's picture settings control the sent image.</p>
+      </details>
+      {% else %}
+      <p class="field-help">Panel view inherits {{ g.devices[0] }}'s picture settings.</p>
       {% endif %}
       <div class="thumb-frame preview-frame"
            {{ color_attrs(g.device_ids|default([])) }}
@@ -345,9 +386,10 @@
            set lazily by editor.js when Panel view is active (kept out of the
            DOM src so it doesn't render until asked). #}
         <img class="preview-panel-img" data-panel-preview data-device-quantised
-             data-panel-src="{{ url_for('composer.compose_panel_preview', page_id=page.id) }}?gamut={{ g.gamut }}&amp;dither=floyd-steinberg&amp;w={{ g.w }}&amp;h={{ g.h }}{% if g.device_ids %}&amp;device={{ g.device_ids[0]|urlencode }}{% endif %}"
+             data-panel-src="{{ url_for('composer.compose_panel_preview', page_id=page.id) }}?{% if g.device_ids %}device={{ g.device_ids[0]|urlencode }}&amp;{% endif %}w={{ g.w }}&amp;h={{ g.h }}"
              alt="Panel view (quantised)" hidden>
       </div>
+      <div class="preview-footer">
       <p class="muted preview-dims">
         {{ g.w }} × {{ g.h }}
         {% if g.devices %}
@@ -357,8 +399,14 @@
         <a href="{{ url_for('auth.settings_area', area='server') }}#app">change panel</a>
         {% endif %}
       </p>
+      <div class="preview-actions">
+        {% if loop.last %}<button type="button" class="btn btn-secondary" data-preview-refresh>Refresh preview</button>{% endif %}
+        <button type="button" class="btn btn-secondary" data-preview-native>View at 100%</button>
+      </div>
+      </div>
     </div>
     {% endfor %}
+    <p class="field-help" data-preview-status role="status" hidden></p>
   </section>
 
   <div class="editor-column">
@@ -686,6 +734,14 @@
    leaves the editor. One dialog per existing schedule plus one blank,
    all rendered up front so condition-picker.js attaches on load; the
    create / update endpoints get ``next`` and come back to #schedules. #}
+<dialog class="native-preview-dialog" data-native-preview aria-labelledby="native-preview-title">
+  <div class="native-preview-head">
+    <h2 id="native-preview-title">Preview at 100%</h2>
+    <button type="button" class="btn btn-secondary" data-native-close>Close</button>
+  </div>
+  <p class="field-help">One image pixel per browser pixel. Scroll to inspect the full screen.</p>
+  <div class="native-preview-scroll" data-native-media></div>
+</dialog>
 {% set _schedule_next = url_for('pages.edit', page_id=page.id) ~ '#schedules' %}
 {% macro schedule_dialog(dialog_id, title, icon, s, edit_mode, next_url) %}
 <dialog id="{{ dialog_id }}" class="wizard-dialog schedule-dialog" aria-labelledby="{{ dialog_id }}-title" data-schedule-dialog>

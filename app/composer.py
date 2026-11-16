@@ -2128,6 +2128,9 @@ def _panel_preview_response(page_id: str) -> Response:
         width, height = preview_dims(page, devices, settings_store)
     prefix = f"{page_id}~panel{width}x{height}"
     token = page_preview_token(page, (width, height))
+    revision = current_app.config.get("PREVIEW_PANEL_VERSIONS", {}).get(page_id)
+    if revision:
+        token = hashlib.sha256(f"{token}:{revision}".encode()).hexdigest()[:16]
     # Whether the caller named a display. A request without one is a preview
     # group picked by size and palette, so its ``?gamut`` still applies.
     asked_device = bool((request.args.get("device") or "").strip())

@@ -2864,3 +2864,31 @@ def test_select_cell_option_coercion_writes_an_alias_as_its_choice() -> None:
     assert _coerce_cell_option(field, "packed", {"opt_layout": "packed"}) == "cluster"
     assert _coerce_cell_option(field, "grid", {"opt_layout": "grid"}) == "grid"
     assert _coerce_cell_option(field, "gone", {"opt_layout": "gone"}) == "gone"
+
+
+def test_preview_invalidates_panel_render_when_widget_data_changes(app, monkeypatch):
+    from app import page_routes
+    from app.state.page_store import Page, Panel
+
+    client = app.test_client()
+    _sign_in(client)
+    store = app.config["PAGE_STORE"]
+    store.save(Page(id="live-data", name="Live data", panel=Panel(w=32, h=24)))
+    frame = {"value": "first"}
+    monkeypatch.setattr(page_routes, "_hydrate_page", lambda *a, **kw: dict(frame))
+    captured = []
+    monkeypatch.setattr(
+        "app.preview_cache.submit", lambda **job: captured.append(job["cache_path"])
+    )
+    for value in ("first", "second", "second"):
+        frame["value"] = value
+        response = client.post(
+            "/pages/live-data/preview",
+            data={"panels[]": "32x24"},
+            headers={"X-Requested-With": "fetch"},
+        )
+        assert response.status_code == 200
+        assert client.get("/compose/live-data/panel.png?w=32&h=24").status_code == 202
+    assert captured[0] != captured[1]
+    assert captured[1] == captured[2]
+    assert store.get("live-data").name == "Live data"
