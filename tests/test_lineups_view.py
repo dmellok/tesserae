@@ -1697,6 +1697,16 @@ def test_a_sleeping_display_counts_to_the_scheduler_s_first_step_after_quiet_hou
     assert "9:30" in pill.label, pill
 
 
+def test_a_tick_held_past_its_time_says_when_it_lands() -> None:
+    """A step due at 00:30 inside quiet hours lands at the 09:01 wake: the tick
+    keeps its due time and names the landing the flag counts to."""
+    from app.lineups_view import UpcomingInput
+
+    due = SAMPLE_NOW.replace(day=29, hour=0, minute=30).timestamp()
+    _now, out = _asleep_in_quiet_hours((UpcomingInput(at=due, lineup_id="i", dashboard_id="art"),))
+    assert [(t.minute, t.lands) for t in _next_ticks(out)] == [(30, "9:01\u202fAM")]
+
+
 def test_a_sleeping_display_counts_to_the_wake_when_the_catch_up_lands_on_it() -> None:
     """The scheduler delivers the skipped step as quiet hours end (09:01), so
     the frame waking then is when the update happens."""

@@ -88,7 +88,27 @@
       TL_KEY,
       JSON.stringify(Object.fromEntries(Object.entries(st.tlOpen).map(([k, v]) => [k, [...v]])))
     );
-  const saveCollapsed = () => store.set(COLLAPSE_KEY, JSON.stringify([...collapsed]));
+  // Phones start with every display collapsed (the header only: what it shows and
+  // its day bar); the displays opened on a phone are remembered under their own
+  // key, so a desktop's collapsed list keeps its meaning. decks.html applies the
+  // same default before first paint.
+  const PHONE_OPEN_KEY = "tesserae.lineups.phone-open";
+  const phoneOpen = new Set(
+    readJSON(PHONE_OPEN_KEY, [], Array.isArray).filter((x) => typeof x === "string")
+  );
+  const narrowMQ = window.matchMedia("(max-width: 600px)");
+  const isCollapsed = (id) => (narrowMQ.matches ? !phoneOpen.has(id) : collapsed.has(id));
+  const setCollapsed = (id, shut) => {
+    if (narrowMQ.matches) {
+      if (shut) phoneOpen.delete(id);
+      else phoneOpen.add(id);
+    } else if (shut) collapsed.add(id);
+    else collapsed.delete(id);
+  };
+  const saveCollapsed = () => {
+    store.set(COLLAPSE_KEY, JSON.stringify([...collapsed]));
+    store.set(PHONE_OPEN_KEY, JSON.stringify([...phoneOpen]));
+  };
 
   /* ------------------------------------------------------------ state */
   const st = {
@@ -250,7 +270,7 @@
     dayFlash: (id) => st.dayFlash[id] || null,
     tlOpen: (d, i) => !!(st.tlOpen[d.id] && st.tlOpen[d.id].has(i)),
     isNew: (l) => l.id === newId,
-    collapsed: (d) => collapsed.has(d.id),
+    collapsed: (d) => isCollapsed(d.id),
     day: dayOf,
     order: (ls) => ordered(ls, null),
     itemChoice: (d, l, s) => choiceFor(d, l, s),
@@ -474,6 +494,8 @@
   // the server's first-paint rule hands over to (drawing is done in render).
   function syncScope() {
     root.removeAttribute("data-lu-boot-scope");
+    root.removeAttribute("data-lu-boot-collapse");
+    root.querySelectorAll("style[data-lu-boot-open]").forEach((el) => el.remove());
     root.dataset.luScope = st.scope;
     // The Timeline always shows the whole week, so the toggle waits for Cards.
     root.querySelectorAll("[data-lu-scope-seg]").forEach((g) => {
@@ -488,7 +510,7 @@
     const fa = root.querySelector("[data-fold-all]");
     if (!fa) return;
     const anyOpen = vm.displays.some(
-      (d) => !collapsed.has(d.id) && (st.view !== "cards" || d.lineups.some((l) => !isFolded(l)))
+      (d) => !isCollapsed(d.id) && (st.view !== "cards" || d.lineups.some((l) => !isFolded(l)))
     );
     fa.querySelector("span").textContent = anyOpen ? "Fold all" : "Unfold all";
     fa.dataset.mode = anyOpen ? "fold" : "unfold";
@@ -2046,7 +2068,7 @@
     st.view = "cards";
     foldChoice[id] = false;
     saveFolds();
-    if (found.d) collapsed.delete(found.d.id);
+    if (found.d) setCollapsed(found.d.id, false);
     saveCollapsed();
     render();
     requestAnimationFrame(() => {
@@ -2197,8 +2219,7 @@
     } else if (t.matches("[data-fold-all]")) {
       const fold = ds.mode === "fold";
       vm.displays.forEach((d) => {
-        if (fold) collapsed.add(d.id);
-        else collapsed.delete(d.id);
+        setCollapsed(d.id, fold);
         d.lineups.forEach((l) => {
           foldChoice[l.id] = fold;
         });
@@ -2209,14 +2230,16 @@
       saveFolds();
       saveCollapsed();
       render();
-    } else if (ds.collapse !== undefined && t.matches("[data-collapse]")) {
-      const id = ds.collapse;
-      if (collapsed.has(id)) collapsed.delete(id);
-      else collapsed.add(id);
+    } else if (
+      (ds.collapse !== undefined && t.matches("[data-collapse]")) ||
+      (ds.showDisplay !== undefined && t.matches("[data-show-display]"))
+    ) {
+      const id = ds.collapse !== undefined ? ds.collapse : ds.showDisplay;
+      setCollapsed(id, !isCollapsed(id));
       saveCollapsed();
       render();
       const sec = host.querySelector(`.lu-ds[data-display="${CSS.escape(id)}"]`);
-      if (sec && !collapsed.has(id)) sec.classList.add("just-opened");
+      if (sec && !isCollapsed(id)) sec.classList.add("just-opened");
       const b = host.querySelector(`[data-collapse="${CSS.escape(id)}"]`);
       if (b) b.focus({ preventScroll: true });
     } else if (ds.dpClose !== undefined && t.matches("[data-dp-close]")) {
@@ -2321,9 +2344,26 @@
         render();
       });
     const keys = { display: "fDisplay", kind: "fKind", state: "fState", sort: "sort" };
+    const ftog = tb.querySelector("[data-lu-filters]");
+    const fcount = tb.querySelector("[data-lu-fcount]");
+    // How many selects differ from their default, shown on the phone's Filters button.
+    const syncFilterCount = () => {
+      if (!fcount) return;
+      const n = [st.fDisplay, st.fKind, st.fState].filter(Boolean).length + (st.sort !== "next");
+      fcount.textContent = String(n);
+      fcount.hidden = !n;
+      ftog.setAttribute("aria-label", n ? `Filters, ${n} on` : "Filters");
+    };
+    if (ftog)
+      ftog.addEventListener("click", () => {
+        const open = ftog.getAttribute("aria-expanded") !== "true";
+        ftog.setAttribute("aria-expanded", String(open));
+        tb.classList.toggle("filters-open", open);
+      });
     tb.querySelectorAll("[data-lu-filter]").forEach((sel) => {
       sel.addEventListener("change", () => {
         st[keys[sel.dataset.luFilter]] = sel.value;
+        syncFilterCount();
         render();
       });
     });
@@ -2528,6 +2568,8 @@
     attributeFilter: ["data-theme", "data-ui", "data-server-colour"],
   });
   render();
+  // Crossing the phone width swaps which remembered set applies.
+  if (narrowMQ.addEventListener) narrowMQ.addEventListener("change", () => !busy() && render());
   if ("ResizeObserver" in window) {
     new ResizeObserver(() =>
       requestAnimationFrame(() => {
@@ -2546,8 +2588,8 @@
     const r = document.getElementById("lu-row-" + id);
     if (r) {
       const found = lineupOf(id);
-      if (found && found.d && collapsed.has(found.d.id)) {
-        collapsed.delete(found.d.id);
+      if (found && found.d && isCollapsed(found.d.id)) {
+        setCollapsed(found.d.id, false);
         render();
       }
       requestAnimationFrame(() => {

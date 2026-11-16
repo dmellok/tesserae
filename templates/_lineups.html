@@ -87,7 +87,7 @@
 <div class="lu-blk{% if hold %} hold{% endif %}{% if push %} push{% endif %}{% if s.live %} live{% endif %}{% if s.lane %} ln{% endif %}{% if s.state and not s.live %} st-{{ s.state }}{% endif %}{% if s.planned and tall %} plan{% endif %}{% if push or (not hold and s.width_pct < 1) %} is-thin{% if loop.previtem and loop.previtem.kind != 'hold' and loop.previtem.end_min >= s.start_min %} grow-r{% endif %}{% endif %}" style="left:{{ s.left_pct }}%;width:{{ s.width_pct }}%;--w:{{ s.width_pct }}{% if s.lane %};--lane:{{ s.lane }}{% endif %}" data-lineup="{{ s.lineup_id }}" data-display="{{ d.id }}" title="{{ s.title }}"
 {%- if ed %} data-edit tabindex="0" role="button" aria-label="{{ s.title }}. Drag or use arrow keys to move{% if not push %}, Shift+arrows to resize the end, Alt+Shift+arrows the start{% endif %}. Click to open."{% else %} role="group" aria-label="{{ s.title }}"{% endif %}>
 {%- if ed and not push %}<i class="lu-h" data-h="l" aria-hidden="true"></i><i class="lu-h" data-h="r" aria-hidden="true"></i>{% endif -%}
-{%- if not hold and not push %}{% for t in s.ticks if t.next or not (day.is_today and day.now_min is not none) or t.minute > day.now_min %}{% if t.next %}<i class="lu-tick next" style="left:{{ t.pct }}%" data-tip="Next refresh {{ t.label }}" aria-hidden="true"></i>{% else %}<i class="lu-tick" style="left:{{ t.pct }}%" data-tip="Refresh {{ t.label }}" aria-hidden="true"></i>{% endif %}{% endfor %}<span class="lu-blk-l">{{ s.label }}</span>{% endif -%}
+{%- if not hold and not push %}{% for t in s.ticks if t.next or not (day.is_today and day.now_min is not none) or t.minute > day.now_min %}{% if t.next %}<i class="lu-tick next" style="left:{{ t.pct }}%" data-tip="Next refresh {{ t.label }}{% if t.lands %}, lands {{ t.lands }}{% endif %}" aria-hidden="true"></i>{% else %}<i class="lu-tick" style="left:{{ t.pct }}%" data-tip="Refresh {{ t.label }}" aria-hidden="true"></i>{% endif %}{% endfor %}<span class="lu-blk-l">{{ s.label }}</span>{% endif -%}
 </div>
 {%- if push and tall %}<span class="lu-blk-side" style="left:calc({{ s.left_pct }}% + 9px)" title="{{ s.title }}">{{ s.label }}</span>{% endif %}
 {%- endfor %}
@@ -288,6 +288,7 @@
 <div class="lu-ds-body" id="lu-dsb-{{ d.id }}">
 <div class="lu-sched">{% if d.lineups %}<ol class="lu-rows">{% for l in d.lineups %}{{ row(d, l, seen) }}{% endfor %}</ol>{% else %}<p class="lu-none">No lineups on this display yet.</p>{% endif %}</div>
 </div>
+{%- if d.lineups %}<button type="button" class="lu-ds-more" data-show-display="{{ d.id }}" aria-expanded="true" aria-controls="lu-dsb-{{ d.id }}">Show {{ d.lineups|length }} lineup{{ '' if d.lineups|length == 1 else 's' }}{{ ico('caret') }}</button>{% endif %}
 </div>
 </section>
 {%- endmacro %}

@@ -528,6 +528,9 @@ class TickView(_Dict):
     in_min: int | None = None
     in_sec: int | None = None
     in_label: str = ""
+    # Only on the next tick, when the update lands well after it (held by quiet
+    # hours, or a sleeper's next check-in): "Mon 6:23 AM". The flag counts to this.
+    lands: str = ""
 
 
 @dataclass
@@ -1915,6 +1918,10 @@ def _next_name(dashboards: Mapping[str, DashboardInfo], dashboard_id: str) -> st
     return _name(dashboards, dashboard_id)
 
 
+# An update landing this much after its tick says so on the tick.
+_LATE_LANDING_SEC = 30 * 60
+
+
 def _day_bar(
     d: DisplayInput,
     model: _Model,
@@ -1995,6 +2002,11 @@ def _day_bar(
                             else None
                         )
                         in_min = in_sec // 60 if in_sec is not None else None
+                        lands = ""
+                        if is_next and next_epoch is not None:
+                            due = clk.epoch_of(abs_t % WEEK_MIN)
+                            if next_epoch - due >= _LATE_LANDING_SEC:
+                                lands = clk.clock(next_epoch)
                         ticks.append(
                             TickView(
                                 minute=m,
@@ -2004,6 +2016,7 @@ def _day_bar(
                                 in_min=in_min,
                                 in_sec=in_sec,
                                 in_label=update_in_label(in_min) if in_min is not None else "",
+                                lands=lands,
                             )
                         )
         if (
