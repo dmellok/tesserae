@@ -114,15 +114,30 @@ def _headers() -> dict[str, str]:
 # each one as an invalid login (and with ip_ban_enabled, can end up
 # banning this host) (#444). Changing the token or URL in Settings changes
 # the key, so the next request goes out immediately.
+#
+# HA also answers 401 when a good token belongs to a user who is not an
+# administrator and the endpoint is admin-only. That says nothing about
+# the token, so it backs off the admin-only endpoints alone: counting it
+# against everything blanked every entity and service widget for five
+# minutes each time the OpenDisplay poll asked for a template (#553).
 _AUTH_COOLDOWN_S = 300.0
+_ADMIN_ONLY_PATHS = ("/api/template", "/api/diagnostics/")
 _auth_lock = threading.Lock()
 _auth_failure: tuple[tuple[str, str], float, str, str] | None = None
+_admin_failure: tuple[tuple[str, str], float, str, str] | None = None
 
 
 def _reset_auth_cooldown() -> None:
-    global _auth_failure
+    global _auth_failure, _admin_failure
     with _auth_lock:
         _auth_failure = None
+        _admin_failure = None
+
+
+def _admin_only(url: str) -> bool:
+    root = base_url()
+    path = url[len(root) :] if url.startswith(root) else url
+    return path.startswith(_ADMIN_ONLY_PATHS)
 
 
 def _urlopen(req: urllib.request.Request, *, timeout: float) -> http.client.HTTPResponse:
@@ -137,11 +152,14 @@ def _urlopen(req: urllib.request.Request, *, timeout: float) -> http.client.HTTP
     process runs out of file descriptors and waitress can no longer accept
     connections (#444). Callers only need ``code`` / ``reason`` (see
     ``coerce_error``), so the body is closed here before re-raising."""
-    global _auth_failure
+    global _auth_failure, _admin_failure
     key = (base_url(), token())
+    admin_only = _admin_only(req.full_url)
     with _auth_lock:
-        failure = _auth_failure
-    if failure is not None:
+        failures = (_auth_failure, _admin_failure if admin_only else None)
+    for failure in failures:
+        if failure is None:
+            continue
         f_key, ts, f_url, f_reason = failure
         if f_key == key and time.monotonic() - ts < _AUTH_COOLDOWN_S:
             raise urllib.error.HTTPError(f_url, 401, f_reason, None, None)  # type: ignore[arg-type]
@@ -160,8 +178,12 @@ def _urlopen(req: urllib.request.Request, *, timeout: float) -> http.client.HTTP
         err.close()
         err.tesserae_detail = detail  # type: ignore[attr-defined]
         if err.code == 401:
+            failed = (key, time.monotonic(), req.full_url, str(err.reason))
             with _auth_lock:
-                _auth_failure = (key, time.monotonic(), req.full_url, str(err.reason))
+                if admin_only:
+                    _admin_failure = failed
+                else:
+                    _auth_failure = failed
         raise
 
 

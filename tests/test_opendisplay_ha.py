@@ -913,6 +913,28 @@ def test_telemetry_poll_skips_without_ha_device_id(app: Flask) -> None:
     assert "kitchen_tag" not in app.config["DEVICE_STATUS"]
 
 
+def test_telemetry_poll_asks_ha_nothing_without_a_linked_tag(app: Flask) -> None:
+    """#553: with no tag linked, the poll still asked HA for the tag registry
+    every 15 minutes. That is an admin-only request, so a non-admin token
+    drew a 401 and an invalid-login line in HA's log each time."""
+    from app.opendisplay_ha import OpenDisplayHaTelemetryPoller
+
+    _make_tag(app, ha_device_id="")
+    core = app.config["PLUGIN_REGISTRY"].get("ha_core").server_module
+    asked: list[str] = []
+    core.render_template = lambda t, timeout=10: asked.append(t) or "[]"  # type: ignore[attr-defined]
+    core.request_json = lambda path, timeout=10: asked.append(path) or {}  # type: ignore[attr-defined]
+    poller = OpenDisplayHaTelemetryPoller(
+        app=app,
+        devices=app.config["DEVICE_REGISTRY"],
+        settings=app.config["SETTINGS_STORE"],
+        run_async=False,
+    )
+    with app.app_context():
+        assert poller.poll_once() == 0
+    assert asked == []
+
+
 def test_telemetry_poll_works_without_an_outer_app_context(app: Flask) -> None:
     """The poller runs on its own thread, where there is no app context.
     ha_core's ``render_template`` reads config through ``current_app``, so
