@@ -383,6 +383,9 @@ def test_stale_frame_goes_out_while_the_next_render_runs(
         waited = time.monotonic() - t0
     assert second["stale"] is True
     assert second["frame"] == first["frame"]
+    # the page is asked for again once the new capture has had time to land
+    assert 0 < second["next_change_at"] - time.time() <= widget.PENDING_RETRY_S
+    assert "next_change_at" not in first
     assert waited < 0.4  # did not block on the in-flight render
     # Let the background render land, then the fresh frame is served.
     job = widget._jobs.get(params)
