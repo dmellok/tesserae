@@ -249,6 +249,8 @@ class _Api:
         self.name_error = ""
         self.edits_error = ""
         self.order_error = ""
+        # Open every display on a phone first (see _open_displays_on_phones).
+        self.open_on_phones = True
 
     def _apply_end_changes(self, body: dict[str, Any]) -> None:
         """What the server does with an end added to a push or taken off a window:
@@ -418,6 +420,19 @@ class _Api:
         page.route(re.compile(r".*/decks/.*"), handle)
         # The live-events stream is not under test; keep the page quiet.
         page.route(re.compile(r".*/events/stream.*"), lambda r: r.fulfill(status=204, body=""))
+        if self.open_on_phones:
+            _open_displays_on_phones(page, [d["id"] for d in self.vm["displays"]])
+
+
+def _open_displays_on_phones(page: Any, ids: list[str]) -> None:
+    """Phones start with every display collapsed; most tests look at the rows,
+    so open them all as a phone that opened them before would (only when the
+    page has no remembered choice yet, so a reload keeps what the test did)."""
+    page.add_init_script(
+        "try { if (localStorage.getItem('tesserae.lineups.phone-open') === null)"
+        f" localStorage.setItem('tesserae.lineups.phone-open', {json.dumps(json.dumps(ids))}) }}"
+        " catch (e) {}"
+    )
 
 
 def _open(
@@ -1194,6 +1209,148 @@ def test_touch_devices_fit_and_every_target_is_44px(live: str, device: str) -> N
         browser.close()
 
 
+# Boxes in a row head, a display header and the page head that must never sit on
+# top of each other: each pair of visible siblings, as "a x b".
+_OVERLAPS = """() => {
+  const vis = (el) => {
+    const r = el.getBoundingClientRect();
+    const cs = getComputedStyle(el);
+    return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && !el.closest('[hidden]');
+  };
+  const name = (el) => el.className.baseVal ?? el.className;
+  const out = [];
+  const check = (parentSel, kidsSel) => document.querySelectorAll(parentSel).forEach((p) => {
+    const kids = [...p.querySelectorAll(kidsSel)].filter(vis);
+    for (let i = 0; i < kids.length; i++) for (let j = i + 1; j < kids.length; j++) {
+      if (kids[i].contains(kids[j]) || kids[j].contains(kids[i])) continue;
+      const a = kids[i].getBoundingClientRect(), b = kids[j].getBoundingClientRect();
+      const ox = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+      const oy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+      if (ox > 1 && oy > 1) out.push(`${name(kids[i])} x ${name(kids[j])}`);
+    }
+  });
+  check('.lu-row-head', ':scope > :not(.lu-row-title), .lu-row-title > *');
+  check('.lu-ds-hdr', ':scope > *');
+  check('.lu-ds-card', ':scope > *');
+  check('.lu-head', ':scope > *');
+  check('.lu-tb', ':scope > :not(.lu-tb-filters), .lu-tb-filters > *');
+  return out;
+}"""
+
+_ROW_HEADS = """() => [...document.querySelectorAll('.lu-row')].filter((r) => r.offsetParent).map((r) => {
+  const box = (sel) => { const el = r.querySelector(sel); return el && el.offsetParent ? el.getBoundingClientRect() : null; };
+  const name = box('.lu-row-name'), tag = box('.lu-row-tag'), act = box('.lu-row-actions');
+  return {id: r.id, folded: r.classList.contains('is-folded'), days: !!box('.lu-days'),
+          nameBesideActions: Math.abs(name.top - act.top) < act.height && name.right <= act.left,
+          tagUnderName: tag.top >= name.bottom - 1};
+})"""
+
+
+@pytest.mark.parametrize("width", [360, 390])
+def test_phone_starts_collapsed_and_nothing_overlaps(live: str, width: int) -> None:
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser = _launch(p)
+        ctx = browser.new_context(
+            viewport={"width": width, "height": 800}, has_touch=True, is_mobile=True
+        )
+        page = ctx.new_page()
+        errors: list[str] = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        api = _Api()
+        api.open_on_phones = False
+        api.install(page)
+        page.goto(live + PAGE, wait_until="load")
+        page.wait_for_function(
+            "() => document.querySelector('[data-lu]').classList.contains('is-enhanced')"
+        )
+        # Collapsed by default: each display is its header (on screen now, day bar)
+        # with a "Show N lineups" button under it; no rows.
+        assert page.locator(".lu-ds.is-collapsed").count() == 2
+        assert page.locator(".lu-row").count() == 0
+        assert page.locator(".lu-ds-hdr .lu-trk.tall").count() == 2
+        more = page.locator('.lu-ds[data-display="frame"] .lu-ds-more')
+        assert more.inner_text().strip() == "Show 5 lineups"
+        assert page.locator('.lu-ds[data-display="kitchen"] .lu-ds-more').inner_text().strip() == (
+            "Show 1 lineup"
+        )
+        assert page.locator("[data-fold-all] span").inner_text() == "Unfold all"
+        # The four selects wait behind Filters.
+        assert not page.locator('[data-lu-filter="kind"]').is_visible()
+        page.locator("[data-lu-filters]").tap()
+        assert page.locator('[data-lu-filter="kind"]').is_visible()
+        page.locator('[data-lu-filter="kind"]').select_option("cycle")
+        assert page.locator("[data-lu-fcount]").inner_text() == "1"
+        page.locator('[data-lu-filter="kind"]').select_option("")
+        assert page.evaluate(_OVERLAPS) == []
+        assert page.evaluate(_SMALL_TARGETS) == []
+
+        # Opening one is remembered on this phone; the other stays collapsed.
+        more.tap()
+        page.wait_for_timeout(450)  # the card's opening animation
+        assert page.locator('.lu-ds[data-display="frame"]:not(.is-collapsed) .lu-row').count() == 5
+        assert not more.is_visible()
+        assert page.evaluate(_OVERLAPS) == []
+        assert page.evaluate(_SMALL_TARGETS) == []
+        assert page.evaluate("() => document.documentElement.scrollWidth - innerWidth") <= 0
+        # A row: the name with its buttons on the first line, the status tag and
+        # time under it; the day tiles only once the row is open.
+        heads = page.evaluate(_ROW_HEADS)
+        assert all(h["nameBesideActions"] and h["tagUnderName"] for h in heads), heads
+        assert all(h["days"] != h["folded"] for h in heads), heads
+        assert any(h["folded"] for h in heads)
+
+        page.reload(wait_until="load")
+        page.wait_for_function(
+            "() => document.querySelector('[data-lu]').classList.contains('is-enhanced')"
+        )
+        assert page.locator('.lu-ds[data-display="frame"]').get_attribute("class") == "lu-ds"
+        assert "is-collapsed" in page.locator('.lu-ds[data-display="kitchen"]').get_attribute(
+            "class"
+        )
+
+        # Wider than a phone, the desktop's own (empty) collapsed list applies.
+        page.set_viewport_size({"width": 1280, "height": 900})
+        page.wait_for_function("() => !document.querySelector('.lu-ds.is-collapsed')")
+        assert not page.locator(".lu-ds-more").first.is_visible()
+        assert errors == []
+        browser.close()
+
+
+def test_phone_paints_collapsed_before_the_script_runs(live: str) -> None:
+    """Without lineups.js the server's markup shows, already collapsed on a
+    phone, except the displays this phone opened before."""
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser = _launch(p)
+        ctx = browser.new_context(
+            viewport={"width": 390, "height": 800}, has_touch=True, is_mobile=True
+        )
+        page = ctx.new_page()
+        api = _Api()
+        api.open_on_phones = False
+        api.install(page)
+        page.route(re.compile(r".*/static/lineups\.js.*"), lambda r: r.abort())
+        page.goto(live + PAGE, wait_until="load")
+        assert page.locator("[data-lu]").get_attribute("data-lu-boot-collapse") == ""
+        assert not page.locator("#lu-dsb-frame").is_visible()
+        assert not page.locator("#lu-dsb-kitchen").is_visible()
+        assert page.locator('.lu-ds[data-display="frame"] .lu-ds-more').is_visible()
+        page.evaluate("() => localStorage.setItem('tesserae.lineups.phone-open', '[\"frame\"]')")
+        page.reload(wait_until="load")
+        assert page.locator("#lu-dsb-frame").is_visible()
+        assert not page.locator('.lu-ds[data-display="frame"] .lu-ds-more').is_visible()
+        assert not page.locator("#lu-dsb-kitchen").is_visible()
+        # A desktop never gets the attribute.
+        page.set_viewport_size({"width": 1280, "height": 900})
+        page.reload(wait_until="load")
+        assert page.locator("[data-lu]").get_attribute("data-lu-boot-collapse") is None
+        assert page.locator("#lu-dsb-kitchen").is_visible()
+        browser.close()
+
+
 @pytest.mark.parametrize("device", ["iPhone 13", "Pixel 7 landscape"])
 def test_phone_bar_is_read_only_and_edits_use_inputs(live: str, device: str) -> None:
     from playwright.sync_api import sync_playwright
@@ -1915,6 +2072,24 @@ def test_next_tick_flag_stays_inside_the_bar_at_its_right_end(live: str) -> None
         assert page.evaluate(
             "() => document.querySelector('.lu-tip').parentElement === document.body"
         )
+        browser.close()
+
+
+def test_next_tick_tooltip_includes_delayed_landing(live: str) -> None:
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser, page, _ = _open(p, live)
+        page.evaluate("""() => {
+          const d = TesseraeLineups.vm.displays.find(x => x.id === 'frame');
+          d.day.segments.forEach(s => s.ticks.forEach(t => {
+            if (t.next) t.lands = 'Thu 09:01';
+          }));
+          TesseraeLineups.render();
+        }""")
+        tick = page.locator('.lu-ds[data-display="frame"] .lu-today .lu-tick.next')
+        assert tick.get_attribute("data-tip") == "Next refresh 18:30, lands Thu 09:01"
+        assert page._lu_errors == []
         browser.close()
 
 
@@ -2683,6 +2858,10 @@ def test_cold_thumbnail_swaps_initial_for_background_snapshot(
         page.wait_for_function(
             "() => document.querySelector('[data-lu]').classList.contains('is-enhanced')"
         )
+        # A phone starts with the displays collapsed; open them to see the rows.
+        for more in page.locator(".lu-ds-more").all():
+            if more.is_visible():
+                more.click()
         assert page.locator(".lu-thumb img").count() == 0
         assert page.locator(".lu-thumb-ph").count() > 0
         assert page.locator("iframe").count() == 0
@@ -4132,8 +4311,13 @@ def test_long_day_tag_never_runs_under_the_row_title(live: str, width: int, fold
         )
         assert len(boxes) >= 5
         for b in boxes:
-            for other in (b["title"], b["name"]):
-                apart = b["tag"][2] <= other[0] + 0.5 or b["tag"][3] <= other[1] + 0.5
+            # On a narrow card the title box is display: contents (no box of its own).
+            for other in (o for o in (b["title"], b["name"]) if o[2] > o[0]):
+                apart = (
+                    b["tag"][2] <= other[0] + 0.5  # left of it
+                    or b["tag"][3] <= other[1] + 0.5  # above it
+                    or b["tag"][1] >= other[3] - 0.5  # under it (narrow cards)
+                )
                 assert apart, (width, folded, b)
         assert page.evaluate("() => document.documentElement.scrollWidth - innerWidth") <= 0
         assert page._lu_errors == []

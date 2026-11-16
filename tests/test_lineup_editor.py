@@ -48,8 +48,7 @@ def _register(app: Flask, device_id: str, kind: str = "esp32_client") -> None:
     assert resp.status_code == 201
 
 
-@pytest.mark.parametrize("mode", ["scheduled", "priority"])
-def test_new_lineup_keeps_step_conditions_and_pick_mode(app, mode):
+def test_new_lineup_keeps_step_conditions(app):
     condition = {
         "source_kind": "ha_entity",
         "source_id": "sensor.example_state",
@@ -64,13 +63,15 @@ def test_new_lineup_keeps_step_conditions_and_pick_mode(app, mode):
             "start": "08:00",
             "end": "20:00",
             "page_ids": ["a", "b"],
-            "advance_mode": mode,
+            # The pick mode is not taken on create: "priority" is a legacy
+            # mode, kept only on lineups that already use it.
+            "advance_mode": "priority",
             "conditions[a]": json.dumps([condition]),
         },
     )
     assert response.status_code == 200
     saved = app.config["DECK_STORE"].get(response.json["id"])
-    assert saved.advance_mode == mode
+    assert saved.advance_mode == "scheduled"
     assert saved.pages[0].conditions[0].model_dump(exclude_none=True) == condition
     assert saved.pages[1].conditions == []
 

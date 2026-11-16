@@ -1456,11 +1456,6 @@ main.page.dxe-page {
   flex-direction: column;
   gap: 12px;
 }
-.lu.dxe .dxe-add-mode {
-  display: grid;
-  gap: 8px;
-  margin-block: 16px;
-}
 .lu.dxe .dxe-add-actions {
   display: flex;
   align-items: center;

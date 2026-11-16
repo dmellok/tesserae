@@ -2953,7 +2953,6 @@ def create_lineup() -> Response:
         )
         deck = _merged_deck(
             deck,
-            advance_mode=form.get("advance_mode") or "scheduled",
             pages=[
                 {
                     **p.model_dump(),
