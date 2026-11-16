@@ -971,6 +971,11 @@ def _rebuild_transport(
         # the PushManager a direct accessor so fan-out stays correct on
         # those paths, not just on request-bound manual Sends.
         plugin_registry_fn=lambda: app.config.get("PLUGIN_REGISTRY"),
+        automation_eligible_fn=lambda page_id, device_id, live: (
+            app.config["SCHEDULER"].automation_page_eligible(page_id, device_id, live=live)
+            if app.config.get("SCHEDULER") is not None
+            else True
+        ),
         # Overlay atlases a fresh render will be asked for are built right
         # after it, off the device's request (#359). Off under pytest, where a
         # background browser per test app is the last thing wanted.

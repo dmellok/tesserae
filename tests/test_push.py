@@ -1569,7 +1569,7 @@ def test_a_send_waits_for_the_page_to_finish_painting(
     naps: list[float] = []
     monkeypatch.setattr(push_mod, "_settle_sleep", naps.append)
     answers = iter([(10, 3), (10, 1), (0, 0)])
-    monkeypatch.setattr(manager, "warm_page", lambda page_id: next(answers))
+    monkeypatch.setattr(manager, "warm_page", lambda page_id, **_kw: next(answers))
 
     with patch("app.push.capture_composed", return_value=(png, [])):
         result = manager.push("home")
