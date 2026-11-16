@@ -2,10 +2,10 @@
  *
  * One state, one draw: the server's JSON island (app.deck_routes._editor_state)
  * becomes `st`, every control edits `st`, and draw() repaints the sections from
- * it. Nothing is sent until Save lineup, which posts the whole lineup to
+ * it. The lineup waits for Save lineup, which posts the whole lineup to
  * /decks/editor-save (respond=json) and reloads; the new-lineup flow posts to
  * /decks/new/lineup and opens the editor of what it made. Push now (a row, or
- * the footer) and Draw another act at once, like on the Lineups page.
+ * the footer), Draw another and Duplicate dashboard act at once.
  *
  * The day bar, day tiles and thumbnails are the Lineups page's own
  * (window.TesseraeLineupsRender): same markup, same dx-lineups.css.
@@ -147,6 +147,7 @@
     elsewhere: false,
     step: S.isNew ? (S.display ? 2 : 1) : 0, // the new flow's open step
     saving: false,
+    duplicating: null,
     pushing: false,
     reload: false,
     msg: "",
@@ -1173,6 +1174,7 @@
     });
     const hooks = {
       pushOverlay: false,
+      zoomBeside: true,
       itemChoice: (_d, _l, vm) => choiceView(vm.dashboard_id),
       stepKey: (vm) => vm.dashboard_id,
       stepAttrs: () => ` draggable="true"`,
@@ -1186,7 +1188,10 @@
           .join(" "),
       tileExtra: (vm) => {
         const open = ui.open.has(vm.dashboard_id);
-        return `<button type="button" class="dxe-sel" data-expand="${esc(vm.dashboard_id)}" data-grip data-fk="sel-${esc(vm.dashboard_id)}" aria-expanded="${open}" aria-controls="dxe-detail" aria-label="${esc(vm.name)}, ${vm.index + 1} of ${n}. ${open ? "Hide" : "Show"} its details; Alt+arrows move it"></button>`;
+        const duplicate = vm.missing
+          ? ""
+          : `<button type="button" class="lu-zoom dxe-duplicate" data-duplicate="${esc(vm.dashboard_id)}" data-fk="dup-${esc(vm.dashboard_id)}" title="Duplicate ${esc(vm.name)}" aria-label="Duplicate ${esc(vm.name)}"${ui.duplicating ? " disabled" : ""}>${ico("copy")}</button>`;
+        return `<button type="button" class="dxe-sel" data-expand="${esc(vm.dashboard_id)}" data-grip data-fk="sel-${esc(vm.dashboard_id)}" aria-expanded="${open}" aria-controls="dxe-detail" aria-label="${esc(vm.name)}, ${vm.index + 1} of ${n}. ${open ? "Hide" : "Show"} its details; Alt+arrows move it"></button>${duplicate}`;
       },
       captionExtra: (vm) => {
         const tags = stepTags(st.steps[vm.index], vm.index);
@@ -2079,7 +2084,7 @@
     // saved and lost.
     const sections = $("dxe-sections");
     const hero = $("dxe-hero");
-    if (sections) sections.inert = ui.saving;
+    if (sections) sections.inert = ui.saving || !!ui.duplicating;
     if (hero) hero.inert = ui.saving;
     const on = $("dxe-enabled");
     if (on) on.disabled = ui.saving;
@@ -2111,7 +2116,7 @@
       setButtons(
         btns,
         `<a class="lu-btn-ghost lu-btn-line" href="${esc(S.urls.back)}" data-fk="f-cancel">Cancel</a>` +
-          `<button type="button" class="lu-btn-primary" data-create data-fk="f-create"${ready && !ui.saving ? "" : " disabled"}>${ui.saving ? "Creating…" : "Create lineup"}</button>`
+          `<button type="button" class="lu-btn-primary" data-create data-fk="f-create"${ready && !ui.saving && !ui.duplicating ? "" : " disabled"}>${ui.saving ? "Creating…" : "Create lineup"}</button>`
       );
       return;
     }
@@ -2124,8 +2129,8 @@
       (ui.reload
         ? `<button type="button" class="lu-btn-ghost lu-btn-line" data-reload data-fk="f-reload">Reload</button>`
         : "") +
-        `<button type="button" class="lu-btn-ghost lu-btn-line" data-discard data-fk="f-discard"${d && !ui.saving ? "" : " disabled"}>Discard</button>` +
-        `<button type="button" class="lu-btn-primary" data-save data-fk="f-save"${ui.saving ? " disabled" : ""}>${ui.saving ? "Saving…" : "Save lineup"}</button>`
+        `<button type="button" class="lu-btn-ghost lu-btn-line" data-discard data-fk="f-discard"${d && !ui.saving && !ui.duplicating ? "" : " disabled"}>Discard</button>` +
+        `<button type="button" class="lu-btn-primary" data-save data-fk="f-save"${ui.saving || ui.duplicating ? " disabled" : ""}>${ui.saving ? "Saving…" : "Save lineup"}</button>`
     );
   }
 
@@ -2195,6 +2200,44 @@
     const grip = root.querySelector(`[data-step="${CSS.escape(id)}"] [data-grip]`);
     if (grip) grip.focus();
     live(`Moved ${pageOf(id).name} to ${j + 1} of ${st.steps.length}.`);
+  }
+
+  async function duplicateStep(id) {
+    const source = stepOf(id);
+    const p = pageOf(id);
+    if (!source || p.missing || ui.saving || ui.duplicating) return;
+    const copy = { ...source };
+    ui.duplicating = id;
+    draw();
+    live(`Duplicating ${p.name}.`);
+    try {
+      const body = new FormData();
+      body.append("respond", "json");
+      const data = await request(S.urls.duplicatePage.replace("__ID__", encodeURIComponent(id)), {
+        method: "POST",
+        body,
+        headers: { Accept: "application/json" },
+      });
+      ui.duplicating = null;
+      change(() => {
+        S.pages[data.page.id] = { ...p, ...data.page, shared: 0, recent: [] };
+        copy.id = data.page.id;
+        st.steps.splice(st.steps.findIndex((s) => s.id === id) + 1, 0, copy);
+        if (hasConditions(source)) stepHadConditions.add(copy.id);
+        if (ui.consent[id]) ui.consent[copy.id] = ui.consent[id];
+        ui.open = new Set([copy.id]);
+      });
+      const tile = root.querySelector(`[data-step="${CSS.escape(copy.id)}"] .dxe-sel`);
+      tile?.focus();
+      live(`Duplicated ${p.name}.`);
+    } catch (err) {
+      ui.duplicating = null;
+      ui.msg = `Couldn't duplicate ${p.name}: ${err.message}`;
+      ui.msgKind = "err";
+      draw();
+      root.querySelector(`[data-duplicate="${CSS.escape(id)}"]`)?.focus();
+      live(ui.msg);
+    }
   }
 
   async function addStep(id, elsewhere) {
@@ -2637,7 +2680,7 @@
   }
 
   async function save() {
-    if (ui.saving) return;
+    if (ui.saving || ui.duplicating) return;
     if (!st.steps.length) {
       ui.msg = "Add at least one dashboard.";
       ui.msgKind = "err";
@@ -2689,7 +2732,7 @@
   }
 
   async function create() {
-    if (ui.saving || !st.display || !st.steps.length || !whenReady()) return;
+    if (ui.saving || ui.duplicating || !st.display || !st.steps.length || !whenReady()) return;
     if (
       !(await confirmBind(
         st.steps.map((s) => s.id),
@@ -2781,6 +2824,7 @@
     }
     if (t.disabled) return;
     const d = t.dataset;
+    if (d.duplicate) return duplicateStep(d.duplicate);
     if (d.day !== undefined && t.classList.contains("lu-dt")) {
       const i = Number(d.day);
       if (st.when.days[i] && st.when.days.filter(Boolean).length === 1) {

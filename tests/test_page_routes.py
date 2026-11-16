@@ -461,6 +461,63 @@ def test_duplicate_missing_page_redirects_with_flash(app: Flask, tmp_path: Path)
     assert resp.headers["Location"].rstrip("/").endswith("/pages")
 
 
+def test_duplicate_json_returns_an_independent_dashboard(app: Flask, tmp_path: Path) -> None:
+    from app.state.page_store import Cell, Page, Panel
+
+    client = app.test_client()
+    _sign_in(client)
+    source = Page(
+        id="source",
+        name="Overview",
+        panel=Panel(w=800, h=600),
+        theme="dark",
+        style="mono",
+        refresh_minutes=30,
+        status_bar_enabled=True,
+        status_bar_cell_id="bar",
+        cells=[
+            Cell(
+                id="bar",
+                plugin="widget_a",
+                x=0,
+                y=0,
+                w=800,
+                h=48,
+                options={"format": "24h", "nested": {"value": 1}},
+            )
+        ],
+    )
+    app.config["PAGE_STORE"].save(source)
+    response = client.post("/pages/source/duplicate", data={"respond": "json"})
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["ok"] is True
+    row = data["page"]
+    assert row["id"] != "source"
+    assert row["name"] == "Overview copy"
+    assert row["id"] in row["thumb"]
+    copied = _store(tmp_path).get(row["id"])
+    assert copied.theme == "dark" and copied.style == "mono"
+    assert copied.panel == source.panel and copied.refresh_minutes == 30
+    assert copied.cells[0].id != "bar"
+    assert copied.status_bar_cell_id == copied.cells[0].id
+    assert copied.cells[0].options == {"format": "24h", "nested": {"value": 1}}
+    copied.cells[0].options["nested"]["value"] = 2
+    app.config["PAGE_STORE"].save(copied)
+    assert _store(tmp_path).get("source").cells[0].options["nested"]["value"] == 1
+
+
+def test_duplicate_json_missing_dashboard_returns_an_error(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    response = client.post("/pages/missing/duplicate", data={"respond": "json"})
+    assert response.status_code == 404
+    assert response.get_json() == {
+        "ok": False,
+        "error": "This dashboard was deleted. Reload the lineup.",
+    }
+
+
 # -- layout apply ---------------------------------------------------
 
 

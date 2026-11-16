@@ -3694,6 +3694,7 @@ def _editor_state(deck: Deck | None) -> dict[str, Any]:
             "view": url_for("decks.view_json"),
             "newDashboard": url_for("pages.index"),
             "editPage": url_for("pages.edit", page_id="__ID__"),
+            "duplicatePage": url_for("pages.duplicate", page_id="__ID__"),
             "pushStep": url_for("decks.push_step", deck_id=deck.id) if deck is not None else "",
             "stepItem": url_for("decks.step_item", deck_id=deck.id) if deck is not None else "",
             "delete": url_for("decks.delete", deck_id=deck.id) if deck is not None else "",
