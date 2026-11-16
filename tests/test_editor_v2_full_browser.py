@@ -49,6 +49,85 @@ pytestmark = [
 PAGE_ID = "full"
 
 
+@pytest.mark.parametrize("plugin", ["", "webpage"])
+def test_look_returns_live_when_a_sensitive_widget_is_added(server, pw, plugin):
+    from playwright.sync_api import expect
+
+    base, app = server
+    store = app.config["PAGE_STORE"]
+    original = store.get(PAGE_ID)
+    store.save(
+        original.model_copy(
+            update={
+                "cells": [
+                    c.model_copy(update={"plugin": plugin, "options": {}}) for c in original.cells
+                ]
+            }
+        )
+    )
+    browser, page, errors = _open(pw, base)
+    try:
+        expect(page.locator("#ev2-step-look")).to_be_hidden()
+        assert page.locator("#ev2-step-schedules .ev2-sn-n").inner_text() == "4"
+        page.evaluate("window.editorStillHere = true")
+        if plugin:
+            page.locator('[data-cell-id="c1"] [data-ev2-row]').click()
+            page.locator('[data-cell-id="c1"] [data-ev2-replace]').click()
+        else:
+            page.locator('[data-cell-id="c1"] [data-ev2-row]').click()
+        page.locator("[data-ev2-pk-q]").fill("word")
+        page.locator('[data-ev2-pk] [data-widget="clock_word"]').click()
+        expect(page.locator("#ev2-step-look")).to_be_visible()
+        assert page.evaluate("window.editorStillHere") is True
+        assert page.locator("#ev2-step-schedules .ev2-sn-n").inner_text() == "5"
+        page.locator('[data-ev2-toggle="look"]').click()
+        page.locator("#ev2-lk-theme").select_option("dark")
+        _wait_for(lambda: store.get(PAGE_ID).theme == "dark", "look saved", page=page)
+        if plugin == "webpage":
+            page.locator('[data-ev2-toggle="widgets"]').click()
+            page.locator('[data-cell-id="c1"] [data-ev2-row]').click()
+            page.locator('[data-cell-id="c1"] [data-ev2-replace]').click()
+            page.locator("[data-ev2-pk-q]").fill("webpage")
+            page.locator('[data-ev2-pk] [data-widget="webpage"]').click()
+            expect(page.locator("#ev2-step-look")).to_be_hidden()
+            assert page.evaluate("window.editorStillHere") is True
+            assert page.locator("#ev2-step-schedules .ev2-sn-n").inner_text() == "4"
+        assert not errors
+    finally:
+        browser.close()
+
+
+def test_empty_dashboard_walk_skips_look_and_handles_its_hash(server, pw):
+    from playwright.sync_api import expect
+
+    base, app = server
+    store = app.config["PAGE_STORE"]
+    original = store.get(PAGE_ID)
+    store.save(
+        original.model_copy(
+            update={
+                "cells": [
+                    c.model_copy(update={"plugin": "", "options": {}}) for c in original.cells
+                ]
+            }
+        )
+    )
+    browser, page, errors = _open(pw, base)
+    try:
+        page.goto(f"{base}/pages/{PAGE_ID}?new=1#look", wait_until="domcontentloaded")
+        expect(page.locator("#ev2-step-look")).to_be_hidden()
+        expect(page.locator("#ev2-step-widgets")).to_have_attribute("data-state", "open")
+        assert page.locator("[data-ev2-next=widgets]").inner_text() == "Next: add to a lineup"
+        page.locator("[data-ev2-next=widgets]").click()
+        expect(page.locator("#ev2-step-lineup")).to_have_attribute("data-state", "open")
+        assert "Last step" in page.locator("[data-ev2-bar-st]").inner_text()
+        page.locator("[data-ev2-finish]").click()
+        page.wait_for_url(f"{base}/pages/{PAGE_ID}")
+        assert not errors
+    finally:
+        browser.close()
+
+
 @pytest.fixture(scope="module")
 def pw() -> Iterator[Any]:
     from playwright.sync_api import sync_playwright

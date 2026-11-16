@@ -168,18 +168,32 @@
     // wipe the new widget's default-on options.)
     const field = form.querySelector("[data-ev2-plugin]");
     const was = field.value;
+    EV2.root.inert = true;
     EV2.flush()
       .then(() => {
         field.value = key;
         return EV2.saveForm(form);
       })
-      .then(() => EV2.reload({ open: "widgets", cell: cellId }))
-      .then((reloaded) => {
-        if (reloaded === false) throw new Error("not reloaded");
+      .then(async () => {
+        try {
+          await EV2.widgets.refreshRow(cellId);
+        } catch {
+          // The widget saved; fetch fresh settings with the existing reload
+          // path if the partial refresh failed.
+          await EV2.reload({ open: "widgets", cell: cellId });
+          return;
+        }
+        close();
+        EV2.root.inert = false;
+        EV2.widgets.openRow(cellId);
+        EV2.widgets.rowFor(cellId).querySelector("[data-ev2-row]")?.focus();
       })
       .catch(() => {
         field.value = was; // the swap didn't save: the form keeps the current widget
         listEl.querySelectorAll("button").forEach((b) => (b.disabled = false));
+      })
+      .finally(() => {
+        EV2.root.inert = false;
       });
   }
 

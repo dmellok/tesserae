@@ -105,6 +105,23 @@
   }
 
   function refreshOverrides() {
+    const content = EV2.widgets
+      ? EV2.widgets.rows().filter((li) => li.dataset.n && li.dataset.widget)
+      : [];
+    const effects = ["custom_css", "gap", "corner_radius", "bleed_color"].some((name) => {
+      const value = form.elements[name].value;
+      if (name === "custom_css") return value.trim();
+      // A saved matting colour is only reachable from this step.
+      if (name === "bleed_color") return value.toLowerCase() !== "#ffffff";
+      return Number(value) !== 0;
+    });
+    // The status bar takes the dashboard's theme, style and font.
+    const statusBar = !!root.querySelector("[data-ev2-sbar]")?.checked;
+    const visible =
+      statusBar ||
+      (content.length > 0 &&
+        (effects || content.some((li) => !JSON.parse(li.dataset.ev2LookRules || "{}").always)));
+    EV2.steps?.setLookVisible(visible);
     const o = overriders();
     refreshSummary();
     if (!box) return;
@@ -221,6 +238,11 @@
   const cells = root.querySelector("[data-ev2-cells]");
   ["input", "change"].forEach((name) => {
     cells?.addEventListener(name, () => queueMicrotask(refreshOverrides));
+    form.addEventListener(name, () => queueMicrotask(refreshOverrides));
   });
+  root
+    .querySelector("[data-ev2-sbar]")
+    ?.addEventListener("change", () => queueMicrotask(refreshOverrides));
+  new MutationObserver(refreshOverrides).observe(cells, { childList: true });
   EV2.ready(refreshOverrides);
 })();
