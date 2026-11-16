@@ -477,6 +477,29 @@ def test_the_checkin_gap_is_the_cadence_not_the_last_sleep_through_quiet_hours()
     assert nu.compute_next_update(1500.0, reach, now=0.0).at == 2800.0
 
 
+def test_first_daytime_checkin_steps_by_the_cadence_after_an_overnight_hold(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    _register(app, client, "panel")
+    morning = datetime(2026, 1, 15, 8, 8, 30, tzinfo=UTC).timestamp()
+    telemetry = app.config["DEVICE_TELEMETRY"]
+    telemetry.record_heartbeat(
+        "panel",
+        received_at=morning - 28800,
+        parsed={"next_sleep_s": 28800},
+        configured_sleep_s=3600,
+    )
+    telemetry.note_server_directive("panel", wake_at=morning, interval_s=28800)
+    app.config["SETTINGS_STORE"].patch_section("devices", {"panel": {"sleep_interval_s": 3600}})
+    with app.app_context():
+        reach = nu.reach_for_device(app.config["DEVICE_REGISTRY"].get("panel"), now=morning)
+    assert reach.next_checkin_at == morning
+    assert reach.gap_s == 3600
+    # Content due after the morning wake lands on the next hourly wake.
+    update = nu.compute_next_update(morning + 60, reach, now=morning)
+    assert update.at == morning + 3600
+
+
 def test_a_page_declared_wake_interval_sets_the_checkin_gap(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

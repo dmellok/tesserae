@@ -445,12 +445,12 @@ def test_issued_poll_replaces_a_configured_fallback(tmp_path: Path) -> None:
     assert entry.consecutive_on_time_wakes == 2
 
 
-def test_issued_poll_leaves_firmware_and_server_predictions_alone(tmp_path: Path) -> None:
+def test_issued_poll_leaves_matching_firmware_and_server_predictions_alone(tmp_path: Path) -> None:
     store = _make_store(tmp_path)
     store.record_heartbeat(
         "fw", received_at=1000.0, parsed={"next_sleep_s": 900}, configured_sleep_s=1800
     )
-    assert store.note_issued_poll("fw", interval_s=300) is None
+    assert store.note_issued_poll("fw", interval_s=900) is None
     assert store.get("fw").predicted_next_wake_at == 1900.0
 
     store.record_heartbeat("aligned", received_at=1000.0, parsed={}, configured_sleep_s=1800)
@@ -464,6 +464,60 @@ def test_issued_poll_leaves_firmware_and_server_predictions_alone(tmp_path: Path
     assert store.note_issued_poll("mains", interval_s=300) is None
     assert store.note_issued_poll("unknown", interval_s=300) is None
     assert store.note_issued_poll("fw", interval_s=0) is None
+
+
+def test_issued_poll_replaces_the_previous_quiet_hours_sleep(tmp_path: Path) -> None:
+    from app.state.device_telemetry import known_sleep_cycle_s
+
+    store = _make_store(tmp_path)
+    t0 = 1_000_000.0
+    # The request still reports the overnight interval, before reading the reply.
+    store.record_heartbeat(
+        "sleeper",
+        received_at=t0,
+        parsed={"next_sleep_s": 28800, "button_event_id": 7},
+        configured_sleep_s=3600,
+    )
+    store.note_issued_poll("sleeper", interval_s=3600)
+    entry = store.get("sleeper")
+    assert entry is not None and entry.predicted_next_wake_at == t0 + 3600
+    assert known_sleep_cycle_s(store, "sleeper") == 3600
+    # Corrected predictions earn trust even if subsequent requests lag a reply.
+    for n in range(1, CONFIDENCE_TRUSTED_AT + 1):
+        entry = store.record_heartbeat(
+            "sleeper",
+            received_at=t0 + n * 3600,
+            parsed={"next_sleep_s": 28800, "button_event_id": 7},
+            configured_sleep_s=3600,
+        )
+        store.note_issued_poll("sleeper", interval_s=3600)
+    assert entry.is_trusted
+    assert store.get("sleeper").consecutive_on_time_wakes == CONFIDENCE_TRUSTED_AT
+    reloaded = TelemetryStore(tmp_path / "core" / "device_telemetry.json").get("sleeper")
+    assert reloaded is not None and reloaded.predicted_next_wake_at == t0 + 4 * 3600
+    pressed_at = t0 + 3 * 3600 + 1200
+    store.record_heartbeat(
+        "sleeper",
+        received_at=pressed_at,
+        parsed={"next_sleep_s": 28800, "button_event_id": 8},
+        configured_sleep_s=3600,
+    )
+    corrected = store.note_issued_poll("sleeper", interval_s=3600)
+    assert corrected is not None and corrected.is_trusted
+    assert corrected.consecutive_on_time_wakes == CONFIDENCE_TRUSTED_AT
+    assert corrected.last_button_event_id == 8 and corrected.button_wake_at == pressed_at
+
+
+def test_issued_poll_keeps_a_matching_firmware_timestamp(tmp_path: Path) -> None:
+    store = _make_store(tmp_path)
+    before = store.record_heartbeat(
+        "sleeper",
+        received_at=1000,
+        parsed={"sleep_until": 4595, "next_sleep_s": 3600},
+        configured_sleep_s=3600,
+    )
+    assert store.note_issued_poll("sleeper", interval_s=3600) is None
+    assert store.get("sleeper") == before
 
 
 def test_a_button_press_wake_does_not_reset_trust(tmp_path: Path) -> None:

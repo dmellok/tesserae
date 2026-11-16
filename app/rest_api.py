@@ -1942,10 +1942,9 @@ def post_status(device_id: str) -> Response:
     # sheds the awake-time slip a relative timer carries; older firmware
     # ignores it and still lands close via next_poll_s.
     if wake_at is None:
-        # No alignment directive. A firmware that publishes neither
-        # sleep_until nor next_sleep_s had its wake predicted from the
-        # configured sleep_interval_s above; it is about to sleep for
-        # next_poll_s instead, so predict from that (#387).
+        # The request's sleep timing predates this reply and may still
+        # describe the overnight quiet-hours hold. Predict from the poll
+        # interval we issued, preserving matching firmware timestamps.
         telemetry = current_app.config.get("DEVICE_TELEMETRY")
         if telemetry is not None:
             try:
