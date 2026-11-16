@@ -6,11 +6,39 @@ is a successful result; known legacy HA error sentinels are unavailable.
 
 from __future__ import annotations
 
+import inspect
+from collections.abc import Callable, Mapping
 from typing import Any
 
 
-def choice_rows(plugin: Any, spec: dict[str, Any]) -> list[dict[str, Any]]:
-    """Load the provider's original rows, preserving web-editor metadata/errors."""
+def accepts_options(fn: Callable[..., Any]) -> bool:
+    """True when a ``choices`` provider takes an ``options`` keyword (or
+    ``**kwargs``): it wants the cell's current option values."""
+    try:
+        params = inspect.signature(fn).parameters.values()
+    except (TypeError, ValueError):
+        return False
+    return any(
+        (p.name == "options" and p.kind is not inspect.Parameter.POSITIONAL_ONLY)
+        or p.kind is inspect.Parameter.VAR_KEYWORD
+        for p in params
+    )
+
+
+def wants_options(plugin: Any) -> bool:
+    """Whether this widget's ``choices`` provider reads the cell's options, so
+    its rows can differ from one cell to the next."""
+    resolver = getattr(getattr(plugin, "server_module", None), "choices", None)
+    return callable(resolver) and accepts_options(resolver)
+
+
+def choice_rows(
+    plugin: Any, spec: dict[str, Any], options: Mapping[str, Any] | None = None
+) -> list[dict[str, Any]]:
+    """Load the provider's original rows, preserving web-editor metadata/errors.
+
+    A provider whose ``choices`` takes an ``options`` keyword gets the cell's
+    current option values (``{}`` when there is no cell to ask about)."""
     source = spec.get("choices_from")
     if source:
         resolver = getattr(plugin.server_module, "choices", None) if plugin else None
@@ -19,6 +47,8 @@ def choice_rows(plugin: Any, spec: dict[str, Any]) -> list[dict[str, Any]]:
         from app.capabilities import capability_scope
 
         with capability_scope(getattr(plugin, "capabilities", None)):
+            if accepts_options(resolver):
+                return list(resolver(source, options=dict(options or {})))
             return list(resolver(source))
     return list(spec.get("choices", []))
 

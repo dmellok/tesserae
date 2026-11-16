@@ -641,10 +641,62 @@
   display: none;
 }
 @media (max-width: 640px), (pointer: coarse) {
+  .ev2pv-tabs button {
+    min-width: 44px;
+    min-height: 44px;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    text-align: left;
+  }
+  .ev2pv-tab-dims {
+    white-space: nowrap;
+  }
   .ev2pv-done {
     min-height: 44px;
   }
 }
 #ev2-preview {
   scroll-margin-top: calc(var(--ev2-app-header, 0px) + var(--ev2-gap, 16px));
+}
+
+/* Native panel zoom keeps every dither dot intact; the viewport scrolls. */
+.ev2pv-panel-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ev2-gap-tight, 8px);
+  margin-bottom: var(--ev2-gap-tight, 8px);
+}
+.ev2pv-panel-controls[hidden] {
+  display: none;
+}
+.ev2pv-panel-controls label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  font-size: var(--ev2-fs-label, 13px);
+}
+.ev2pv-panel-controls p {
+  flex-basis: 100%;
+  margin: 0;
+}
+.ev2pv.is-panel-native .ev2pv-stage {
+  display: block;
+  overflow: auto;
+  max-height: var(--ev2pv-max-h);
+  min-height: 0;
+}
+.ev2pv.is-panel-native .ev2pv-panel-img,
+.ev2pv-native-scroll img {
+  image-rendering: pixelated;
+  max-width: none;
+}
+.ev2pv.is-glass .ev2pv-panel-img {
+  filter: saturate(0.85) contrast(0.92) sepia(0.06) blur(0.25px);
+}
+
+/* Fit may shrink an image for an overview; enlargement uses 1x or 2x. */
+.ev2pv.is-panel:not(.is-panel-native) .ev2pv-bezel {
+  max-width: calc(var(--ev2pv-pixel-w) + var(--ev2pv-pad-x));
 }

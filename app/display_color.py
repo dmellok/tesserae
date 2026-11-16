@@ -60,6 +60,11 @@ def display_color_mode(
         values = {**values, **(renderer.manifest.get("render_overrides") or {})}
         if isinstance(values.get("dither"), str):
             dither = str(values["dither"])
+    return color_for_gamut(gamut, dither)
+
+
+def color_for_gamut(gamut: str, dither: str | None = None) -> DisplayColor:
+    """Browser approximation of a panel type, independent of device binding."""
     gamut = canonicalise_gamut(gamut)
     if gamut == "mono":
         # Only an explicit no-dither mode paints hard black/white. Every error
@@ -77,11 +82,12 @@ def register_preview_color(app: Flask) -> None:
 
     def preview_color(
         device_ids: str | list[str] | tuple[str, ...] | None = None,
+        fallback_gamut: str | None = None,
     ) -> DisplayColor:
         ids = [device_ids] if isinstance(device_ids, str) else list(device_ids or [])
         devices = app.config.get("DEVICE_REGISTRY")
         if not ids or devices is None:
-            return DisplayColor()
+            return color_for_gamut(fallback_gamut) if fallback_gamut else DisplayColor()
         cache: dict[str, DisplayColor] = g.setdefault("_preview_colors", {})
         modes = []
         for did in ids:

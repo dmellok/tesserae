@@ -199,6 +199,13 @@ Lowercase `[a-z0-9_]` is a convention, not a requirement. Name it
 
     Without the flag, sharing is unchanged.
 
+* Set `render.paid` when a render may cost money, such as a new AI picture.
+    Use `true` for every placement, or an object in the `show_if` format naming the options that make it so: `"paid": {"method": "ai"}`.
+
+    The lineup editor uses it to warn about renders nobody sees.
+    A display that wakes every 60 min only shows the last of the sends before each wake, so a lineup sending every 5 min could pay for 11 unseen pictures an hour.
+    The flag changes no rendering, and older servers ignore it.
+
 * Set `render.full_bleed` to `true` to remove outer page padding where a cell touches the panel wall.
     `picture_gallery` and `picture_apod` use it.
     Gaps between cells remain, and per-cell padding overrides win.
@@ -303,6 +310,53 @@ dropdown:
 ```python
 return [{"value": "", "label": "Add an Immich library under Settings → Widgets.", "note": True}]
 ```
+
+Rows may carry the same keys as static choices (`group`, `image`, `image_large`, `aliases`).
+Rows with an `image` draw the picture picker, as they do for static choices.
+
+#### Choices that can't work here, `disabled` and `reason`
+
+Mark a choice `"disabled": true` when it can't work for the current setup, and say why in `reason`:
+
+```python
+{"value": "toolpath", "label": "Toolpaths", "disabled": True,
+ "reason": "Not available for Printer A: Home Assistant gets no sliced files from it."}
+```
+
+The editors list the choice greyed, with the reason beside it, and it can't be picked there.
+A cell that already holds a disabled choice keeps it: the editor shows a warning with the reason under the field, and a save leaves the value alone.
+A manifest `default` that is a disabled choice is treated the same way on a new cell.
+
+`disabled` is a hint to the editors, not a rule the host enforces.
+Nothing checks it when a cell is saved, so a disabled value can still reach your widget:
+
+- the API and MCP agents can set any value;
+- the editor's list is the one it loaded when it opened, so a choice that became unavailable since (the user changed the option it depends on, say) can still be picked and saved.
+
+Validate the value at render time and draw a clear message when it can't work.
+Static `choices` can carry `disabled` and `reason` too.
+Older servers ignore both keys and show the choice as usual.
+
+#### Choices that read the cell's options
+
+A provider can read the cell's other options. Take an `options` keyword in `choices`, and the host passes the cell's current option values:
+
+```python
+def choices(name: str, options: dict | None = None) -> list[dict]:
+    if name == "method":
+        printer = (options or {}).get("printer", "")
+        return _methods_for(printer)
+    ...
+```
+
+`options` is `{}` when the caller has no cell's options to pass.
+Only the editors pass them; MCP agents listing a widget's choices, the composer and the template market all call without them.
+Return a sensible list for `{}`, and don't rely on those callers seeing the per-cell `disabled` flags.
+Older servers call `choices(name)`, so give `options` a default.
+
+Choices reflect the saved options when the editor renders the fields. Changing another option does not refresh them live. Tell users when availability depends on another option, for example: "Availability depends on the printer. Save and reopen to refresh."
+
+Choices load every time the editor opens, so keep `choices` fast: cache what it reads, and give up quickly when a service is slow.
 
 The host calls `choices()` on the manifest's plugin, never a sibling.
 For a companion `_core` plugin, expose `choices()` on the widget and delegate through the plugin registry:
