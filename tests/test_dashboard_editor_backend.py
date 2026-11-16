@@ -486,3 +486,35 @@ def test_switching_editor_keeps_the_other_ui_settings(app):
     settings.update_section("ui", {"dashboard_editor": "new", "other": "kept"})
     app.test_client().post("/pages/editor-version", data={"version": "classic"})
     assert settings.get_section("ui") == {"dashboard_editor": "classic", "other": "kept"}
+
+
+@pytest.mark.parametrize(
+    "gamut", ["rgb24", "waveshare_e6", "inky_7colour", "gray_4", "gray_16", "mono"]
+)
+def test_test_display_type_is_saved_and_used_for_preview_and_push(app, gamut):
+    client = app.test_client()
+    client.post("/pages/home", data={"test_display_gamut": gamut})
+    page = app.config["PAGE_STORE"].get("home")
+    assert page.test_display_gamut == gamut
+    assert (
+        PageStore(app.config["DATA_ROOT"] / "core" / "pages.json").get("home").test_display_gamut
+        == gamut
+    )
+    assert resolve_panel_for_page(page, None, app.config["SETTINGS_STORE"]).gamut == gamut
+    assert panel_groups_for_push(page, None, app.config["SETTINGS_STORE"])[0][0].gamut == gamut
+    assert preview_groups_for_page(page, None, app.config["SETTINGS_STORE"])[0]["gamut"] == gamut
+
+
+def test_invalid_test_display_type_does_not_save_partial_updates(app):
+    app.test_client().post("/pages/home", data={"test_display_gamut": "bad", "name": "Wrong"})
+    assert app.config["PAGE_STORE"].get("home").name == "Home"
+
+
+def test_each_selected_device_gets_its_own_pixel_preview_even_at_the_same_size(app):
+    _device(app, "desk")
+    _device(app, "hall")
+    page = app.config["PAGE_STORE"].get("home").model_copy(update={"device_ids": ["desk", "hall"]})
+    app.config["PAGE_STORE"].save(page)
+    _, context = _editor(app)
+    assert [g["device_ids"] for g in context["panel_preview_groups"]] == [["desk"], ["hall"]]
+    assert len(context["preview_groups"]) == 1  # Classic layout grouping stays by shape.

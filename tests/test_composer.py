@@ -1030,3 +1030,92 @@ def test_pending_hint_sums_the_widgets_pending_work() -> None:
         == 5
     )
     assert pending_hint([{"data": {"live_pending": -4}}, {"data": {"live_pending": "x"}}]) == 0
+
+
+@pytest.mark.parametrize(
+    "gamut",
+    [
+        "rgb24",
+        "waveshare_e6",
+        "inky_7colour",
+        "bwry_4",
+        "bwr_3",
+        "bwy_3",
+        "gray_4",
+        "gray_8",
+        "gray_16",
+        "mono",
+        "kaleido3",
+    ],
+)
+@pytest.mark.parametrize("width", [120, 121])
+def test_test_display_preview_uses_its_palette_at_any_custom_size(app, gamut, width):
+    import io
+
+    from PIL import Image
+
+    from app.quantizer import palette_for_gamut
+    from app.state.page_store import Page, Panel
+
+    page = Page(id="typed", name="Typed", panel=Panel(w=width, h=100), test_display_gamut=gamut)
+    app.config["PAGE_STORE"].save(page)
+    token = composer.page_preview_token(page, (width, 100))
+    cache = app.config["DATA_ROOT"] / "core" / "previews"
+    cache.mkdir(parents=True, exist_ok=True)
+    source = io.BytesIO()
+    Image.new("RGB", (width, 100), (123, 170, 210)).save(source, "PNG")
+    (cache / f"typed~panel{width}x100__{token}.png").write_bytes(source.getvalue())
+    response = app.test_client().get(f"/compose/typed/panel.png?w={width}&h=100")
+    assert response.status_code == 200
+    with Image.open(io.BytesIO(response.data)) as image:
+        assert image.size == (width, 100)
+        if gamut not in ("rgb24", "kaleido3"):
+            assert set(image.convert("RGB").getdata()) <= set(palette_for_gamut(gamut))
+        if gamut == "rgb24":
+            assert image.convert("RGB").getpixel((0, 0)) == (123, 170, 210)
+
+
+def test_typed_test_display_inherits_real_renderer_picture_settings(app):
+    import io
+
+    from PIL import Image
+
+    from app.state.page_store import Page, Panel
+
+    page = Page(id="virtual", name="Virtual", panel=Panel(w=120, h=100), test_display_gamut="mono")
+    app.config["PAGE_STORE"].save(page)
+    token = composer.page_preview_token(page, (120, 100))
+    cache = app.config["DATA_ROOT"] / "core" / "previews"
+    cache.mkdir(parents=True, exist_ok=True)
+    source = io.BytesIO()
+    Image.new("RGB", (120, 100), (120, 120, 120)).save(source, "PNG")
+    (cache / f"virtual~panel120x100__{token}.png").write_bytes(source.getvalue())
+    settings = app.config["SETTINGS_STORE"]
+    settings.patch_section("renderers", {"esp32_bw_bin": {"dither": "none"}})
+    first = app.test_client().get("/compose/virtual/panel.png?w=120&h=100")
+    settings.patch_section("renderers", {"esp32_bw_bin": {"dither": "atkinson"}})
+    second = app.test_client().get("/compose/virtual/panel.png?w=120&h=100")
+    assert first.headers["ETag"] != second.headers["ETag"]
+    assert first.data != second.data
+
+
+def test_second_device_preview_captures_its_own_widget_context(app, monkeypatch):
+    from types import SimpleNamespace
+
+    from app.state.page_store import Page
+
+    devices = {
+        did: SimpleNamespace(id=did, panel={"w": 32, "h": 24}, renderer_ids=["esp32_bin"])
+        for did in ("desk", "hall")
+    }
+    app.config["DEVICE_REGISTRY"] = SimpleNamespace(get=devices.get, devices=devices)
+    app.config["PAGE_STORE"].save(Page(id="multi", name="Multi", device_ids=["desk", "hall"]))
+    submitted = []
+    monkeypatch.setattr("app.preview_cache.submit", lambda **kw: submitted.append(kw))
+    for did in devices:
+        assert (
+            app.test_client().get(f"/compose/multi/panel.png?w=32&h=24&device={did}").status_code
+            == 202
+        )
+    assert [job["query"] for job in submitted] == ["device_id=desk", "device_id=hall"]
+    assert submitted[0]["cache_path"] != submitted[1]["cache_path"]

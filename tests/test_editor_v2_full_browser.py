@@ -665,6 +665,61 @@ def test_phone_layout_has_no_sideways_scroll_and_44px_targets(
     browser.close()
 
 
+@pytest.mark.parametrize("scheme", ["light", "dark"])
+@pytest.mark.parametrize(("name", "width", "height"), PHONES)
+def test_phone_panel_controls_and_device_tabs_have_touch_targets(
+    phone_server: tuple[str, Flask], pw: Any, name: str, width: int, height: int, scheme: str
+) -> None:
+    import io
+
+    from PIL import Image
+
+    base, app = phone_server
+    source = io.BytesIO()
+    Image.new("RGB", (8, 8), "white").save(source, "PNG")
+    browser, page, errors = _phone(pw, name, width, height, scheme)
+    try:
+        # Controlled image: test the editor's scrolling and controls, not capture timing.
+        page.route(
+            "**/compose/*/panel.png?*",
+            lambda route: route.fulfill(
+                status=200, content_type="image/png", body=source.getvalue()
+            ),
+        )
+        page.goto(base + "/pages/mnew?new=1", wait_until="domcontentloaded")
+        page.wait_for_function("() => window.EV2 && window.EV2Preview")
+        # The longest panel type must stay inside the field on a narrow phone.
+        page.locator("[data-ev2-test-type]").evaluate("el => el.value = 'bwry_4'")
+        page.locator('[data-ev2pv-mode="panel"]').tap()
+        for zoom in ("1", "2", "fit"):
+            page.locator(f'[data-ev2pv-zoom="{zoom}"]').tap()
+            _no_sideways_scroll(page)
+            assert page.evaluate(_SMALL_TARGETS) == []
+        glass = page.locator("[data-ev2pv-glass]")
+        assert glass.locator("..").bounding_box()["height"] >= 44
+        glass.check()
+        assert glass.is_checked()
+
+        app.config["DEVICE_REGISTRY"].get("hall").manifest["name"] = (
+            "HallwayDisplayWithAnUnbrokenNameThatMustWrap"
+        )
+        store = app.config["PAGE_STORE"]
+        dashboard = store.get("medit").model_copy(update={"device_ids": ["hall", "greyish"]})
+        store.save(dashboard)
+        page.goto(base + "/pages/medit", wait_until="domcontentloaded")
+        page.wait_for_function("() => window.EV2Preview")
+        tabs = page.locator("[data-ev2pv-tab]")
+        assert tabs.count() == 2
+        for tab in tabs.all():
+            tab.tap()
+            assert tab.locator(".ev2pv-tab-dims").evaluate("el => el.getClientRects().length") == 1
+            _no_sideways_scroll(page)
+            assert page.evaluate(_SMALL_TARGETS) == []
+        assert not errors
+    finally:
+        browser.close()
+
+
 def test_phone_new_dashboard_by_touch(phone_server: tuple[str, Flask], pw: Any) -> None:
     base, _app = phone_server
     browser, page, errors = _phone(pw, "iPhone 15", 393, 852)

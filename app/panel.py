@@ -313,10 +313,14 @@ def resolve_panel_for_page(
 
 
 def resolve_test_display(page: Page, settings: SettingsStore) -> Panel:
-    """Override only explicit test dimensions, keeping the inherited panel metadata."""
+    """Resolve per-dashboard test dimensions and optional panel type."""
     panel = page.panel or resolve_settings_panel(settings)
     return panel.model_copy(
-        update={"w": page.test_display_w or panel.w, "h": page.test_display_h or panel.h}
+        update={
+            "w": page.test_display_w or panel.w,
+            "h": page.test_display_h or panel.h,
+            "gamut": page.test_display_gamut or panel.gamut,
+        }
     )
 
 
@@ -350,16 +354,30 @@ def preview_groups_for_page(
     page: Page,
     devices: DeviceRegistry | None,
     settings: SettingsStore,
+    *,
+    per_device: bool = False,
 ) -> list[dict[str, Any]]:
     """One entry per distinct aspect ratio among the page's targeted
     devices, the editor renders a preview card for each. Same aspect =
     same layout, so devices that differ only in resolution share a card.
-    No targeted device → a single virtual-panel card."""
+    No targeted device → a single virtual-panel card. ``per_device`` keeps
+    separate pixel previews for devices with different picture settings, even
+    when their shape and size match."""
     panels = _selected_device_panels(page, devices)
     if not panels:
         p = resolve_panel_for_page(page, devices, settings)
+        return [{"w": p.w, "h": p.h, "label": "Virtual panel", "devices": [], "gamut": p.gamut}]
+    if per_device:
         return [
-            {"w": p.w, "h": p.h, "label": "Virtual panel", "devices": [], "gamut": "waveshare_e6"}
+            {
+                "w": p.w,
+                "h": p.h,
+                "gamut": p.gamut,
+                "label": d.display_name,
+                "devices": [d.display_name],
+                "device_ids": [d.id],
+            }
+            for d, p in panels
         ]
     groups: dict[tuple[int, int], dict[str, Any]] = {}
     for device, panel in panels:
