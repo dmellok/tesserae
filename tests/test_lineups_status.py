@@ -439,3 +439,144 @@ def test_view_json_ranks_a_merged_priority_lineup(app: Flask, client: Any) -> No
     # The editor names the entities the same way.
     html = client.get("/decks/door_frame/edit").get_data(as_text=True)
     assert "Printer A Print status" in html
+
+
+# -- where the frame came from, read from the push log ---------------------------------
+
+
+def _log_push(app: Flask, source: str, page: str = "photos") -> int:
+    return int(
+        app.config["EVENT_LOG"].record(
+            type="push", source=source, target=page, status="sent", extra={"device_ids": ["panel"]}
+        )
+    )
+
+
+def _log_fire(app: Flask, kind: str, record_id: str, push_id: int | None) -> None:
+    app.config["EVENT_LOG"].record(
+        type=kind,
+        source=kind,
+        target=record_id,
+        status="sent",
+        extra={"rotation_name": record_id, "schedule_name": record_id, "push_event_id": push_id},
+    )
+
+
+def _source(app: Flask, page: str = "photos") -> Any:
+    from app.deck_routes import _frame_source
+
+    with app.test_request_context():
+        return _frame_source("panel", page, nav_rec=None, lineup_names={})
+
+
+def test_an_auto_update_keeps_the_lineup_that_put_the_page_up(app: Flask) -> None:
+    _log_fire(app, "rotation", "photos", _log_push(app, "rotation"))
+    for _ in range(3):
+        _log_push(app, "page_refresh")
+    src = _source(app)
+    assert src.phrase == "an auto update"
+    assert (src.lineup_id, src.known) == ("photos", True)
+
+
+def test_an_auto_update_over_a_manual_push_still_means_no_lineup(app: Flask) -> None:
+    _log_push(app, "manual")
+    _log_push(app, "page_refresh")
+    src = _source(app)
+    assert (src.lineup_id, src.known) == (None, True)
+
+
+def test_only_auto_updates_in_the_log_leave_the_source_unknown(app: Flask) -> None:
+    for _ in range(30):
+        _log_push(app, "page_refresh")
+    src = _source(app)
+    assert (src.phrase, src.lineup_id, src.known) == ("an auto update", None, False)
+
+
+def test_a_busier_rotation_does_not_hide_the_one_that_fired(app: Flask) -> None:
+    _log_fire(app, "rotation", "photos", _log_push(app, "rotation"))
+    for _ in range(130):
+        _log_fire(app, "rotation", "elsewhere", _log_push(app, "rotation", page="alpha"))
+    src = _source(app)
+    assert (src.phrase, src.lineup_id, src.known) == ("photos", "photos", True)
+
+
+def test_a_fire_whose_engine_row_is_gone_is_unknown_not_another_rotation(app: Flask) -> None:
+    _log_push(app, "rotation")
+    _log_fire(app, "rotation", "elsewhere", _log_push(app, "rotation", page="alpha"))
+    src = _source(app)
+    assert (src.phrase, src.lineup_id, src.known) == ("another rotation", None, False)
+
+
+def _glass_shows_photos(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The panel reports the photos frame, and no nav record explains it."""
+    from app import deck_routes
+
+    app.config["DECK_NAV_STORE"].clear("panel")
+    monkeypatch.setattr(
+        deck_routes,
+        "_panel_states",
+        lambda devices: {
+            d.id: {"page_id": "photos", "at": None, "verb": "fetched", "reports": True}
+            for d in devices
+        },
+    )
+
+
+def test_view_json_keeps_live_through_an_auto_update(
+    app: Flask, client: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _glass_shows_photos(app, monkeypatch)
+    _log_fire(app, "scheduler", "photos", _log_push(app, "scheduler"))
+    _log_push(app, "page_refresh")
+    got = _view_rows(client)
+    assert got["photos"]["status"] == "live"
+    assert [lu["status"] for lu in got.values()].count("live") == 1
+
+
+def test_view_json_keeps_live_when_other_fires_crowd_the_log(
+    app: Flask, client: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _glass_shows_photos(app, monkeypatch)
+    _log_fire(app, "scheduler", "photos", _log_push(app, "scheduler"))
+    for _ in range(130):
+        _log_fire(app, "scheduler", "elsewhere", _log_push(app, "scheduler", page="alpha"))
+    got = _view_rows(client)
+    assert got["photos"]["status"] == "live"
+
+
+def test_view_json_has_no_live_row_after_a_manual_push(
+    app: Flask, client: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _glass_shows_photos(app, monkeypatch)
+    _log_fire(app, "scheduler", "photos", _log_push(app, "scheduler"))
+    _log_push(app, "manual")
+    got = _view_rows(client)
+    assert [lu["status"] for lu in got.values()].count("live") == 0
+
+
+# -- a daily push that already went out ------------------------------------------------
+
+
+def _morning(**kw: Any) -> LineupInput:
+    return LineupInput("morning", "Morning", "daily", (StepInput("alpha"),), start="07:00", **kw)
+
+
+def _scheduled(lineup: LineupInput) -> str | None:
+    from app.lineups_view import _build_model, _last_push, _make_clock
+
+    clk = _make_clock(NOW)
+    lp = _last_push(_build_model((lineup,), clk), clk.now_abs)
+    return lp[1].lineup.id if lp is not None else None
+
+
+def test_a_push_that_went_out_counts_though_its_conditions_fail_now() -> None:
+    assert _scheduled(_morning(ready=False, last_held=False)) == "morning"
+
+
+def test_a_push_the_scheduler_held_does_not_count() -> None:
+    assert _scheduled(_morning(ready=True, last_held=True)) is None
+
+
+def test_with_no_record_of_the_fire_the_gate_as_it_reads_now_decides() -> None:
+    assert _scheduled(_morning(ready=False)) is None
+    assert _scheduled(_morning(ready=True)) == "morning"

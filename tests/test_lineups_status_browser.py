@@ -17,7 +17,7 @@ from flask import Flask, render_template
 
 from app.lineups_view import build_view
 from app.main import create_app
-from tests.test_lineups_browser import _HAS_CHROMIUM, _launch
+from tests.test_lineups_browser import _HAS_CHROMIUM, _launch, _open_displays_on_phones
 from tests.test_lineups_status import DASH, DOOR_FRAME, NOW, door
 
 pytestmark = pytest.mark.skipif(not _HAS_CHROMIUM, reason="Playwright Chromium not installed")
@@ -129,6 +129,8 @@ def test_door_frame_shows_one_live_row_and_laned_day_bar(
         page = ctx.new_page()
         errors: list[str] = []
         page.on("pageerror", lambda e: errors.append(str(e)))
+        # Phones start with every display collapsed; this one is opened.
+        _open_displays_on_phones(page, ["test_display"])
         page.route(
             "**/decks/view.json*",
             lambda route: route.fulfill(
@@ -196,6 +198,8 @@ def test_priority_lineup_reads_as_choices_with_condition_chips(live: str) -> Non
         page = ctx.new_page()
         errors: list[str] = []
         page.on("pageerror", lambda e: errors.append(str(e)))
+        # Phones start with every display collapsed; this one is opened.
+        _open_displays_on_phones(page, ["test_display"])
         page.route(
             "**/decks/view.json*",
             lambda route: route.fulfill(

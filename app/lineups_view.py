@@ -215,6 +215,9 @@ class LineupInput:
     urls: LineupUrls = field(default_factory=LineupUrls)
     priority: int = 0  # wins a tie with another lineup due at the same moment
     last_fired: float | None = None  # epoch of an interval lineup's last fire
+    #: whether the scheduler held that last fire back (conditions not met, every
+    #: display paused) instead of sending it; ``None`` when it does not remember
+    last_held: bool | None = None
     #: the lineup names its display(s), so a step bound elsewhere cannot show
     explicit_display: bool = False
     #: a daily push's stored ``advance_end_at`` (the scheduler ignores it): what
@@ -1337,11 +1340,17 @@ def _next_fire(model: _Model, after: int) -> tuple[int, _Block, _Point] | None:
 
 
 def _last_push(model: _Model, now_abs: int) -> tuple[int, _Block] | None:
-    """The most recent daily push at or before now (``(week minute, block)``,
-    the minute possibly last week); on a tie the scheduler's winner."""
+    """The most recent daily push at or before now that went out (``(week
+    minute, block)``, the minute possibly last week); on a tie the scheduler's
+    winner."""
     found: list[tuple[int, _Block]] = []
     for b in model.blocks:
-        if b.push and b.lineup.ready:
+        # A push already behind us went out or not as the conditions stood
+        # then, which the scheduler's record of its last fire says. The gate as
+        # it reads now only stands in when there is no such record.
+        lu = b.lineup
+        went = (not lu.last_held) if lu.last_held is not None else lu.ready
+        if b.push and went:
             t = b.s if b.s <= now_abs else b.s - WEEK_MIN
             found.append((t, b))
     if not found:
