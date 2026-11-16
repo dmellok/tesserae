@@ -121,6 +121,7 @@ def test_warm_page_reads_the_hint_back_from_the_composed_page(tmp_path) -> None:
     manager._devices = None
     manager._settings = None
     manager._base_url_fn = lambda: "http://127.0.0.1:5000"
+    manager._automation_eligible_fn = None
     panel = SimpleNamespace(w=800, h=480)
 
     class _Resp:
@@ -172,3 +173,43 @@ def test_items_learn_seconds_per_item_across_warms() -> None:
     seen = w.learned("p")
     assert seen and 10 <= seen["per_item_s"] <= 22 and 4 <= seen["items"] <= 6, seen
     assert 100 <= w.lead_s("p", 600) <= 200, "six items at about fifteen seconds, with a margin"
+
+
+def test_ineligible_warm_is_not_started_and_can_resume():
+    clock = _Clock()
+    renders = []
+    eligible = False
+    w = WarmAhead(
+        warm=lambda pid: (renders.append(pid) or 0, 0),
+        clock=clock,
+        sleep=clock.sleep,
+        threaded=False,
+        eligible=lambda _pid: eligible,
+    )
+    assert w.consider("home", clock.at + 100, 150, clock.at) is False
+    assert len(renders) == 0
+    eligible = True
+    assert w.consider("home", clock.at + 100, 150, clock.at) is True
+    assert len(renders) == 1
+
+
+def test_warm_stops_polling_when_target_becomes_ineligible():
+    clock = _Clock()
+    renders = []
+    eligible = True
+
+    def sleep(seconds):
+        nonlocal eligible
+        clock.sleep(seconds)
+        eligible = False
+
+    w = WarmAhead(
+        warm=lambda pid: (renders.append(pid) or 10, 1), clock=clock, sleep=sleep, threaded=False
+    )
+    w._eligible = lambda _pid: eligible
+    fire_at = clock.at + 100
+    assert w.consider("home", fire_at, 150, clock.at) is True
+    assert len(renders) == 1
+    eligible = True
+    assert w.consider("home", fire_at, 150, clock.at) is True
+    assert len(renders) == 2

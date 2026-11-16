@@ -19,8 +19,9 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- Pre-renders and warm-ahead runs are skipped for a display that is paused, in quiet hours, or whose lineup conditions for that dashboard fail, so background renders no longer spend money nobody can see. A dashboard on the glass keeps its refreshes and edits as before. An automated follow-up is dropped once a newer frame has reached the display, and a display coming back from a pause gets a fresh render instead of a frame drawn before it. (#535)
+- Hiding or closing the dashboard editor tab keeps the latest edit: an earlier autosave still on its way can no longer overwrite it, and closing the tab sends the edit at once.
 - Show when a held update will land in the next refresh tooltip.
-
 - Buttons: a press on a lineup starts from the dashboard the lineup is showing, not its first one. Refresh re-sends that dashboard and Next goes to the one after it. This applies to every lineup that runs on a schedule, with or without conditions. Next and Previous also skip dashboards whose conditions fail, and History says where the press landed. A button set to a fixed step still goes to that step.
 - Device page: a display's **Own hours** switch under Quiet hours can be turned off again. Saving with it off left it on, because the page sent nothing for that section. The window you set is kept for when you switch it back on. (#523)
 - Lineup editor: a dashboard switched from canvas to grid lists its items again (its leftover canvas data counted as a second widget).
