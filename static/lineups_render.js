@@ -539,9 +539,15 @@
         body = '<div class="lu-sched"><p class="lu-none">No lineups on this display yet.</p></div>';
     }
     const pending = ui && ui.pendingBar ? ui.pendingBar(d) : "";
+    // Under a collapsed card on a phone: how many lineups the card holds, and a
+    // wide target to open it (templates/_lineups.html draws the same).
+    const n = d.lineups.length;
+    const more = n
+      ? `<button type="button" class="lu-ds-more" data-show-display="${esc(d.id)}" aria-expanded="${collapsed ? "false" : "true"}" aria-controls="lu-dsb-${esc(d.id)}">Show ${n} lineup${n === 1 ? "" : "s"}${ico("caret")}</button>`
+      : "";
     return (
       `<section class="lu-ds${collapsed ? " is-collapsed" : ""}" data-display="${esc(d.id)}" id="display-${esc(d.id)}"><div class="lu-ds-card">${header(vm, d, ui)}` +
-      `<div class="lu-ds-body" id="lu-dsb-${esc(d.id)}"${collapsed ? " hidden" : ""}>${body}${pending}</div></div></section>`
+      `<div class="lu-ds-body" id="lu-dsb-${esc(d.id)}"${collapsed ? " hidden" : ""}>${body}${pending}</div>${more}</div></section>`
     );
   }
 

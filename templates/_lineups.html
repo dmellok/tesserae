@@ -281,6 +281,7 @@
 <div class="lu-ds-body" id="lu-dsb-{{ d.id }}">
 <div class="lu-sched">{% if d.lineups %}<ol class="lu-rows">{% for l in d.lineups %}{{ row(d, l, seen) }}{% endfor %}</ol>{% else %}<p class="lu-none">No lineups on this display yet.</p>{% endif %}</div>
 </div>
+{%- if d.lineups %}<button type="button" class="lu-ds-more" data-show-display="{{ d.id }}" aria-expanded="true" aria-controls="lu-dsb-{{ d.id }}">Show {{ d.lineups|length }} lineup{{ '' if d.lineups|length == 1 else 's' }}{{ ico('caret') }}</button>{% endif %}
 </div>
 </section>
 {%- endmacro %}
