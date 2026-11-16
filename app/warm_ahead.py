@@ -90,8 +90,10 @@ class WarmAhead:
         sleep: Callable[[float], None] = time.sleep,
         threaded: bool = True,
         name: Callable[[str], str] | None = None,
+        eligible: Callable[[str], bool] | None = None,
     ) -> None:
         self._warm = warm
+        self._eligible = eligible or (lambda _page_id: True)
         self._name = name
         self._clock = clock
         self._sleep = sleep
@@ -122,7 +124,7 @@ class WarmAhead:
         seconds) when it is within the lead and has not been warmed. True when
         a warm was started."""
         lead = self.lead_s(page_id, default_s)
-        if not (0 < fire_at - now <= lead):
+        if not (0 < fire_at - now <= lead) or not self._eligible(page_id):
             return False
         key = f"{page_id}|{int(fire_at)}"
         with self._lock:
@@ -191,6 +193,12 @@ class WarmAhead:
         title = f"Running {name} ahead of its send"
         try:
             while True:
+                if not self._eligible(page_id):
+                    # Leave this fire eligible if the display comes back
+                    # before it is due. A cancelled warm teaches us nothing.
+                    with self._lock:
+                        self._started.pop(f"{page_id}|{int(fire_at)}", None)
+                    return
                 jobs.report(
                     "scheduler",
                     key,
