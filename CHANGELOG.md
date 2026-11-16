@@ -6,6 +6,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+- Show a numeric address example for Meural frames.
+
 ### Security
 
 - Zero-touch pairing: a display's MAC address collects its access token only once. Before, any request to `/api/v1/device/discover` carrying the MAC of a registered display was given that display's token, and a MAC can be read by anything on the network. Now the match stops working after the display's first request with its token. A display that is re-flashed or factory reset shows **This display is asking to pair again** on its page and on Settings › Devices, and **Allow re-pair** lets it collect its token again with its pages and history kept. Displays you already have are not affected until they lose their token. (#515)
