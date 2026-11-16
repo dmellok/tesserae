@@ -1682,7 +1682,10 @@ def compose_overlay_atlas() -> str:
         "#strip{display:flex;align-items:flex-start;font-family:'Inter',sans-serif;"
         f"font-size:{px}px;font-weight:{weight};line-height:1.2;white-space:pre;color:#000}}"
         "#strip span{display:inline-block}"
-        f"</style></head><body><div id='strip'>{spans}</div></body></html>"
+        f"</style></head><body><div id='strip'>{spans}</div>"
+        # The renderer waits on this flag before it captures, as for a compose
+        # render. Without it every atlas build sat out the full 25 s timeout.
+        "<script>window.__tesseraeComposed = true;</script></body></html>"
     )
 
 
