@@ -95,7 +95,8 @@
   // about 15 minutes, or a push, is thin: it draws above its neighbours.
   // One that starts where the block before it ends grows to the right
   // instead (grow-r), so it never covers that block's end.
-  const blkStyle = (s) => `left:${s.left_pct}%;width:${s.width_pct}%;--w:${s.width_pct}`;
+  const blkStyle = (s) =>
+    `left:${s.left_pct}%;width:${s.width_pct}%;--w:${s.width_pct}${s.lane ? `;--lane:${s.lane}` : ""}`;
   const thin = (s) => s.kind === "push" || (s.kind !== "hold" && s.width_pct < 1);
   const growsRight = (segs, k) => {
     const prev = segs[k - 1];
@@ -115,6 +116,8 @@
         hold ? "hold" : "",
         push ? "push" : "",
         s.live ? "live" : "",
+        s.lane ? "ln" : "",
+        s.state && !s.live ? "st-" + s.state : "",
         s.planned && tall ? "plan" : "",
         s.pending ? "is-pending" : "",
         thin(s) ? "is-thin" : "",
@@ -155,7 +158,10 @@
     if (day.is_today && day.now_pct !== null && day.now_pct !== undefined) {
       html += `<i class="lu-nowm" style="left:${day.now_pct}%" title="Now ${clock(day.now_min)}"></i>`;
     }
-    return `<div class="lu-trk${tall ? " tall" : ""}${flag ? " flagged" : ""}${extraCls ? " " + extraCls : ""}" role="group" aria-label="${esc(day.aria_label)}" data-day="${day.weekday}">${html}</div>`;
+    // Overlapping windows each get a row (server: assign_lanes): the main bar,
+    // then a thin lane per extra one under it.
+    const lanes = day.lanes > 1 ? day.lanes : 0;
+    return `<div class="lu-trk${tall ? " tall" : ""}${lanes ? " laned" : ""}${flag ? " flagged" : ""}${extraCls ? " " + extraCls : ""}"${lanes ? ` style="--lanes:${lanes}"` : ""} role="group" aria-label="${esc(day.aria_label)}" data-day="${day.weekday}">${html}</div>`;
   }
 
   const scale = (hours, short) =>
@@ -261,6 +267,14 @@
     if (l.status === "live") {
       return `<div class="lu-hs"><span class="lu-hs-line">${w}${ws}<span>${l.kind === "manual" ? "playing now" : "live"}</span></span></div>`;
     }
+    // Queued and waiting say why in a few words; the server picks them
+    // (app/lineups_view.py _standings), the page only draws them.
+    if (l.status === "queued" || l.status === "waiting") {
+      const why = l.status_reason
+        ? `${ws}<span class="lu-hs-why ${l.status === "queued" ? "q" : "w"}">${esc(l.status_reason)}</span>`
+        : "";
+      return `<div class="lu-hs" title="${esc(l.status_title || "")}"><span class="lu-hs-line">${w}${why}</span></div>`;
+    }
     if (l.status === "later_today") {
       const title = (l.progress ? l.progress.title : "") || (l.next_run ? l.next_run.note : "");
       return `<div class="lu-hs" title="${esc(title)}"><span class="lu-hs-line">${w}${ws}<span>in <b>${esc(l.progress ? l.progress.starts_in_label : "")}</b></span></span></div>`;
@@ -305,9 +319,14 @@
       s += im(
         "timer",
         l.step_label,
-        l.step_minutes ? `Advances every ${l.step_minutes} min` : `Advances every ${l.step_label}`
+        l.priority_mode
+          ? `Checks its choices again every ${l.step_label}`
+          : l.step_minutes
+            ? `Advances every ${l.step_minutes} min`
+            : `Advances every ${l.step_label}`
       );
-    if (l.kind === "cycle" && l.cycle_label)
+    // A priority lineup never loops through its steps, so it has no cycle.
+    if (l.kind === "cycle" && l.cycle_label && !l.priority_mode)
       s += im("span", l.cycle_label, `Full cycle ${l.cycle_label}`, "opt");
     return s;
   }
@@ -359,6 +378,58 @@
   // ``ui.pushOverlay === false`` (Push now lives elsewhere; the arrows stay).
   // A tile is a stack with a ×N badge when the dashboard lists more than one item, or a
   // "random" (or ×N) badge when it draws one at random.
+  /* A step's conditions in words, the twin of _condition_words / _condition_chip in
+     app/deck_routes.py (the lineup editor draws unsaved ones). ``names`` maps an
+     entity id to Home Assistant's friendly name. */
+  const entityWords = (id) => {
+    const w = String(id || "")
+      .replace(/^[^.]*\./, "")
+      .replace(/_/g, " ")
+      .trim();
+    return w ? w.charAt(0).toUpperCase() + w.slice(1) : String(id || "");
+  };
+  const VERB = {
+    "==": "is",
+    "!=": "is not",
+    ">": "is above",
+    "<": "is below",
+    ">=": "is at least",
+    "<=": "is at most",
+  };
+  const SUN = {
+    before_sunrise: "it is before sunrise",
+    after_sunset: "it is after sunset",
+    is_day: "it is daytime",
+    is_night: "it is night",
+  };
+  function condWords(c, names) {
+    const op = c.operator;
+    if (c.source_kind === "ha_entity") {
+      const name = (names && names[c.source_id]) || entityWords(c.source_id);
+      if (op === "in") {
+        const v = (c.value || []).map(String);
+        return `${name} is ${v.length > 1 ? `${v.slice(0, -1).join(", ")} or ${v[v.length - 1]}` : v.join("")}`;
+      }
+      if (op === "present_within_seconds") return `${name} has changed recently`;
+      return `${name} ${VERB[op] || op} ${c.value}`;
+    }
+    if (c.source_kind === "time_window") {
+      const v = c.value || {};
+      return `the time is ${v.start_local || "?"}\u2013${v.end_local || "?"}`;
+    }
+    if (c.source_kind === "sun") return SUN[op] || "the sun condition passes";
+    return "its conditions pass";
+  }
+  function condChip(conds, names) {
+    const words = (conds || []).map((c) => condWords(c, names));
+    if (!words.length) return { label: "", title: "" };
+    const more = words.length > 1 ? ` +${words.length - 1} more` : "";
+    return {
+      label: `Only while ${words[0]}${more}`,
+      title: `Shows only while ${words.join(" and ")}.`,
+    };
+  }
+
   function stepHtml(d, l, s, ui) {
     const choice = (ui && ui.itemChoice && ui.itemChoice(d, l, s)) || null;
     const canPush = !!(d.id && l.actions.push_step_url && !s.missing && !s.off_display);
@@ -397,9 +468,19 @@
           ? `<span class="lu-count is-draw" title="${drawN > 1 ? `Draws one of ${drawN} at random` : "A random one each time it is sent"}">${drawN > 1 ? `×${drawN}` : "random"}</span>`
           : "";
     const hook = (name) => (ui && ui[name] ? ui[name](s) || "" : "");
-    const cond = s.conditional
-      ? ` <span title="Shows only while its conditions pass">${ico("funnel")}</span>`
-      : "";
+    // A conditional step says when it shows, in words (cond_label from the
+    // server, or condChip in the editor); the last step of a priority lineup with
+    // none is its fallback. "ok" / "no": its conditions pass or fail right now.
+    const condCls = s.cond_ok === true ? " ok" : s.cond_ok === false ? " no" : "";
+    const cond = s.cond_label
+      ? `<span class="lu-cond${condCls}" title="${esc(s.cond_title || s.cond_label)}">${ico("funnel")}<span>${esc(s.cond_label)}</span></span>`
+      : s.fallback
+        ? `<span class="lu-cond fb" title="Shows when none of the dashboards before it can">Fallback</span>`
+        : "";
+    const funnel =
+      s.conditional && !s.cond_label
+        ? ` <span title="Shows only while its conditions pass">${ico("funnel")}</span>`
+        : "";
     const off = s.off_display
       ? `<span class="lu-step-off" title="${esc(s.off_display_note)}">Not on this display</span>${
           d.id && l.actions.bind_url
@@ -412,21 +493,32 @@
         ? `<span class="lu-sep" aria-hidden="true">${ico("chev")}</span>`
         : s.separator === "loop"
           ? `<span class="lu-sep loop" title="Loops back to ${esc(l.steps[0].name)}">${ico("loop")}</span>`
-          : "";
+          : s.separator === "else"
+            ? `<span class="lu-sep else" title="If it can't show, the next one">otherwise</span>`
+            : "";
     return (
       `<li class="lu-step${cls ? " " + cls : ""}${s.missing ? " is-missing" : ""}${s.off_display ? " is-offdisplay" : ""}${hook("stepClass") ? " " + hook("stepClass") : ""}" data-step="${esc(ui && ui.stepKey ? ui.stepKey(s) : s.index)}"${hook("stepAttrs")}${s.missing ? ' title="This dashboard was deleted; remove it from the lineup"' : s.off_display ? ` title="${esc(s.off_display_note)}"` : ""}><figure><span class="lu-slot">${pill}</span>` +
       `<span class="lu-tile${stacked ? " stacked" : ""}${canPick ? " has-items" : ""}${choice && choice.state === "loading" ? " is-loading" : ""}${choice && (choice.state === "error" || choice.state === "busy") ? " is-itemfail" : ""}">${thumb(s.name, picked || s.thumb_url, s.aspect, d.orientation || s.orientation, s.missing ? "missing" : s.off_display ? "offdisplay" : "", null, false, d, s.thumb_url && !s.missing && !s.off_display ? zoomBtn(`step:${l.id}:${s.index}`, `Zoom ${s.name}`) : "")}<span class="lu-scrim" aria-hidden="true"></span>${push}${items}<span class="lu-pushed-msg" aria-hidden="true"></span>${count}${hook("tileExtra")}</span>` +
-      `<figcaption><span class="lu-step-name">${esc(s.name)}</span><span class="lu-step-meta">${esc(s.position)}${cond}</span>${off}${hook("captionExtra")}</figcaption></figure>${sep}</li>`
+      `<figcaption><span class="lu-step-name">${esc(s.name)}</span><span class="lu-step-meta">${esc(s.position)}${funnel}</span>${cond}${off}${hook("captionExtra")}</figcaption></figure>${sep}</li>`
     );
   }
 
   const STATE_CLS = {
     live: "is-live",
+    queued: "is-queued",
+    waiting: "is-off is-waiting",
     later_today: "is-later",
     not_today: "is-off",
     off: "is-off is-disabled",
   };
-  const TAG_CLS = { live: "live", later_today: "later", not_today: "off", off: "off" };
+  const TAG_CLS = {
+    live: "live",
+    queued: "queued",
+    waiting: "wait",
+    later_today: "later",
+    not_today: "off",
+    off: "off",
+  };
 
   // A lineup on several displays draws once per display; the first copy keeps
   // the plain id, the others add the display (ui.seen is reset per draw).
@@ -859,6 +951,28 @@
     return { blocks, holds };
   }
 
+  // Twin of assign_lanes in app/lineups_view.py: overlapping windows on their
+  // own rows, the live lineup on the main one, the rest by start, longer first.
+  // Holds and pushes stay on the main row. Sets s.lane, returns the row count.
+  function assignLanes(segments, first) {
+    const wins = segments.filter((s) => s.kind === "window");
+    wins.sort(
+      (a, b) =>
+        (a.lineup_id !== first) - (b.lineup_id !== first) ||
+        a.start_min - b.start_min ||
+        b.end_min - b.start_min - (a.end_min - a.start_min) ||
+        (a.lineup_id < b.lineup_id ? -1 : a.lineup_id > b.lineup_id ? 1 : 0)
+    );
+    const rows = [];
+    wins.forEach((s) => {
+      let k = rows.findIndex((row) => row.every(([a, b]) => s.end_min <= a || s.start_min >= b));
+      if (k < 0) k = rows.push([]) - 1;
+      rows[k].push([s.start_min, s.end_min]);
+      s.lane = k;
+    });
+    return Math.max(1, rows.length);
+  }
+
   function previewDay(d, model, day, liveId, nowWeekday, nowMin) {
     const a = day * DAY_MIN;
     const z = a + DAY_MIN;
@@ -931,8 +1045,17 @@
       .filter((s) => s.kind !== "hold")
       .map((s) => `${s.lineup_name} ${clock(s.start_min)}`);
     const base = d.week[day];
+    // Keep each block's live / queued / waiting look from the server's bar.
+    const states = Object.fromEntries(
+      (base.segments || []).filter((s) => s.state).map((s) => [s.lineup_id, s.state])
+    );
+    segments.forEach((s) => {
+      if (isToday && s.kind === "window" && states[s.lineup_id]) s.state = states[s.lineup_id];
+    });
+    const lanes = assignLanes(segments, isToday ? liveId : null);
     return Object.assign({}, base, {
       segments,
+      lanes,
       aria_label: `${DAYS[day]}: ${names.join(", ") || "no lineups"}`,
     });
   }
@@ -1269,6 +1392,7 @@
     dayPop,
     row,
     stepHtml,
+    condChip,
     header,
     display,
     unassigned,
