@@ -31,6 +31,7 @@ import logging
 import re
 import time
 import uuid
+from collections.abc import Mapping
 from typing import Any, Final
 from urllib.parse import urlsplit
 
@@ -75,6 +76,7 @@ from app.state.deck_model import Deck, DeckPage
 from app.state.legacy_projections import is_timed_view_deck
 from app.state.page_store import Cell, Page, PageStore, Panel, clean_custom_css
 from app.state.settings_store import SettingsStore
+from app.widget_choices import wants_options
 from app.widget_look import editor_look_context
 from app.widget_picker import CATEGORIES as WIDGET_CATEGORIES
 from app.widget_picker import display_name as widget_display_name
@@ -516,10 +518,32 @@ def _apply_layout_to_cells(layout_slug: str, page: Page) -> list[Cell]:
     return out
 
 
-def _materialize_cell_options(plugins: list[Any]) -> dict[str, list[dict[str, Any]]]:
+def _materialize_cell_choices(
+    page: Any, plugins: list[Any], shared: dict[str, list[dict[str, Any]]]
+) -> dict[str, list[dict[str, Any]]]:
+    """Per-cell option specs for the cells whose widget's ``choices`` reads
+    the cell's options; every other cell uses its widget's shared specs."""
+    by_id = {p.id: p for p in plugins}
+    out: dict[str, list[dict[str, Any]]] = {}
+    for cell in getattr(page, "cells", None) or []:
+        plugin = by_id.get(cell.plugin) if cell.plugin else None
+        if plugin is None or plugin.id not in shared or not wants_options(plugin):
+            continue
+        out[cell.id] = _materialize_cell_options([plugin], cell.options or {}).get(plugin.id, [])
+    return out
+
+
+def _materialize_cell_options(
+    plugins: list[Any], options: Mapping[str, Any] | None = None
+) -> dict[str, list[dict[str, Any]]]:
     """For each widget plugin, return its cell_options spec with any
     ``choices_from`` fields swapped to concrete ``choices`` lists by
     calling the plugin's ``choices(name)`` function.
+
+    ``options`` is one cell's option values, handed to a provider whose
+    ``choices`` takes an ``options`` keyword (``choices(name, options=...)``),
+    so its rows can depend on the cell (a choice that can't work for the
+    printer picked above it, say). Choices are computed when fields render.
 
     Plugins that don't expose ``choices`` (or that raise) get an empty
     list, the editor will render an empty dropdown rather than break.
@@ -536,16 +560,16 @@ def _materialize_cell_options(plugins: list[Any]) -> dict[str, list[dict[str, An
 
     out: dict[str, list[dict[str, Any]]] = {}
     for plugin in plugins:
-        options = localized_option_specs(plugin, "cell_options")
+        specs = localized_option_specs(plugin, "cell_options")
         resolver = getattr(plugin.server_module, "choices", None) if plugin.server_module else None
         materialized: list[dict[str, Any]] = []
         plugin_label = str(plugin.manifest.get("name") or plugin.id)
-        for opt in options:
+        for opt in specs:
             spec = dict(opt)
             source = spec.pop("choices_from", None)
             if source and callable(resolver):
                 try:
-                    spec["choices"] = choice_rows(plugin, opt)
+                    spec["choices"] = choice_rows(plugin, opt, options)
                 except SecretBoxError:
                     logger.warning(
                         "plugin %s: choices(%r) hit SecretBoxError, the stored "
@@ -761,6 +785,7 @@ def _editor_context(page: Page) -> dict[str, Any]:
         _anchor="lineup" if is_new else "schedules",
     )
     lineup_args: dict[str, Any] = {"return": lineup_return}
+    cell_options = _materialize_cell_options(widgets)
 
     from app.settings.index_routes import palette_label
 
@@ -827,7 +852,8 @@ def _editor_context(page: Page) -> dict[str, Any]:
             ],
         },
         "widget_names": {w.id: widget_display_name(w.name, w.id) for w in widgets},
-        "plugin_cell_options": _materialize_cell_options(widgets),
+        "plugin_cell_options": cell_options,
+        "cell_option_specs": _materialize_cell_choices(page, widgets, cell_options),
         "fonts": sorted(plugins.fonts.values(), key=lambda f: f.name.lower()),
         "layouts": LAYOUTS,
         "active_layout": active_layout.slug if active_layout else None,

@@ -122,6 +122,14 @@
                   "type": "array",
                   "items": {},
                   "description": "Values an earlier manifest used for this choice. A cell that still holds one shows this choice selected (not \"Unavailable\"), show_if reads it as this choice, and the next save writes value."
+                },
+                "disabled": {
+                  "type": "boolean",
+                  "description": "The choice can't work for this setup: the editors list it greyed and it can't be picked there. A cell that already holds it keeps it, with a warning. A hint to the editors only: saves are not checked, so the API or an agent can still set it and the widget must validate at render time. Usually set by a choices() provider. See docs/widgets.md."
+                },
+                "reason": {
+                  "type": "string",
+                  "description": "Why a disabled choice can't be picked, in a short sentence the editor shows beside it."
                 }
               }
             }

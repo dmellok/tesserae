@@ -156,7 +156,7 @@
        update_cell defaults to the cell's current geometry when these
        fields are absent, so the layout survives a cell-option save. #}
 
-    {% set cell_opts = plugin_cell_options.get(plugin.id, []) %}
+    {% set cell_opts = cell_option_specs.get(cell.id) or plugin_cell_options.get(plugin.id, []) %}
     {% if plugin.on_change_updates or plugin.on_schedule_updates %}
     <fieldset class="form-group">
       <legend>Updates</legend>

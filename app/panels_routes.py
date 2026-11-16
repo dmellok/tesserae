@@ -919,13 +919,16 @@ def configure_suggest(canvas_id: str) -> Response:
     return _configure_result(canvas_id, updated)
 
 
-def _materialised_options(plugin: Any) -> list[dict[str, Any]]:
+def _materialised_options(
+    plugin: Any, values: dict[str, Any] | None = None
+) -> list[dict[str, Any]]:
     """Resolve a widget's ``cell_options`` (swapping ``choices_from`` for
     concrete choices) using the grid editor's shared machinery, so the canvas
-    source-config form renders identical controls."""
+    source-config form renders identical controls. ``values`` are the
+    source's current options, for a provider whose choices depend on them."""
     from app.page_routes import _materialize_cell_options
 
-    return _materialize_cell_options([plugin]).get(plugin.id, [])
+    return _materialize_cell_options([plugin], values).get(plugin.id, [])
 
 
 @bp.post("/source-form")
@@ -943,7 +946,7 @@ def source_form() -> Response:
     values = body.get("options")
     html = render_template(
         "panels_source_form.html",
-        opts=_materialised_options(plugin),
+        opts=_materialised_options(plugin, values if isinstance(values, dict) else None),
         plugin=plugin,
         cell_w=body.get("cell_w", 0),
         cell_h=body.get("cell_h", 0),
