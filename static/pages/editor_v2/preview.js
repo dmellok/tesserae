@@ -26,7 +26,7 @@
 //                                           layout and displays. Pass cells to skip
 //                                           the re-read of the layout.
 // window.EV2Preview = {reload(), setTab(groupKey), sync()}. groupKey is the
-// group's "WxH" (e.g. "800x480") or its index.
+// group's "WxH-device" key, "WxH" (first matching size), or its index.
 
 (function () {
   "use strict";
@@ -482,6 +482,7 @@
   const state = {
     group: 0,
     mode: store.get(MODE_KEY) === "panel" ? "panel" : "live",
+    zoom: "1",
     edit: false,
     snap: null, // {cols, rows}
     selected: null, // edit mode: the cell the Split / Remove tools act on
@@ -529,6 +530,7 @@
     const u = new URL(data.urls.compose, location.origin);
     u.searchParams.set("w", String(g.w));
     u.searchParams.set("h", String(g.h));
+    if (g.deviceIds && g.deviceIds.length) u.searchParams.set("device_id", g.deviceIds[0]);
     if (data.version) u.searchParams.set("v", data.version);
     if (fresh) u.searchParams.set("fresh", "1");
     u.searchParams.set("_t", String(Date.now()));
@@ -551,6 +553,19 @@
     f.iframe.style.transform = `scale(${w / f.g.w})`;
   }
 
+  function setPanelZoom() {
+    const native = state.mode === "panel" && state.zoom !== "fit";
+    root.classList.toggle("is-panel-native", native);
+    root.querySelectorAll("[data-ev2pv-zoom]").forEach((b) => {
+      b.setAttribute("aria-pressed", String(b.dataset.ev2pvZoom === state.zoom));
+    });
+    frames.forEach((f) => {
+      f.canvas.style.width = native ? `${f.g.w * Number(state.zoom)}px` : "";
+      f.canvas.parentElement.style.width = native ? "max-content" : "";
+      fitFrame(f);
+    });
+  }
+
   function buildGroups() {
     if (ro) ro.disconnect();
     frames.forEach((f) => clearPanelPoll(f));
@@ -560,6 +575,7 @@
       const wrap = make("div", "ev2pv-group");
       wrap.dataset.groupKey = g.key;
       wrap.style.setProperty("--ev2pv-ar", String(g.w / g.h));
+      wrap.style.setProperty("--ev2pv-pixel-w", `${g.w}px`);
       wrap.hidden = i !== state.group;
       wrap.classList.toggle("is-placeholder", state.placeholder);
       const stage = make("div", "ev2pv-stage");
@@ -736,6 +752,9 @@
         f.throbber.hidden = f.loaded || f.stale;
       }
     });
+    root.classList.toggle("is-panel", state.mode === "panel");
+    q("[data-ev2pv-panel-controls]").hidden = state.mode !== "panel";
+    setPanelZoom();
     if (state.mode === "panel") loadPanel(frame());
   }
 
@@ -781,7 +800,10 @@
   }
 
   function setTab(key) {
-    let i = typeof key === "number" ? key : data.groups.findIndex((g) => g.key === String(key));
+    let i =
+      typeof key === "number"
+        ? key
+        : data.groups.findIndex((g) => g.key === String(key) || `${g.w}x${g.h}` === String(key));
     if (!(i >= 0 && i < data.groups.length)) i = 0;
     if (state.drag) return;
     state.group = i;
@@ -1467,6 +1489,16 @@
       return;
     }
     if (ev.target.closest("[data-ev2pv-dialog-close]")) q("[data-ev2pv-dialog]").close();
+  });
+
+  root.querySelectorAll("[data-ev2pv-zoom]").forEach((b) => {
+    b.addEventListener("click", () => {
+      state.zoom = b.dataset.ev2pvZoom;
+      setPanelZoom();
+    });
+  });
+  q("[data-ev2pv-glass]").addEventListener("change", (ev) => {
+    root.classList.toggle("is-glass", ev.target.checked);
   });
 
   function openNative() {
