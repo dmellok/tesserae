@@ -2423,7 +2423,9 @@ main.page.lu-page {
 .lu .lu-strip:not(.has-now) {
   --slot-h: 0px;
 }
-.lu .lu-strip:not(.has-now) .lu-slot:empty {
+/* A strip with a NEXT/QUEUED pill on any tile keeps every tile's pill slot, so the
+   pictures stay level in one row instead of the tagged tile sitting lower. */
+.lu .lu-strip:not(.has-now):not(:has(.lu-pill)) .lu-slot:empty {
   display: none;
 }
 .lu .lu-step {
