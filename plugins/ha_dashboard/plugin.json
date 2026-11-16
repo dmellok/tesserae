@@ -55,6 +55,7 @@
     },
     {
       "name": "theme",
+      "overrides_look": "uses Home Assistant's theme",
       "type": "select",
       "label": "Theme",
       "help": "The Home Assistant theme to capture with, from the themes installed there. Only the capture uses it; your own browsers keep their theme.",

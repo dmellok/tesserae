@@ -28,6 +28,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - Fraimic closes HTTP error responses after reading the frame error.
 - Windows installer: a failed check (git or Python missing) now shows its message and leaves the PowerShell window open. Before, the window closed before the message could be read.
 - Lineups show the delivered, queued and waiting states, with separate lanes for overlapping windows.
+- The dashboard editor warns when a Home Assistant theme overrides the dashboard appearance.
 - Smart sync: button wakes no longer reset wake-time trust.
 - Pre-renders and warm-ahead runs are skipped for a display that is paused, in quiet hours, or whose lineup conditions for that dashboard fail, so background renders no longer spend money nobody can see. A dashboard on the glass keeps its refreshes and edits as before. An automated follow-up is dropped once a newer frame has reached the display, and a display coming back from a pause gets a fresh render instead of a frame drawn before it. (#535)
 - Hiding or closing the dashboard editor tab keeps the latest edit: an earlier autosave still on its way can no longer overwrite it, and closing the tab sends the edit at once.
