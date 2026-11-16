@@ -316,9 +316,17 @@ Mark a choice `"disabled": true` when it can't work for the current setup, and s
  "reason": "Not available for Printer A: Home Assistant gets no sliced files from it."}
 ```
 
-The editor lists the choice greyed, with the reason beside it, and it can't be picked.
+The editors list the choice greyed, with the reason beside it, and it can't be picked there.
 A cell that already holds a disabled choice keeps it: the editor shows a warning with the reason under the field, and a save leaves the value alone.
-Your widget still has to cope with that value at render time.
+A manifest `default` that is a disabled choice is treated the same way on a new cell.
+
+`disabled` is a hint to the editors, not a rule the host enforces.
+Nothing checks it when a cell is saved, so a disabled value can still reach your widget:
+
+- the API and MCP agents can set any value;
+- the editor's list is the one it loaded when it opened, so a choice that became unavailable since (the user changed the option it depends on, say) can still be picked and saved.
+
+Validate the value at render time and draw a clear message when it can't work.
 Static `choices` can carry `disabled` and `reason` too.
 Older servers ignore both keys and show the choice as usual.
 
@@ -334,7 +342,9 @@ def choices(name: str, options: dict | None = None) -> list[dict]:
     ...
 ```
 
-`options` is `{}` when there is no cell to ask about, such as when an agent lists the widget's choices.
+`options` is `{}` when the caller has no cell's options to pass.
+Only the editors pass them; MCP agents listing a widget's choices, the composer and the template market all call without them.
+Return a sensible list for `{}`, and don't rely on those callers seeing the per-cell `disabled` flags.
 Older servers call `choices(name)`, so give `options` a default.
 
 Choices reflect the saved options when the editor renders the fields. Changing another option does not refresh them live. Tell users when availability depends on another option, for example: "Availability depends on the printer. Save and reopen to refresh."

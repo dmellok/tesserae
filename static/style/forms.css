@@ -3088,10 +3088,6 @@ input[type="range"].slider:focus::-moz-range-thumb {
   font-size: 14px;
   color: var(--t-warn);
 }
-/* the refreshable wrapper around a field whose choices follow another option */
-.opt-choices {
-  display: contents;
-}
 /* each picture's corner button opens it large; shown on hover and focus,
    and always where there is no hover to show it */
 .pic-cell {

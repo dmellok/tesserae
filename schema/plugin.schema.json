@@ -125,7 +125,7 @@
                 },
                 "disabled": {
                   "type": "boolean",
-                  "description": "The choice can't work for this setup: the editor lists it greyed and it can't be picked. A cell that already holds it keeps it, with a warning. Usually set by a choices() provider. See docs/widgets.md."
+                  "description": "The choice can't work for this setup: the editors list it greyed and it can't be picked there. A cell that already holds it keeps it, with a warning. A hint to the editors only: saves are not checked, so the API or an agent can still set it and the widget must validate at render time. Usually set by a choices() provider. See docs/widgets.md."
                 },
                 "reason": {
                   "type": "string",
