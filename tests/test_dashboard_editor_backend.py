@@ -518,3 +518,24 @@ def test_each_selected_device_gets_its_own_pixel_preview_even_at_the_same_size(a
     _, context = _editor(app)
     assert [g["device_ids"] for g in context["panel_preview_groups"]] == [["desk"], ["hall"]]
     assert len(context["preview_groups"]) == 1  # Classic layout grouping stays by shape.
+
+
+def test_classic_panel_view_names_each_groups_display(app, monkeypatch):
+    """The classic editor's Panel view asks for a group's own display, so a
+    page with mixed panels is not previewed with the first display's renderer."""
+    groups = [
+        {"w": 800, "h": 480, "label": "Colour", "devices": ["Desk"], "device_ids": ["desk"]},
+        {"w": 296, "h": 128, "label": "Tag", "devices": ["Tag"], "device_ids": ["tag 1"]},
+        {"w": 400, "h": 300, "label": "Virtual panel", "devices": []},
+    ]
+    for group, gamut in zip(groups, ("waveshare_e6", "mono", "gray_4"), strict=True):
+        group["gamut"] = gamut
+    monkeypatch.setattr("app.page_routes.preview_groups_for_page", lambda *a, **kw: groups)
+    app.config["SETTINGS_STORE"].update_section("ui", {"dashboard_editor": "classic"})
+    body = app.test_client().get("/pages/home").text
+    assert (
+        "gamut=waveshare_e6&amp;dither=floyd-steinberg&amp;w=800&amp;h=480&amp;device=desk" in body
+    )
+    assert "gamut=mono&amp;dither=floyd-steinberg&amp;w=296&amp;h=128&amp;device=tag%201" in body
+    assert "gamut=gray_4&amp;dither=floyd-steinberg&amp;w=400&amp;h=300&quot;" not in body
+    assert 'w=400&amp;h=300"' in body

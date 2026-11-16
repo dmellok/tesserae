@@ -1119,3 +1119,100 @@ def test_second_device_preview_captures_its_own_widget_context(app, monkeypatch)
         )
     assert [job["query"] for job in submitted] == ["device_id=desk", "device_id=hall"]
     assert submitted[0]["cache_path"] != submitted[1]["cache_path"]
+
+
+def _two_display_page(app, monkeypatch, page_id, hall_panel, hall_renderer):
+    """A page bound to a colour ``desk`` and a second ``hall`` display, with a
+    grey composition seeded at every cache path the route asks to render."""
+    import io
+    from types import SimpleNamespace
+
+    from PIL import Image
+
+    from app.state.page_store import Page
+
+    devices = {
+        "desk": SimpleNamespace(
+            id="desk", panel={"w": 32, "h": 24, "gamut": "waveshare_e6"}, renderer_ids=["esp32_bin"]
+        ),
+        "hall": SimpleNamespace(id="hall", panel=hall_panel, renderer_ids=[hall_renderer]),
+    }
+    app.config["DEVICE_REGISTRY"] = SimpleNamespace(get=devices.get, devices=devices)
+    app.config["PAGE_STORE"].save(Page(id=page_id, name=page_id, device_ids=["desk", "hall"]))
+
+    def seed(**job):
+        source = io.BytesIO()
+        Image.new("RGB", (job["width"], job["height"]), (120, 120, 120)).save(source, "PNG")
+        job["cache_path"].parent.mkdir(parents=True, exist_ok=True)
+        job["cache_path"].write_bytes(source.getvalue())
+        seeded.append(job)
+
+    seeded: list[dict] = []
+    monkeypatch.setattr("app.preview_cache.submit", seed)
+    return seeded
+
+
+def test_classic_group_preview_uses_the_display_with_that_palette(app, monkeypatch):
+    """The classic editor names a group's palette and size. A mono group on a
+    page whose first display is colour must come back in mono's two inks."""
+    import io
+
+    from PIL import Image
+
+    _two_display_page(
+        app, monkeypatch, "mixed", {"w": 296, "h": 128, "gamut": "mono"}, "esp32_bw_bin"
+    )
+    client = app.test_client()
+    url = "/compose/mixed/panel.png?gamut=mono&dither=floyd-steinberg&w=296&h=128"
+    assert client.get(url).status_code == 202
+    response = client.get(url)
+    assert response.status_code == 200
+    with Image.open(io.BytesIO(response.data)) as image:
+        assert image.size == (296, 128)
+        assert set(image.convert("RGB").getdata()) <= {(0, 0, 0), (255, 255, 255)}
+
+
+def test_same_size_displays_keep_each_others_cached_render(app, monkeypatch):
+    from app.preview_cache import PreviewRenderQueue
+
+    seeded = _two_display_page(
+        app, monkeypatch, "twins", {"w": 32, "h": 24, "gamut": "waveshare_e6"}, "esp32_bin"
+    )
+    client = app.test_client()
+    for did in ("desk", "hall"):
+        url = f"/compose/twins/panel.png?w=32&h=24&device={did}"
+        assert client.get(url).status_code == 202
+        assert client.get(url).status_code == 200
+    desk, hall = (job["cache_path"] for job in seeded)
+    # Publishing either display's render evicts older versions of its own only.
+    PreviewRenderQueue._evict_stale(desk)
+    PreviewRenderQueue._evict_stale(hall)
+    assert desk.exists() and hall.exists()
+    assert len(seeded) == 2
+    for did in ("desk", "hall"):
+        assert client.get(f"/compose/twins/panel.png?w=32&h=24&device={did}").status_code == 200
+    assert len(seeded) == 2
+
+
+def test_panel_preview_that_cannot_be_drawn_is_not_a_server_error(app, monkeypatch):
+    _two_display_page(
+        app, monkeypatch, "broken", {"w": 32, "h": 24, "gamut": "waveshare_e6"}, "esp32_bin"
+    )
+    client = app.test_client()
+    url = "/compose/broken/panel.png?w=32&h=24&device=desk"
+    assert client.get(url).status_code == 202
+
+    def fail(error):
+        def render(*args, **kwargs):
+            raise error
+
+        return render
+
+    monkeypatch.setattr(
+        "app.panel_preview.render_panel_preview",
+        fail(ValueError("Unsupported panel buffer size for preview")),
+    )
+    assert client.get(url).status_code == 422
+    # The composition was evicted between the cache check and the read.
+    monkeypatch.setattr("app.panel_preview.render_panel_preview", fail(FileNotFoundError()))
+    assert client.get(url).status_code == 202

@@ -1713,6 +1713,28 @@ def _push_fanout_device_ids(
     return [str(d) for d in page.device_ids]
 
 
+def _bound_device_for_group(
+    page: Page, devices: Any, gamut: str, width: int, height: int
+) -> Any | None:
+    """The page's bound display whose panel has ``gamut`` at ``width`` x
+    ``height``, or ``None`` when no bound display matches (the caller then
+    previews the palette without a display)."""
+    from app.panel import device_panel
+    from app.quantizer import canonicalise_gamut
+
+    wanted = canonicalise_gamut(gamut)
+    for did in getattr(page, "device_ids", None) or []:
+        device = devices.get(did) if devices is not None else None
+        panel = device_panel(device) if device is not None else None
+        if panel is None:
+            continue
+        if (panel.w, panel.h) == (width, height) and (
+            canonicalise_gamut(str(getattr(panel, "gamut", "") or "")) == wanted
+        ):
+            return device
+    return None
+
+
 def _preview_target_device(page: Page, devices: Any) -> str:
     """First bound device id that exists in the registry, or ``""``.
 
@@ -2058,6 +2080,17 @@ def compose_preview(page_id: str) -> WerkzeugResponse:
 
 @bp.get("/compose/<page_id>/panel.png")
 def compose_panel_preview(page_id: str) -> Response:
+    """Panel view route. A composition evicted mid-request answers ``202`` so
+    the editor polls again and the next request re-renders it."""
+    try:
+        return _panel_preview_response(page_id)
+    except FileNotFoundError:
+        resp = current_app.response_class(status=202)
+        resp.headers["Cache-Control"] = "no-store"
+        return resp
+
+
+def _panel_preview_response(page_id: str) -> Response:
     """Panel view (#45): the dashboard preview quantised and dithered to a target
     device's palette, so the editor can show the exact per-pixel output the e-ink
     panel paints rather than the full-colour composition.
@@ -2092,6 +2125,9 @@ def compose_panel_preview(page_id: str) -> Response:
         width, height = preview_dims(page, devices, settings_store)
     prefix = f"{page_id}~panel{width}x{height}"
     token = page_preview_token(page, (width, height))
+    # Whether the caller named a display. A request without one is a preview
+    # group picked by size and palette, so its ``?gamut`` still applies.
+    asked_device = bool((request.args.get("device") or "").strip())
 
     # A real display owns its palette. Explicit gamut choices are for virtual
     # previews. Skip deleted bindings when choosing the default display.
@@ -2100,7 +2136,14 @@ def compose_panel_preview(page_id: str) -> Response:
     target_panel = device_panel(device) if device is not None else None
     if target_panel is None:
         device = None
-    gamut = "" if device is not None else (request.args.get("gamut") or "").strip()
+    asked_gamut = (request.args.get("gamut") or "").strip()
+    if device is not None and not asked_device and asked_gamut:
+        # An older editor names the group's palette, not its display. Use the
+        # bound display that has that palette at this size, never the primary
+        # display's renderer on another panel's pixels.
+        device = _bound_device_for_group(page, devices, asked_gamut, width, height)
+        target_panel = device_panel(device) if device is not None else None
+    gamut = "" if device is not None else asked_gamut
     if not gamut and device is not None:
         panel = device_panel(device)
         if panel is not None and getattr(panel, "gamut", None):
@@ -2120,8 +2163,13 @@ def compose_panel_preview(page_id: str) -> Response:
         dither = "floyd-steinberg"
 
     # A second display may have device-specific widgets even at the same size.
+    # It gets its own cache prefix as well as its own token: the cache keeps one
+    # render per prefix, so two displays of one size sharing a prefix would
+    # delete each other's render on every switch.
     primary_id = next((did for did in page.device_ids if devices and devices.get(did)), "")
     if device is not None and device.id != primary_id:
+        device_key = hashlib.sha256(device.id.encode()).hexdigest()[:8]
+        prefix = f"{prefix}~d{device_key}"
         token = hashlib.sha256(f"{token}:device:{device.id}".encode()).hexdigest()[:16]
 
     cache_dir = Path(current_app.config["DATA_ROOT"]) / "core" / "previews"
@@ -2239,9 +2287,30 @@ def compose_panel_preview(page_id: str) -> Response:
                     target = target.model_copy(
                         update={"w": width + padding, "native_w": width + padding}
                     )
-            quantised = render_panel_preview(
-                source, renderer=preview_renderer, panel=target, settings=render_settings
-            )
+            try:
+                quantised = render_panel_preview(
+                    source, renderer=preview_renderer, panel=target, settings=render_settings
+                )
+            except FileNotFoundError:
+                raise
+            except Exception:
+                # A renderer that cannot draw this size or palette is a bad
+                # preview request, not a server fault.
+                logger.warning(
+                    "panel preview failed: page=%s renderer=%s %sx%s",
+                    page_id,
+                    preview_renderer.id,
+                    width,
+                    height,
+                    exc_info=True,
+                )
+                resp = current_app.response_class(
+                    "This display's panel view can't be drawn at this size.",
+                    status=422,
+                    mimetype="text/plain",
+                )
+                resp.headers["Cache-Control"] = "no-store"
+                return resp
             if padding:
                 with Image.open(io.BytesIO(quantised)) as image:
                     cropped = image.crop((0, 0, width, height))
