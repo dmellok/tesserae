@@ -222,7 +222,14 @@ def test_status_bar_does_not_make_look_visible():
 
 
 @pytest.mark.parametrize(
-    "settings", [{"gap": 12}, {"corner_radius": 8}, {"custom_css": ".cell {opacity:.8}"}]
+    "settings",
+    [
+        {"gap": 12},
+        {"corner_radius": 8},
+        {"custom_css": ".cell {opacity:.8}"},
+        {"bleed_color": "#1C1B19"},
+        {"status_bar_enabled": True},
+    ],
 )
 def test_saved_page_effects_keep_look_editable_for_independent_widgets(settings):
     from app.widget_look import editor_look_context

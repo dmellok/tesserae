@@ -88,9 +88,15 @@ def editor_look_context(page: Page, widgets: Iterable[Any]) -> dict[str, Any]:
             )
     # Partial overrides leave other dashboard controls useful. Only a whole-
     # widget declaration makes it independent; missing widgets stay editable.
+    # The status bar takes the dashboard's theme, style and font, and a saved
+    # matting colour is only reachable from this step, so both keep it.
     content = [c for c in page.cells if c.id != page.status_bar_cell_id and c.plugin]
-    visible = bool(content) and (
-        bool(page.custom_css.strip() or page.gap or page.corner_radius)
-        or any(not rules.get(c.plugin or "", {}).get("always") for c in content)
+    matted = (page.bleed_color or "#ffffff").lower() != "#ffffff"
+    visible = page.status_bar_enabled or (
+        bool(content)
+        and (
+            bool(page.custom_css.strip() or page.gap or page.corner_radius or matted)
+            or any(not rules.get(c.plugin or "", {}).get("always") for c in content)
+        )
     )
     return {"look_overrides": rows, "widget_look_rules": rules, "look_visible": visible}
