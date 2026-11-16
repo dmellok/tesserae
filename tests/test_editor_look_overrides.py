@@ -47,6 +47,7 @@ def _render(app, **fields):
     ("options", "message", "field"),
     [
         ({"dark_mode": True}, "uses its own dark mode", "opt_dark_mode"),
+        ({"theme": "Graphite"}, "uses Home Assistant's theme", "opt_theme"),
     ],
 )
 def test_ha_look_options_warn_in_server_html(app, options, message, field):
