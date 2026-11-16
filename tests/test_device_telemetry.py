@@ -464,3 +464,93 @@ def test_issued_poll_leaves_firmware_and_server_predictions_alone(tmp_path: Path
     assert store.note_issued_poll("mains", interval_s=300) is None
     assert store.note_issued_poll("unknown", interval_s=300) is None
     assert store.note_issued_poll("fw", interval_s=0) is None
+
+
+def test_a_button_press_wake_does_not_reset_trust(tmp_path: Path) -> None:
+    """A press wakes the device off-schedule, and it sends a second beat while still
+    awake. Neither says the sleep timer's prediction was wrong, so trust built from
+    on-time wakes survives (the Test Display never earned smart sync because of this)."""
+    store = _make_store(tmp_path)
+    t0 = 1_000_000.0
+    hb = {"next_sleep_s": 3600, "button": "refresh", "button_event_id": 7}
+    store.record_heartbeat("door", received_at=t0, parsed=hb, configured_sleep_s=None)
+    for n in range(1, CONFIDENCE_TRUSTED_AT + 1):
+        entry = store.record_heartbeat(
+            "door", received_at=t0 + n * 3600, parsed=hb, configured_sleep_s=None
+        )
+    assert entry.is_trusted
+    built = entry.consecutive_on_time_wakes
+    press = {**hb, "button_event_id": 8}
+    tp = t0 + CONFIDENCE_TRUSTED_AT * 3600 + 1200  # a press twenty minutes after a wake
+    entry = store.record_heartbeat("door", received_at=tp, parsed=press, configured_sleep_s=None)
+    assert entry.consecutive_on_time_wakes == built  # the press wake is not scored
+    entry = store.record_heartbeat(
+        "door", received_at=tp + 75, parsed=press, configured_sleep_s=None
+    )
+    assert entry.consecutive_on_time_wakes == built  # nor the beat while still awake
+    # The next timer wake is scored against the prediction made after the press.
+    entry = store.record_heartbeat(
+        "door", received_at=tp + 75 + 3600, parsed=press, configured_sleep_s=None
+    )
+    assert entry.consecutive_on_time_wakes == built + 1 and entry.is_trusted
+
+
+def test_a_late_timer_wake_still_resets_trust_without_a_press(tmp_path: Path) -> None:
+    store = _make_store(tmp_path)
+    t0 = 1_000_000.0
+    hb = {"next_sleep_s": 600, "button_event_id": 7}
+    store.record_heartbeat("x", received_at=t0, parsed=hb, configured_sleep_s=None)
+    for n in range(1, 3):
+        store.record_heartbeat("x", received_at=t0 + n * 600, parsed=hb, configured_sleep_s=None)
+    entry = store.record_heartbeat(
+        "x",
+        received_at=t0 + 3 * 600 + ON_TIME_TOLERANCE_S + 30,
+        parsed=hb,  # same event id: the timer woke it, late
+        configured_sleep_s=None,
+    )
+    assert entry.consecutive_on_time_wakes == 0
+
+
+def test_the_button_event_id_survives_a_restart(tmp_path: Path) -> None:
+    store = _make_store(tmp_path)
+    store.record_heartbeat(
+        "x",
+        received_at=1.0,
+        parsed={"next_sleep_s": 600, "button_event_id": 5},
+        configured_sleep_s=None,
+    )
+    again = _make_store(tmp_path)
+    entry = again.get("x")
+    assert entry is not None and entry.last_button_event_id == 5
+
+
+def test_a_press_reported_on_the_frame_request_does_not_reset_trust(tmp_path: Path) -> None:
+    """Stock firmware reports a press on its frame GET, ahead of the wake's
+    heartbeat, and that heartbeat carries no ``button_event_id``. The frame route
+    stamps the press with ``note_button_wake`` so the wake is still left unscored."""
+    store = _make_store(tmp_path)
+    t0 = 1_000_000.0
+    hb = {"next_sleep_s": 3600}
+    store.record_heartbeat("door", received_at=t0, parsed=hb, configured_sleep_s=None)
+    for n in range(1, CONFIDENCE_TRUSTED_AT + 1):
+        entry = store.record_heartbeat(
+            "door", received_at=t0 + n * 3600, parsed=hb, configured_sleep_s=None
+        )
+    assert entry.is_trusted
+    built = entry.consecutive_on_time_wakes
+    tp = t0 + CONFIDENCE_TRUSTED_AT * 3600 + 1200  # a press twenty minutes after a wake
+    noted = store.note_button_wake("door", at=tp)
+    assert noted is not None and noted.button_wake_at == tp
+    entry = store.record_heartbeat("door", received_at=tp + 4, parsed=hb, configured_sleep_s=None)
+    assert entry.consecutive_on_time_wakes == built  # the press wake is not scored
+    # The next timer wake is scored against the prediction made after the press.
+    entry = store.record_heartbeat(
+        "door", received_at=tp + 4 + 3600, parsed=hb, configured_sleep_s=None
+    )
+    assert entry.consecutive_on_time_wakes == built + 1 and entry.is_trusted
+
+
+def test_noting_a_button_wake_for_an_unknown_device_is_a_no_op(tmp_path: Path) -> None:
+    store = _make_store(tmp_path)
+    assert store.note_button_wake("nobody", at=1_000_000.0) is None
+    assert store.get("nobody") is None

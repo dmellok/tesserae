@@ -309,8 +309,10 @@ def test_a_rotation_cut_to_one_dashboard_carries_its_cadence(real: tuple[str, Fl
         assert page.locator('[data-dwell="weather"]').count() == 1  # a cycle: its own time
         page.locator('[data-expand="agenda"]').click()
         page.locator('[data-remove="agenda"]').click()
-        # Now an interval: its one cadence is what the dashboard showed for.
-        assert "Sent again every 5 min" in page.locator("#dxe-sections").inner_text()
+        # Now an interval: its one cadence is what the dashboard showed for
+        # (hall sends just before it wakes, every minute: a floor of 5 min).
+        assert "at most every 5 min" in page.locator("#dxe-sections").inner_text()
+        assert page.locator("[data-interval]").input_value() == "5"
         assert page.locator("[data-dwell]").count() == 0
         _save(page)
         d = decks.get("morning")
@@ -435,9 +437,12 @@ def test_pace_shows_only_the_options_a_display_has(real: tuple[str, Flask]) -> N
         opts = page.locator('[data-fold="options"]').inner_text()
         # Buttons always flip; the touch switch is only for a display with touch.
         assert "Touch also flips" not in opts and page.locator("[data-taps]").count() == 0
-        assert "Send just before it wakes" in opts
-        page.locator("[data-smart]").click()
-        assert not page.locator("[data-smart]").is_checked()
+        # Sending just before it wakes is the Timing card's own line; the
+        # timer is the way out of it.
+        assert "How far ahead of a wake" in opts
+        page.locator("[data-wake-timer]").click()
+        assert page.locator("[data-wake-timer]").count() == 0
+        assert "Send just before each wake" in page.locator(".dxe-pace").inner_text()
         _save(page)
         d = app.config["DECK_STORE"].get("morning")
         assert d.advance_smart_sync is False and d.advance == "both"
@@ -1650,9 +1655,10 @@ def test_pace_names_the_dashboards_with_their_own_time_and_links_to_them(
         browser, page, errors = _open(p, base, "/decks/morning/edit")
         line = page.locator(".dxe-overridden")
         assert line.inner_text() == "Overridden by: Weather (50 min), Agenda (1 h 3 min)"
-        # Every dashboard has its own time: said, the default greyed, a warning icon.
+        # Every dashboard has its own time: the default greyed, a warning icon
+        # (the lead states the sleeping display's facts first).
         assert page.locator("#dxe-h-timing + .dxe-lead").inner_text() == (
-            "Every dashboard has its own time."
+            "hall sleeps and wakes every 1 min. Changes show at its next wake."
         )
         assert "is-unused" in page.locator("[data-interval]").get_attribute("class")
         assert line.locator(".lu-ico").count() == 1

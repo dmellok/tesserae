@@ -8,13 +8,12 @@
 
     Steps <-> preview events and window.EV2Preview are documented at the top
     of preview.js. -#}
-{%- from "_preview_color.html" import attrs as color_attrs with context -%}
 {%- set _ev2pv_groups = [] -%}
-{%- for g in preview_groups -%}
+{%- for g in panel_preview_groups | default(preview_groups) -%}
   {%- set _ids = g.device_ids | default([]) -%}
-  {%- set _color = preview_color(_ids) -%}
+  {%- set _color = preview_color(_ids, g.gamut) -%}
   {%- set _ = _ev2pv_groups.append({
-        "key": g.w ~ "x" ~ g.h,
+        "key": g.w ~ "x" ~ g.h ~ ("-" ~ _ids[0] if _ids else ""),
         "w": g.w,
         "h": g.h,
         "devices": g.devices | default([]),
@@ -52,7 +51,7 @@
       <button type="button" data-ev2pv-mode="live" aria-pressed="true"
               title="Full-colour render">Live</button>
       <button type="button" data-ev2pv-mode="panel" aria-pressed="false"
-              title="Exactly what the e-ink panel shows, after dithering">As the panel shows it</button>
+              title="Renderer pixels after dithering">As the panel shows it</button>
     </div>
     <div class="ev2pv-icons">
       <button type="button" class="ev2pv-iconbtn" data-ev2pv-reload
@@ -67,13 +66,23 @@
     </div>
   </div>
 
-  {# The display colour mode per shape, from the same macro the classic editor
+  <div class="ev2pv-panel-controls" data-ev2pv-panel-controls hidden>
+    <div class="ev2pv-seg" role="group" aria-label="Panel zoom">
+      <button type="button" data-ev2pv-zoom="fit" aria-pressed="false">Fit</button>
+      <button type="button" data-ev2pv-zoom="1" aria-pressed="true">1x</button>
+      <button type="button" data-ev2pv-zoom="2" aria-pressed="false">2x</button>
+    </div>
+    <label><input type="checkbox" data-ev2pv-glass> Simulate e-ink glass</label>
+    <p class="ev2pv-native-help">1x and 2x preserve the dither dots. Fit is an overview. Glass is an approximation of ink and surface softness.</p>
+  </div>
+
+  {# The display colour mode per device, from the same resolver the classic editor
      and the dashboard list use (data-gamut / data-grey-levels). preview.js
      reads it and puts it on each canvas, where preview-color.css greys or
      thresholds the Live render to match a grey or black-and-white panel. #}
   <span hidden aria-hidden="true">
     {%- for g in _ev2pv_groups %}
-    <i data-ev2pv-color="{{ g.key }}" {{ color_attrs(g.deviceIds) }}></i>
+    <i data-ev2pv-color="{{ g.key }}" data-gamut="{{ g.gamut }}" data-grey-levels="{{ g.greyLevels }}"></i>
     {%- endfor %}
   </span>
   <div class="ev2pv-groups" data-ev2pv-groups></div>
