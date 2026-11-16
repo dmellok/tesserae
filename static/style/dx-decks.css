@@ -1546,6 +1546,10 @@ main.page.dxe-page {
   justify-content: space-between;
   gap: 16px;
 }
+/* The words give way, not the control (a long label squeezed its select). */
+.lu.dxe .dxe-opt > :last-child {
+  flex: none;
+}
 .lu.dxe .dxe-opt b {
   font-weight: 600;
   font-size: var(--t-size-base);
@@ -1575,6 +1579,78 @@ main.page.dxe-page {
 }
 .lu.dxe .dxe-lead-s .dxe-num {
   width: 72px;
+}
+
+/* 3 Timing on a display that sleeps: the freshness line, and the warning
+   when it gets more sends than it wakes for (deck_editor.js wakeCallout). */
+.lu.dxe .dxe-fresh {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--t-space-2);
+  margin: 0;
+  padding-top: var(--t-space-2);
+  font-size: var(--t-size-md);
+  color: var(--t-fg);
+}
+.lu.dxe .dxe-fresh > .lu-ico {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 3px;
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-fresh small {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--t-size-sm);
+}
+.lu.dxe .dxe-fresh-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  padding-left: calc(14px + var(--t-space-2));
+}
+.lu.dxe .dxe-wake-warns {
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-3);
+  padding: 0 0 var(--t-space-4) calc(var(--dxe-label-w) + var(--t-space-4));
+}
+.lu.dxe .dxe-edit + .dxe-wake-warn {
+  margin-top: 14px;
+}
+.lu.dxe .dxe-wake-warn {
+  align-items: flex-start;
+  gap: var(--t-space-2) 10px;
+  padding: var(--t-space-3);
+  line-height: 1.45;
+}
+.lu.dxe .dxe-wake-warn > .lu-ico {
+  margin-top: 3px;
+}
+.lu.dxe .dxe-wake-warn.is-paid {
+  background: color-mix(in oklab, var(--t-warn) 24%, var(--t-surface));
+}
+.lu.dxe .dxe-wake-cost {
+  display: block;
+  margin-top: 4px;
+  font-weight: 600;
+}
+.lu.dxe .dxe-wake-acts {
+  flex: 1 1 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--t-space-2) var(--t-space-4);
+  padding-left: 24px;
+}
+.lu.dxe .dxe-wake-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--t-space-2);
+  margin-left: auto;
 }
 
 /* the new-lineup flow */
@@ -1710,7 +1786,11 @@ main.page.dxe-page {
   .lu.dxe .dxe-on {
     margin-left: auto;
   }
-  .lu.dxe .dxe-fold-body {
+  .lu.dxe .dxe-fold-body,
+  .lu.dxe .dxe-wake-warns {
+    padding-left: 0;
+  }
+  .lu.dxe .dxe-wake-acts {
     padding-left: 0;
   }
   /* The dashboard's name keeps the line, with ×; its actions go under it. */

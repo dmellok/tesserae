@@ -447,6 +447,15 @@
             {% if _using_test %}
             {% set _custom = not (_presets | selectattr('0', 'equalto', _td.w) | selectattr('1', 'equalto', _td.h) | list) %}
             <div class="ev2-sizes">
+              <label class="ev2-lbl" for="ev2-test-type">Panel type</label>
+              <select id="ev2-test-type" class="ev2-select" name="test_display_gamut" data-ev2-test-type>
+                <option value=""{{ ' selected' if not test_display_gamut }}>Use existing settings</option>
+                {% for t in test_display_types %}
+                <option value="{{ t.value }}"{{ ' selected' if t.value == test_display_gamut }}>{{ t.label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="ev2-sizes">
               <span class="ev2-lbl" id="ev2-size-l">Test size</span>
               <div class="ev2-seg ev2-seg--sm ev2-sizeseg" role="group" aria-labelledby="ev2-size-l">
                 {% for w, h in _presets %}

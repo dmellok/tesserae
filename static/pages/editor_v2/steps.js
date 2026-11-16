@@ -214,6 +214,12 @@
       .catch(() => {});
   });
 
+  root.querySelector("[data-ev2-test-type]")?.addEventListener("change", (ev) => {
+    EV2.post(cfg.updateUrl, { test_display_gamut: ev.target.value })
+      .then(() => EV2.reload())
+      .catch(() => {});
+  });
+
   function saveTestSize(w, h) {
     EV2.post(cfg.updateUrl, { test_display_w: w, test_display_h: h })
       .then(() => EV2.reload())

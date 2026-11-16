@@ -345,7 +345,7 @@
            set lazily by editor.js when Panel view is active (kept out of the
            DOM src so it doesn't render until asked). #}
         <img class="preview-panel-img" data-panel-preview data-device-quantised
-             data-panel-src="{{ url_for('composer.compose_panel_preview', page_id=page.id) }}?gamut={{ g.gamut }}&amp;dither=floyd-steinberg&amp;w={{ g.w }}&amp;h={{ g.h }}"
+             data-panel-src="{{ url_for('composer.compose_panel_preview', page_id=page.id) }}?gamut={{ g.gamut }}&amp;dither=floyd-steinberg&amp;w={{ g.w }}&amp;h={{ g.h }}{% if g.device_ids %}&amp;device={{ g.device_ids[0]|urlencode }}{% endif %}"
              alt="Panel view (quantised)" hidden>
       </div>
       <p class="muted preview-dims">

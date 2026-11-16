@@ -239,6 +239,8 @@ class Page(BaseModel):
     # bounds match the existing dashboard design-size picker.
     test_display_w: int | None = Field(default=None, ge=100, le=4000)
     test_display_h: int | None = Field(default=None, ge=100, le=4000)
+    test_display_gamut: str | None = None
+
     device_ids: list[str] = Field(default_factory=list)
     # Content-update cadence ("Updates" in the UI): how often this
     # page's content is worth re-rendering, in minutes. 0 (default) =
@@ -330,6 +332,17 @@ class Page(BaseModel):
             data = {**data, "device_ids": [legacy] if legacy else []}
             data.pop("device_id", None)
         return data
+
+    @field_validator("test_display_gamut")
+    @classmethod
+    def validate_test_display_gamut(cls, value: str | None) -> str | None:
+        from app.quantizer import ACCEPTED_GAMUTS, canonicalise_gamut
+
+        if value is None:
+            return None
+        if value not in ACCEPTED_GAMUTS:
+            raise ValueError("Unknown test display type")
+        return canonicalise_gamut(value)
 
     @field_validator("device_ids", mode="before")
     @classmethod

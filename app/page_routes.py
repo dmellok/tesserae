@@ -787,6 +787,8 @@ def _editor_context(page: Page) -> dict[str, Any]:
     lineup_args: dict[str, Any] = {"return": lineup_return}
     cell_options = _materialize_cell_options(widgets)
 
+    from app.settings.index_routes import palette_label
+
     return {
         "page": page,
         **editor_look_context(page, widgets),
@@ -797,6 +799,26 @@ def _editor_context(page: Page) -> dict[str, Any]:
             "decks.editor", display=first_display, page_id=page.id, **lineup_args
         ),
         "test_display": {"w": test_display.w, "h": test_display.h},
+        "test_display_gamut": page.test_display_gamut or "",
+        "test_display_types": [
+            {"value": g, "label": palette_label(g)}
+            for g in (
+                "rgb24",
+                "waveshare_e6",
+                "inky_7colour",
+                "bwry_4",
+                "bwr_3",
+                "bwy_3",
+                "gray_4",
+                "gray_8",
+                "gray_16",
+                "mono",
+                "kaleido3",
+            )
+        ],
+        "panel_preview_groups": preview_groups_for_page(
+            page, device_registry, _settings_store(), per_device=True
+        ),
         "test_display_presets": [[800, 480], [480, 800], [1200, 825], [1920, 1080]],
         "lineups": _editor_lineups(page),
         # The delete button names the lineups it would leave, in one confirm.
@@ -1520,6 +1542,13 @@ def update(page_id: str) -> Response:
                 False, "Test display dimensions must be whole pixels from 100 to 4000."
             )
         updates[field] = size
+    if "test_display_gamut" in form:
+        from app.quantizer import ACCEPTED_GAMUTS, canonicalise_gamut
+
+        gamut = (form.get("test_display_gamut") or "").strip()
+        if gamut and gamut not in ACCEPTED_GAMUTS:
+            return _flash_save(False, "Choose a supported test display type.")
+        updates["test_display_gamut"] = canonicalise_gamut(gamut) if gamut else None
     if "name" in form:
         updates["name"] = (form.get("name") or page.name).strip() or page.name
     if "theme" in form:

@@ -199,6 +199,13 @@ Lowercase `[a-z0-9_]` is a convention, not a requirement. Name it
 
     Without the flag, sharing is unchanged.
 
+* Set `render.paid` when a render may cost money, such as a new AI picture.
+    Use `true` for every placement, or an object in the `show_if` format naming the options that make it so: `"paid": {"method": "ai"}`.
+
+    The lineup editor uses it to warn about renders nobody sees.
+    A display that wakes every 60 min only shows the last of the sends before each wake, so a lineup sending every 5 min could pay for 11 unseen pictures an hour.
+    The flag changes no rendering, and older servers ignore it.
+
 * Set `render.full_bleed` to `true` to remove outer page padding where a cell touches the panel wall.
     `picture_gallery` and `picture_apod` use it.
     Gaps between cells remain, and per-cell padding overrides win.
