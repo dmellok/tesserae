@@ -205,7 +205,9 @@ def test_condition_badge_marks_screens_with_conditions(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
     body = client.get("/decks").get_data(as_text=True)
-    assert body.count('title="Shows only while its conditions pass"') == 1
+    # The conditional step says when it shows, in words; the other has no chip.
+    assert body.count('<span class="lu-cond') == 1
+    assert "Only while Motion is on" in body
 
 
 def test_disabled_state_and_summary_render(app: Flask) -> None:
@@ -1004,10 +1006,11 @@ def test_rotation_row_says_the_display_holds_a_manual_push(app: Flask) -> None:
 
     body = client.get("/decks").get_data(as_text=True)
     section = body[body.index('id="display-panel"') :]
-    # The header names the page someone pushed; the rotation row stays live
-    # (its next advance takes the panel back).
+    # The header names the page someone pushed. No lineup put it there, so no
+    # row is live; the rotation is queued (its next advance takes the panel back).
     assert re.search(r'<p class="lu-show \w+"[^>]*>.*?<b>' + other.title() + "</b>", section, re.S)
-    assert '<li class="lu-row is-live" id="lu-row-loop"' in section
+    assert '<li class="lu-row is-queued" id="lu-row-loop"' in section
+    assert "lu-row is-live" not in section
     assert "from a manual push" in section
     assert "resumes " in section
 
@@ -1032,10 +1035,11 @@ def test_rotation_row_names_the_lineup_holding_the_display(app: Flask) -> None:
 
     body = client.get("/decks").get_data(as_text=True)
     section = body[body.index('id="display-panel"') :]
-    # Both lineups target the display: the by-hand deck it is parked on and
-    # the rotation; nothing claims a frame the panel has not fetched.
+    # Both lineups target the display: the by-hand deck it is parked on is the
+    # one live row, the rotation is queued behind it; nothing claims a frame
+    # the panel has not fetched.
     assert '<li class="lu-row is-live" id="lu-row-wayfind"' in section
-    assert '<li class="lu-row is-live" id="lu-row-loop"' in section
+    assert '<li class="lu-row is-queued" id="lu-row-loop"' in section
     assert '<p class="lu-show unknown"' in section
 
 

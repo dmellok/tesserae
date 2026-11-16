@@ -93,7 +93,11 @@ DAY_PLURAL: tuple[str, ...] = (
 ALL_DAYS: tuple[int, ...] = (0, 1, 2, 3, 4, 5, 6)
 
 LineupKind = Literal["cycle", "interval", "daily", "manual"]
-LineupStatus = Literal["live", "later_today", "not_today", "off"]
+#: ``live`` is the one lineup per display whose picture is on the glass now;
+#: ``queued`` has its window open and is next in line (it won the display and
+#: has not reached the panel yet, or a higher-priority lineup is ahead of it);
+#: ``waiting`` has its window open but its conditions do not pass right now.
+LineupStatus = Literal["live", "queued", "waiting", "later_today", "not_today", "off"]
 SegmentKind = Literal["window", "hold", "push"]
 PillKind = Literal["now", "queued", "next"]
 PrimaryAction = Literal["skip", "play", "push"]
@@ -155,6 +159,12 @@ class StepInput:
     dashboard_id: str
     dwell_minutes: int = 0
     conditional: bool = False
+    #: its conditions in plain words: the chip ("Only while Printer B Print status is
+    #: running") and the full sentence for its title; whether they pass right now
+    #: (``None``: not known)
+    cond_label: str = ""
+    cond_title: str = ""
+    cond_ok: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -205,11 +215,24 @@ class LineupInput:
     urls: LineupUrls = field(default_factory=LineupUrls)
     priority: int = 0  # wins a tie with another lineup due at the same moment
     last_fired: float | None = None  # epoch of an interval lineup's last fire
+    #: whether the scheduler held that last fire back (conditions not met, every
+    #: display paused) instead of sending it; ``None`` when it does not remember
+    last_held: bool | None = None
     #: the lineup names its display(s), so a step bound elsewhere cannot show
     explicit_display: bool = False
     #: a daily push's stored ``advance_end_at`` (the scheduler ignores it): what
     #: "Add end time" offers first
     end_hint: str | None = None
+    #: the scheduler's condition picker would put a step on the panel now (no
+    #: conditions, or at least one step's conditions pass). False holds it back.
+    ready: bool = True
+    #: when not ready: the first condition that fails, in plain words
+    #: ("Printer B print status is running"), and every failing one for the tooltip
+    waits_for: str = ""
+    waits_title: str = ""
+    #: a rotation in priority mode: the first step whose conditions pass is shown,
+    #: the rest are fallbacks in order (it does not take them in turn)
+    priority_mode: bool = False
 
 
 @dataclass(frozen=True)
@@ -229,6 +252,11 @@ class OnScreenInput:
     dashboard_id: str
     since: float | None = None  # epoch the frame went up / was fetched
     verb: str = "sent"
+    #: the lineup that put this frame on the glass (the header's "from ..."), and
+    #: whether that is known: ``origin_known`` with no ``lineup_id`` means it came
+    #: from somewhere else (a push by hand), so no lineup is live.
+    lineup_id: str | None = None
+    origin_known: bool = False
 
 
 @dataclass(frozen=True)
@@ -556,6 +584,11 @@ class SegmentView(_Dict):
     is_current: bool = False
     steps: list[SegmentStepView] = field(default_factory=list)
     steps_total: int = 0
+    #: the row the block sits on when windows overlap (0 = the main bar); see
+    #: :func:`assign_lanes`
+    lane: int = 0
+    #: today's open window only: its lineup's status ("live", "queued", "waiting")
+    state: str = ""
 
 
 @dataclass
@@ -597,6 +630,8 @@ class DayBarView(_Dict):
     now_label: str | None = None  # ``now_min`` as the page reads it, see ``clock``
     # Block start labels instead of the 00-24 axis; None (axis) for 1-2 blocks.
     starts: list[StartLabelView] | None = None
+    #: rows of blocks: 1 unless windows overlap that day (``SegmentView.lane``)
+    lanes: int = 1
 
 
 @dataclass
@@ -683,7 +718,8 @@ class StepView(_Dict):
     queued: bool
     on_screen: bool
     pill: PillView | None
-    separator: Literal["arrow", "loop", ""]
+    #: "else" between the choices of a priority lineup (the first that passes)
+    separator: Literal["arrow", "loop", "else", ""]
     push_title: str
     composition_digest: str | None = None
     #: items can be chosen: each has a ``key`` the preview and Push now accept
@@ -698,6 +734,12 @@ class StepView(_Dict):
     #: its dashboard is bound only to other displays, so this one never shows it
     off_display: bool = False
     off_display_note: str = ""  # "Bound to Frame (480×800)"
+    #: see ``StepInput``: the chip under a conditional step and its title
+    cond_label: str = ""
+    cond_title: str = ""
+    cond_ok: bool | None = None
+    #: the last, unconditional step of a priority lineup: shown when none before it is
+    fallback: bool = False
 
 
 @dataclass
@@ -764,6 +806,12 @@ class LineupView(_Dict):
     missing_count: int = 0  # steps whose dashboard was deleted; not in step_count
     # Set on the rows drawn grey (status not_today / off): the reason, as a tag.
     off_why: OffWhyView | None = None
+    #: queued / waiting: why, in a few words ("lands ~1:25 PM", "behind Night",
+    #: "until Printer B print status is running"); ``status_title`` is the full sentence
+    status_reason: str = ""
+    status_title: str = ""
+    #: see ``LineupInput.priority_mode``
+    priority_mode: bool = False
 
 
 @dataclass
@@ -1209,7 +1257,8 @@ def _build_model(lineups: Sequence[LineupInput], clk: _Clock | None = None) -> _
             )
     # With overlapping windows the panel shows whichever fired last; a tie
     # goes the way the scheduler's tick does (priority, then kind, then id).
-    live = [b for b in blocks if b.pts and _within(b, now_abs)]
+    # A lineup whose conditions fail right now does not fire, so it is out.
+    live = [b for b in blocks if b.pts and b.lineup.ready and _within(b, now_abs)]
     live_block = (
         max(
             live,
@@ -1291,11 +1340,17 @@ def _next_fire(model: _Model, after: int) -> tuple[int, _Block, _Point] | None:
 
 
 def _last_push(model: _Model, now_abs: int) -> tuple[int, _Block] | None:
-    """The most recent daily push at or before now (``(week minute, block)``,
-    the minute possibly last week); on a tie the scheduler's winner."""
+    """The most recent daily push at or before now that went out (``(week
+    minute, block)``, the minute possibly last week); on a tie the scheduler's
+    winner."""
     found: list[tuple[int, _Block]] = []
     for b in model.blocks:
-        if b.push:
+        # A push already behind us went out or not as the conditions stood
+        # then, which the scheduler's record of its last fire says. The gate as
+        # it reads now only stands in when there is no such record.
+        lu = b.lineup
+        went = (not lu.last_held) if lu.last_held is not None else lu.ready
+        if b.push and went:
             t = b.s if b.s <= now_abs else b.s - WEEK_MIN
             found.append((t, b))
     if not found:
@@ -1886,13 +1941,26 @@ def _day_bar(
     next_tick: int | None,
     screens: Mapping[str, ScreenView],
     next_epoch: float | None = None,
+    *,
+    live_id: str | None = None,
+    standing: Mapping[str, _Standing] | None = None,
 ) -> DayBarView:
     today = clk.now_abs // DAY_MIN
     is_today = day == today
     segs: list[SegmentView] = []
     for x, s, e, push in _day_pieces(model, day):
         lineup = x.lineup
-        live_now = is_today and (x is model.live_block or x is model.live_hold)
+        # ``driving``: the block the scheduler advances next (its next tick);
+        # ``on_glass``: the live lineup's block or hold, drawn in the accent.
+        driving = is_today and (x is model.live_block or x is model.live_hold)
+        on_glass = is_today and lineup.id == live_id and _within(x, clk.now_abs)
+        state = ""
+        if is_today and not x.hold and _within(x, clk.now_abs):
+            st_ = (standing or {}).get(lineup.id)
+            if st_ is not None:
+                state = st_.status
+        elif on_glass:
+            state = "live"
         carried: ScreenView | None = None
         from_prev_day = False
         from_day_label: str | None = None
@@ -1936,7 +2004,7 @@ def _day_bar(
                         )
                     )
                     if not push and s < m < e:
-                        is_next = live_now and next_tick is not None and abs_t == next_tick
+                        is_next = driving and next_tick is not None and abs_t == next_tick
                         in_sec = (
                             max(0, int((next_epoch or clk.epoch_of(abs_t % WEEK_MIN)) - clk.epoch))
                             if is_next
@@ -1963,7 +2031,7 @@ def _day_bar(
         if (
             next_epoch is not None
             and next_tick is not None
-            and live_now
+            and driving
             and not push
             and not any(t.next for t in ticks)
         ):
@@ -2009,7 +2077,7 @@ def _day_bar(
                 end_min=e,
                 left_pct=_pct(s),
                 width_pct=0.4 if push else _pct(e - s),
-                live=live_now,
+                live=on_glass,
                 planned=not is_today and not x.hold,
                 title=title,
                 label="" if x.hold else lineup.name,
@@ -2020,11 +2088,17 @@ def _day_bar(
                 from_prev_day=from_prev_day,
                 from_day_label=from_day_label,
                 predicted=x.hold and day * DAY_MIN + s > clk.now_abs,
-                is_current=live_now,
+                is_current=on_glass,
                 steps=steps,
                 steps_total=len(points),
+                state=state,
             )
         )
+        sg = segs[-1]
+        st_ = (standing or {}).get(lineup.id) if state else None
+        if st_ is not None and st_.status != "live":
+            sg.title += f". {st_.label}" + (f", {st_.reason}" if st_.reason else "")
+    lanes = assign_lanes(segs, live_id if is_today else None)
     pause_segs: list[PauseSegmentView] = []
     if d.pause is not None:
         pz = d.pause
@@ -2059,6 +2133,7 @@ def _day_bar(
         absent=absent,
         now_label=clock(now_min) if now_min is not None else None,
         starts=start_labels(segs),
+        lanes=lanes,
     )
 
 
@@ -2389,6 +2464,18 @@ def build_display(
         lands_now = _lands_at(d, clk, clk.epoch)
         push_lands = f"lands {lands_now.label}" if lands_now.label else "lands later"
 
+    # -- which row is live, queued or waiting ----------------------------------
+    live_id = _live_lineup_id(d, model, sched, on_id, now_abs)
+    standing = _standings(
+        d,
+        model,
+        clk,
+        sched=sched,
+        live_id=live_id,
+        queued=queued,
+        next_adv=next_adv if lb is not None else None,
+    )
+
     # -- step roles on the live block (for the lanes) --------------------------
     roles: dict[tuple[str, int], str] = {}
     if lb is not None and sched is not None and sched.lineup is lb.lineup:
@@ -2414,6 +2501,8 @@ def build_display(
                 on_id=on_id,
                 queued=queued,
                 fold_default=fold_default,
+                live_id=live_id,
+                standing=standing.get(lineup.id),
             )
         )
     views.sort(key=_lineup_sort_key)
@@ -2426,7 +2515,19 @@ def build_display(
     screens = {pid: _screen(dashboards.get(pid), pid, d) for pid in dashboard_ids}
     next_epoch = adv_lands.epoch if adv_lands is not None else None
     week = [
-        _day_bar(d, model, i, clk, dashboards, roles, next_tick, screens, next_epoch)
+        _day_bar(
+            d,
+            model,
+            i,
+            clk,
+            dashboards,
+            roles,
+            next_tick,
+            screens,
+            next_epoch,
+            live_id=live_id,
+            standing=standing,
+        )
         for i in range(7)
     ]
     return DisplayView(
@@ -2464,6 +2565,203 @@ def build_display(
         placeholder=placeholder,
         queued_thumb=queued_thumb,
     )
+
+
+@dataclass(frozen=True)
+class _Standing:
+    """A row's status while its window is open (or it holds the panel)."""
+
+    status: LineupStatus
+    label: str
+    reason: str = ""
+    title: str = ""
+
+
+def _ordinal(n: int) -> str:
+    """1st, 2nd, 3rd, 4th ... 11th, 12th, 13th, 21st."""
+    tail = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{tail}"
+
+
+def short_name(name: str, display_name: str) -> str:
+    """A lineup's name in a reason: "Printing now: Printer A (Test Display)" reads
+    "Printing now: Printer A" under the Test Display, which already says where."""
+    tail = f" ({display_name})"
+    if display_name and name.endswith(tail) and len(name) > len(tail):
+        return name[: -len(tail)]
+    return name
+
+
+def _live_lineup_id(
+    d: DisplayInput,
+    model: _Model,
+    sched: _Scheduled | None,
+    on_id: str | None,
+    now_abs: int,
+) -> str | None:
+    """The one lineup whose picture is on the glass now, or ``None``.
+
+    The header's own answer first (``OnScreenInput.lineup_id``: the nav record
+    or the push log names where the frame came from). Without it, the lineup
+    that shows the dashboard on the glass, preferring the scheduler's pick,
+    then the one the display was last driven by, then any whose window is
+    open. With the glass unknown, the lineup the display was last driven by,
+    else the scheduler's pick, stands in."""
+    enabled = {lu.id: lu for lu in d.lineups if lu.enabled}
+    shown = d.on_screen
+    if shown is not None and shown.origin_known:
+        return shown.lineup_id if shown.lineup_id in enabled else None
+    if on_id is None:
+        driven = next((lu.id for lu in enabled.values() if lu.playing), None)
+        return driven or (sched.lineup.id if sched is not None else None)
+
+    def shows(lu: LineupInput) -> bool:
+        return any(st.dashboard_id == on_id for st in lu.steps)
+
+    if sched is not None and shows(sched.lineup):
+        return sched.lineup.id
+    playing = [lu for lu in enabled.values() if lu.playing]
+    running = [b.lineup for b in model.blocks if b.pts and _within(b, now_abs)]
+    return next((lu.id for lu in [*playing, *running] if shows(lu)), None)
+
+
+def _standings(
+    d: DisplayInput,
+    model: _Model,
+    clk: _Clock,
+    *,
+    sched: _Scheduled | None,
+    live_id: str | None,
+    queued: QueuedView | None,
+    next_adv: int | None,
+) -> dict[str, _Standing]:
+    """Live / queued / waiting for the rows that have a say right now.
+
+    Exactly one row is live: the lineup on the glass (``live_id``). Of the
+    others whose window is open, one whose conditions fail waits for them; the
+    scheduler's pick (``sched``, which already skips those) is queued until its
+    picture lands; the rest are queued behind it. A lineup the display was last
+    driven by that is not on the glass yet is queued too. Rows not listed keep
+    their schedule status (later today, not today, off)."""
+    now_abs = clk.now_abs
+    by_id = {lu.id: lu for lu in d.lineups}
+    running = {b.lineup.id for b in model.blocks if b.pts and _within(b, now_abs)}
+    winner = sched.lineup if sched is not None and not sched.hold else None
+    live = by_id.get(live_id or "")
+    out: dict[str, _Standing] = {}
+    # A lineup holding the panel after its window (its last frame kept until the
+    # next one starts) keeps its schedule status and the ``holding`` flag.
+    if live is not None and live.enabled and (live.id in running or live.playing):
+        out[live.id] = _Standing("live", "Live")
+
+    def lands_for(lu: LineupInput) -> tuple[str, str] | None:
+        """``(when, sentence)`` its picture reaches the glass."""
+        if queued is not None and any(st.dashboard_id == queued.dashboard_id for st in lu.steps):
+            return queued.lands, f"{queued.name} is waiting for the display's next check-in."
+        ev = next(
+            (e for e in d.upcoming or () if e.lineup_id == lu.id and e.at > clk.epoch),
+            None,
+        )
+        lands = (
+            _lands_at(d, clk, ev.at)
+            if ev is not None
+            else _lands(d, clk, next_adv)
+            if winner is lu and next_adv is not None
+            else None
+        )
+        return (lands.label, lands.text) if lands is not None else None
+
+    for lu in d.lineups:
+        if not lu.enabled or lu.id in out:
+            continue
+        is_running = lu.id in running
+        if is_running and not lu.ready:
+            what = lu.waits_for or "its conditions pass"
+            out[lu.id] = _Standing(
+                "waiting",
+                "Waiting",
+                f"until {what}",
+                lu.waits_title or f"Its window is open, but it waits until {what}.",
+            )
+        elif (is_running and lu is winner) or (lu.playing and not is_running):
+            lands = lands_for(lu)
+            if lands is not None and lands[0]:
+                reason = f"lands {lands[0]}"
+                title = f"Next on {d.name}. {lands[1]}"
+            else:
+                reason = "lands at the next update"
+                title = f"Next on {d.name}; it lands at the display's next update."
+            out[lu.id] = _Standing("queued", "Queued", reason, title)
+        elif is_running:
+            ahead = winner if winner is not None and winner is not lu else live
+            nxt = _next_point(model, lu, now_abs)
+            if (ahead is not None and ahead.priority > lu.priority) or nxt is None:
+                # Out-ranked: the higher priority lineup wins every tie.
+                name = short_name(ahead.name, d.name) if ahead is not None else ""
+                out[lu.id] = _Standing(
+                    "queued",
+                    "Queued",
+                    f"behind {name}" if name else "",
+                    (
+                        f"Its window is open, but {ahead.name} has the display "
+                        f"(priority {ahead.priority} over {lu.priority})."
+                        if ahead is not None
+                        else "Its window is open; it takes over at its next step."
+                    ),
+                )
+            else:
+                # Not out-ranked, only fired before the one on the panel: its
+                # next step lands over it.
+                nl = _lands(d, clk, nxt)
+                out[lu.id] = _Standing(
+                    "queued",
+                    "Queued",
+                    f"next {nl.label or clock(nxt)}",
+                    f"Its next step goes to {d.name} at {clock(nxt)}. {nl.text}",
+                )
+    return out
+
+
+def _next_point(model: _Model, lineup: LineupInput, now_abs: int) -> int | None:
+    """The lineup's next advance strictly after now, in week minutes relative
+    to now (it may be next week's)."""
+    found = [
+        p.t + off
+        for b in model.blocks
+        if b.lineup is lineup
+        for off in (0, WEEK_MIN)
+        for p in b.pts
+        if p.t + off > now_abs
+    ]
+    return min(found) if found else None
+
+
+def assign_lanes(segs: Sequence[SegmentView], first: str | None = None) -> int:
+    """Put overlapping windows on separate rows (``lane``), so each one shows;
+    returns how many rows the day needs. ``first`` (the live lineup) takes the
+    main row; the rest go by start, the longer first. Holds and single pushes
+    stay on the main row: a hold fills a gap and a push is a moment. Mirrored
+    by ``assignLanes`` in static/lineups_render.js for the edit preview."""
+    wins = [sg for sg in segs if sg.kind == "window"]
+    wins.sort(
+        key=lambda sg: (
+            sg.lineup_id != first,
+            sg.start_min,
+            sg.start_min - sg.end_min,
+            sg.lineup_id,
+        )
+    )
+    rows: list[list[tuple[int, int]]] = []
+    for sg in wins:
+        for k, row in enumerate(rows):
+            if all(sg.end_min <= a or sg.start_min >= b for a, b in row):
+                row.append((sg.start_min, sg.end_min))
+                sg.lane = k
+                break
+        else:
+            rows.append([(sg.start_min, sg.end_min)])
+            sg.lane = len(rows) - 1
+    return max(1, len(rows))
 
 
 def _next_update_view(
@@ -2524,10 +2822,12 @@ def _off_why(status: LineupStatus, *, manual: bool, runs_today: bool) -> OffWhyV
 
 
 def _lineup_sort_key(v: LineupView) -> tuple[int, int, str]:
+    """Live first, then queued, then waiting, then by when each plays next;
+    switched off last."""
     if v.status == "off":
-        return (2, 0, v.name.lower())
-    live = v.status == "live" or v.holding
-    return (0 if live else 1, v.sort_minutes, v.name.lower())
+        return (4, 0, v.name.lower())
+    group = {"live": 0, "queued": 1, "waiting": 2}.get(v.status, 0 if v.holding else 3)
+    return (group, v.sort_minutes, v.name.lower())
 
 
 def _lineup_view(
@@ -2543,12 +2843,14 @@ def _lineup_view(
     on_id: str | None,
     queued: QueuedView | None,
     fold_default: bool,
+    live_id: str | None = None,
+    standing: _Standing | None = None,
 ) -> LineupView:
     now_abs = clk.now_abs
     today = now_abs // DAY_MIN
     mine = [b for b in model.blocks if b.lineup is lineup]
     # Its own run in progress: with overlapping lineups more than one can be
-    # running, though only the scheduler's winner holds the panel.
+    # running, though only one is on the glass (``standing`` says which).
     lb = next((b for b in mine if b.pts and _within(b, now_abs)), None)
     live = lb is not None
     holding = model.live_hold is not None and model.live_hold.lineup is lineup
@@ -2560,8 +2862,8 @@ def _lineup_view(
     status: LineupStatus
     if not lineup.enabled:
         status, status_label = "off", "Off"
-    elif live or lineup.playing:
-        status, status_label = "live", "Live"
+    elif standing is not None:
+        status, status_label = standing.status, standing.label
     elif later:
         status, status_label = "later_today", "Later today"
     elif lineup.kind == "manual":
@@ -2570,6 +2872,11 @@ def _lineup_view(
         status, status_label = "not_today", days_label(days_sorted)
 
     off_why = _off_why(status, manual=lineup.kind == "manual", runs_today=today % 7 in lineup.days)
+    if status == "waiting":
+        off_why = OffWhyView(
+            "Conditions not met",
+            f"{standing.title if standing else ''} {_GREY_NOTE}".strip(),
+        )
 
     # -- window ------------------------------------------------------------
     win = window_minutes(lineup)
@@ -2702,9 +3009,10 @@ def _lineup_view(
     n = len(lineup.steps)
     intended = on_panel = nxt = -1
     next_at = ""
+    if lineup.id == live_id and on_id is not None:
+        on_panel = next((i for i, s in enumerate(lineup.steps) if s.dashboard_id == on_id), -1)
     if live and sched is not None and sched.lineup is lineup:
         intended = sched.index
-        on_panel = next((i for i, s in enumerate(lineup.steps) if s.dashboard_id == on_id), -1)
         if next_adv is not None and lb is not None and next_adv < _rel_now(lb.e, now_abs):
             nxt = next(
                 (p.i for p in lb.pts if p.t % WEEK_MIN == next_adv % WEEK_MIN),
@@ -2724,6 +3032,7 @@ def _lineup_view(
             next_at = clock(next_adv)
     steps: list[StepView] = []
     loops = lineup.kind == "cycle" and n > 1
+    ranked = lineup.priority_mode and n > 1
     for i, st in enumerate(lineup.steps):
         dash = dashboards.get(st.dashboard_id)
         scr = _screen(dash, st.dashboard_id, d)
@@ -2742,7 +3051,7 @@ def _lineup_view(
                 f"Queued · {queued.lands}" if queued.lands else "Queued",
                 "Sent; the display picks it up at its next check-in",
             )
-        if i == nxt:
+        if i == nxt and not is_queued:
             pill = PillView("next", f"Next {next_at}", f"Next advance {next_at}")
         shot = d.shots.get(st.dashboard_id)
         items = list(dash.items) if dash else []
@@ -2754,10 +3063,17 @@ def _lineup_view(
             and dash.bound_ids
             and d.id not in dash.bound_ids
         )
+        fallback = ranked and i == n - 1 and not st.conditional
+        if ranked:
+            position = f"{_ordinal(i + 1)} choice"
+            separator: Literal["arrow", "loop", "else", ""] = "else" if i < n - 1 else ""
+        else:
+            position = f"{i + 1}/{n}" if n > 1 else "only"
+            separator = "arrow" if i < n - 1 else ("loop" if loops else "")
         steps.append(
             StepView(
                 index=i,
-                position=f"{i + 1}/{n}" if n > 1 else "only",
+                position=position,
                 dashboard_id=st.dashboard_id,
                 name=scr.name,
                 thumb_url="" if off_display else scr.thumb_url,
@@ -2782,7 +3098,11 @@ def _lineup_view(
                 queued=is_queued,
                 on_screen=i == on_panel,
                 pill=pill,
-                separator="arrow" if i < n - 1 else ("loop" if loops else ""),
+                separator=separator,
+                cond_label=st.cond_label,
+                cond_title=st.cond_title,
+                cond_ok=st.cond_ok,
+                fallback=fallback,
                 push_title=MISSING_TITLE if scr.missing else f"Push {scr.name} to {d.name} now",
                 missing=scr.missing,
                 off_display=off_display,
@@ -2796,8 +3116,9 @@ def _lineup_view(
     missing_count = sum(1 for sv in steps if sv.missing)
 
     live_now: LiveNowView | None = None
-    if live and intended >= 0:
-        sd = lineup.steps[intended].dashboard_id
+    shown = intended if intended >= 0 else on_panel
+    if status == "live" and shown >= 0:
+        sd = lineup.steps[shown].dashboard_id
         live_now = LiveNowView(
             scheduled_name=_name(dashboards, sd),
             on_screen_name=_name(dashboards, on_id) if on_id else None,
@@ -2806,7 +3127,7 @@ def _lineup_view(
         )
 
     step_min, step_lbl, cycle_min, cycle_lbl = _step_meta(lineup)
-    folded = status in ("not_today", "off") or (fold_default and status == "later_today")
+    folded = status in ("not_today", "off", "waiting") or (fold_default and status == "later_today")
     if lineup.kind == "daily":
         primary: PrimaryAction = "push"
         primary_label = "Push now: send it to the display"
@@ -2815,7 +3136,11 @@ def _lineup_view(
     else:
         primary, primary_label = "play", "Play now: start this lineup on the panel"
     u = lineup.urls
-    sort_minutes = 0 if live else ((next_abs - now_abs) if next_abs is not None else WEEK_MIN)
+    sort_minutes = (
+        0
+        if live or status == "live"
+        else ((next_abs - now_abs) if next_abs is not None else WEEK_MIN)
+    )
     return LineupView(
         id=lineup.id,
         name=lineup.name,
@@ -2865,6 +3190,9 @@ def _lineup_view(
         ),
         sort_minutes=sort_minutes,
         off_why=off_why,
+        priority_mode=lineup.priority_mode,
+        status_reason=standing.reason if standing and status == standing.status else "",
+        status_title=standing.title if standing and status == standing.status else "",
     )
 
 
