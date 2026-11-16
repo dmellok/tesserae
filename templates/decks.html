@@ -25,6 +25,9 @@
     do not run today never flash. lineups.js takes over (and drops the
     boot attribute) once it runs; storage may be blocked. -#}
 <script>try{if(localStorage.getItem("tesserae.lineups.scope")==="today")document.currentScript.parentNode.setAttribute("data-lu-boot-scope","today")}catch(e){}</script>
+{#- Phones start with the displays collapsed, except the ones opened on this
+    phone before (static/lineups.js, tesserae.lineups.phone-open). -#}
+<script>(function(s){if(!matchMedia("(max-width: 600px)").matches)return;var r=s.parentNode,o=[];r.setAttribute("data-lu-boot-collapse","");try{o=JSON.parse(localStorage.getItem("tesserae.lineups.phone-open")||"[]")}catch(e){}if(!Array.isArray(o)||!o.length||!window.CSS||!CSS.escape)return;var st=document.createElement("style");st.setAttribute("data-lu-boot-open","");st.textContent=o.filter(function(x){return typeof x==="string"}).map(function(x){var i="#lu-dsb-"+CSS.escape(x);return i+"{display:block!important}"+i+"+.lu-ds-more{display:none!important}"}).join("");r.appendChild(st)})(document.currentScript)</script>
 <header class="lu-head">
   <div>
     <h1>{{ lu.ico('screen') }}Lineups</h1>
@@ -52,12 +55,16 @@
 <div class="lu-tb" role="search" data-lu-toolbar hidden>
   <label class="lu-tb-search">{{ lu.ico('search') }}
     <input type="search" placeholder="Search lineups" aria-label="Search lineups" autocomplete="off" spellcheck="false" data-lu-q></label>
+  {#- Phones fold the four selects behind this button; wider screens show them inline. -#}
+  <button type="button" class="lu-btn-ghost lu-tb-ftog" data-lu-filters aria-expanded="false" aria-controls="lu-tb-filters">{{ lu.ico('funnel') }}<span>Filters</span><b data-lu-fcount hidden></b></button>
+  <div class="lu-tb-filters" id="lu-tb-filters">
   {% if displays|length > 1 %}
   <select class="lu-tb-select" aria-label="Filter by display" data-lu-filter="display"><option value="">All displays</option>{% for d in displays %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}</select>
   {% endif %}
   <select class="lu-tb-select" aria-label="Filter by kind" data-lu-filter="kind"><option value="">Every kind</option><option value="cycle">Rotations</option><option value="send">Schedules</option><option value="nav">By hand or tap</option></select>
   <select class="lu-tb-select" aria-label="Filter by state" data-lu-filter="state"><option value="">Live, waiting or off</option><option value="live">Live now</option><option value="wait">Waiting</option><option value="off">Off</option></select>
   <select class="lu-tb-select" aria-label="Order" data-lu-filter="sort"><option value="next">Next to play</option><option value="name">Name A to Z</option><option value="kind">Kind</option><option value="screens">Most dashboards</option></select>
+  </div>
   <div class="lu-seg" role="group" aria-label="View"><button type="button" data-view="cards" aria-pressed="true">Cards</button><button type="button" data-view="timeline" aria-pressed="false">Timeline</button></div>
   <div class="lu-seg" role="group" aria-label="Rows to show" data-lu-scope-seg><button type="button" data-scope="today" aria-pressed="false" title="Only what is live now or still to run on the day shown">Today</button><button type="button" data-scope="all" aria-pressed="true" title="Every lineup, including the ones that run on other days">All</button></div>
   <button type="button" class="lu-btn-ghost" data-fold-all data-mode="fold">{{ lu.ico('foldall') }}<span>Fold all</span></button>
