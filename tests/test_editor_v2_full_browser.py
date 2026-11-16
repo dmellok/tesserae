@@ -478,8 +478,8 @@ def test_new_lineup_round_trip_keeps_dashboard_and_returns_to_open_step(
         page.locator('[data-time="end"]').dispatch_event("change")
         page.locator('[data-goto="3"]').click()
         assert page.locator(f'[data-step="{PAGE_ID}"]').count() == 1
+        page.locator("[data-picker]").click()
         page.locator('[data-add="companion"]').click()
-        page.locator("[data-add-confirm]").click()
         page.evaluate("() => sessionStorage.removeItem('ev2-step:full')")
         page.locator("[data-create]").click()
         page.wait_for_url(f"**/pages/{PAGE_ID}{'?new=1' if is_new else ''}#{step}")

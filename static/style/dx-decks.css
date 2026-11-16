@@ -1432,22 +1432,6 @@ main.page.dxe-page {
 }
 
 /* add-dashboard row and picker */
-.lu.dxe .dxe-add-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 16px;
-  padding: 8px 12px;
-  border-top: 1px solid var(--t-border);
-}
-.lu.dxe .dxe-steps-card > .dxe-add-row:first-child,
-.lu.dxe .dxe-steps:empty + .dxe-add-row {
-  border-top: 0;
-}
-.lu.dxe .dxe-add {
-  color: var(--t-fg);
-  font-weight: 500;
-}
 .lu.dxe .dxe-picker {
   --dxe-tw: min(80px, calc(60px * var(--dxe-arw, 16) / var(--dxe-arh, 10)));
   padding: 14px 16px 16px;
@@ -1455,17 +1439,6 @@ main.page.dxe-page {
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-.lu.dxe .dxe-add-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-top: 16px;
-}
-.lu.dxe .dxe-sec > .dxe-picker {
-  padding: 16px 0 0;
-  border-top: 0;
 }
 .lu.dxe .dxe-picks {
   display: grid;
@@ -1666,8 +1639,101 @@ main.page.dxe-page {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--t-space-1) var(--t-space-3);
-  margin-top: var(--t-space-6);
+  min-height: 44px;
+  margin-top: var(--t-space-3);
   font-size: var(--t-size-base);
+}
+.lu.dxe .dxe-done + .dxe-done {
+  margin-top: 0;
+}
+.lu.dxe .dxe-done .dxe-soft {
+  color: var(--t-fg);
+}
+/* The done steps are one line each; Change keeps a finger-sized target. */
+.lu.dxe .dxe-done .dxe-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 4px;
+}
+/* The open step leads: its number in the accent. */
+.lu.dxe .dxe-sec.is-current .dxe-n {
+  background: var(--lu-acc);
+  border-color: var(--lu-acc);
+  color: var(--lu-acc-fg);
+}
+.lu.dxe .dxe-done + .dxe-sec.is-current {
+  margin-top: var(--t-space-6);
+}
+
+/* No dashboards yet: the add tile where the first one goes, and a line. */
+.lu.dxe .dxe-none {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--t-space-4) var(--t-space-5);
+  padding: var(--dxe-pad);
+}
+.lu.dxe .dxe-none .dxe-add-tile {
+  --th: 120px;
+  border-color: var(--lu-acc);
+  color: var(--lu-acc-text);
+}
+.lu.dxe .dxe-none .dxe-add-tile:hover,
+.lu.dxe .dxe-none .dxe-add-tile[aria-expanded="true"] {
+  border-style: solid;
+  color: var(--lu-acc-text);
+  background: color-mix(in oklab, var(--lu-acc) 6%, transparent);
+}
+.lu.dxe .dxe-none .dxe-add-tile:disabled {
+  border-color: var(--t-border-strong);
+  color: var(--t-fg-soft);
+  cursor: not-allowed;
+}
+.lu.dxe .dxe-none-t {
+  display: flex;
+  flex: 1 1 220px;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  font-size: var(--t-size-md);
+}
+.lu.dxe .dxe-none-t b {
+  font-size: var(--t-size-base);
+  font-weight: 600;
+}
+
+/* The picker, inside the card under the tiles, with a line that says a pick adds. */
+.lu.dxe .dxe-pick-wrap {
+  border-top: 1px solid var(--t-border);
+}
+.lu.dxe .dxe-pick-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px var(--t-space-2);
+  margin: 0;
+  padding: 14px 16px 0;
+  font-size: var(--t-size-md);
+}
+.lu.dxe .dxe-pick-wrap > .dxe-picker {
+  border-top: 0;
+}
+
+/* A new dashboard's optional condition, opened from its details. */
+.lu.dxe .dxe-cond-new {
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-2);
+  font-size: var(--t-size-md);
+}
+.lu.dxe .dxe-cond-new > small {
+  font-size: var(--t-size-sm);
+}
+.lu.dxe .dxe-sum-r .dxe-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
 }
 .lu.dxe .dxe-done b {
   font-weight: 600;
@@ -1759,6 +1825,17 @@ main.page.dxe-page {
 }
 .lu.dxe .dxe-actionbar-btns .lu-btn-ghost {
   color: var(--t-fg);
+}
+/* The new lineup's Cancel: a link, left of Create, finger-sized. */
+.lu.dxe .dxe-actionbar-btns .dxe-cancel {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--t-space-3);
+}
+.lu.dxe .dxe-actionbar-btns .lu-btn-primary[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* narrow: one column */
@@ -2005,4 +2082,14 @@ html .dxe-move-dialog .wizard-footer button.primary.dxe-caution:hover {
     animation: none;
     box-shadow: 0 0 0 3px var(--lu-acc);
   }
+}
+
+/* The new lineup's one primary action: finger-sized. */
+.lu.dxe.is-new .dxe-actionbar-btns .lu-btn-primary {
+  height: 44px;
+  padding: 0 20px;
+}
+.lu.dxe.is-new .dxe-actionbar-btns .lu-btn-primary[aria-disabled="true"]:hover {
+  background: var(--lu-acc);
+  border-color: var(--lu-acc);
 }
