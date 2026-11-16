@@ -82,7 +82,7 @@
 {% set h = section.status.health %}
 <span class="dx-devstatus is-{{ h }}">
   <span class="dx-dot is-{{ h }}" aria-hidden="true"></span>
-  {% if not section.capabilities.heartbeat %}{{ 'Not checked yet' if h == 'unknown' else ('Checked ' ~ section.status.relative) }}
+  {% if not section.get('capabilities', {}).get('heartbeat', true) %}{{ 'Not checked yet' if h == 'unknown' else ('Checked ' ~ section.status.relative) }}
   {% elif h == 'ok' %}online · seen {{ section.status.relative }}
   {% elif h == 'warn' %}quiet · seen {{ section.status.relative }}
   {% elif h == 'stale' %}stale · seen {{ section.status.relative }}
