@@ -253,6 +253,7 @@
         </div>
         {% endif %}
 
+        {% if section.calibration_url or section.picture_quality %}
         <div class="dx-grp" id="rendering" data-devsub>
           <div class="dx-grp-head">
             <h3 class="dx-grp-title">Rendering</h3>
@@ -320,6 +321,7 @@
           </div>
         </div>
 
+        {% endif %}
         {% for gname in _grouped|map(attribute='group')|unique %}
         <div class="dx-grp" id="grp-{{ gname|lower|replace(' ', '-') }}" data-devsub>
           <div class="dx-grp-head"><h3 class="dx-grp-title">{{ gname }}</h3></div>

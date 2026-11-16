@@ -568,7 +568,7 @@
   // ---- Transport segmented control (Add device card, issue #16) -------
   // Buttons inside [data-segmented-group]; clicking flips the active
   // button + swaps [hidden] on [data-transport-branch="rest|mqtt|
-  // opendisplay|visionect|samsung_frame|fraimic"]. Both branches stay in the DOM, so typed values in the
+  // opendisplay|visionect|samsung_frame|fraimic|meural"]. Branches stay in the DOM, so typed values in the
   // inactive branch are preserved across flips.
   function initSegmented(group) {
     const card = group.closest("[data-add-device-card]") || group;
@@ -582,6 +582,7 @@
       visionect: card.querySelector("[data-segmented-help-visionect]"),
       samsung_frame: card.querySelector("[data-segmented-help-samsung_frame]"),
       fraimic: card.querySelector("[data-segmented-help-fraimic]"),
+      meural: card.querySelector("[data-segmented-help-meural]"),
     };
     buttons.forEach(function (btn) {
       btn.addEventListener("click", function () {

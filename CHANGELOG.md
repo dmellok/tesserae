@@ -12,6 +12,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Add Netgear Meural local-network previews and quiet-hours sleep control.
+
 - Offer optional conditions when adding a dashboard to a lineup.
 - Widget choices can be shown as unavailable in the editors, with a reason, and can depend on saved cell options. The flag guides the editors only; saves are not checked against it.
 - The lineup editor shows display wake times and warns about renders between wakes.

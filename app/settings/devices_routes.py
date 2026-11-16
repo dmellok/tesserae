@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from flask import Response as FlaskResponse
-from flask import current_app, flash, redirect, request, session, url_for
+from flask import abort, current_app, flash, redirect, request, session, url_for
 from werkzeug.wrappers import Response
 
 from app import (
@@ -333,6 +333,8 @@ def devices_add() -> Response:
     renderer_loader.seed_device_settings_from_base(renderers(), settings_store())
     rebuild_transport_fn()()
     flash(f"Added device {result.device.name!r}.", "ok")
+    if result.device.kind_of == "meural":
+        return _device_page_redirect(result.device.id)
     return redirect(
         url_for(
             "auth.settings_area",
@@ -2148,6 +2150,22 @@ def devices_delete(instance_id: str) -> Response:
     rebuild_transport_fn()()
     flash(f"Deleted device {result.device.name!r}.", "ok")
     return redirect(url_for("auth.settings_area", area="devices"))
+
+
+@bp.before_request
+def _guard_device_capabilities() -> None:
+    from app.device_loader import supports_capability
+
+    if request.endpoint not in {
+        "auth.devices_calibrate",
+        "auth.devices_calibrate_apply",
+        "auth.devices_send_test_pattern",
+        "auth.devices_test_pattern_preview",
+    }:
+        return
+    device = devices().get((request.view_args or {}).get("instance_id", ""))
+    if device is not None and not supports_capability(device, "calibration"):
+        abort(400, description="This display does not support calibration.")
 
 
 @bp.post("/settings/devices/<instance_id>/calibrate")

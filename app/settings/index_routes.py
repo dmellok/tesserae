@@ -18,7 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from flask import current_app, flash, redirect, render_template, request, session, url_for
+from flask import abort, current_app, flash, redirect, render_template, request, session, url_for
 from werkzeug.wrappers import Response
 
 from app import backup as _backup_mod
@@ -36,7 +36,13 @@ from app import install_id as install_id_module
 from app import updater as _updater_mod
 from app.button_actions import DEFAULT_BUTTON_MAP, registered_actions
 from app.clock_text import clock_of
-from app.device_loader import Device, has_battery, has_buttons, uses_renderer_settings
+from app.device_loader import (
+    Device,
+    has_battery,
+    has_buttons,
+    supports_capability,
+    uses_renderer_settings,
+)
 from app.ha_options import is_ha_addon
 from app.network import detect_local_ip, docker_bridge_ip_warning, is_docker_bridge_ip, url_host
 from app.online import online_enabled
@@ -1499,9 +1505,45 @@ def _build_device_section(store: Any, device: Device) -> dict[str, Any] | None:
     # Keys the redesigned Devices tab (table row + quick panel) and the
     # per-device page read on top of the card-era dict above.
     kind = devices().get(str(device.kind_of))
+    section["capabilities"] = {
+        name: supports_capability(device, name)
+        for name in ("calibration", "wake_schedule", "firmware_updates", "device_logs", "heartbeat")
+    }
+    section["capabilities"]["battery"] = has_battery(device)
+    if not section["capabilities"]["calibration"]:
+        section["palette"] = None
+        section["colour_depth"] = None
+        for key in (
+            "calibrate_endpoint",
+            "calibrate_apply_endpoint",
+            "test_pattern_endpoint",
+            "test_pattern_preview_url",
+            "custom_image_upload_endpoint",
+            "custom_image_delete_endpoint",
+        ):
+            section[key] = None
+    if not section["capabilities"]["wake_schedule"]:
+        section["status"]["smart_sync"] = None
+        section["status"]["smart_sync_header"] = None
+    if not section["capabilities"]["firmware_updates"]:
+        section["status"]["firmware"] = None
+        section["status"]["ota"] = None
+        section["status"]["parsed"] = {
+            k: v for k, v in section["status"]["parsed"].items() if k != "fw_version"
+        }
+    if not section["capabilities"]["heartbeat"]:
+        section["status"]["relative"] = (
+            "Not checked yet"
+            if section["status"]["health"] == "unknown"
+            else section["status"]["relative"]
+        )
     section["kind_name"] = kind.name if kind is not None else str(device.kind_of)
     section["page_url"] = url_for("auth.device_page", instance_id=device.id)
-    section["calibration_url"] = url_for("auth.device_calibration", instance_id=device.id)
+    section["calibration_url"] = (
+        url_for("auth.device_calibration", instance_id=device.id)
+        if section["capabilities"]["calibration"]
+        else None
+    )
     section["preview_url"] = url_for("preview_png", device_id=device.id)
     section["mirror_url"] = url_for("mirror", device_id=device.id)
     section["touch_monitor_url"] = (
@@ -1512,7 +1554,9 @@ def _build_device_section(store: Any, device: Device) -> dict[str, Any] | None:
     section["has_controls"] = bool(section["button_map_capable"] or section["touch_monitor_url"])
     section["push_now_endpoint"] = url_for("auth.devices_push_now", instance_id=device.id)
     section["overview"] = _device_overview(device, section)
-    section["battery_card"] = _battery_card_or_none(device.id) if is_instance else None
+    section["battery_card"] = (
+        _battery_card_or_none(device.id) if is_instance and has_battery(device) else None
+    )
     section["lineup_names"] = _lineup_names_for(device.id, section["timetable_entries"])
     section["now_line"] = _now_line_for(device.id)
     section["lineup_rows"] = _lineup_rows_for(device.id) if is_instance else []
@@ -1873,7 +1917,11 @@ def device_page(instance_id: str) -> str | Response:
         return redirect(url_for("auth.settings_area", area="devices"))
     # Built here rather than in the shared section builder: it lists the
     # device's stored uploads, which only this page shows.
-    section["logs"] = _logs_view(str(section["device_id"]), request.args.get("log") or "")
+    section["logs"] = (
+        _logs_view(str(section["device_id"]), request.args.get("log") or "")
+        if section["capabilities"]["device_logs"]
+        else None
+    )
     return render_template(
         "device_page.html",
         section=section,
@@ -1895,6 +1943,8 @@ def device_calibration(instance_id: str) -> str | Response:
     if section is None:
         flash(f"Unknown device {instance_id!r}.", "error")
         return redirect(url_for("auth.settings_area", area="devices"))
+    if not section["capabilities"]["calibration"]:
+        abort(404)
     return render_template(
         "device_calibration.html",
         section=section,
@@ -2380,6 +2430,8 @@ def _transport_badge(device: Device) -> str:
     if device.transport == "rest":
         return "REST"
     if device.transport == "push":
+        if device.kind_of == "meural":
+            return "LAN"
         if samsung_frame.is_samsung_frame_device(device) or fraimic.is_fraimic_device(device):
             return "LAN"
         return "TCP" if visionect_routes.is_visionect_device(device) else "HA"

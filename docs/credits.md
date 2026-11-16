@@ -101,6 +101,8 @@ Widget data stays under its provider's terms. Required credits appear here and o
 
 ## Protocols and reference clients
 
+- **[GuySie/ha-meural](https://github.com/GuySie/ha-meural)**: Meural LAN protocol reference (MIT).
+
 - **[TRMNL](https://usetrmnl.com)**: The open bring-your-own-server protocol Tesserae's TRMNL path implements, and the idea of playlists behind rotations.
 - **[Terminus (byos_laravel)](https://github.com/usetrmnl/byos_laravel)**: TRMNL's reference server, which Tesserae's envelopes and access-token flow were checked against.
 - **[KOReader](https://github.com/koreader/koreader)**: The e-reader platform behind Kindle and Kobo support.

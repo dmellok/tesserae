@@ -61,6 +61,7 @@ Supported clients appear under Settings → Devices → Discovered after flashin
 | `esp32_client` | 800×480 | `esp32_bin` | Battery-powered ESP32 firmware that subscribes to tesserae/esp32/frame/bin (retained), paints the panel via SPI, and goes back to deep sleep. |
 | `fraimic` | 1440×2560 | `fraimic_bin` | Fraimic colour e-paper canvas (31.5" Large Canvas or 13.3"), driven over its local REST API with no app, cloud or firmware change. |
 | `koreader_client` | 758×1024 | `esp32_gray_bin`, `esp32_gray2_bin`, `esp32_bw_bin`, `kaleido_png` | Jailbroken Kindle, Kobo, and other e-readers running KOReader with the Tesserae plugin (dmellok/tesserae-koreader). |
+| `meural` | 1080×1920 | `pi_png` | Meural Canvas over the local network. |
 | `opendisplay` | 800×480 | `pi_png` | An OpenDisplay BLE e-paper tag, driven by the tesserae-opendisplay bridge. |
 | `opendisplay_ha` | 800×480 | `pi_png` | An OpenDisplay BLE e-paper tag driven through Home Assistant. |
 | `pi_bin_client` | 1424×1200 | `pi_bin` | Raspberry-Pi-side client that consumes the 4-bpp .bin frame. |
