@@ -116,8 +116,8 @@
   const formSaved = new Map();
   // Save a form now. A failure keeps the form on the retry list: its fields
   // still hold what the user typed, and the next flush sends them again.
-  function postForm(form) {
-    const p = post(form.action, new FormData(form));
+  function postForm(form, opts) {
+    const p = post(form.action, new FormData(form), opts);
     p.then(
       () => failedForms.delete(form),
       () => failedForms.add(form)
@@ -175,16 +175,13 @@
     return timers.size > 0 || inFlight > 0;
   }
 
-  // Leaving with a debounce still pending: send it with keepalive so it
-  // survives the navigation.
   function flushOnLeave() {
     const forms = new Set([...timers.keys(), ...failedForms]);
     timers.forEach((t) => clearTimeout(t));
     forms.forEach((form) => {
-      send(form.action, new FormData(form), { keepalive: true }).catch(() => {});
+      postForm(form, { keepalive: true }).catch(() => {});
     });
     timers.clear();
-    failedForms.clear();
   }
   window.addEventListener("pagehide", flushOnLeave);
   document.addEventListener("visibilitychange", () => {

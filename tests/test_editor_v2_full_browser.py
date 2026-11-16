@@ -147,6 +147,65 @@ def _type_zoom(page: Any, cell_id: str, value: str) -> None:
     )
 
 
+@pytest.mark.parametrize("event", ["visibilitychange", "pagehide"])
+def test_leaving_queues_latest_edit_after_in_flight_autosave(
+    server: tuple[str, Flask], pw: Any, event: str
+) -> None:
+    base, app = server
+    browser, page, errors = _open(pw, base)
+    try:
+        page.locator('.ev2-cl[data-cell-id="c1"] [data-ev2-row]').click()
+        # Hold the older request before it reaches the real server. A parallel
+        # leave-save would land first and then be overwritten when we release it.
+        page.evaluate(
+            """() => {
+              const send = window.fetch;
+              window.__latestSent = false;
+              window.fetch = async (url, opts) => {
+                if (url.endsWith('/cells/c1') && opts?.body instanceof FormData) {
+                  const label = opts.body.get('opt_label');
+                  if (label === 'Older') {
+                    await new Promise(resolve => { window.__releaseOlder = resolve; });
+                  }
+                  if (label === 'Latest') window.__latestSent = true;
+                }
+                return send(url, opts);
+              };
+              const input = document.getElementById('ev2-c1-opt-label');
+              input.value = 'Older';
+              EV2.saveForm(input.form, 0).catch(() => {});
+            }"""
+        )
+        page.wait_for_function("() => !!window.__releaseOlder")
+        page.evaluate(
+            """event => {
+              const input = document.getElementById('ev2-c1-opt-label');
+              input.value = 'Latest';
+              EV2.saveForm(input.form, 10000).catch(() => {});
+              if (event === 'visibilitychange') {
+                Object.defineProperty(document, 'visibilityState', {value: 'hidden'});
+                document.dispatchEvent(new Event(event));
+              } else window.dispatchEvent(new Event(event));
+            }""",
+            event,
+        )
+        # If the latest request bypassed the chain, let its real write finish
+        # before releasing Older. If it was queued, it cannot have been sent.
+        if page.evaluate("() => window.__latestSent"):
+            _wait_for(
+                lambda: _cell(app, PAGE_ID, "c1").options.get("label") == "Latest",
+                "the parallel leave-save to land",
+                page=page,
+            )
+        page.evaluate("() => window.__releaseOlder()")
+        page.wait_for_function("() => window.__latestSent", timeout=5000)
+        page.evaluate("() => EV2.flush()")
+        assert _cell(app, PAGE_ID, "c1").options.get("label") == "Latest"
+        assert not errors
+    finally:
+        browser.close()
+
+
 def test_pending_autosave_and_resize_both_survive(server: tuple[str, Flask], pw: Any) -> None:
     base, app = server
     browser, page, errors = _open(pw, base)
