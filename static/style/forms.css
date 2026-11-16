@@ -2999,6 +2999,99 @@ input[type="range"].slider:focus::-moz-range-thumb {
   font-size: var(--t-size-sm, var(--t-size-xs));
   color: var(--t-muted);
 }
+/* A choice that can't work for this setup (``disabled`` with a ``reason``):
+   its picture greyed, its name kept readable, the reason under it. It can
+   still be focused, so the reason is read out, but not chosen. */
+.pic-opt.is-disabled,
+.pic-opt.is-disabled:hover {
+  cursor: not-allowed;
+  background: transparent;
+  border-color: transparent;
+  color: var(--t-fg-soft);
+}
+.pic-opt-text.is-disabled,
+.pic-opt-text.is-disabled:hover {
+  flex-direction: column;
+  border-color: var(--t-border);
+}
+.pic-opt.is-disabled img {
+  filter: grayscale(1);
+  opacity: 0.45;
+}
+.pic-opt.is-disabled[aria-selected="true"] {
+  border-color: var(--t-border-strong);
+  background: var(--t-surface-soft);
+}
+.pic-why {
+  display: block;
+  overflow-wrap: normal;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--t-muted);
+}
+.pic-why .ph {
+  margin-right: 3px;
+  font-size: 12px;
+  vertical-align: -2px;
+}
+/* the full reasons, under the grid */
+.pic-whys {
+  display: grid;
+  gap: var(--t-space-1);
+  margin: 0;
+  padding: var(--t-space-2) 0 0;
+  border-top: 1px solid var(--t-border);
+  list-style: none;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--t-fg-soft);
+}
+.pic-whys li {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.pic-whys .ph {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--t-muted);
+}
+.pic-whys b {
+  font-weight: 600;
+  color: var(--t-fg);
+}
+.pic-trigger.is-unavailable .pic-thumb img {
+  filter: grayscale(1);
+  opacity: 0.5;
+}
+.pic-trigger.is-unavailable .pic-current {
+  color: var(--t-fg-soft);
+}
+/* The saved value is a disabled choice: it is kept, and this says why it
+   won't work. Icon and words, not colour alone. */
+.field-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: var(--t-space-1) 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--t-fg-soft);
+}
+.field-warn[hidden] {
+  display: none;
+}
+.field-warn .ph {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  font-size: 14px;
+  color: var(--t-warn);
+}
+/* the refreshable wrapper around a field whose choices follow another option */
+.opt-choices {
+  display: contents;
+}
 /* each picture's corner button opens it large; shown on hover and focus,
    and always where there is no hover to show it */
 .pic-cell {

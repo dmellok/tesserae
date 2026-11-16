@@ -1130,6 +1130,8 @@
     const boxOf = (o) => o.closest(".pic-cell") || o;
     const visibleOpts = (f) =>
       Array.from(f.querySelectorAll(".pic-opt")).filter((o) => !boxOf(o).hidden);
+    // a choice the widget marked disabled is shown, with its reason, never chosen
+    const isOff = (o) => o.getAttribute("aria-disabled") === "true";
 
     function sync(f) {
       const sel = native(f);
@@ -1143,6 +1145,8 @@
       const opt = sel.options[sel.selectedIndex];
       const label = f.querySelector("[data-pic-current-label]");
       if (label) label.textContent = opt ? opt.textContent : "";
+      const trig = trigger(f);
+      if (trig) trig.classList.toggle("is-unavailable", !!(chosen && isOff(chosen)));
       const thumb = f.querySelector("[data-pic-current-thumb]");
       if (thumb) {
         const src = chosen && chosen.dataset.picImage;
@@ -1179,7 +1183,7 @@
     }
     function choose(f, o) {
       const sel = native(f);
-      if (!sel) return;
+      if (!sel || isOff(o)) return;
       if (sel.value !== o.dataset.picValue) {
         sel.value = o.dataset.picValue;
         sel.dispatchEvent(new Event("input", { bubbles: true }));
@@ -1256,11 +1260,14 @@
       img.alt = name;
       view.el.setAttribute("aria-label", name);
       view.el.querySelector("[data-pv-name]").textContent = name;
-      view.el.querySelector("[data-pv-pos]").textContent = `${view.at + 1} of ${view.pics.length}`;
       const use = view.el.querySelector("[data-pv-use]");
       const chosen = o.getAttribute("aria-selected") === "true";
-      use.textContent = chosen ? "Chosen" : "Choose";
-      use.disabled = chosen;
+      const off = isOff(o);
+      use.textContent = chosen ? "Chosen" : off ? "Not available" : "Choose";
+      use.disabled = chosen || off;
+      const why = o.dataset.picWhy || (off ? "Not available here" : "");
+      view.el.querySelector("[data-pv-pos]").textContent =
+        `${view.at + 1} of ${view.pics.length}` + (why ? ` · ${why}` : "");
       // the one after is fetched ahead, so stepping is instant
       const next = view.pics[(view.at + 1) % view.pics.length];
       if (next && next !== o) new Image().src = next.dataset.picLarge;
@@ -1351,7 +1358,8 @@
       const at = opts.indexOf(ev.target);
       if (ev.key === "Enter" && ev.target.matches("[data-pic-filter]") && opts.length) {
         ev.preventDefault();
-        choose(f, opts[0]);
+        const first = opts.find((o) => !isOff(o));
+        if (first) choose(f, first);
         return;
       }
       const grid = f.querySelector(".pic-grid");
@@ -1367,6 +1375,25 @@
       }
     });
   })();
+
+  // A select whose saved value is a disabled choice keeps it (selected and
+  // submitted) with a warning under the field. Once something else is picked
+  // the warning goes and the disabled choice can't be picked back.
+  document.addEventListener("change", (ev) => {
+    const sel = ev.target;
+    if (!(sel instanceof HTMLSelectElement)) return;
+    const field = sel.closest(".field");
+    const warn = field && field.querySelector("[data-choice-warn]");
+    if (!warn) return;
+    const opt = sel.options[sel.selectedIndex];
+    const off = !!(opt && opt.hasAttribute("data-choice-disabled"));
+    warn.hidden = !off;
+    if (!off) {
+      sel.querySelectorAll("option[data-choice-disabled]").forEach((o) => {
+        o.disabled = true;
+      });
+    }
+  });
 
   // A clock time in the app's style (window.TESSERAE_TIME_CYCLE, from the
   // locale): "3:48 PM" / "15:48"; whole hours drop ":00" in 12-hour ("11 PM"),

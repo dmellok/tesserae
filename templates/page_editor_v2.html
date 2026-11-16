@@ -104,7 +104,7 @@
     changed means no line. -#}
 {% macro cell_summary(cell, plugin) -%}
 {% set ns = namespace(out='') %}
-{% for opt in plugin_cell_options.get(plugin.id, []) if not ns.out and not opt.get('advanced') and opt.name in cell.options %}
+{% for opt in (cell_option_specs.get(cell.id) or plugin_cell_options.get(plugin.id, [])) if not ns.out and not opt.get('advanced') and opt.name in cell.options %}
   {% set t = opt.get('type', 'string') %}
   {% if t not in ('boolean', 'switch', 'textarea', 'variables_textarea', 'entity_overrides', 'location_search', 'color', 'server_colour', 'days') and not opt.get('secret') and not opt.get('mask') %}
     {% set v = cell.options.get(opt.name) %}
@@ -176,7 +176,7 @@
   <p class="ev2-wsub">{{ entry.desc }}</p>
   {% endif %}
   {% if plugin %}
-  {% set cell_opts = plugin_cell_options.get(plugin.id, []) %}
+  {% set cell_opts = cell_option_specs.get(cell.id) or plugin_cell_options.get(plugin.id, []) %}
   {% set secs = option_sections(cell_opts, cell.options) %}
   {#- A choices provider that can't list anything (Home Assistant not set up
       or unreachable) answers with one blank row whose label says why. Say
