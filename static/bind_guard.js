@@ -2,7 +2,7 @@
  * bound to (see bind_prompt.js). The server refuses such a save without
  * consent, so this only has to ask: it checks the picked dashboards against
  * the picked displays, shows the prompt, and submits again with the answer as
- * hidden `bind_pages` / `bind_also` fields. Cancelling saves nothing.
+ * hidden `bind_pages` / `bind_also` / `bind_keep` fields. Cancelling saves nothing.
  *
  * Opt in with `data-bind-guard` (+ `data-bind-check-url`) on a form that has `page_id` (and optionally
  * `fallback_page_id`) selects and `device_ids` checkboxes. A form with no
@@ -50,12 +50,11 @@
             if (!mode) return;
             form.querySelectorAll("input[data-bind-consent]").forEach((n) => n.remove());
             res.unbound_pages.forEach((p) => {
-              const names = mode === "also" ? ["bind_pages", "bind_also"] : ["bind_pages"];
-              names.forEach((name) => {
+              window.TesseraeBindPrompt.fields(mode, p.id).forEach(([name, value]) => {
                 const i = document.createElement("input");
                 i.type = "hidden";
                 i.name = name;
-                i.value = p.id;
+                i.value = value;
                 i.dataset.bindConsent = "1";
                 form.appendChild(i);
               });

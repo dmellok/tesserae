@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 from collections.abc import Iterator
 from pathlib import Path
@@ -1306,7 +1307,7 @@ def test_move_stages_shows_pending_saves_and_cancel_and_discard_reset(
         # Confirm asks to bind the dashboards, then only stages it.
         dlg = _open_move(page)
         dlg.locator("[data-ok]").click()
-        page.locator("dialog.bind-dialog:not(.dxe-move-dialog) button.primary").click()
+        _bind_move(page)
         page.locator("#dxe-loc .is-pending").wait_for()
         assert _loc(page).startswith("Moving to tv")
         assert page.locator(state).inner_text() == "Unsaved changes"
@@ -1320,7 +1321,7 @@ def test_move_stages_shows_pending_saves_and_cancel_and_discard_reset(
         # Undo drops it too.
         dlg = _open_move(page)
         dlg.locator("[data-ok]").click()
-        page.locator("dialog.bind-dialog:not(.dxe-move-dialog) button.primary").click()
+        _bind_move(page)
         page.locator("[data-move-undo]").click()
         assert _loc(page).startswith("On hall")
         assert page.locator(state).inner_text() == "All changes saved"
@@ -1328,13 +1329,24 @@ def test_move_stages_shows_pending_saves_and_cancel_and_discard_reset(
         dlg = _open_move(page)
         dlg.locator("[data-ok]").click()
         page.locator("dialog.bind-dialog:not(.dxe-move-dialog)").wait_for(state="visible")
-        page.locator("dialog.bind-dialog:not(.dxe-move-dialog) button.primary").click()
+        _bind_move(page)
         _save(page)
         assert store.get("morning").device_ids == ["tv"]
         assert app.config["PAGE_STORE"].get("weather").device_ids == ["tv"]
         assert _loc(page).startswith("On tv")
         assert errors == []
         browser.close()
+
+
+def _bind_move(page: Any) -> None:
+    """Answer the bind prompt with a move: untick every display but the
+    lineup's own (they start ticked, which keeps them), then confirm."""
+    dlg = page.locator("dialog.bind-dialog:not(.dxe-move-dialog)")
+    dlg.wait_for(state="visible")
+    for box in dlg.locator(".bind-row:not(.is-target) input").all():
+        box.uncheck()
+    dlg.get_by_role("button", name=re.compile(r"^Move to ")).click()
+    dlg.wait_for(state="detached")
 
 
 def test_move_cancelled_at_the_bind_prompt_stays_put(real: tuple[str, Flask]) -> None:
@@ -1345,7 +1357,9 @@ def test_move_cancelled_at_the_bind_prompt_stays_put(real: tuple[str, Flask]) ->
         browser, page, errors = _open(p, base, "/decks/morning/edit")
         dlg = _open_move(page)
         dlg.locator("[data-ok]").click()
-        page.locator("dialog.bind-dialog:not(.dxe-move-dialog) button.ghost").click()
+        page.locator("dialog.bind-dialog:not(.dxe-move-dialog)").get_by_role(
+            "button", name="Cancel"
+        ).click()
         page.locator("dialog.bind-dialog:not(.dxe-move-dialog)").wait_for(state="detached")
         assert _loc(page).startswith("On hall")
         assert page.locator("#dxe-save-state").inner_text() == "All changes saved"

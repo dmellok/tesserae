@@ -2184,14 +2184,12 @@ main.page.dxe-page {
   }
 }
 
-/* "Bind to this display?" prompt (static/bind_prompt.js), on the wizard's
-   dialog shell. */
+/* "Show it on this display?" prompt (static/bind_prompt.js), on the wizard's
+   dialog shell. One row per display, ticked = the dashboard stays there.
+   The Move dialog (.dxe-move-dialog) borrows .bind-dialog for its width and
+   body padding only. */
 .bind-dialog {
-  width: min(460px, calc(100vw - 24px));
-}
-.bind-dialog .wizard-head-icon {
-  background: color-mix(in oklab, var(--t-warn) 16%, var(--t-surface));
-  color: color-mix(in oklab, var(--t-warn) 75%, var(--t-fg));
+  width: min(480px, calc(100vw - 24px));
 }
 .bind-dialog-body {
   display: flex;
@@ -2200,23 +2198,194 @@ main.page.dxe-page {
   padding: 2px 18px 16px;
   font-size: 13.5px;
   line-height: 1.5;
+  overflow-y: auto;
+  min-height: 0;
 }
 .bind-dialog-body p {
   margin: 0;
   max-width: 62ch;
 }
+.bind-dialog .bind-dialog-lead {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--t-fg-soft);
+}
+.bind-dialog-set {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.bind-dialog-legend {
+  padding: 0;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t-muted);
+}
+.bind-dialog-rows {
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-md, 10px);
+  overflow: hidden;
+}
+.bind-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.14s;
+}
+.bind-row + .bind-row {
+  border-top: 1px solid color-mix(in oklab, var(--t-border) 70%, transparent);
+}
+.bind-row:hover {
+  background: color-mix(in oklab, var(--t-fg) 3.5%, transparent);
+}
+.bind-row:has(input:focus-visible) {
+  background: color-mix(in oklab, var(--t-accent) 6%, var(--t-surface));
+}
+.bind-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  flex: none;
+  accent-color: var(--t-accent);
+  cursor: pointer;
+}
+.bind-row.is-target {
+  cursor: default;
+  background: color-mix(in oklab, var(--t-accent) 5%, var(--t-surface));
+}
+.bind-row.is-target input[type="checkbox"] {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+.bind-row-shape {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  color: var(--t-fg-soft);
+}
+.bind-row-shape-frame {
+  display: block;
+  border: 1.5px solid currentColor;
+  border-radius: 2.5px;
+  box-sizing: border-box;
+}
+.bind-row-shape-frame.is-unknown {
+  width: 18px;
+  height: 18px;
+  border-style: dashed;
+}
+.bind-row-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.bind-row-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 550;
+  color: var(--t-fg);
+}
+.bind-row-meta {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  color: var(--t-muted);
+  font-variant-numeric: tabular-nums;
+}
+.bind-row-state {
+  flex: none;
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--t-muted);
+}
+.bind-row-state:empty {
+  display: none;
+}
+.bind-row.is-target .bind-row-state {
+  color: var(--t-accent-ink, var(--t-accent));
+}
+.bind-row.is-off .bind-row-name {
+  color: var(--t-muted);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in oklab, var(--t-muted) 60%, transparent);
+}
+.bind-row.is-off .bind-row-shape {
+  opacity: 0.5;
+}
+.bind-row.is-off .bind-row-state {
+  color: var(--t-pill-warn-fg, var(--t-warn));
+}
+:root[data-theme="dark"] .bind-row.is-target .bind-row-state {
+  color: var(--t-accent);
+}
+:root[data-theme="dark"] .bind-row.is-off .bind-row-state {
+  color: var(--t-warn);
+}
+.bind-row.is-nudged input[type="checkbox"] {
+  animation: bind-nudge 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes bind-nudge {
+  0%,
+  100% {
+    transform: none;
+  }
+  30% {
+    transform: translateX(-3px);
+  }
+  65% {
+    transform: translateX(2px);
+  }
+}
+.bind-dialog-summary {
+  color: var(--t-fg);
+}
+.bind-dialog .bind-dialog-hint {
+  padding: 8px 10px;
+  border-radius: var(--t-radius-sm, 6px);
+  background: var(--t-pill-warn-bg, var(--t-warn-bg));
+  color: var(--t-pill-warn-fg, var(--t-fg));
+  font-size: 12.5px;
+}
+.bind-dialog .bind-dialog-hint:empty {
+  display: none;
+}
+:root[data-theme="dark"] .bind-dialog .bind-dialog-hint {
+  background: color-mix(in oklab, var(--t-warn) 16%, var(--t-surface));
+  color: var(--t-fg);
+}
 .bind-dialog-note {
   color: var(--t-fg-soft);
   font-size: 12.5px;
 }
-.bind-dialog-list {
-  margin: 0;
-  padding-left: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+.bind-dialog .wizard-footer button {
+  min-height: 36px;
+}
+.bind-dialog-ok {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 /* The Move dialog (deck_editor.js askMove): the warn tint, not red. */
+.dxe-move-dialog {
+  width: min(460px, calc(100vw - 24px));
+}
+.dxe-move-dialog .wizard-head-icon {
+  background: color-mix(in oklab, var(--t-warn) 16%, var(--t-surface));
+  color: color-mix(in oklab, var(--t-warn) 75%, var(--t-fg));
+}
 .dxe-move-dialog .dxe-move-lines {
   display: flex;
   flex-direction: column;
@@ -2238,15 +2407,46 @@ html .dxe-move-dialog .wizard-footer button.primary.dxe-caution {
 html .dxe-move-dialog .wizard-footer button.primary.dxe-caution:hover {
   background: color-mix(in oklab, var(--t-warn) 42%, var(--t-surface));
 }
+/* Phone: a bottom sheet with 44px targets. Cancel stays left of the one
+   button, in the order Tab goes. */
 @media (max-width: 480px) {
-  .bind-dialog .wizard-footer {
+  .bind-dialog:not(.dxe-move-dialog) {
+    width: 100vw;
+    max-width: 100vw;
+    max-height: min(88vh, 88dvh);
+    margin: auto 0 0;
+    border-radius: var(--t-radius-lg, 16px) var(--t-radius-lg, 16px) 0 0;
+  }
+  .bind-dialog:not(.dxe-move-dialog) .wizard-footer {
+    padding-bottom: max(11px, env(safe-area-inset-bottom));
+  }
+  .bind-dialog:not(.dxe-move-dialog) .wizard-footer button {
+    min-height: 44px;
+  }
+  .bind-dialog:not(.dxe-move-dialog) .bind-dialog-ok {
+    flex: 1 1 auto;
+  }
+  .bind-row {
+    min-height: 56px;
+  }
+  .dxe-move-dialog .wizard-footer {
     flex-wrap: wrap;
   }
-  .bind-dialog .wizard-footer-spacer {
+  .dxe-move-dialog .wizard-footer-spacer {
     display: none;
   }
-  .bind-dialog .wizard-footer button {
+  .dxe-move-dialog .wizard-footer button {
     flex: 1 1 100%;
+  }
+}
+@media (pointer: coarse) {
+  .bind-dialog .wizard-footer button {
+    min-height: 44px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bind-row.is-nudged input[type="checkbox"] {
+    animation: none;
   }
 }
 

@@ -371,8 +371,10 @@ def test_every_page_puts_links_left_of_buttons(
 def test_bind_prompt_buttons_read_the_same_way_they_tab(
     live: tuple[str, Flask], width: int
 ) -> None:
-    """Cancel first, the primary last, on a phone too (the dialog used to move
-    Cancel to the bottom with CSS `order`, which left Tab going the other way)."""
+    """Cancel (a link) first, the one primary last, on a phone too (the dialog
+    used to move Cancel to the bottom with CSS `order`, which left Tab going
+    the other way). On a phone the footer stays one row: link left, button
+    right."""
     from playwright.sync_api import sync_playwright
 
     base, app = live
@@ -388,14 +390,14 @@ def test_bind_prompt_buttons_read_the_same_way_they_tab(
             foot = page.locator("dialog.bind-dialog .wizard-footer button")
             foot.first.wait_for()
             labels = [b.inner_text().strip() for b in foot.all()]
-            assert labels[0] == "Cancel" and labels[-1].startswith("Bind to ") and len(labels) == 3
+            assert labels == ["Cancel", "Show on 2 displays"], labels
+            assert "primary" in (foot.last.get_attribute("class") or "")
             page.wait_for_timeout(500)  # the dialog eases in; measure it at rest
             boxes = page.evaluate(
                 """() => [...document.querySelectorAll('dialog.bind-dialog .wizard-footer button')]
                     .map((b) => { const r = b.getBoundingClientRect(); return [r.left, r.top]; })"""
             )
-            axis = 1 if width < 480 else 0  # stacked on a phone, in a row otherwise
-            along = [b[axis] for b in boxes]
+            along = [b[0] for b in boxes]  # one row at every width
             assert along == sorted(along), boxes
             assert page.evaluate(_SWEEP_JS) == []
         finally:

@@ -6,7 +6,8 @@ fails on every fire ("dashboard targets none of the requested device(s)").
 Every write path that can put a dashboard on a display goes through here:
 it names the dashboards that would be stranded, and refuses unless the
 caller consented to bind them (``bind_pages``, optionally ``bind_also`` to
-keep the dashboard's other display). Nothing is ever bound silently.
+keep the dashboard's other displays, or ``bind_keep`` to keep only some of
+them). Nothing is ever bound silently.
 
 A dashboard bound to no display at all is not stranded: the existing
 "adding one binds it" rule for unassigned dashboards is unchanged.
@@ -14,6 +15,7 @@ A dashboard bound to no display at all is not stranded: the existing
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
@@ -25,24 +27,56 @@ CODE = "pages_not_bound"
 
 @dataclass(frozen=True)
 class Consent:
-    """Dashboards the caller agreed to bind. ``also`` keeps their other
-    display (bound to both); the rest move to the lineup's display."""
+    """Dashboards the caller agreed to bind. ``also`` keeps all their other
+    displays; ``keep`` (page id -> display ids) keeps just those of them,
+    which is how the bind prompt's per-display checkboxes arrive; the rest
+    move to the lineup's display."""
 
     pages: frozenset[str] = frozenset()
     also: frozenset[str] = frozenset()
+    keep: Mapping[str, frozenset[str]] = field(default_factory=dict)
 
     def covers(self, page_id: str) -> bool:
-        return page_id in self.pages or page_id in self.also
+        return page_id in self.pages or page_id in self.also or page_id in self.keep
+
+    def kept(self, page_id: str, current: Iterable[str]) -> list[str]:
+        """Which of the dashboard's ``current`` displays it stays on."""
+        current = list(current)
+        if page_id in self.keep:
+            return [d for d in current if d in self.keep[page_id]]
+        return current if page_id in self.also else []
 
     @classmethod
     def from_form(cls, form: Any) -> Consent:
         also = frozenset(_ids(form.getlist("bind_also")))
-        return cls(frozenset(_ids(form.getlist("bind_pages"))) | also, also)
+        keep = _keep(form.getlist("bind_keep"))
+        return cls(frozenset(_ids(form.getlist("bind_pages"))) | also | set(keep), also, keep)
 
     @classmethod
     def from_json(cls, body: Mapping[str, Any]) -> Consent:
         also = frozenset(_ids(body.get("bind_also")))
-        return cls(frozenset(_ids(body.get("bind_pages"))) | also, also)
+        keep = _keep(body.get("bind_keep"))
+        return cls(frozenset(_ids(body.get("bind_pages"))) | also | set(keep), also, keep)
+
+
+def _keep(raw: Any) -> dict[str, frozenset[str]]:
+    """``bind_keep``: a ``{page id: [display ids]}`` object, a JSON string of
+    one, or a list of either (a form sends one field per dashboard). Bad
+    entries are ignored; an empty list keeps none (the same as a move)."""
+    items = raw if isinstance(raw, list) else [raw]
+    out: dict[str, set[str]] = {}
+    for item in items:
+        if isinstance(item, str):
+            try:
+                item = json.loads(item)
+            except ValueError:
+                continue
+        if not isinstance(item, Mapping):
+            continue
+        for pid, ids in item.items():
+            if isinstance(ids, list):
+                out.setdefault(str(pid).strip(), set()).update(_ids(ids))
+    return {pid: frozenset(ids) for pid, ids in out.items() if pid}
 
 
 @dataclass
@@ -176,7 +210,8 @@ def flash_text(display_ids: list[str], pages: list[Stranded], *, retry: bool = T
 
 def apply_consent(display_ids: list[str], page_ids: Iterable[str], consent: Consent) -> None:
     """Bind the consented, stranded dashboards. ``bind_also`` ones keep their
-    other displays; the rest move to the lineup's displays."""
+    other displays, ``bind_keep`` ones keep the listed ones; the rest move to
+    the lineup's displays."""
     store = current_app.config["PAGE_STORE"]
     for s in stranded_pages(display_ids, page_ids):
         if not consent.covers(s.page_id):
@@ -184,5 +219,5 @@ def apply_consent(display_ids: list[str], page_ids: Iterable[str], consent: Cons
         page = store.get(s.page_id)
         if page is None:
             continue
-        keep = list(page.device_ids) if s.page_id in consent.also else []
+        keep = consent.kept(s.page_id, page.device_ids)
         store.save(page.model_copy(update={"device_ids": _unique([*keep, *display_ids])}))

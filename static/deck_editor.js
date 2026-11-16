@@ -150,7 +150,7 @@
     msg: "",
     msgKind: "",
     justDay: null,
-    consent: {}, // page id -> "move" | "also", for the display chosen
+    consent: {}, // page id -> the bind prompt's answer ({mode, modes, keep}), for the display chosen
     consentDisplay: S.display,
   };
   const snapshot = () => JSON.stringify(Object.assign({}, st, { whenChanged: false }));
@@ -492,8 +492,7 @@
   function consentFields(fd) {
     st.steps.forEach((s) => {
       if (!strandedFor(s.id, st.display) || !ui.consent[s.id]) return;
-      fd.append("bind_pages", s.id);
-      if (ui.consent[s.id] === "also") fd.append("bind_also", s.id);
+      window.TesseraeBindPrompt.fields(ui.consent[s.id], s.id).forEach(([k, v]) => fd.append(k, v));
     });
   }
 

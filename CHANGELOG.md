@@ -6,6 +6,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+- Choose which displays keep a dashboard when binding it; keep all by default.
+
 - Pick dashboards in a popup with previews shaped for the display.
 
 - Add dashboards to a new lineup in one click.

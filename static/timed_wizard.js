@@ -573,8 +573,7 @@
     // Consent the user gave in the bind prompt on the previous attempt.
     if (bind) {
       bind.pages.forEach((p) => {
-        body.append("bind_pages", p.id);
-        if (bind.mode === "also") body.append("bind_also", p.id);
+        window.TesseraeBindPrompt.fields(bind.mode, p.id).forEach(([k, v]) => body.append(k, v));
       });
     }
 
