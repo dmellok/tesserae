@@ -1214,6 +1214,7 @@ def _build_device_section(store: Any, device: Device) -> dict[str, Any] | None:
         # operator's to pick (see ``_palette_view``); None hides it.
         "palette": _palette_view(device) if is_instance else None,
         "opendisplay_delivery": _opendisplay_delivery(device) if is_instance else None,
+        "meural_account": _meural_account_view(device) if is_instance else None,
         "delete_endpoint": (
             url_for("auth.devices_delete", instance_id=device.id) if is_instance else None
         ),
@@ -1537,6 +1538,17 @@ def _build_device_section(store: Any, device: Device) -> dict[str, Any] | None:
             if section["status"]["health"] == "unknown"
             else section["status"]["relative"]
         )
+    if device.kind_of == "meural":
+        from app.meural_schedule import DAYS, schedule_view
+
+        sleep = schedule_view(current_app, device)
+        sleep["refresh_url"] = url_for("auth.meural_sleep_refresh", instance_id=device.id)
+        sleep["edit_url"] = url_for("auth.meural_sleep", instance_id=device.id)
+        sleep["last_synced"] = _clock_hhmm(sleep.get("synced_at")) or "Not synced yet"
+        sleep["day_choices"] = DAYS
+        section["meural_sleep"] = sleep
+        if sleep["available"]:
+            section["quiet_hours_endpoint"] = None
     section["kind_name"] = kind.name if kind is not None else str(device.kind_of)
     section["page_url"] = url_for("auth.device_page", instance_id=device.id)
     section["calibration_url"] = (
@@ -2411,6 +2423,31 @@ def _device_meta_block(device: Device, is_instance: bool) -> dict[str, Any]:
 _TRANSPORT_BADGE = {"rest": "REST", "mqtt": "MQTT", "push": "HA"}
 
 
+def _meural_account_view(device: Device) -> dict[str, Any] | None:
+    if device.kind_of != "meural":
+        return None
+    cfg = (settings_store().get_section("devices") or {}).get(device.id) or {}
+    from app.meural_cloud import delivery_for_device
+
+    delivery = delivery_for_device(current_app, device)
+    return {
+        "signed_in": bool(cfg.get("meural_refresh_token_secret"))
+        and not cfg.get("meural_auth_failed"),
+        "expired": bool(cfg.get("meural_auth_failed")),
+        "has_session": bool(cfg.get("meural_refresh_token_secret")),
+        "email": cfg.get("meural_email", ""),
+        "frames": cfg.get("meural_devices", []),
+        "selected": str(cfg.get("cloud_device_id") or ""),
+        "login_url": url_for("auth.meural_login", instance_id=device.id),
+        "logout_url": url_for("auth.meural_logout", instance_id=device.id),
+        "frame_url": url_for("auth.meural_select_frame", instance_id=device.id),
+        "manage_url": url_for("auth.meural_manage", instance_id=device.id),
+        "paused": bool(cfg.get("meural_management_paused")),
+        "held": bool(delivery and delivery[0].held(delivery[1]))
+        or (Path(device.data_dir) / "meural_sleep.json").is_file(),
+    }
+
+
 def _transport_switchable(device: Device) -> bool:
     """Whether the instance's kind has a client that could follow a
     switch to MQTT (see ``device_service.transport_switchable``)."""
@@ -2431,7 +2468,8 @@ def _transport_badge(device: Device) -> str:
         return "REST"
     if device.transport == "push":
         if device.kind_of == "meural":
-            return "LAN"
+            cfg = (settings_store().get_section("devices") or {}).get(device.id) or {}
+            return "LAN" if cfg.get("delivery_method") == "local" else "Cloud"
         if samsung_frame.is_samsung_frame_device(device) or fraimic.is_fraimic_device(device):
             return "LAN"
         return "TCP" if visionect_routes.is_visionect_device(device) else "HA"

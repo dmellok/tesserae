@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Sign in to Meural - Tesserae</title>
+  <style nonce="{{ nonce }}">
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 24px; background: Canvas; color: CanvasText; }
+    main { max-width: 440px; margin: 5vh auto; }
+    h1 { margin: 28px 0 12px; font-size: 1.5rem; }
+    p { line-height: 1.5; }
+    label { display: block; margin-top: 20px; font-weight: 600; }
+    input { width: 100%; margin-top: 8px; padding: 12px; border: 1px solid GrayText;
+            border-radius: 8px; background: Field; color: FieldText; font: inherit; }
+    button { width: 100%; margin-top: 24px; padding: 12px; border: 1px solid ButtonText;
+             border-radius: 8px; background: ButtonFace; color: ButtonText; font: inherit; cursor: pointer; }
+    button:hover { background: Highlight; color: HighlightText; }
+    button:disabled { opacity: .55; cursor: wait; }
+    :focus-visible { outline: 2px solid Highlight; outline-offset: 3px; }
+    a { color: LinkText; text-underline-offset: .15em; }
+    #code-form, #done { display: none; }
+    #status { min-height: 1.5em; margin-top: 20px; }
+    .hint { font-size: .9rem; }
+    .error { color: light-dark(#a51c23, #ff9b9f); }
+  </style>
+</head>
+<body>
+<main data-meural-login>
+  <a href="{{ return_url }}">Back to {{ device_name }}</a>
+  <section id="login">
+    <h1>Sign in to Meural</h1>
+    <p class="hint">Your password and verification code go directly to Netgear. Tesserae saves an encrypted session and renews it automatically.</p>
+    <form id="login-form">
+      <label>Email<input id="email" type="email" autocomplete="username" maxlength="320" required></label>
+      <label>Password<input id="password" type="password" autocomplete="current-password" required></label>
+      <button id="login-button" type="submit">Sign in with Netgear</button>
+    </form>
+    <form id="code-form">
+      <label>Verification code<input id="code" type="text" autocomplete="one-time-code" inputmode="numeric" required></label>
+      <button id="code-button" type="submit">Verify</button>
+    </form>
+    <p id="status" role="status" aria-live="polite"></p>
+    <p class="hint">If Netgear blocks this connection, open this page on a phone using mobile data.</p>
+    <a href="" id="restart-link" hidden>Start again</a>
+  </section>
+  <section id="done">
+    <h1>Signed in</h1>
+    <p>Your Meural session is saved.</p>
+    <a href="{{ return_url }}" id="return-link">Return to display settings</a>
+  </section>
+</main>
+<script id="meural-auth-config" type="application/json" nonce="{{ nonce }}">{{ auth_config|tojson }}</script>
+<script src="{{ url_for('static', filename='meural-login.js') }}" nonce="{{ nonce }}" defer></script>
+</body>
+</html>

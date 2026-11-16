@@ -28,9 +28,16 @@ Beyond the aggregate `api.tesserae.ink` requests described above, the app does n
 - Secrets, including passwords, tokens and API keys
 - Push contents or anything tied to a real-world identity
 
-This list covers the app itself, not the widgets you install.
+This list excludes optional device connections such as Meural and the widgets you install.
 
 ## Netgear Meural
+
+Cloud Meural delivery uploads dashboard images to Netgear. Calendar entries, photos
+and any other details visible on a dashboard are included in that image.
+Your password and verification code go from your browser to Netgear; Tesserae
+stores encrypted access and refresh tokens. Signing out or deleting the device
+removes those tokens and attempts to remove Tesserae uploads from your library.
+Uploads may remain if Netgear cannot be reached.
 
 Local Meural previews send dashboard images only to the frame on your LAN.
 If its address changes while Tesserae has put it to sleep, wake it in the Meural app.

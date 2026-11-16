@@ -3,10 +3,8 @@
   "name": "Netgear Meural",
   "icon": "device-tablet",
   "version": "0.1.0",
-  "description": "Meural Canvas over the local network. Enter the frame's IP address from its app or router. Tesserae needs no cloud login or firmware changes. It sends the current page as a temporary preview and renews it while running. When Tesserae stops, the frame returns to its own artwork after the preview expires. Quiet hours can put the frame to sleep; Tesserae wakes it afterward only if it put it to sleep. Frames asleep from their own controls or light sensor stay asleep.",
-  "renderers": [
-    "pi_png"
-  ],
+  "description": "Sign in to Netgear and choose a frame. Tesserae displays one image at a time and creates no Meural galleries. Cloud delivery pauses gallery rotation and keeps the frame's sleep scheduler active. Resume Meural gallery restores your previous playback. Local previews are available as a backup. An optional LAN address enables quiet-hours sleep control.",
+  "renderers": ["pi_png"],
   "transport": "push",
   "panel": {
     "w": 1080,
@@ -19,20 +17,34 @@
   "battery": false,
   "renderer_settings": false,
   "config_schema": {
+    "delivery_method": {
+      "type": "select",
+      "group": "Delivery",
+      "label": "Delivery method",
+      "default": "cloud",
+      "choices": [
+        {"value": "cloud", "label": "Cloud image"},
+        {"value": "local", "label": "Local preview (backup)"}
+      ],
+      "help": "Cloud uploads only changed pages and displays one image at a time, without creating galleries. Local previews need Tesserae running and repeat the upload before the preview expires."
+    },
     "host": {
       "type": "string",
+      "group": "Delivery",
       "label": "Frame address",
       "default": "",
       "placeholder": "meural.local",
-      "help": "The frame's IP address or host name. Reserve its address in your router."
+      "help": "Optional for cloud delivery; used for quiet-hours control. Required for local previews. Filled from your account when available. Reserve its address in your router."
     },
     "refresh_interval_s": {
       "type": "int",
+      "group": "Delivery",
       "label": "Renew preview every",
       "default": 15,
       "min": 5,
       "max": 3600,
-      "help": "Seconds between local uploads of the current page. This must be shorter than the frame's preview duration, which is often 30 seconds. New pages are sent immediately."
+      "help": "Seconds between local uploads of the current page. This must be shorter than the frame's preview duration, which is often 30 seconds. New pages are sent immediately.",
+      "show_if": {"delivery_method": "local"}
     }
   },
   "calibration": false,

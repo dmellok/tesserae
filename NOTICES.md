@@ -5,6 +5,36 @@ the following projects. Code-level dependencies are tracked in
 [pyproject.toml](pyproject.toml); this file lists upstream contributions
 that aren't reflected in a package install.
 
+## GuySie/ha-meural
+
+Meural sign-in and token renewal in `app/meural_auth.py` and
+`static/meural-login.js` are adapted from the installed HA-meural integration's
+`netgear_auth.py` and `mobile_auth.py`.
+
+Upstream: https://github.com/GuySie/ha-meural
+
+MIT License
+
+Copyright (c) 2020 Guy Sie
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
 ## paperlesspaper/epdoptimize
 
 Tesserae's optional calibrated Spectra 6 and ACeP palettes (in

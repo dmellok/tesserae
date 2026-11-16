@@ -35,6 +35,7 @@ parked through those sleeps rather than scanning for a tap nobody makes.
 from __future__ import annotations
 
 import logging
+import time as wall_time
 from collections.abc import Iterable
 from datetime import UTC, datetime, time, timedelta, tzinfo
 from typing import Any, NamedTuple
@@ -74,6 +75,7 @@ class QuietHoursWindow(NamedTuple):
     all_day: frozenset[int] = NO_DAYS
     sleep_through: bool = False
     touch_off: bool = False
+    native_schedule: dict[str, Any] | None = None
 
 
 def _parse_hhmm(value: str | None) -> time | None:
@@ -169,6 +171,15 @@ def resolve_quiet_hours(
     2. App-level setting (when ``quiet_hours_enabled``).
     3. ``None`` (quiet hours off).
     """
+    native = (getattr(device, "manifest", None) or {}).get("_native_sleep_schedule")
+    if (
+        isinstance(native, dict)
+        and native.get("available")
+        and wall_time.time() - float(native.get("checked_at") or 0) < 300
+    ):
+        return QuietHoursWindow(
+            time(0), time(0), NO_DAYS, sleep_through=True, native_schedule=native
+        )
     override = _device_override(device)
     if override and override.get("enabled"):
         window = _build_window(
@@ -198,6 +209,10 @@ def is_in_window(window: QuietHoursWindow, now: datetime, tz: tzinfo | None) -> 
     """``True`` iff ``now`` (interpreted in ``tz``) falls inside
     ``window``. Handles midnight wrap: a window with ``start=22:00,
     end=07:00`` means *from 22:00 today through 07:00 tomorrow*."""
+    if window.native_schedule is not None:
+        from app.meural_schedule import in_sleep_window
+
+        return in_sleep_window(window.native_schedule, now)
     local = now.astimezone(tz) if tz else now
     weekday = local.weekday()
     if weekday in window.all_day:
@@ -252,6 +267,10 @@ def quiet_ends_at(window: QuietHoursWindow, now: datetime, tz: tzinfo | None) ->
     already outside the window. Aware input yields UTC; naive stays naive."""
     if not is_in_window(window, now, tz):
         return now
+    if window.native_schedule is not None:
+        from app.meural_schedule import next_wake_at
+
+        return next_wake_at(window.native_schedule, now)
     local = now.astimezone(tz) if tz else now
     day0 = local.date()
     end_plus = (

@@ -44,10 +44,11 @@ KOReader's `trmnl-display` plugin needs a short token instead:
 
 1. Open **Settings → Devices → Add device → Netgear Meural**.
 2. Enter a device id and display name, then click **Add Netgear Meural**.
-3. On the new device's page, enter its **Frame address** and save.
+3. On the new device's page, open **Connection** and click **Sign in to Netgear**.
+4. Complete sign-in and any verification challenge, then choose a frame from your account.
 
 The panel starts at 1080×1920 in portrait. Change its orientation if the frame hangs sideways.
-See [Meural setup](clients.md#netgear-meural) for preview renewal and quiet hours.
+See [Meural setup](clients.md#netgear-meural) for cloud delivery, local preview backup and quiet hours.
 
 ## Per-device settings
 

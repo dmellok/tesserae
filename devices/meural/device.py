@@ -1,4 +1,4 @@
-"""Status and configuration for stock Meural frames on the local network."""
+"""Status and configuration for Netgear Meural frames."""
 
 from __future__ import annotations
 
@@ -9,6 +9,8 @@ from app.meural import valid_host
 
 
 def validate_config(payload: dict[str, Any]) -> tuple[bool, str | None]:
+    if payload.get("delivery_method") not in (None, "", "cloud", "local"):
+        return False, "Delivery method must be cloud or local"
     host = payload.get("host")
     if host not in (None, "") and not (isinstance(host, str) and valid_host(host.strip())):
         return False, "Frame address must be an IPv4 address or host name"

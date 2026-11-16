@@ -71,6 +71,7 @@ def setup(app):
     settings = app.config["SETTINGS_STORE"]
     cfg = dict((settings.get_section("devices") or {}).get("test_frame") or {})
     cfg["host"] = "192.0.2.10"
+    cfg["delivery_method"] = "local"
     settings.patch_section("devices", {"test_frame": cfg})
     frame = Frame()
     clock = [100.0]
@@ -114,7 +115,8 @@ def test_device_is_native_lan_and_preserves_portrait(setup):
         assert image.size == (108, 192)
     from app.settings.index_routes import _transport_badge
 
-    assert _transport_badge(setup.device) == "LAN"
+    with setup.app.app_context():
+        assert _transport_badge(setup.device) == "LAN"
 
 
 def test_renews_unchanged_preview_before_expiry(setup):
@@ -136,6 +138,74 @@ def test_new_composition_is_sent_without_waiting(setup):
     pub.on_push()
     assert len(setup.frame.uploads) == 2
     assert setup.frame.uploads[0] != setup.frame.uploads[1]
+
+
+def test_cloud_is_default_and_unchanged_images_are_not_uploaded_again(setup, monkeypatch):
+    class Cloud:
+        account_id = "17"
+
+        def __init__(self):
+            self.uploads = []
+            self.loads = []
+
+        def get_playback(self, target):
+            return {
+                "gallery_id": "27",
+                "item_id": "28",
+                "settings": {
+                    "galleryRotation": True,
+                    "schedulerEnabled": True,
+                },
+            }
+
+        def pause_rotation(self, target):
+            pass
+
+        def upload(self, image, name):
+            self.uploads.append(image)
+            return "100"
+
+        def show_item(self, target, item):
+            self.loads.append((target, item))
+
+    cloud = Cloud()
+    cfg = dict(setup.settings.get_section("devices")["test_frame"])
+    cfg.pop("delivery_method")
+    cfg["cloud_device_id"] = "101"
+    setup.settings.patch_section("devices", {"test_frame": cfg})
+    monkeypatch.setattr("app.meural_cloud.get_cloud_client", lambda *a: cloud)
+    for moment in (100, 115, 200):
+        setup.clock[0] = moment
+        setup.publisher().poll_once()
+    assert len(cloud.uploads) == 1
+    assert cloud.loads == [("101", "100")]
+    assert setup.frame.uploads == []
+    with setup.app.app_context():
+        from app.settings.index_routes import _transport_badge
+
+        assert _transport_badge(setup.device) == "Cloud"
+
+
+def test_released_frame_is_not_sent_new_previews(setup):
+    setup.settings.update_item("devices", "test_frame", {"meural_management_paused": True})
+    setup.publisher().poll_once()
+    assert setup.frame.uploads == []
+    setup.settings.update_item("devices", "test_frame", {"meural_management_paused": False})
+    setup.publisher().poll_once()
+    assert len(setup.frame.uploads) == 1
+
+
+def test_cloud_error_does_not_silently_enable_local_previews(setup, monkeypatch):
+    cfg = dict(setup.settings.get_section("devices")["test_frame"])
+    cfg.update(delivery_method="cloud", cloud_device_id="101")
+    setup.settings.patch_section("devices", {"test_frame": cfg})
+
+    def unavailable(*args):
+        raise MeuralError("cloud unavailable")
+
+    monkeypatch.setattr("app.meural_cloud.get_cloud_client", unavailable)
+    setup.publisher().poll_once()
+    assert setup.frame.uploads == []
 
 
 def test_failed_upload_can_retry_and_is_not_marked_delivered(setup):
@@ -497,3 +567,42 @@ def test_redirects_do_not_forward_authorization():
         NoRedirect().redirect_request(request, None, 302, "Found", {}, "https://other.example")
         is None
     )
+
+
+def test_cloud_sleep_ownership_survives_frame_ip_change(setup):
+    setup.app.config["SETTINGS_STORE"].update_item(
+        "devices", "test_frame", {"cloud_device_id": "101", "meural_account_id": "17"}
+    )
+    setup.quiet[0] = True
+    setup.publisher().poll_once()
+    assert setup.frame.sleeping
+    setup.app.config["SETTINGS_STORE"].update_item("devices", "test_frame", {"host": "192.0.2.11"})
+    setup.quiet[0] = False
+    setup.publisher().poll_once()
+    assert not setup.frame.sleeping
+
+
+def test_native_schedule_keeps_status_checks_and_does_not_wake_the_frame(setup):
+    import time
+
+    setup.app.config["SETTINGS_STORE"].update_item(
+        "devices",
+        "test_frame",
+        {
+            "cloud_device_id": "101",
+            "meural_account_id": "17",
+            "meural_refresh_token_secret": "example-refresh",
+            "meural_sleep_schedule": {
+                "scope": "17:101",
+                "available": True,
+                "checked_at": time.time(),
+            },
+        },
+    )
+    publisher = setup.publisher()
+    publisher._save_sleep(setup.device, "192.0.2.10")
+    setup.frame.sleeping = True
+    publisher.poll_once()
+    assert setup.frame.sleeping
+    assert setup.frame.power == []
+    assert "test_frame" in publisher._telemetry
