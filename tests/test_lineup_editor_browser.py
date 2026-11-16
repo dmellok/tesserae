@@ -227,6 +227,27 @@ def test_a_redraw_from_an_item_list_keeps_the_raw_conditions_open(
         browser.close()
 
 
+def test_a_dashboard_without_conditions_can_be_given_one(real: tuple[str, Flask]) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    sun = {"source_kind": "sun", "operator": "is_day", "value": {}}
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/art/edit")
+        page.locator('[data-expand="clock"]').click()
+        page.locator('[data-edit="clock"]').click()
+        page.locator('[data-add-cond="clock"]').click()
+        picker = page.locator('[data-panel="clock"] [data-condition-picker]')
+        picker.locator("summary").click()
+        picker.locator("textarea").fill(json.dumps([sun]))
+        assert page.locator("#dxe-save-state").inner_text() == "Unsaved changes"
+        _save(page)
+        assert errors == []
+        browser.close()
+    clock = next(pg for pg in app.config["DECK_STORE"].get("art").pages if pg.page_id == "clock")
+    assert [(c.source_kind, c.operator) for c in clock.conditions] == [("sun", "is_day")]
+
+
 def test_a_rotation_cut_to_one_dashboard_carries_its_cadence(real: tuple[str, Flask]) -> None:
     from playwright.sync_api import sync_playwright
 
@@ -656,7 +677,9 @@ def test_the_audit_hides_what_does_nothing(real: tuple[str, Flask]) -> None:
             assert gone not in text, gone
         page.locator('[data-expand="clock"]').click()
         page.locator('[data-edit="clock"]').click()
-        assert page.locator('[data-cond="clock"]').count() == 0  # no conditions, no editor
+        # No conditions: the editor stays shut behind "Add a condition".
+        assert page.locator('[data-cond="clock"]').count() == 0
+        assert page.locator('[data-add-cond="clock"]').count() == 1
         _settle(page)
         # By hand: no days, no timer row, and the header says how it flips.
         page.goto(base + "/decks/hand/edit", wait_until="load")
