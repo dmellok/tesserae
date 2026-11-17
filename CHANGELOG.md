@@ -29,6 +29,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- Sync painting budgets and spending records to disk, serialize charges across server processes, and let Repaint recover a failed picture's saved payload.
 - Duplicating a dashboard with a status bar keeps the copy's status bar under its own control. The copy pointed at the original's bar, so switching it off on the copy left it in place.
 - Home Assistant: entity and service widgets no longer drop out for five minutes in every fifteen when the access token belongs to a user who is not an administrator. The OpenDisplay check asked Home Assistant an admin-only question every 15 minutes, even with no OpenDisplay tags set up, and the refusal was treated as a rejected token. With no tags linked it now asks nothing, and a refusal from an admin-only request no longer holds back the requests the token is allowed to make. (#553)
 - Lineup thumbnail files close before transmission, so disconnected browsers cannot leave them open.

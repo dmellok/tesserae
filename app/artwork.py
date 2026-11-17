@@ -51,7 +51,7 @@ import os
 import re
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -87,7 +87,10 @@ class ArtworkError(Exception):
 def _write(path: Path, data: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + ".tmp")
-    tmp.write_bytes(data)
+    with tmp.open("wb") as out:
+        out.write(data)
+        out.flush()
+        os.fsync(out.fileno())
     os.replace(tmp, path)
 
 
@@ -123,6 +126,19 @@ def host_configure(
 _CHARGE_LOCK = threading.RLock()
 
 
+@contextlib.contextmanager
+def _charge_locked() -> Iterator[None]:
+    with _CHARGE_LOCK, contextlib.ExitStack() as stack:
+        ledger = _HOST.get("ledger")
+        if ledger is not None:
+            from app.kie_images import _locked
+
+            ledger.folder.mkdir(parents=True, exist_ok=True)
+            # Use the same cross-platform folder lock as paid image tasks.
+            stack.enter_context(_locked(ledger.folder))
+        yield
+
+
 def ceiling_spent() -> str:
     """Why nothing more may be painted server-wide, or empty."""
     ledger, ceilings = _HOST.get("ledger"), _HOST.get("ceilings")
@@ -151,7 +167,7 @@ def charge(
     Legacy painters can use this with FalClient without moving their image cache.
     ``debit`` checks and updates the widget's own daily allowance.
     """
-    with _CHARGE_LOCK:
+    with _charge_locked():
         why = ceiling_spent()
         if why:
             raise ArtworkError(why)
@@ -169,7 +185,7 @@ def refund(
     """Hand back a charge for a request the provider definitely refused, so
     it does not count against the ceilings or the widget's day. ``credit``
     undoes the widget's own debit. The ledger keeps both lines."""
-    with _CHARGE_LOCK:
+    with _charge_locked():
         credit()
         _ledger_line(plugin_id, collection, model, -int(cents))
 
@@ -994,7 +1010,9 @@ class Collection:
     def _note_error(self, job: Job, why: str) -> None:
         _write(
             self.folder(job.data_dir) / f"{job.key}.err",
-            json.dumps({"why": why, "at": int(time.time()), "title": job.title}).encode(),
+            json.dumps(
+                {"why": why, "at": int(time.time()), "title": job.title, "payload": job.payload}
+            ).encode(),
         )
 
     def stop(self, key: str, data_dir: Path) -> bool:
@@ -1366,6 +1384,9 @@ class Collection:
         if not isinstance(payload, dict) or not payload:
             held = self.held(data_dir).get(key)
             payload = held.get("payload") if isinstance(held, dict) else None
+        if not isinstance(payload, dict) or not payload:
+            error = _read_json(self.folder(data_dir) / f"{key}.err", {})
+            payload = error.get("payload") if isinstance(error, dict) else None
         if not isinstance(payload, dict) or not payload:
             return False
         self.clear_error(key, data_dir)
