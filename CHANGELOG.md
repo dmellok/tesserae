@@ -29,6 +29,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- Fix lineup binding races and warnings, and load picker previews on demand with an inline fallback.
 - Sync painting budgets and spending records to disk, serialize charges across server processes, and let Repaint recover a failed picture's saved payload.
 - Touch switches, sliders and steppers read the right way up on a panel mounted a quarter turn from its native orientation, such as a reTerminal Sticky set to landscape. The server now tells the panel how far the page was turned. Needs panel firmware that draws turned controls (tesserae-device-firmware#73); older firmware ignores it and draws as before.
 - A cell's Flat dithering setting now works on CircuitPython and Pico displays, including the status bar. Before, those displays dithered every cell whatever the setting said. The setting's first choice is now called Display setting, since it follows the display's Calibration tab; the old Use dashboard and Smooth choices did the same thing. (#572)
