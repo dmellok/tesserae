@@ -30,6 +30,12 @@ Beyond the aggregate `api.tesserae.ink` requests described above, the app does n
 
 This list covers the app itself, not the widgets you install.
 
+## Netgear Meural
+
+Local Meural previews send dashboard images only to the frame on your LAN.
+If its address changes while Tesserae has put it to sleep, wake it in the Meural app.
+Reserve its address in your router to avoid this.
+
 ## Install identifier
 
 On first startup, Tesserae creates a random identifier and saves it in `data/core/install_id.json`.

@@ -134,7 +134,7 @@
         <span class="dx-devrow-l dx-devrow-l3">
           <span class="dx-devrow-mono dx-devrow-batt{% if section.overview.battery.low %} is-warn{% endif %}"{% if section.status.phone_readings.battery %} title="{{ section.status.phone_readings.battery }}"{% endif %}>{% if section.overview.battery.muted %}-{% else %}{{ section.overview.battery.value }}{% endif %}</span>
           <span class="dx-devrow-mono dx-devrow-fw"{% if section.status.firmware and section.status.firmware.current %} title="{{ section.status.phone_readings.firmware or section.overview.firmware.value }}"{% endif %}>{% if section.status.firmware and section.status.firmware.current %}{{ section.overview.firmware.value }}{% else %}-{% endif %}</span>
-          <span class="dx-devrow-seen is-{{ _h }}">{% if _h == 'unknown' %}no heartbeat yet{% else %}{{ section.status.relative }}{% endif %}</span>
+          <span class="dx-devrow-seen is-{{ _h }}">{% if not section.capabilities.heartbeat and _h == 'unknown' %}Not checked yet{% elif _h == 'unknown' %}no heartbeat yet{% else %}{{ section.status.relative }}{% endif %}</span>
         </span>
       </span>
       <span class="dx-devrow-chev" aria-hidden="true"><i class="ph ph-caret-right"></i></span>

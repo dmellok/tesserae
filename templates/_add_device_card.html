@@ -39,7 +39,7 @@
       </p>
     </div>
 
-    {# Transport segmented control. Two buttons, REST-default. #}
+    {# Transport segmented control, REST-default. #}
     <div class="dx-segmented-group" data-segmented-group>
       <label class="dx-segmented-label">Transport</label>
       <div class="dx-segmented" role="tablist" aria-label="Transport for this device">
@@ -85,6 +85,13 @@
                 aria-selected="false">
           <i class="ph ph-frame-corners" aria-hidden="true"></i><span>Fraimic</span>
         </button>
+        <button type="button"
+                class="dx-segmented-btn"
+                data-segmented-btn="meural"
+                role="tab"
+                aria-selected="false">
+          <i class="ph ph-device-tablet" aria-hidden="true"></i><span>Netgear Meural</span>
+        </button>
       </div>
       <p class="dx-segmented-help" data-segmented-help-rest{% if default_transport != 'rest' %} hidden{% endif %}>
         REST is the recommended default, devices pair with a one-time code, no broker required.
@@ -100,6 +107,9 @@
       </p>
       <p class="dx-segmented-help" data-segmented-help-fraimic hidden>
         Fraimic colour e-paper canvases, sent new pictures over your local network when they wake.
+      </p>
+      <p class="dx-segmented-help" data-segmented-help-meural hidden>
+        Add it, then enter the frame's local address on its page.
       </p>
       <p class="dx-segmented-help" data-segmented-help-visionect hidden>
         Visionect and Joan e-paper signs, over their own protocol on TCP {{ visionect_listener.port if visionect_listener and visionect_listener.port else 'the configured port' }}.
@@ -462,6 +472,22 @@
         {{ text_input('add-fr-name', 'name', 'Display name', value='', placeholder='Hallway Fraimic') }}
         <div class="dx-actions-right">
           <button type="submit" class="dx-btn-primary"><i class="ph ph-plus" aria-hidden="true"></i><span>Add Fraimic</span></button>
+        </div>
+      </form>
+    </div>
+
+    <div class="dx-add-branch dx-add-branch--meural"
+         data-transport-branch="meural"
+         hidden>
+      <form method="post" action="{{ url_for('auth.devices_add') }}" class="form">
+        <input type="hidden" name="kind" value="meural">
+        {{ text_input('add-meural-id', 'id', 'Device id', value='', placeholder='meural_frame', required=True,
+                      help='Lowercase, no spaces.') }}
+        {{ text_input('add-meural-name', 'name', 'Display name', value='', placeholder='Meural frame') }}
+        {{ text_input('add-meural-host', 'host', 'Frame address', value='', placeholder='meural.local', required=True,
+                      help='The frame address on your local network.') }}
+        <div class="dx-actions-right">
+          <button type="submit" class="dx-btn-primary"><i class="ph ph-plus" aria-hidden="true"></i><span>Add Netgear Meural</span></button>
         </div>
       </form>
     </div>

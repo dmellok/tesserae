@@ -239,6 +239,11 @@
  ],
  "protocols": [
   {
+   "name": "GuySie/ha-meural",
+   "url": "https://github.com/GuySie/ha-meural",
+   "used_for": "Meural LAN protocol reference (MIT)"
+  },
+  {
    "name": "TRMNL",
    "url": "https://usetrmnl.com",
    "used_for": "The open bring-your-own-server protocol Tesserae's TRMNL path implements, and the idea of playlists behind rotations"
