@@ -390,3 +390,43 @@ def test_rejected_token_backs_off_until_settings_change(app: Flask, monkeypatch)
             assert len(calls) == 2
     finally:
         core._reset_auth_cooldown()
+
+
+def test_admin_only_401_does_not_block_other_requests(app: Flask, monkeypatch) -> None:
+    """#553: HA answers 401 to a good token on an admin-only endpoint when
+    its user is not an administrator. That backs off the admin-only
+    endpoints, not the states and services the token is allowed to read."""
+    core = _core(app)
+    core._reset_auth_cooldown()
+    calls: list[str] = []
+
+    def fake_urlopen(req, timeout=0, context=None):
+        calls.append(req.full_url)
+        if "/api/template" in req.full_url or "/api/diagnostics/" in req.full_url:
+            raise _http_error(req.full_url, 401, _TrackedBody(b""))
+        return _FakeResp(b"[]")
+
+    try:
+        with app.app_context():
+            _configure(app)
+            monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+            for _ in range(2):
+                try:
+                    core.render_template("{{ 1 }}")
+                except urllib.error.HTTPError as err:
+                    assert err.code == 401
+                else:
+                    raise AssertionError("expected HTTPError")
+            # The second template request, and the other admin-only
+            # endpoint, never left: HA logs each one as an invalid login.
+            try:
+                core.request_json("/api/diagnostics/config_entry/abc")
+            except urllib.error.HTTPError as err:
+                assert err.code == 401
+            else:
+                raise AssertionError("expected HTTPError")
+            assert len(calls) == 1
+            assert core.request_json("/api/states") == []
+            assert len(calls) == 2
+    finally:
+        core._reset_auth_cooldown()

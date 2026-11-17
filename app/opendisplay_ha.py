@@ -750,7 +750,11 @@ class OpenDisplayHaTelemetryPoller:
                 continue
             if self._record(device, heartbeat):
                 recorded += 1
-        self.refresh_tag_facts(mod)
+        # Nothing to look up without a linked tag, and the lookup is a request
+        # to HA: every 15 minutes, to an admin-only endpoint, for an install
+        # that has no OpenDisplay tags at all (#553).
+        if attempted:
+            self.refresh_tag_facts(mod)
         # A poll where every configured tag failed is a broken integration, not
         # a slow one. The per-device causes stay at DEBUG (they repeat per
         # interval); this one line is what makes a total failure visible, which

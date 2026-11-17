@@ -28,6 +28,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- Home Assistant: entity and service widgets no longer drop out for five minutes in every fifteen when the access token belongs to a user who is not an administrator. The OpenDisplay check asked Home Assistant an admin-only question every 15 minutes, even with no OpenDisplay tags set up, and the refusal was treated as a rejected token. With no tags linked it now asks nothing, and a refusal from an admin-only request no longer holds back the requests the token is allowed to make. (#553)
 - Lineup thumbnail files close before transmission, so disconnected browsers cannot leave them open.
 - Font atlases for touch and overlay displays build in about a second instead of 25. Each build waited out a timeout and logged `composer mount wait timed out`, which on a fresh start looked like the server had hung.
 - Windows: the server starts again. The kie.ai image service used a file lock that only exists on Linux and macOS, so `run.ps1` stopped with `ModuleNotFoundError: No module named 'fcntl'`.
