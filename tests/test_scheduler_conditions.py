@@ -18,6 +18,8 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from app.push import PushResult
 from app.scheduler import Scheduler
 from app.scheduler_conditions import ConditionEvaluator
@@ -98,6 +100,47 @@ def _hourly_schedule(
 
 
 # -- schedule conditions -----------------------------------------------
+
+
+def test_event_snapshot_stays_authoritative_until_disconnect():
+    from app.state.conditions import Condition
+
+    cond = Condition(
+        source_kind="ha_entity",
+        source_id="sensor.printer",
+        operator="==",
+        value="running",
+    )
+    evaluator = ConditionEvaluator(
+        ha_get_states=lambda: [{"entity_id": "sensor.printer", "state": "idle"}]
+    )
+    evaluator.receive_ha_snapshot([{"entity_id": "sensor.printer", "state": "idle"}])
+    evaluator.receive_ha_state(
+        "sensor.printer", {"entity_id": "sensor.printer", "state": "running"}
+    )
+    evaluator.refresh_ha_states()
+    assert evaluator.all_pass([cond])
+    evaluator.ha_stream_disconnected()
+    assert not evaluator._ha_streaming
+    evaluator.refresh_ha_states()
+    assert not evaluator.all_pass([cond])
+    evaluator.receive_ha_snapshot([{"entity_id": "sensor.printer", "state": "running"}])
+    assert evaluator.all_pass([cond])
+    evaluator.receive_ha_state("sensor.printer", None)
+    assert evaluator.ha_state("sensor.printer") is None
+    assert evaluator.all_pass([cond])  # Unknown entities keep the default fail-open policy.
+
+
+def test_inflight_rest_snapshot_cannot_overwrite_new_event_snapshot():
+    evaluator = ConditionEvaluator()
+
+    def rest():
+        evaluator.receive_ha_snapshot([{"entity_id": "sensor.printer", "state": "running"}])
+        return [{"entity_id": "sensor.printer", "state": "idle"}]
+
+    evaluator._ha_get_states = rest
+    evaluator.refresh_ha_states()
+    assert evaluator.ha_state("sensor.printer")["state"] == "running"
 
 
 def test_schedule_with_passing_conditions_fires(tmp_path: Path) -> None:
@@ -489,13 +532,14 @@ def test_rotation_priority_mode_holds_when_nothing_matches(tmp_path: Path) -> No
 # -- min hold gate -----------------------------------------------------
 
 
-def test_min_hold_gate_blocks_repeat_within_window(tmp_path: Path) -> None:
+@pytest.mark.parametrize("mode", ["scheduled", "priority"])
+def test_min_hold_gate_blocks_repeat_within_window(tmp_path: Path, mode: str) -> None:
     """After a successful fire, the gate prevents another transition
     until ``min_hold_minutes`` have elapsed - even if conditions now
     point at a different step."""
     rotation = _rotation(
         "lounge",
-        mode="priority",
+        mode=mode,
         min_hold_minutes=5,
         steps=[
             RotationStep(
@@ -680,3 +724,18 @@ def test_live_step_index_is_the_pick_a_press_starts_from(tmp_path: Path) -> None
     assert scheduler.step_conditions_pass(rotation, 0, now) is False
     assert scheduler.step_conditions_pass(rotation, 2, now) is True
     assert scheduler.step_conditions_pass(rotation, 9, now) is True  # out of range: no gate
+
+
+def test_failed_inflight_rest_refresh_keeps_healthy_stream_fresh():
+    condition = ha_condition("sensor.activity", "==", "on").model_copy(
+        update={"if_unknown": "fail"}
+    )
+    evaluator = ConditionEvaluator()
+
+    def rest():
+        evaluator.receive_ha_snapshot([{"entity_id": "sensor.activity", "state": "on"}])
+        raise OSError("REST unavailable")
+
+    evaluator._ha_get_states = rest
+    assert evaluator.refresh_ha_states()
+    assert evaluator.all_pass([condition])

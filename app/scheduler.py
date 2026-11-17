@@ -416,6 +416,7 @@ class Scheduler:
         # evaluator backed by ha_core's state list + the app's tz +
         # settings.app lat/lon.
         condition_evaluator: ConditionEvaluator | None = None,
+        ha_state_listener: Callable[[threading.Event], None] | None = None,
         tick_seconds: int = 30,
         paused_provider: Callable[[], bool] | None = None,
     ) -> None:
@@ -562,6 +563,8 @@ class Scheduler:
         # schedule.
         self._rotation_force_state: dict[str, tuple[datetime, int]] = {}
         self._lock = threading.Lock()
+        self._ha_state_listener = ha_state_listener
+        self._ha_thread: threading.Thread | None = None
         self._priority_lock = threading.RLock()
         self._priority_thread: threading.Thread | None = None
         self._priority_signal = threading.Event()
@@ -586,6 +589,14 @@ class Scheduler:
         )
         watchdog.start()
         self._watchdog_thread = watchdog
+        if self._ha_state_listener is not None:
+            self._ha_thread = threading.Thread(
+                target=self._ha_state_listener,
+                args=(self._stop,),
+                name="tesserae-ha-states",
+                daemon=True,
+            )
+            self._ha_thread.start()
         self._priority_thread = threading.Thread(
             target=self._run_priority, name="tesserae-priority", daemon=True
         )
@@ -595,9 +606,10 @@ class Scheduler:
     def stop(self) -> None:
         self._stop.set()
         self._priority_signal.set()
-        if self._priority_thread is not None:
-            self._priority_thread.join(timeout=5)
-        self._priority_thread = None
+        for thread in (self._ha_thread, self._priority_thread):
+            if thread is not None:
+                thread.join(timeout=5)
+        self._ha_thread = self._priority_thread = None
         if self._thread is not None:
             self._thread.join(timeout=5)
             self._thread = None
@@ -626,6 +638,42 @@ class Scheduler:
             # so a 1-minute clock page drifted through the minute and skipped
             # one every few minutes (#39 on the firmware repo).
             self._stop.wait(self._tick - (_wall_clock_s() % self._tick))
+
+    def has_ha_lineup_conditions(self) -> bool:
+        return any(
+            condition.is_ha_entity()
+            for rotation in self._cycle_records()
+            if rotation.enabled
+            for step in rotation.steps
+            for condition in step.conditions
+        ) or any(
+            condition.is_ha_entity()
+            for schedule in self._timed_records()
+            if schedule.enabled
+            for condition in schedule.conditions
+        )
+
+    def on_ha_state_changed(
+        self, entity_id: str, state: dict[str, Any] | None, *, now: datetime | None = None
+    ) -> None:
+        if self._condition_evaluator is None:
+            return
+        self._condition_evaluator.receive_ha_state(entity_id, state)
+        if not any(
+            c.source_id == entity_id
+            for rotation in self._cycle_records()
+            if rotation.enabled and rotation.mode == "priority"
+            for step in rotation.steps
+            for c in step.conditions
+            if c.is_ha_entity()
+        ):
+            return
+        self.conditions_changed(now=now)
+
+    def conditions_changed(self, *, now: datetime | None = None) -> None:
+        # A fixed one-second coalescing window cannot be postponed forever
+        # by a busy sensor. The event callback never renders or calls HA.
+        self._priority_recheck_at((now or datetime.now(UTC)).timestamp() + 1.0)
 
     def _run_priority(self) -> None:
         while not self._stop.is_set():

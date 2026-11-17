@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import io
 import json
+import threading
 import urllib.error
 
 from flask import Flask
@@ -18,6 +19,73 @@ _STATES = [
 
 def _core(app: Flask):
     return app.config["PLUGIN_REGISTRY"].get("ha_core").server_module
+
+
+def test_state_events_subscribe_and_apply_snapshot_changes_and_removal(app, monkeypatch):
+    core = _core(app)
+    stop = threading.Event()
+    sent, received = [], []
+    messages = iter(
+        [
+            {"type": "auth_required"},
+            {"type": "auth_ok"},
+            {"id": 1, "type": "result", "success": True},
+            {
+                "id": 2,
+                "type": "result",
+                "success": True,
+                "result": [{"entity_id": "sensor.printer", "state": "idle"}],
+            },
+            {
+                "id": 1,
+                "type": "event",
+                "event": {
+                    "data": {
+                        "entity_id": "sensor.printer",
+                        "new_state": {"entity_id": "sensor.printer", "state": "running"},
+                    }
+                },
+            },
+            {
+                "id": 1,
+                "type": "event",
+                "event": {"data": {"entity_id": "sensor.printer", "new_state": None}},
+            },
+        ]
+    )
+
+    class Socket:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def send(self, message):
+            sent.append(json.loads(message))
+
+        def recv(self, **kwargs):
+            return json.dumps(next(messages))
+
+    def changed(entity_id, state):
+        received.append((entity_id, state))
+        if state is None:
+            stop.set()
+
+    monkeypatch.setattr("websockets.sync.client.connect", lambda *a, **kw: Socket())
+    monkeypatch.setattr(core, "is_configured", lambda: True)
+    monkeypatch.setattr(core, "base_url", lambda: "http://ha")
+    monkeypatch.setattr(core, "token", lambda: "test-token")
+    core.watch_state_changes(stop, lambda states: received.extend(states), changed)
+    assert sent[1:] == [
+        {"id": 1, "type": "subscribe_events", "event_type": "state_changed"},
+        {"id": 2, "type": "get_states"},
+    ]
+    assert received == [
+        {"entity_id": "sensor.printer", "state": "idle"},
+        ("sensor.printer", {"entity_id": "sensor.printer", "state": "running"}),
+        ("sensor.printer", None),
+    ]
 
 
 def test_unconfigured_choices_guide_the_user(app: Flask) -> None:
@@ -430,3 +498,173 @@ def test_admin_only_401_does_not_block_other_requests(app: Flask, monkeypatch) -
             assert len(calls) == 2
     finally:
         core._reset_auth_cooldown()
+
+
+def test_refused_event_token_shares_rest_cooldown(app, monkeypatch):
+    import threading
+
+    import pytest
+
+    core = _core(app)
+    core._reset_auth_cooldown()
+    now = [1000.0]
+    connections = []
+    monkeypatch.setattr(core.time, "monotonic", lambda: now[0])
+
+    def connect(*args, **kwargs):
+        connections.append(now[0])
+        return _FakeSocket([{"type": "auth_required"}, {"type": "auth_invalid"}])
+
+    monkeypatch.setattr("websockets.sync.client.connect", connect)
+    monkeypatch.setattr(
+        "urllib.request.urlopen", lambda *a, **kw: pytest.fail("REST bypassed cooldown")
+    )
+    try:
+        with app.app_context():
+            _configure(app)
+            for offset in (0, 30, 60, 299):
+                now[0] = 1000.0 + offset
+                with pytest.raises(urllib.error.HTTPError) as error:
+                    core.watch_state_changes(
+                        threading.Event(), lambda states: None, lambda *a: None
+                    )
+                assert error.value.code == 401
+                with pytest.raises(urllib.error.HTTPError):
+                    core.request_json("/api/states")
+            assert connections == [1000.0]
+            now[0] = 1300.0
+            with pytest.raises(urllib.error.HTTPError):
+                core.watch_state_changes(threading.Event(), lambda states: None, lambda *a: None)
+            assert connections == [1000.0, 1300.0]
+            app.config["SETTINGS_STORE"].update_section(
+                "plugins", {"ha_core": {"base_url": "http://ha", "token_secret": "fresh"}}
+            )
+            with pytest.raises(urllib.error.HTTPError):
+                core.watch_state_changes(threading.Event(), lambda states: None, lambda *a: None)
+            assert len(connections) == 3
+    finally:
+        core._reset_auth_cooldown()
+
+
+def test_event_subscription_respects_rest_auth_failure(app, monkeypatch):
+    import threading
+
+    import pytest
+
+    core = _core(app)
+    core._reset_auth_cooldown()
+    monkeypatch.setattr(
+        "urllib.request.urlopen",
+        lambda req, **kw: (_ for _ in ()).throw(_http_error(req.full_url, 401, _TrackedBody(b""))),
+    )
+    monkeypatch.setattr(
+        "websockets.sync.client.connect", lambda *a, **kw: pytest.fail("cooldown bypassed")
+    )
+    try:
+        with app.app_context():
+            _configure(app)
+            with pytest.raises(urllib.error.HTTPError):
+                core.request_json("/api/states")
+            with pytest.raises(urllib.error.HTTPError):
+                core.watch_state_changes(threading.Event(), lambda states: None, lambda *a: None)
+    finally:
+        core._reset_auth_cooldown()
+
+
+class _RetryStop:
+    def __init__(self, limit=5):
+        self.waits = []
+        self.limit = limit
+
+    def is_set(self):
+        return len(self.waits) >= self.limit
+
+    def wait(self, delay):
+        self.waits.append(delay)
+        return self.is_set()
+
+
+def _conditioned_lineup(app):
+    from app.state.conditions import Condition
+    from app.state.deck_model import Deck, DeckPage
+
+    deck = Deck(
+        id="events",
+        name="Events",
+        advance="timer",
+        advance_mode="priority",
+        pages=[
+            DeckPage(
+                page_id="home",
+                conditions=[
+                    Condition(
+                        source_kind="ha_entity",
+                        source_id="sensor.activity",
+                        operator="==",
+                        value="on",
+                    )
+                ],
+            )
+        ],
+    )
+    app.config["DECK_STORE"].upsert(deck)
+    return deck
+
+
+def test_event_listener_backs_off_exponentially(app, monkeypatch):
+    core = _core(app)
+    _conditioned_lineup(app)
+    with app.app_context():
+        _configure(app)
+
+    def failed(*args, **kwargs):
+        raise OSError("unreachable")
+
+    monkeypatch.setattr(core, "watch_state_changes", failed)
+    stop = _RetryStop()
+    app.config["SCHEDULER"]._ha_state_listener(stop)
+    assert stop.waits == [30, 60, 120, 240, 300]
+
+
+def test_event_listener_waits_until_a_lineup_needs_home_assistant(app, monkeypatch):
+    import pytest
+
+    core = _core(app)
+    with app.app_context():
+        _configure(app)
+    monkeypatch.setattr(core, "watch_state_changes", lambda *a, **kw: pytest.fail("unused socket"))
+    stop = _RetryStop(1)
+    app.config["SCHEDULER"]._ha_state_listener(stop)
+    assert stop.waits == [30]
+
+
+def test_event_stream_closes_when_last_ha_lineup_is_disabled(app, monkeypatch):
+    import threading
+
+    core = _core(app)
+    deck = _conditioned_lineup(app)
+    scheduler = app.config["SCHEDULER"]
+    socket = _FakeSocket(
+        [
+            {"type": "auth_required"},
+            {"type": "auth_ok"},
+            {"id": 1, "success": True},
+            {"id": 2, "type": "result", "success": True, "result": _STATES},
+        ]
+    )
+    _fake_connect(monkeypatch, socket)
+
+    def snapshot(states):
+        app.config["DECK_STORE"].upsert(deck.model_copy(update={"enabled": False}))
+
+    with app.app_context():
+        _configure(app)
+        assert scheduler.has_ha_lineup_conditions()
+        core.watch_state_changes(
+            threading.Event(),
+            snapshot,
+            lambda *a: None,
+            is_needed=scheduler.has_ha_lineup_conditions,
+        )
+        assert not scheduler.has_ha_lineup_conditions()
+        assert socket.replies == []

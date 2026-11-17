@@ -3,8 +3,7 @@
 No widget cell of its own; sibling ha_* widgets reach in via the plugin
 registry and call ``get_state`` / ``get_states`` / ``history`` /
 ``entity_choices`` so all of them share one base URL, token, and TLS
-policy. Tesserae renders headlessly on push/schedule, so a plain REST
-poll at render time fits, no WebSocket needed.
+policy. The scheduler also uses its read-only WebSocket state subscription.
 
 Config lives in Settings → Widgets → Home Assistant Core: a base URL and
 a Long-Lived Access Token (HA → profile → Long-Lived Access Tokens).
@@ -378,6 +377,93 @@ def ws_command(command: dict[str, Any], *, timeout: float = 15.0) -> dict[str, A
             result = json.loads(ws.recv(timeout=remaining))
             if result.get("id") == 1 and result.get("type") == "result":
                 return dict(result)
+
+
+def auth_retry_after() -> float:
+    """Seconds left in the shared rejected-token cooldown for these settings."""
+    key = (base_url(), token())
+    with _auth_lock:
+        failure = _auth_failure
+    if failure is None or failure[0] != key:
+        return 0.0
+    return max(0.0, _AUTH_COOLDOWN_S - (time.monotonic() - failure[1]))
+
+
+def _event_auth_refused(url: str, access_token: str) -> urllib.error.HTTPError:
+    global _auth_failure
+    reason = "Home Assistant refused the access token"
+    with _auth_lock:
+        _auth_failure = ((url, access_token), time.monotonic(), url + "/api/websocket", reason)
+    return urllib.error.HTTPError(url + "/api/websocket", 401, reason, None, None)  # type: ignore[arg-type]
+
+
+def watch_state_changes(
+    stop: threading.Event, on_snapshot: Any, on_change: Any, *, is_needed: Any = None
+) -> None:
+    """One read-only event session, using the shared HA credentials and TLS policy.
+
+    Subscribe before fetching the initial snapshot so no state change falls
+    between them. The host owns reconnect/backoff and cache freshness.
+    """
+    if not is_configured():
+        raise _not_configured()
+    from websockets.exceptions import InvalidStatus
+    from websockets.sync.client import connect
+
+    url, access_token = base_url(), token()
+    if auth_retry_after() > 0:
+        raise urllib.error.HTTPError(
+            url + "/api/websocket", 401, "access token on cooldown", None, None
+        )  # type: ignore[arg-type]
+    ws_url = "wss://" + url[8:] if url.startswith("https://") else "ws://" + url.split("://", 1)[-1]
+    ws_url = ws_url.rstrip("/") + "/api/websocket"
+    extra: dict[str, Any] = {"ssl": _ssl_context()} if ws_url.startswith("wss://") else {}
+    try:
+        socket = connect(
+            ws_url,
+            open_timeout=10,
+            close_timeout=1,
+            user_agent_header=USER_AGENT,
+            max_size=16 << 20,
+            **extra,
+        )
+    except InvalidStatus as err:
+        if err.response.status_code == 401:
+            raise _event_auth_refused(url, access_token) from None
+        raise
+    with socket as ws:
+        if json.loads(ws.recv(timeout=10)).get("type") != "auth_required":
+            raise RuntimeError("unexpected Home Assistant greeting")
+        ws.send(json.dumps({"type": "auth", "access_token": access_token}))
+        if json.loads(ws.recv(timeout=10)).get("type") != "auth_ok":
+            raise _event_auth_refused(url, access_token)
+        ws.send(json.dumps({"id": 1, "type": "subscribe_events", "event_type": "state_changed"}))
+        subscribed = json.loads(ws.recv(timeout=10))
+        if subscribed.get("id") != 1 or not subscribed.get("success"):
+            raise RuntimeError("Home Assistant refused state events")
+        ws.send(json.dumps({"id": 2, "type": "get_states"}))
+        snapshot_due = time.monotonic() + 10
+        have_snapshot = False
+        while not stop.is_set() and (is_needed is None or is_needed()):
+            # Reconnect after a settings change, without logging credentials.
+            if (base_url(), token()) != (url, access_token):
+                return
+            try:
+                message = json.loads(ws.recv(timeout=1))
+            except TimeoutError:
+                if not have_snapshot and time.monotonic() >= snapshot_due:
+                    raise TimeoutError("Home Assistant state snapshot timed out") from None
+                continue
+            if message.get("id") == 2 and message.get("type") == "result":
+                if not message.get("success") or not isinstance(message.get("result"), list):
+                    raise RuntimeError("Home Assistant state snapshot failed")
+                on_snapshot(message["result"])
+                have_snapshot = True
+            elif message.get("id") == 1 and message.get("type") == "event":
+                data = (message.get("event") or {}).get("data") or {}
+                entity_id = data.get("entity_id")
+                if isinstance(entity_id, str):
+                    on_change(entity_id, data.get("new_state"))
 
 
 def remove_media(media_id: str, *, timeout: float = 15.0) -> bool:

@@ -1,8 +1,8 @@
 """Evaluator for ``Condition`` records on schedules + rotation steps.
 
-The scheduler refreshes the evaluator's HA state cache once per tick
-(``refresh_ha_states``) so a tick with N conditions across M schedules
-makes one HA call rather than M*N. Time + sun resolvers are pure
+HA state events keep the evaluator's cache current. Without an event
+connection, the scheduler refreshes it once per tick (``refresh_ha_states``)
+so conditions share one HA call. Time + sun resolvers are pure
 local computations against the app's configured timezone and lat /
 lon, so they don't need refreshing.
 
@@ -60,9 +60,9 @@ class ConditionEvaluator:
         self._loc_provider = location_provider or (lambda: (None, None))
         self._ha_cache: dict[str, dict[str, Any]] = {}
         self._ha_cache_ts: float = 0.0
-        # False while the last refresh couldn't read Home Assistant (the cache
-        # is then a stale snapshot); conditions with ``if_unknown="fail"`` fail.
+        # False while neither REST nor the event stream has current state.
         self._ha_fresh = False
+        self._ha_streaming = False
         self._ha_lock = threading.Lock()
         self._sun_cache: dict[
             tuple[date, float, float], tuple[datetime | None, datetime | None]
@@ -86,6 +86,9 @@ class ConditionEvaluator:
         every gated step fires. We only adopt the new snapshot when
         it carries at least one entity, OR when the cache itself was
         also empty (so the first successful sync still lands)."""
+        with self._ha_lock:
+            if self._ha_streaming:
+                return self._ha_fresh
         if self._ha_get_states is None:
             return False
         try:
@@ -93,10 +96,13 @@ class ConditionEvaluator:
         except Exception as err:
             logger.warning("HA state refresh failed: %s", err)
             with self._ha_lock:
-                self._ha_fresh = False
-            return False
+                if not self._ha_streaming:
+                    self._ha_fresh = False
+                return self._ha_fresh
         new_cache = {s["entity_id"]: s for s in states if "entity_id" in s}
         with self._ha_lock:
+            if self._ha_streaming:
+                return self._ha_fresh
             if not new_cache and self._ha_cache:
                 # Empty snapshot but we had data before; keep the
                 # previous one so a transient HA blip doesn't fail-open
@@ -111,6 +117,25 @@ class ConditionEvaluator:
             self._ha_cache = new_cache
             self._ha_fresh = bool(new_cache)
         return True
+
+    def receive_ha_snapshot(self, states: list[dict[str, Any]]) -> None:
+        """Adopt the authenticated event stream's initial/reconnect snapshot."""
+        with self._ha_lock:
+            self._ha_cache = {s["entity_id"]: s for s in states if "entity_id" in s}
+            self._ha_fresh = True
+            self._ha_streaming = True
+
+    def receive_ha_state(self, entity_id: str, state: dict[str, Any] | None) -> None:
+        with self._ha_lock:
+            if state is None:
+                self._ha_cache.pop(entity_id, None)
+            else:
+                self._ha_cache[entity_id] = state
+
+    def ha_stream_disconnected(self) -> None:
+        with self._ha_lock:
+            self._ha_streaming = False
+            self._ha_fresh = False
 
     def ha_state(self, entity_id: str) -> dict[str, Any] | None:
         with self._ha_lock:

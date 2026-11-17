@@ -439,3 +439,74 @@ def test_a_reordered_rotation_sends_the_dashboard_now_in_its_slot(wiring) -> Non
     scheduler.resync_cycle("d1")
     scheduler._tick_once(datetime(2026, 6, 15, 0, 12, tzinfo=UTC))
     push.push.assert_not_called()
+
+
+def test_printer_event_selects_within_debounce_and_next_wake_gets_print(priority_frame):
+    scheduler, transport, nav, states, telemetry = priority_frame
+    wake = datetime(2026, 11, 16, 11, 0, tzinfo=UTC)
+    scheduler._tick_once(wake)
+    assert nav.current_page("panel", "d1") == "photos"
+    telemetry.predicted_next_wake_at = (wake + timedelta(hours=1)).timestamp()
+    started = wake + timedelta(minutes=21)
+    states[0] = {"entity_id": "sensor.printer", "state": "running"}
+    scheduler.on_ha_state_changed("sensor.printer", states[0], now=started)
+    scheduler._priority_pass(started + timedelta(seconds=1))
+    assert scheduler.live_step_index(scheduler._cycle_records()[0], started) == 0
+    # Smart sync avoids paid work while the frame is asleep. The old nav
+    # record must not let a photos refresh replace the selected print.
+    transport.sent.clear()
+    scheduler._maybe_refresh_pages(started + timedelta(minutes=1))
+    assert transport.sent == []
+    assert nav.current_page("panel", "d1") == "photos"
+    scheduler._priority_pass(wake + timedelta(minutes=59, seconds=30))
+    assert transport.latest_render_for("panel")["page_id"] == "print"
+    assert nav.current_page("panel", "d1") == "print"
+    scheduler.prepare_device_wake("panel", now=wake + timedelta(hours=1))
+    scheduler._priority_pass(wake + timedelta(hours=1))
+    assert transport.latest_render_for("panel")["page_id"] == "print"
+    transport.sent.clear()
+    scheduler._maybe_refresh_pages(wake + timedelta(hours=1, minutes=1))
+    assert all(page != "photos" for _, page, _ in transport.sent)
+    transport.push("photos", device_ids={"panel"}, source="page")
+    assert transport.latest_render_for("panel")["page_id"] == "photos"
+    # An unchanged selection must not undo an explicit push at wake.
+    scheduler.prepare_device_wake("panel", now=wake + timedelta(hours=1, minutes=2))
+    scheduler._priority_pass(wake + timedelta(hours=1, minutes=2))
+    assert transport.latest_render_for("panel")["page_id"] == "photos"
+
+
+def test_printer_event_is_debounced_without_waiting_for_a_timer_tick(priority_frame):
+    scheduler, transport, nav, states, telemetry = priority_frame
+    now = datetime(2026, 11, 16, 11, 0, tzinfo=UTC)
+    scheduler._tick_once(now)
+    telemetry.always_on = True
+    started = now + timedelta(minutes=1)
+    states[0] = {"entity_id": "sensor.printer", "state": "running"}
+    scheduler.on_ha_state_changed("sensor.printer", states[0], now=started)
+    transport.sent.clear()
+    assert scheduler._priority_pass(started + timedelta(seconds=0.5)) == 0.5
+    assert transport.sent == []
+    scheduler._priority_pass(started + timedelta(seconds=1))
+    assert nav.current_page("panel", "d1") == "print"
+
+
+def test_event_sensor_flaps_wait_for_minimum_hold_expiry(priority_frame):
+    scheduler, transport, nav, states, telemetry = priority_frame
+    deck = scheduler._deck_store.get("d1")
+    scheduler._deck_store.upsert(deck.model_copy(update={"advance_min_hold_minutes": 30}))
+    telemetry.always_on = True
+    now = datetime(2026, 11, 16, 11, 0, tzinfo=UTC)
+    scheduler._tick_once(now)
+    scheduler._condition_evaluator.receive_ha_snapshot(states)
+    transport.sent.clear()
+    for minute, value in [(1, "running"), (2, "idle"), (3, "running")]:
+        changed = now + timedelta(minutes=minute)
+        scheduler.on_ha_state_changed(
+            "sensor.printer", {"entity_id": "sensor.printer", "state": value}, now=changed
+        )
+        scheduler._priority_pass(changed + timedelta(seconds=1))
+    assert transport.sent == []
+    assert scheduler._priority_pass(now + timedelta(minutes=29, seconds=59)) == 1
+    scheduler._priority_pass(now + timedelta(minutes=30))
+    assert transport.sent == [("panel", "print", "deck")]
+    assert nav.current_page("panel", "d1") == "print"

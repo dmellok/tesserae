@@ -1208,6 +1208,51 @@ def create_app(
     )
     app.config["CONDITION_EVALUATOR"] = condition_evaluator
 
+    def _listen_ha_states(stop: Any) -> None:
+        retry_delay = 30.0
+
+        def snapshot(states: list[dict[str, Any]]) -> None:
+            nonlocal retry_delay
+            retry_delay = 30.0
+            condition_evaluator.receive_ha_snapshot(states)
+            scheduler.conditions_changed()
+
+        while not stop.is_set():
+            plugin = app.config["PLUGIN_REGISTRY"].get("ha_core")
+            module = plugin.server_module if plugin else None
+            watch = getattr(module, "watch_state_changes", None)
+            delay = 30.0
+            listening = False
+            try:
+                with app.app_context():
+                    if (
+                        scheduler.has_ha_lineup_conditions()
+                        and module is not None
+                        and callable(watch)
+                        and module.is_configured()
+                    ):
+                        cooldown = module.auth_retry_after()
+                        if cooldown > 0:
+                            # Check for edited credentials/lineups without another login or warning.
+                            stop.wait(min(30.0, cooldown))
+                            continue
+                        listening = True
+                        watch(
+                            stop,
+                            snapshot,
+                            scheduler.on_ha_state_changed,
+                            is_needed=scheduler.has_ha_lineup_conditions,
+                        )
+            except Exception as err:
+                logger.warning("HA state events disconnected (%s); retrying", type(err).__name__)
+                delay = retry_delay
+                retry_delay = min(retry_delay * 2, 300.0)
+            finally:
+                if listening:
+                    condition_evaluator.ha_stream_disconnected()
+                    scheduler.conditions_changed()
+            stop.wait(delay)
+
     scheduler = Scheduler(
         store=schedule_store,
         rotation_store=rotation_store,
@@ -1223,6 +1268,7 @@ def create_app(
         device_ids_for_page=_device_ids_for_page,
         device_telemetry=app.config["DEVICE_TELEMETRY"],
         condition_evaluator=condition_evaluator,
+        ha_state_listener=_listen_ha_states,
         paused_provider=lambda: bool(settings.get_section("app").get("automation_paused")),
     )
     app.config["SCHEDULER"] = scheduler
