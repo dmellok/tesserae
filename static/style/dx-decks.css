@@ -2387,6 +2387,15 @@ main.page.dxe-page {
 .bind-dialog-summary {
   color: var(--t-fg);
 }
+/* Unticking a display another lineup also lands on. Empty until then. */
+.bind-dialog-warning {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--t-warn);
+}
+.bind-dialog-warning:empty {
+  display: none;
+}
 .bind-dialog .bind-dialog-hint {
   padding: 8px 10px;
   border-radius: var(--t-radius-sm, 6px);
