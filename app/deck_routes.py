@@ -3562,7 +3562,11 @@ def _editor_state(deck: Deck | None) -> dict[str, Any]:
         for pid, shot in _display_shots(
             shot_device, sw, sh, [p for p in pages if p.id in page_meta]
         ).items():
-            page_meta[pid].update(thumb=shot.thumb_url, w=shot.width, h=shot.height)
+            # No URL means that picture is still being drawn. Keep the shared
+            # preview until it is ready: the editor reads its tiles once, so an
+            # empty one would stay a blank tile until the page was reloaded.
+            if shot.thumb_url:
+                page_meta[pid].update(thumb=shot.thumb_url, w=shot.width, h=shot.height)
     # A step whose dashboard was deleted still belongs to the lineup: list it,
     # flagged, so it can be seen and removed rather than kept on every save.
     for dp in deck.pages if deck is not None else []:

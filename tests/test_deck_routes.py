@@ -914,3 +914,32 @@ def test_editor_tile_shows_the_lineups_display_its_own_picture(
     page = state["pages"]["photos"]
     assert (page["thumb"], page["w"], page["h"]) == ("/compose/thumbs/portrait.png", 1200, 1600)
     assert state["pages"]["overview"]["thumb"] != "/compose/thumbs/portrait.png"
+
+
+def test_editor_tile_keeps_the_shared_preview_while_its_own_picture_renders(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The display's own picture has no URL while it is queued to render. The
+    tile keeps the shared preview then, instead of going blank until a reload."""
+    import app.deck_routes as routes
+    from app.lineups_view import DisplayShot
+    from app.state.page_store import Page as PageModel
+
+    app.config["PAGE_STORE"].save(PageModel(id="photos", name="Photos"))
+    queued = DisplayShot(thumb_url="", width=1200, height=1600, composition_digest="")
+
+    class Door:
+        id = "door"
+
+    registry = app.config["DEVICE_REGISTRY"]
+    monkeypatch.setattr(registry, "get", lambda did: Door() if did == "door" else None)
+    monkeypatch.setattr(routes, "_device_size", lambda d: (1200, 1600, "1200×1600"))
+    monkeypatch.setattr(routes, "_display_shots", lambda *a: {"photos": queued})
+    client = app.test_client()
+    _sign_in(client)
+    plain = _state(client.get("/decks/new").text)["pages"]["photos"]
+    page = _state(client.get("/decks/new", query_string={"display": "door"}).text)["pages"][
+        "photos"
+    ]
+    assert page["thumb"] and page["thumb"] == plain["thumb"]
+    assert (page["w"], page["h"]) == (plain["w"], plain["h"])
