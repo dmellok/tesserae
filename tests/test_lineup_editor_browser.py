@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 from collections.abc import Iterator
 from pathlib import Path
@@ -45,6 +46,149 @@ if not _HAS_CHROMIUM and os.environ.get("TESSERAE_REQUIRE_BROWSER_TESTS") == "1"
 pytestmark = pytest.mark.skipif(not _HAS_CHROMIUM, reason="Playwright Chromium not installed")
 
 ALL_DAYS = [0, 1, 2, 3, 4, 5, 6]
+
+
+@pytest.mark.parametrize("width", [1280, 390])
+def test_duplicate_dashboard_copies_the_step_and_keeps_tile_controls(real, width):
+    from playwright.sync_api import expect, sync_playwright
+
+    base, app = real
+    decks = app.config["DECK_STORE"]
+    deck = decks.get("morning")
+    deck.pages[0] = DeckPage(
+        page_id="weather",
+        dwell_minutes=45,
+        refresh_interval_minutes=60,
+        conditions=[
+            {
+                "source_kind": "ha_entity",
+                "source_id": "sensor.example_state",
+                "operator": "==",
+                "value": "on",
+            }
+        ],
+    )
+    decks.upsert(deck)
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/morning/edit", width, touch=width == 390)
+        duplicate = page.get_by_role("button", name="Duplicate Weather", exact=True)
+        expect(duplicate).to_be_visible()
+        assert float(duplicate.evaluate("e => getComputedStyle(e).opacity")) > 0
+        assert duplicate.get_attribute("title") == "Duplicate Weather"
+        if width == 390:
+            box = duplicate.bounding_box()
+            assert box["width"] >= 44 and box["height"] >= 44
+        if width == 1280:
+            duplicate.focus()
+            page.keyboard.press("Enter")
+        else:
+            duplicate.tap()
+        expect(page.locator("[data-step]")).to_have_count(3)
+        copy_id = _steps(page)[1]
+        assert _steps(page) == ["weather", copy_id, "agenda"]
+        copied = app.config["PAGE_STORE"].get(copy_id)
+        assert copied.name == "Weather copy"
+        assert decks.get("morning").page_ids == ["weather", "agenda"]
+        expect(page.locator("#dxe-save-state")).to_have_text("Unsaved changes")
+        expect(page.locator("#dxe-live")).to_have_text("Duplicated Weather.")
+        expect(page.locator(f'[data-step="{copy_id}"] .dxe-sel')).to_be_focused()
+        assert (
+            page.get_by_role("link", name="Edit dashboard Weather copy", exact=True)
+            .get_attribute("href")
+            .endswith(copy_id)
+        )
+        page.locator(f'[data-step="{copy_id}"] .dxe-sel').press("Alt+ArrowRight")
+        assert _steps(page) == ["weather", "agenda", copy_id]
+        page.locator(f'[data-step="{copy_id}"] .dxe-sel').click()
+        expect(page.locator(f'[data-panel="{copy_id}"]')).to_have_count(0)
+        page.locator(f'[data-step="{copy_id}"] .dxe-sel').click()
+        expect(page.locator(f'[data-panel="{copy_id}"]')).to_be_visible()
+        page.get_by_role("button", name="Zoom Weather copy", exact=True).click()
+        expect(page.locator(".lu-lb")).to_be_visible()
+        page.keyboard.press("Escape")
+        _save(page)
+        saved = decks.get("morning")
+        assert saved.page_ids == ["weather", "agenda", copy_id]
+        assert saved.pages[-1].dwell_minutes == 45
+        assert saved.pages[-1].refresh_interval_minutes == 60
+        assert saved.pages[-1].conditions == deck.pages[0].conditions
+        assert not errors
+        browser.close()
+
+
+def test_duplicate_dashboard_in_a_new_lineup(real):
+    from playwright.sync_api import expect, sync_playwright
+
+    base, app = real
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/new?display=hall&page_id=weather")
+        page.locator("[data-goto='3']").click()
+        page.get_by_role("button", name="Duplicate Weather", exact=True).click()
+        expect(page.locator("[data-step]")).to_have_count(2)
+        copy_id = _steps(page)[1]
+        assert app.config["PAGE_STORE"].get(copy_id).name == "Weather copy"
+        assert len(app.config["DECK_STORE"].all()) == 2
+        assert not errors
+        _settle(page)
+        browser.close()
+
+
+def test_duplicate_missing_dashboard_is_hidden_and_deleted_source_explained(real):
+    from playwright.sync_api import expect, sync_playwright
+
+    base, app = real
+    app.config["PAGE_STORE"].delete("agenda")
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/morning/edit")
+        assert page.locator('[data-step="agenda"] [data-duplicate]').count() == 0
+        app.config["PAGE_STORE"].delete("weather")
+        page.get_by_role("button", name="Duplicate Weather", exact=True).click()
+        expect(page.locator("#dxe-save-state")).to_contain_text("deleted")
+        assert _steps(page) == ["weather", "agenda"]
+        expect(page.get_by_role("button", name="Duplicate Weather", exact=True)).to_be_enabled()
+        assert not errors
+        _settle(page)
+        browser.close()
+
+
+@pytest.mark.parametrize("offline", [False, True])
+def test_duplicate_failure_keeps_edits_and_allows_retry(real, offline):
+    from playwright.sync_api import expect, sync_playwright
+
+    base, _app = real
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/morning/edit")
+        page.locator("#dxe-title").fill("Changed lineup")
+        page.locator("#dxe-title").blur()
+        pending = []
+        page.route("**/pages/weather/duplicate", lambda route: pending.append(route))
+        page.get_by_role("button", name="Duplicate Weather", exact=True).click()
+        expect(page.locator("[data-save]")).to_be_disabled()
+        expect(page.locator("[data-discard]")).to_be_disabled()
+        expect(page.get_by_role("button", name="Duplicate Weather", exact=True)).to_be_disabled()
+        assert len(pending) == 1
+        if offline:
+            pending[0].abort()
+        else:
+            pending[0].fulfill(
+                status=500,
+                content_type="application/json",
+                body=json.dumps(
+                    {"ok": False, "error": "Storage is full. Free some space and try again."}
+                ),
+            )
+        expect(page.locator("#dxe-save-state")).to_contain_text("Couldn't duplicate Weather")
+        assert _steps(page) == ["weather", "agenda"]
+        assert page.locator("#dxe-title").input_value() == "Changed lineup"
+        expect(page.get_by_role("button", name="Duplicate Weather", exact=True)).to_be_enabled()
+        expect(page.locator("[data-save]")).to_be_enabled()
+        page.unroute("**/pages/weather/duplicate")
+        page.get_by_role("button", name="Duplicate Weather", exact=True).click()
+        expect(page.locator("[data-step]")).to_have_count(3)
+        assert page.locator("#dxe-title").input_value() == "Changed lineup"
+        assert not errors
+        _settle(page)
+        browser.close()
 
 
 @pytest.mark.parametrize("conditional", [False, True])
@@ -166,9 +310,13 @@ def real(tmp_path: Path) -> Iterator[tuple[str, Flask]]:
         thread.join(timeout=10)
 
 
-def _open(p: Any, base: str, path: str, width: int = 1280) -> tuple[Any, Any, list[str]]:
+def _open(
+    p: Any, base: str, path: str, width: int = 1280, *, touch: bool = False
+) -> tuple[Any, Any, list[str]]:
     browser = _launch(p)
-    page = browser.new_page(viewport={"width": width, "height": 900})
+    page = browser.new_page(
+        viewport={"width": width, "height": 900}, has_touch=touch, is_mobile=touch
+    )
     errors: list[str] = []
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.goto(base + path, wait_until="load")
@@ -1306,7 +1454,7 @@ def test_move_stages_shows_pending_saves_and_cancel_and_discard_reset(
         # Confirm asks to bind the dashboards, then only stages it.
         dlg = _open_move(page)
         dlg.locator("[data-ok]").click()
-        page.locator("dialog.bind-dialog:not(.dxe-move-dialog) button.primary").click()
+        _bind_move(page)
         page.locator("#dxe-loc .is-pending").wait_for()
         assert _loc(page).startswith("Moving to tv")
         assert page.locator(state).inner_text() == "Unsaved changes"
@@ -1320,7 +1468,7 @@ def test_move_stages_shows_pending_saves_and_cancel_and_discard_reset(
         # Undo drops it too.
         dlg = _open_move(page)
         dlg.locator("[data-ok]").click()
-        page.locator("dialog.bind-dialog:not(.dxe-move-dialog) button.primary").click()
+        _bind_move(page)
         page.locator("[data-move-undo]").click()
         assert _loc(page).startswith("On hall")
         assert page.locator(state).inner_text() == "All changes saved"
@@ -1328,13 +1476,24 @@ def test_move_stages_shows_pending_saves_and_cancel_and_discard_reset(
         dlg = _open_move(page)
         dlg.locator("[data-ok]").click()
         page.locator("dialog.bind-dialog:not(.dxe-move-dialog)").wait_for(state="visible")
-        page.locator("dialog.bind-dialog:not(.dxe-move-dialog) button.primary").click()
+        _bind_move(page)
         _save(page)
         assert store.get("morning").device_ids == ["tv"]
         assert app.config["PAGE_STORE"].get("weather").device_ids == ["tv"]
         assert _loc(page).startswith("On tv")
         assert errors == []
         browser.close()
+
+
+def _bind_move(page: Any) -> None:
+    """Answer the bind prompt with a move: untick every display but the
+    lineup's own (they start ticked, which keeps them), then confirm."""
+    dlg = page.locator("dialog.bind-dialog:not(.dxe-move-dialog)")
+    dlg.wait_for(state="visible")
+    for box in dlg.locator(".bind-row:not(.is-target) input").all():
+        box.uncheck()
+    dlg.get_by_role("button", name=re.compile(r"^Move to ")).click()
+    dlg.wait_for(state="detached")
 
 
 def test_move_cancelled_at_the_bind_prompt_stays_put(real: tuple[str, Flask]) -> None:
@@ -1345,7 +1504,9 @@ def test_move_cancelled_at_the_bind_prompt_stays_put(real: tuple[str, Flask]) ->
         browser, page, errors = _open(p, base, "/decks/morning/edit")
         dlg = _open_move(page)
         dlg.locator("[data-ok]").click()
-        page.locator("dialog.bind-dialog:not(.dxe-move-dialog) button.ghost").click()
+        page.locator("dialog.bind-dialog:not(.dxe-move-dialog)").get_by_role(
+            "button", name="Cancel"
+        ).click()
         page.locator("dialog.bind-dialog:not(.dxe-move-dialog)").wait_for(state="detached")
         assert _loc(page).startswith("On hall")
         assert page.locator("#dxe-save-state").inner_text() == "All changes saved"

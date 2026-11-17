@@ -892,7 +892,8 @@ unbound_pages:[{id, name, bound_to}], fix:{bind_pages:[ids]}} and nothing
 is saved or bound. To proceed, either bind the dashboards to the display
 first (bind_devices), or repeat the call with consent in the same object:
 "bind_pages": [ids] moves them to this display, and "bind_also": [ids]
-binds them to it while keeping their other display. Never bind a
+binds them to it while keeping their other display ("bind_keep":
+{id: [display ids]} keeps only those). Never bind a
 dashboard on your own initiative: it may belong to another lineup, so ask
 the user (or pick a dashboard already on this display). A dashboard bound
 to no display is allowed as before.""",
@@ -918,7 +919,8 @@ unbound_pages:[{id, name, bound_to}], fix:{bind_pages:[ids]}} and nothing
 is saved or bound. To proceed, either bind the dashboards to the display
 first (bind_devices), or repeat the call with consent in the same object:
 "bind_pages": [ids] moves them to this display, and "bind_also": [ids]
-binds them to it while keeping their other display. Never bind a
+binds them to it while keeping their other display ("bind_keep":
+{id: [display ids]} keeps only those). Never bind a
 dashboard on your own initiative: it may belong to another lineup, so ask
 the user (or pick a dashboard already on this display). A dashboard bound
 to no display is allowed as before.""",
@@ -953,7 +955,8 @@ unbound_pages:[{id, name, bound_to}], fix:{bind_pages:[ids]}} and nothing
 is saved or bound. To proceed, either bind the dashboards to the display
 first (bind_devices), or repeat the call with consent in the same object:
 "bind_pages": [ids] moves them to this display, and "bind_also": [ids]
-binds them to it while keeping their other display. Never bind a
+binds them to it while keeping their other display ("bind_keep":
+{id: [display ids]} keeps only those). Never bind a
 dashboard on your own initiative: it may belong to another lineup, so ask
 the user (or pick a dashboard already on this display). A dashboard bound
 to no display is allowed as before.""",

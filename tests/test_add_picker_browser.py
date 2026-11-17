@@ -334,7 +334,8 @@ def test_one_already_in_the_lineup_is_listed_but_cannot_be_added(
         assert dlg.is_visible() and _steps(page) == ["clock"]
         assert dlg.locator('[aria-selected="true"]').get_attribute("data-add") == "art"
         dlg.locator("[data-add-confirm]").click()
-        bind.get_by_role("button", name="Bind to frame").click()
+        bind.get_by_role("checkbox", name="tv", exact=True).uncheck()
+        bind.get_by_role("button", name="Move to frame", exact=True).click()
         dlg.wait_for(state="detached")
         assert _steps(page) == ["clock", "art"]
         _settle(page)
@@ -473,7 +474,9 @@ def test_the_new_lineup_adds_from_the_picker_in_one_step(real: tuple[str, Flask]
         dlg.get_by_role("button", name="Add condition", exact=True).click()
         dlg.locator(".cp-row").get_by_role("combobox").first.select_option("time_window")
         dlg.locator("[data-add-confirm]").click()
-        page.locator("dialog.bind-dialog").get_by_role("button", name="Bind to frame").click()
+        bind = page.locator("dialog.bind-dialog")
+        bind.get_by_role("checkbox", name="tv", exact=True).uncheck()
+        bind.get_by_role("button", name="Move to frame", exact=True).click()
         dlg.wait_for(state="detached")
         assert _steps(page) == ["art"]
         assert page.locator("[data-create]").is_enabled()

@@ -1,7 +1,9 @@
-"""The "Bind to this display?" prompt in a live Chromium, against the real
+"""The "Show it on this display?" prompt in a live Chromium, against the real
 routes: the deck editor (adding a dashboard from another display, switching
-the lineup's display), the setup wizard and the schedule form. Cancel adds
-and saves nothing; each bind choice binds exactly what it says."""
+the lineup's display), the setup wizard and the schedule form. One checkbox
+per display: the lineup's display stays ticked, the dashboard's other displays
+start ticked and come off when unticked. Cancel adds and saves nothing; the
+saved binding matches the summary line."""
 
 from __future__ import annotations
 
@@ -96,7 +98,7 @@ def _members(app: Flask, deck_id: str = "mine") -> list[str]:
 
 def _editor(p: Any, base: str, deck: str = "mine", **ctx: Any) -> tuple[Any, Any, list[str]]:
     browser = _launch(p)
-    page = browser.new_context(viewport={"width": 1440, "height": 900}, **ctx).new_page()
+    page = browser.new_context(**{"viewport": {"width": 1440, "height": 900}, **ctx}).new_page()
     errors: list[str] = []
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.goto(f"{base}/decks/{deck}/edit", wait_until="load")
@@ -110,7 +112,18 @@ def _answer(page: Any, name: str | re.Pattern[str]) -> None:
     dlg.wait_for(state="detached")
 
 
-_BIND = re.compile(r"^Bind to (?!both)")
+def _move(page: Any) -> None:
+    """The old "Bind to <display>": untick every other display, confirm."""
+    dlg = page.locator("dialog.bind-dialog:not(.dxe-move-dialog)")
+    dlg.wait_for(state="visible")
+    for box in dlg.locator(".bind-row:not(.is-target) input").all():
+        box.uncheck()
+    _answer(page, re.compile(r"^Move to "))
+
+
+def _also(page: Any) -> None:
+    """The old "Bind to both": leave the ticks as they are, confirm."""
+    _answer(page, re.compile(r"^Show on "))
 
 
 def _save(page: Any) -> None:
@@ -153,8 +166,8 @@ def test_adding_a_dashboard_from_another_display_asks_first(real: tuple[str, Fla
         # picker stays open with the choice.
         _add_other(page, "photos")
         dlg = page.locator("dialog.bind-dialog")
-        assert dlg.get_by_role("heading").inner_text().startswith("Bind “Google Photos” to ")
-        assert "currently bound to" in dlg.inner_text()
+        assert dlg.get_by_role("heading").inner_text() == "Show “Google Photos” on hallway?"
+        assert dlg.get_by_role("checkbox", name="frame").is_checked()
         _answer(page, "Cancel")
         assert _steps(page) == ["clock"]
         assert page.locator("#dxe-picker").is_visible()
@@ -174,7 +187,7 @@ def test_adding_a_dashboard_from_another_display_asks_first(real: tuple[str, Fla
 
         # Bind agreed: added at once; the display binding waits for Save.
         _add_other(page, "photos")
-        _answer(page, _BIND)
+        _move(page)
         page.locator("#dxe-picker").wait_for(state="detached")
         assert _steps(page) == ["clock", "photos"]
         assert _bound(app, "photos") == ["frame"]  # nothing changes until Save
@@ -185,7 +198,7 @@ def test_adding_a_dashboard_from_another_display_asks_first(real: tuple[str, Fla
         browser.close()
 
 
-def test_bind_to_both_keeps_the_other_display(real: tuple[str, Flask]) -> None:
+def test_leaving_the_ticks_keeps_the_other_display(real: tuple[str, Flask]) -> None:
     from playwright.sync_api import sync_playwright
 
     base, app = real
@@ -198,7 +211,7 @@ def test_bind_to_both_keeps_the_other_display(real: tuple[str, Flask]) -> None:
             "time_window"
         )
         page.locator("#dxe-picker [data-add-confirm]").click()
-        _answer(page, "Bind to both")
+        _also(page)
         assert _steps(page) == ["clock", "photos"]
         _save(page)
         assert _members(app) == ["clock", "photos"]
@@ -228,13 +241,13 @@ def test_switching_display_asks_and_cancel_reverts(real: tuple[str, Flask]) -> N
             return page.locator("dialog.bind-dialog:not(.dxe-move-dialog)")
 
         dlg = move()
-        assert dlg.get_by_role("heading").inner_text().startswith("Bind “Clock” to ")
+        assert dlg.get_by_role("heading").inner_text() == "Show “Clock” on frame?"
         _answer(page, "Cancel")
         assert loc.inner_text().startswith("On hallway")  # nothing changed
         assert page.locator(".dxe-step .dxe-tag.warn").count() == 0
 
         move()
-        _answer(page, _BIND)
+        _move(page)
         assert loc.inner_text().startswith("Moving to frame")
         assert page.locator(".dxe-step .dxe-tag.warn").count() == 1
         _save(page)
@@ -260,7 +273,7 @@ def test_an_already_broken_lineup_asks_on_save(real: tuple[str, Flask]) -> None:
         assert _bound(app, "photos") == ["frame"]  # nothing saved
         page.locator("[data-save]").click()
         with page.expect_navigation():
-            _answer(page, "Bind to both")
+            _also(page)
         assert _bound(app, "photos") == ["frame", "hallway"]
         assert errors == []
         browser.close()
@@ -294,7 +307,7 @@ def test_wizard_asks_before_creating_and_cancel_creates_nothing(real: tuple[str,
         assert _bound(app, "photos") == ["frame"]
 
         wiz.locator("[data-wizard-forward]").click()
-        _answer(page, _BIND)
+        _move(page)
         page.wait_for_function(
             "() => document.querySelector('#timed-wizard [data-wizard-view=created]:not([hidden])')"
         )
@@ -331,9 +344,255 @@ def test_schedule_form_asks_before_saving(real: tuple[str, Flask], editor: str) 
         assert app.config["SCHEDULE_STORE"].all() == []
         assert _bound(app, "photos") == ["frame"]
         dlg.locator('button[type="submit"]').first.click()
-        _answer(page, _BIND)
+        _move(page)
         page.wait_for_function("() => !document.querySelector('#schedule-dialog-new[open]')")
         assert len(app.config["SCHEDULE_STORE"].all()) == 1
         assert _bound(app, "photos") == ["hallway"]
+        assert errors == []
+        browser.close()
+
+
+# -- the checkbox list ---------------------------------------------------------------
+
+_PHONE: dict[str, Any] = {
+    "viewport": {"width": 390, "height": 844},
+    "is_mobile": True,
+    "has_touch": True,
+}
+
+
+def _add_display(app: Flask, dev: str) -> None:
+    code = app.config["PAIRING_STORE"].issue(note="t").code
+    resp = app.test_client().post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+        data=json.dumps({"device_id": dev, "kind": "esp32_client"}),
+    )
+    assert resp.status_code == 201
+
+
+def _prompt(page: Any) -> Any:
+    dlg = page.locator("dialog.bind-dialog:not(.dxe-move-dialog)")
+    dlg.wait_for(state="visible")
+    return dlg
+
+
+def _rows(dlg: Any) -> list[tuple[str, bool]]:
+    return [
+        (r.locator(".bind-row-name").inner_text(), r.locator("input").is_checked())
+        for r in dlg.locator(".bind-row").all()
+    ]
+
+
+def _summary(dlg: Any) -> str:
+    return str(dlg.locator(".bind-dialog-summary").inner_text())
+
+
+@pytest.mark.parametrize("phone", [False, True], ids=["desktop", "phone"])
+def test_unticking_a_display_takes_the_dashboard_off_it(
+    real: tuple[str, Flask], phone: bool
+) -> None:
+    """Bound to several: every current display is listed and ticked, the
+    lineup's own is ticked and stays so; unticking one drops it from the
+    summary, and the save binds exactly what the summary said."""
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    _add_display(app, "door")
+    app.config["PAGE_STORE"].save(Page(id="art", name="Art", device_ids=["frame", "door"]))
+    with sync_playwright() as p:
+        browser, page, errors = _editor(p, base, **(_PHONE if phone else {}))
+        _add_other(page, "art")
+        dlg = _prompt(page)
+        assert dlg.get_by_role("heading").inner_text() == "Show “Art” on hallway?"
+        assert dlg.locator("fieldset legend").inner_text() == "Displays"
+        assert _rows(dlg) == [("hallway", True), ("frame", True), ("door", True)]
+        assert _summary(dlg) == "Art will be on hallway, frame and door."
+        assert dlg.locator(".bind-dialog-summary").get_attribute("aria-live") == "polite"
+        ok = dlg.locator(".wizard-footer button.primary")
+        assert ok.inner_text() == "Show on 3 displays" and ok.is_enabled()
+
+        # The lineup's display can't be dropped: the tick stays, a hint says why.
+        target = dlg.get_by_role("checkbox", name="hallway")
+        assert target.get_attribute("aria-disabled") == "true"
+        target.click(force=True)
+        assert target.is_checked()
+        assert "stays ticked" in dlg.locator(".bind-dialog-hint").inner_text()
+        assert ok.is_enabled()
+
+        dlg.get_by_role("checkbox", name="door").uncheck()
+        assert _summary(dlg) == "Art will be on hallway and frame. Removed from door."
+        assert "Comes off" in dlg.locator(".bind-row.is-off").inner_text()
+        assert ok.inner_text() == "Show on 2 displays"
+        dlg.get_by_role("checkbox", name="frame").uncheck()
+        assert _summary(dlg) == "Art will be on hallway. Removed from frame and door."
+        assert ok.inner_text() == "Move to hallway"
+        dlg.get_by_role("checkbox", name="frame").check()
+
+        if phone:  # a bottom sheet with finger-sized targets
+            box = dlg.bounding_box()
+            assert abs(box["y"] + box["height"] - 844) < 2 and box["width"] >= 389
+            for el in dlg.locator(".bind-row, .wizard-footer button").all():
+                assert el.bounding_box()["height"] >= 44
+        assert _summary(dlg) == "Art will be on hallway and frame. Removed from door."
+        _answer(page, "Show on 2 displays")
+        assert _bound(app, "art") == ["frame", "door"]  # nothing until Save
+        _save(page)
+        assert _members(app) == ["clock", "art"]
+        assert sorted(_bound(app, "art")) == ["frame", "hallway"]
+        assert errors == []
+        browser.close()
+
+
+def test_cancel_and_escape_forget_the_ticks(real: tuple[str, Flask]) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    _add_display(app, "door")
+    app.config["PAGE_STORE"].save(Page(id="art", name="Art", device_ids=["frame", "door"]))
+    with sync_playwright() as p:
+        browser, page, errors = _editor(p, base)
+        _add_other(page, "art")
+        dlg = _prompt(page)
+        dlg.get_by_role("checkbox", name="door").uncheck()
+        page.keyboard.press("Escape")
+        dlg.wait_for(state="detached")
+        _add_other(page, "art")
+        dlg = _prompt(page)
+        assert _rows(dlg) == [("hallway", True), ("frame", True), ("door", True)]
+        dlg.get_by_role("checkbox", name="frame").uncheck()
+        _answer(page, "Cancel")
+        assert _steps(page) == ["clock"]
+        assert _bound(app, "art") == ["frame", "door"]
+        assert errors == []
+        browser.close()
+
+
+def test_keyboard_moves_through_the_list_and_stays_in_the_dialog(
+    real: tuple[str, Flask],
+) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, _app = real
+    with sync_playwright() as p:
+        browser, page, errors = _editor(p, base)
+        _add_other(page, "photos")
+        dlg = _prompt(page)
+        focused = "() => document.activeElement.closest('dialog') ? " \
+            "(document.activeElement.getAttribute('aria-labelledby') || " \
+            "document.activeElement.textContent.trim()) : 'OUTSIDE'"  # fmt: skip
+        assert page.evaluate(focused) == "Show on 2 displays"  # the primary has focus
+        seen = []
+        for _ in range(5):
+            page.keyboard.press("Tab")
+            seen.append(page.evaluate(focused))
+        assert "OUTSIDE" not in seen
+        # The rows come first, then Cancel, then the primary.
+        order = [x for x in dict.fromkeys(seen)]
+        assert order.index("bind-row-0-name") < order.index("bind-row-1-name")
+        assert order.index("bind-row-1-name") < order.index("Cancel")
+        dlg.get_by_role("checkbox", name="hallway").focus()
+        page.keyboard.press("Shift+Tab")
+        assert page.evaluate(focused) == "Show on 2 displays"  # wraps backwards too
+        # Space toggles a row, and the summary follows.
+        dlg.get_by_role("checkbox", name="frame").focus()
+        page.keyboard.press("Space")
+        assert _summary(dlg) == "Google Photos will be on hallway. Removed from frame."
+        assert errors == []
+        browser.close()
+
+
+_ASK = """(pages) => {
+  window.__answer = 'pending';
+  TesseraeBindPrompt.ask({
+    display: {id: 'lounge', name: 'Meural Lounge Frame', width: 1920, height: 1080},
+    pages,
+  }).then((a) => { window.__answer = a; });
+}"""
+_DOOR = {"id": "door", "name": "Door Frame", "width": 1200, "height": 1600}
+_MINI = {"id": "mini", "name": "Mini Frame", "width": 480, "height": 800}
+_LONG = {
+    "id": "long",
+    "name": "Upstairs landing hallway frame by the big bookshelf near the window",
+    "width": 1920,
+    "height": 1080,
+}
+
+
+@pytest.mark.parametrize("phone", [False, True], ids=["desktop", "phone"])
+def test_edge_cases_none_one_many_and_long_names(real: tuple[str, Flask], phone: bool) -> None:
+    from playwright.sync_api import sync_playwright
+
+    base, _app = real
+    with sync_playwright() as p:
+        browser, page, errors = _editor(p, base, **(_PHONE if phone else {}))
+
+        def ask(pages: list[dict[str, Any]]) -> Any:
+            page.evaluate(_ASK, pages)
+            return _prompt(page)
+
+        def answer() -> Any:
+            return page.evaluate("() => window.__answer")
+
+        # Bound to none: just the target, a plain "Show on" and no removals.
+        dlg = ask([{"id": "n", "name": "Loose", "bound_to": []}])
+        assert _rows(dlg) == [("Meural Lounge Frame", True)]
+        assert _summary(dlg) == "Loose will be on Meural Lounge Frame."
+        assert dlg.locator(".bind-dialog-note").count() == 0
+        _answer(page, "Show on Meural Lounge Frame")
+        assert answer() == {"mode": "move", "modes": {"n": "move"}, "keep": {"n": []}}
+
+        # Bound to one, then unticked: a move, with the size note.
+        dlg = ask([{"id": "w", "name": "Weather", "bound_to": [_DOOR]}])
+        assert _rows(dlg) == [("Meural Lounge Frame", True), ("Door Frame", True)]
+        assert "1920×1080, so Weather shows scaled there" in dlg.inner_text()
+        dlg.get_by_role("checkbox", name="Door Frame").uncheck()
+        _answer(page, "Move to Meural Lounge Frame")
+        assert answer()["mode"] == "move"
+
+        # Several dashboards: each row says which it has; per-page answers.
+        dlg = ask(
+            [
+                {"id": "a", "name": "Art", "bound_to": [_DOOR, _MINI]},
+                {"id": "w", "name": "Weather", "bound_to": [_DOOR]},
+            ]
+        )
+        assert (
+            dlg.get_by_role("heading").inner_text() == "Show 2 dashboards on Meural Lounge Frame?"
+        )
+        assert "has Art and Weather" in dlg.locator(".bind-row").nth(1).inner_text()
+        dlg.get_by_role("checkbox", name="Mini Frame").uncheck()
+        assert _summary(dlg) == (
+            "These 2 dashboards will be on Meural Lounge Frame and Door Frame. "
+            "Removed from Mini Frame."
+        )
+        _answer(page, "Show on 2 displays")
+        got = answer()
+        assert got["keep"] == {"a": ["door"], "w": ["door"]}
+        assert got["modes"] == {"a": "some", "w": "also"} and got["mode"] == "some"
+        fields = page.evaluate(
+            "(a) => [TesseraeBindPrompt.fields(a, 'a'), TesseraeBindPrompt.fields(a, 'w')]", got
+        )
+        assert fields == [
+            [["bind_pages", "a"], ["bind_keep", '{"a":["door"]}']],
+            [["bind_pages", "w"], ["bind_also", "w"]],
+        ]
+
+        # Long names truncate inside the row; nothing spills sideways.
+        dlg = ask([{"id": "s", "name": "Night sky over the reservoir, long", "bound_to": [_LONG]}])
+        name = dlg.locator(".bind-row-name").nth(1)
+        assert name.get_attribute("title") == _LONG["name"]
+        assert page.evaluate(
+            "() => { const n = document.querySelectorAll('.bind-row-name')[1];"
+            " return n.scrollWidth > n.clientWidth; }"
+        )
+        assert page.evaluate(
+            "() => { const d = document.querySelector('dialog.bind-dialog');"
+            " return d.scrollWidth <= d.clientWidth && d.getBoundingClientRect().right"
+            " <= innerWidth + 1; }"
+        )
+        page.keyboard.press("Escape")
+        dlg.wait_for(state="detached")
+        assert answer() is None
         assert errors == []
         browser.close()
