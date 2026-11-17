@@ -3533,11 +3533,14 @@ def _editor_state(deck: Deck | None) -> dict[str, Any]:
     # How many other lineups show each dashboard: a pin or Updates changes
     # it for them too.
     shared: dict[str, int] = {}
+    shared_displays: dict[str, set[str]] = {}
+    page_devices = {p.id: p.device_ids for p in _pages().list()}
     for other in all_decks:
         if deck is not None and other.id == deck.id:
             continue
         for pid in set(other.page_ids):
             shared[pid] = shared.get(pid, 0) + 1
+            shared_displays.setdefault(pid, set()).update(_deck_displays(other, page_devices))
     page_meta: dict[str, dict[str, Any]] = {}
     for p in pages:
         try:
@@ -3550,6 +3553,7 @@ def _editor_state(deck: Deck | None) -> dict[str, Any]:
                 p, dims, token, deck.device_ids[0] if deck and deck.device_ids else None
             ),
             "shared": shared.get(p.id, 0),
+            "shared_displays": sorted(shared_displays.get(p.id, set())),
         }
     # A dashboard shared by displays of different shapes has one preview, drawn at its
     # largest panel (a 16:9 TV's landscape picture cropped into a portrait frame's

@@ -396,7 +396,10 @@
       pages: need.map((id) => ({
         id,
         name: S.pages[id].name,
-        bound_to: S.pages[id].devices.map(devInfo),
+        bound_to: S.pages[id].devices.map((d) => ({
+          ...devInfo(d),
+          shared: (S.pages[id].shared_displays || []).includes(d),
+        })),
       })),
     });
     if (!mode) return false;
