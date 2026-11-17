@@ -2399,6 +2399,7 @@ def test_unreadable_condition_choice_survives_save_and_reload(real, width):
         page.locator("[data-picker]").click()
         page.locator('[data-add="clock"]').click()
         picker = page.locator("#dxe-picker")
+        picker.locator(".dxe-pick-cond > summary").click()
         picker.get_by_role("button", name="Add condition", exact=True).click()
         picker.locator(".cp-row input[list]").fill("sensor.example_state")
         choice = picker.get_by_label("Not met when it can't be read")
@@ -2416,5 +2417,41 @@ def test_unreadable_condition_choice_survives_save_and_reload(real, width):
         page.locator('[data-edit="clock"]').click()
         assert row.get_by_label("Not met when it can't be read").is_checked()
         assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+        assert not errors
+        browser.close()
+
+
+@pytest.mark.parametrize("native_dialog", [False, True])
+@pytest.mark.parametrize("width", [1280, 390])
+def test_picker_adds_and_cancels_without_dialog_support(real, native_dialog, width):
+    from playwright.sync_api import expect, sync_playwright
+
+    base, app = real
+    pages = app.config["PAGE_STORE"]
+    pages.save(pages.get("clock").model_copy(update={"device_ids": ["hall"]}))
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/morning/edit", width=width)
+        if not native_dialog:
+            page.evaluate("window.HTMLDialogElement = undefined")
+        requests = []
+        page.on("request", lambda r: requests.append(r) if "/picker-previews" in r.url else None)
+        page.locator("[data-picker]").click()
+        picker = page.locator("#dxe-picker")
+        expect(picker).to_be_visible()
+        expect(picker.locator('[data-add="clock"]')).to_be_focused()
+        page.wait_for_function("() => !!document.querySelector('#dxe-picker')")
+        picker.locator('[data-add="clock"]').press("Escape")
+        expect(picker).to_have_count(0)
+        expect(page.locator("[data-picker]")).to_be_focused()
+        assert _steps(page) == ["weather", "agenda"]
+        page.locator("[data-picker]").click()
+        page.locator('[data-add="clock"]').click()
+        page.locator("[data-add-confirm]").click()
+        expect(page.locator('[data-step="clock"]')).to_be_visible()
+        assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+        assert requests
+        assert "clock" in requests[0].post_data_json["page_ids"]
+        _save(page)
+        assert app.config["DECK_STORE"].get("morning").page_ids == ["weather", "agenda", "clock"]
         assert not errors
         browser.close()

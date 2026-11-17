@@ -1585,19 +1585,31 @@
   }
   // Opens the picker; resolves when it closes (added or not).
   function openPicker() {
-    if (!st.display || typeof HTMLDialogElement === "undefined") return;
+    if (!st.display) return;
     const old = document.getElementById("dxe-picker");
-    if (old && old.open) return;
+    if (old && old.hasAttribute("open")) return;
     if (old) old.remove(); // closed, its close event still to come
     const opener = document.activeElement;
-    const dlg = document.createElement("dialog");
+    const nativeDialog =
+      typeof HTMLDialogElement !== "undefined" &&
+      typeof HTMLDialogElement.prototype.showModal === "function";
+    const dlg = document.createElement(nativeDialog ? "dialog" : "div");
     dlg.id = "dxe-picker";
     dlg.className = "wizard-dialog dxe-pick-dlg";
     dlg.setAttribute("aria-labelledby", "dxe-pick-title");
+    if (!nativeDialog) {
+      dlg.classList.add("is-inline");
+      dlg.setAttribute("role", "region");
+      dlg.setAttribute("open", "");
+    }
     const v = viewOf(st.display) || {};
     dlg.style.cssText = `--dxe-arw:${Number(v.width) || 16};--dxe-arh:${Number(v.height) || 10}`;
     dlg.innerHTML = pickerDialogHtml();
     ui.picker = true;
+    const close = () => {
+      if (nativeDialog) dlg.close();
+      else dlg.dispatchEvent(new Event("close"));
+    };
     let sel = null;
     let busy = false;
     let added = false;
@@ -1669,7 +1681,7 @@
     );
     // Closed is gone: nothing half-open is left in the page.
     const shut = () => {
-      if (dlg.open) dlg.close();
+      close();
       dlg.remove();
     };
     dlg.addEventListener("cancel", (e) => {
@@ -1691,6 +1703,10 @@
       if (o && o.dataset.add === sel) confirm();
     });
     dlg.addEventListener("keydown", (e) => {
+      if (!nativeDialog && e.key === "Escape") {
+        e.preventDefault();
+        return shut();
+      }
       const o = e.target.closest && e.target.closest(".dxe-pick-opt");
       const inQ = e.target === q;
       if (!o && !inQ) return;
@@ -1752,7 +1768,30 @@
     });
     root.append(dlg);
     filter();
-    dlg.showModal();
+    if (nativeDialog) dlg.showModal();
+    else dlg.scrollIntoView({ block: "nearest" });
+    const display = st.display;
+    request(S.urls.pickerPreviews, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        display_id: display,
+        page_ids: Object.values(S.pages)
+          .filter((p) => !p.missing)
+          .map((p) => p.id),
+      }),
+    })
+      .then((data) => {
+        if (!dlg.isConnected || st.display !== display) return;
+        Object.entries(data.pages || {}).forEach(([id, shot]) => {
+          Object.assign(S.pages[id], shot);
+          const thumb = dlg.querySelector(`[data-add="${CSS.escape(id)}"] .dxe-pick-th`);
+          if (thumb) thumb.innerHTML = stackedThumb(pageOf(id));
+        });
+      })
+      .catch(() => {
+        // The shared pictures remain available when display previews cannot load.
+      });
     // Search first on a long list; else the first dashboard that can be added.
     if (q) q.focus();
     else {
@@ -2479,7 +2518,6 @@
       if ((conditions || "").trim()) stepHadConditions.add(id);
       if (!st.home) st.home = "";
       ui.picker = false;
-      ui.elsewhere = false;
       ui.open.clear();
       ui.open.add(id);
     });
@@ -3402,17 +3440,6 @@
       e.preventDefault();
       move(row.dataset.step, e.key === "ArrowUp" || e.key === "ArrowLeft" ? -1 : 1);
       return;
-    }
-    // Esc closes the picker and goes back to its button.
-    if (e.key === "Escape" && ui.picker && !(LB && LB.isOpen())) {
-      const inside = e.target.closest && e.target.closest("#dxe-picker, [data-picker]");
-      if (inside) {
-        e.preventDefault();
-        ui.picker = false;
-        draw();
-        root.querySelector("[data-picker]")?.focus();
-        return;
-      }
     }
     // Esc closes the open details and goes back to its tile.
     if (e.key === "Escape" && ui.open.size && !(LB && LB.isOpen())) {
