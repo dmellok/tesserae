@@ -497,3 +497,14 @@ hr.dx-divider {
   flex: 1 1 8em;
   min-width: 6em;
 }
+
+/* "Not met when it can't be read" on HA condition rows: a quiet full-width
+   line under the entity / operator / value inputs. */
+.condition-picker .cp-row-body .cond-unknown {
+  flex-basis: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--t-muted, var(--t-fg));
+}

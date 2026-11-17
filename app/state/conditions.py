@@ -72,6 +72,12 @@ class Condition(BaseModel):
     #   time_window in:             {"start_local", "end_local", "days_of_week"}
     #   sun before_sunrise/...:     {"offset_minutes": int} (offset optional)
     value: Any = None
+    # ha_entity only: what an unreadable entity counts as. "pass" (the default)
+    # keeps dashboards up through a Home Assistant outage; "fail" keeps an
+    # interrupting lineup off (a print page while the printer can't be read).
+    # Unreadable = HA unreachable on the last refresh, the entity missing, or
+    # its state unavailable / unknown.
+    if_unknown: Literal["pass", "fail"] = "pass"
 
     @field_validator("source_id")
     @classmethod

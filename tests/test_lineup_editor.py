@@ -54,6 +54,7 @@ def test_new_lineup_keeps_step_conditions(app):
         "source_id": "sensor.example_state",
         "operator": "==",
         "value": "active",
+        "if_unknown": "fail",
     }
     response = app.test_client().post(
         "/decks/new/lineup",
