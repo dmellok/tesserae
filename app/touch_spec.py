@@ -75,6 +75,27 @@ def wire_is_upright(panel: dict[str, Any]) -> bool:
     return comp_landscape == native_landscape and not geo["flip"]
 
 
+def wire_turn(panel: dict[str, Any]) -> int:
+    """How far the composition is turned, clockwise, on its way to the device
+    framebuffer: 0, 90, 180 or 270.
+
+    The same two steps as :func:`app.overlay_sync.rect_to_wire`: a quarter turn
+    clockwise when the composition's orientation differs from the
+    firmware-native one, then a half turn for a flipped mount. A firmware that
+    reads the spec's ``turn`` draws each control's label and value turned to
+    match, so they read upright on the wall (firmware #73). Unusable geometry
+    answers 0, like :func:`wire_is_upright`."""
+    geo = _panel_geometry(panel)
+    if geo is None:
+        return 0
+    turn = 0
+    if (geo["comp_w"] > geo["comp_h"]) != (geo["native_w"] > geo["native_h"]):
+        turn += 90
+    if geo["flip"]:
+        turn += 180
+    return turn
+
+
 def is_spec_primitive(el: Element, *, upright: bool = True) -> bool:
     """Whether ``el`` makes it into a frame spec (ignoring the wire transform's
     off-panel check). The firmware draws only what the spec carries, so the
@@ -238,7 +259,11 @@ def fold_atlas_digests(layout_digest: str, atlas_digests: Iterable[str]) -> str:
 
 
 def build_frame_spec(
-    els: Iterable[Element], *, wire: WireFn | None = None, upright: bool = True
+    els: Iterable[Element],
+    *,
+    wire: WireFn | None = None,
+    upright: bool = True,
+    turn: int = 0,
 ) -> dict[str, Any]:
     """Build the frame spec from a layout's elements.
 
@@ -248,10 +273,24 @@ def build_frame_spec(
     is derived from the primitive structure (stable across data-only redraws).
     ``atlases`` is omitted here; the atlas pipeline attaches descriptors for the
     roles the primitives reference. Invalid primitives are skipped, and so are
-    buttons when ``upright`` is False (see :func:`is_spec_primitive`)."""
+    buttons when ``upright`` is False (see :func:`is_spec_primitive`).
+
+    ``turn`` (from :func:`wire_turn`) is written into the doc and folded into
+    the digest only when it is not 0, so an upright panel's spec and digest
+    are unchanged. A device keeps its held spec while the digest stays the
+    same, and the rects of a square or symmetric layout can survive a turn
+    unchanged, hence the fold."""
     primitives = [
         p
         for p in (_primitive_for(el, wire) for el in els if upright or el.kind != "button")
         if p is not None
     ]
-    return {"layout_digest": touch_layout_digest(primitives), "primitives": primitives}
+    digest = touch_layout_digest(primitives)
+    if turn not in (90, 180, 270):
+        return {"layout_digest": digest, "primitives": primitives}
+    blob = json.dumps([digest, {"turn": turn}], separators=(",", ":"))
+    return {
+        "layout_digest": hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16],
+        "turn": turn,
+        "primitives": primitives,
+    }
