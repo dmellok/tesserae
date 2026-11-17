@@ -14,6 +14,7 @@ import json
 import urllib.error
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -493,6 +494,27 @@ def test_tap_steps_the_display_once_when_asked(app: Flask) -> None:
     _run(pub, clock, 40)
     assert len(steps) == 1
     assert steps[0]["device_id"] == "hall" and steps[0]["forward"] and "sleep" not in _names(frame)
+
+
+def test_frame_up_early_for_its_wake_is_not_a_tap(app: Flask) -> None:
+    """The frame boots half a minute before a chain slot: still that wake,
+    so no step, and it is slept like any scheduled wake."""
+    device = _make_frame(app, tap_action="next")
+    clock = Clock()
+    frame = FakeFrame(clock)
+    wake = T0 + 600
+    frame.schedule.update({"enabled": True, "interval_minutes": 60})
+    frame.next_wakes = [wake + 3600, wake + 7200]
+    pub = _publisher(app, frame, clock)
+    pub.update_state(device, {"next_wakes": [wake, wake + 3600], "boot": 1})
+    steps: list[dict[str, Any]] = []
+    app.config["BUTTON_SERVICE"] = SimpleNamespace(step=lambda **kw: steps.append(kw))
+    frame.wake(wake - 30)
+    clock.now = wake - 19
+    _run(pub, clock, 90)
+    assert steps == []
+    assert "sleep" in _names(frame)
+    assert wake in pub.load_state(device)["handled_wakes"]
 
 
 def test_tap_does_nothing_extra_by_default(app: Flask) -> None:
