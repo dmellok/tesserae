@@ -828,6 +828,36 @@ main.page.dxe-page {
   outline: 2px solid var(--t-fg);
   outline-offset: 4px;
 }
+.lu.dxe .dxe-duplicate {
+  left: 4px;
+  right: auto;
+  cursor: pointer;
+}
+.lu.dxe .dxe-duplicate:disabled {
+  cursor: progress;
+  opacity: 0.4;
+}
+@media (max-width: 600px), (pointer: coarse) {
+  .lu.dxe .dxe-duplicate {
+    top: 0;
+    left: 0;
+    width: 44px;
+    height: 44px;
+    background: none;
+  }
+  .lu.dxe .dxe-duplicate .lu-ico {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    right: auto;
+    box-sizing: border-box;
+    width: 26px;
+    height: 26px;
+    padding: 5px;
+    border-radius: var(--lu-r-xs);
+    background: rgba(21, 20, 18, 0.62);
+  }
+}
 /* The open dashboard: an accent frame round the whole tile, its stack
    included (the tile's own button grows over the back cards), so it never
    cuts through them; the accent is the primary buttons', in both themes. */
