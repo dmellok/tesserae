@@ -56,6 +56,7 @@ def register(app: Flask) -> None:
         firmware_routes,
         genai_routes,
         index_routes,
+        meural_routes,
         palette_routes,
         relay_routes,
         rooms_routes,

@@ -85,6 +85,7 @@ def test_meural_tab_adds_a_frame_and_opens_its_setup_page(
         assert page.locator("[data-segmented-help-meural]").is_visible()
         assert not page.locator('[data-transport-branch="rest"]').is_visible()
         assert not page.locator("[data-segmented-help-rest]").is_visible()
+        branch.get_by_label("Delivery", exact=True).select_option("local")
         branch.get_by_label("Device id").fill(f"meural_test_{width}")
         branch.get_by_label("Display name", exact=True).fill("Example frame")
         branch.get_by_label("Frame address").fill("192.0.2.10")

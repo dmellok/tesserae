@@ -26,11 +26,14 @@ client and what's been tested on real hardware.
 
 ## Netgear Meural
 
-Open **Settings → Devices → Add device → Netgear Meural**, enter a device id and display name, then click **Add Netgear Meural**. On its page, enter its LAN address under **Frame address** and save. Tesserae sends a temporary preview through the frame's local API and renews it while running. Set **Renew preview every** shorter than your frame's preview duration. When renewal stops, the frame returns to its own artwork.
+Open **Settings → Devices → Add device → Netgear Meural**. Enter a device id and display name, sign in to Netgear, choose a frame, then add the device. Sign-in expires after 15 minutes if you do not finish adding it. Use HTTPS or a trusted local connection. Tesserae stores encrypted tokens; your password and verification code go directly from your browser to Netgear.
 
-Enable **Sleep through quiet hours** to put the frame to sleep during that window. Tesserae wakes it afterward only if it put it to sleep; a frame asleep through its own controls stays asleep. Keep the frame's unauthenticated local API on a trusted network.
+Cloud delivery uses an unofficial API and client ids from Netgear's app. Netgear can change them or block access, so this path can stop working. The minimum delivery interval is five minutes by default and is adjustable per device. Renders in between are combined; the latest page wins.
 
-Local network mode is untested on a physical frame. Automated tests use fake transports. Cloud sign-in and persistent artwork delivery are separate work.
+Sign-in and single-image cloud delivery have been verified on a real frame. Token renewal is implemented but remains unverified against the live service. Sleep schedule sync and playback restore are unverified and are not included. Tesserae does not change gallery rotation or native sleep schedules. Click **Stop Tesserae delivery** before choosing a gallery or playback settings in the Meural app. Sign-out, frame changes and deletion also stop delivery. Upload cleanup is best effort and never blocks these actions.
+
+
+For **Local preview (backup)**, enter the frame's LAN address. Unchanged images are not uploaded again by default. If your frame expires local previews, set a renewal interval shorter than its preview duration. Orientation is sent when the address or orientation changes. A LAN address also lets Tesserae check sleep status and apply its quiet hours. It wakes only a frame it put to sleep, including a best-effort wake before deletion. Reserve the address in your router; if it changes while asleep in LAN-only mode, wake it in the Meural app.
 
 ## tesserae-device-firmware
 

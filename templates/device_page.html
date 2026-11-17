@@ -659,6 +659,10 @@
             {% endif %}
           </div>
 
+          {% if section.meural_account %}
+          {% with account=section.meural_account, meural_mode='device' %}{% include '_meural_account.html' %}{% endwith %}
+          {% endif %}
+
           {% if section.repair_request %}
           {% set _rr = section.repair_request %}
           <div class="dx-band is-warn" id="repair-request">

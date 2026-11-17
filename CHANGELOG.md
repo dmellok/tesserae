@@ -12,6 +12,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Add Meural cloud sign-in and single-image delivery with a per-device delivery interval.
 - Export dashboards and lineups to a file and import them on another server. An export leaves out displays, passwords and keys; an import shows what it will add or replace before anything changes, and replacing keeps the displays already assigned. (#541)
 - Offer optional conditions when adding a dashboard to a lineup.
 - Add Netgear Meural local-network previews and quiet-hours sleep control.

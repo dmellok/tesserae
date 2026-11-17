@@ -42,12 +42,18 @@ KOReader's `trmnl-display` plugin needs a short token instead:
 
 ## Add a Netgear Meural
 
+Meural cloud delivery uses an unofficial Netgear API and client ids from Netgear's app. Netgear can change them or block access, so this path can stop working.
+
 1. Open **Settings → Devices → Add device → Netgear Meural**.
 2. Enter a device id and display name, then click **Add Netgear Meural**.
-3. On the new device's page, enter its **Frame address** and save.
+3. On the new device's page, open **Connection** and click **Sign in to Netgear**.
+4. Complete sign-in and any verification challenge, then choose a frame from your account.
+
+Cloud delivery waits at least five minutes between updates by default. Change the minimum interval in Connection settings; renders in between are combined and the latest page wins. Sleep schedule sync and playback restore are unverified and are not included. Use the Meural app to manage native schedules and playback. Cloud cleanup failures never block sign-out, frame changes, stopping delivery or deletion.
+
 
 The panel starts at 1080×1920 in portrait. Change its orientation if the frame hangs sideways.
-See [Meural setup](clients.md#netgear-meural) for preview renewal and quiet hours.
+See [Meural setup](clients.md#netgear-meural) for cloud delivery, local preview backup and quiet hours.
 
 ## Per-device settings
 
