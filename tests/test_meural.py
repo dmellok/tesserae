@@ -497,3 +497,29 @@ def test_redirects_do_not_forward_authorization():
         NoRedirect().redirect_request(request, None, 302, "Found", {}, "https://other.example")
         is None
     )
+
+
+def test_a_frame_that_stays_unreachable_is_reported_once(setup, caplog):
+    """Retries run every few seconds, so a frame switched off at the wall must not
+    write the same warning and History row on each one."""
+    events = setup.app.config["EVENT_LOG"]
+
+    def errors():
+        return events.list(source="test_frame", statuses=("error",))
+
+    pub = setup.publisher()
+    setup.frame.fail_upload = True
+    with caplog.at_level("WARNING", logger="app.meural"):
+        for _ in range(4):
+            pub.poll_once()
+            setup.clock[0] += 10
+    assert len([r for r in caplog.records if "upload rejected" in r.getMessage()]) == 1
+    assert len(errors()) == 1
+
+    setup.frame.fail_upload = False
+    pub.poll_once()
+    assert len(setup.frame.uploads) == 1
+    setup.frame.fail_upload = True
+    setup.clock[0] += 60
+    pub.poll_once()
+    assert len(errors()) == 2

@@ -170,6 +170,9 @@ class MeuralPublisher:
         self._sent: dict[str, tuple[str, float]] = {}
         self._images: dict[str, tuple[str, bytes]] = {}
         self._retry_at: dict[str, float] = {}
+        # device id -> the failure last reported, so a frame that stays
+        # unreachable is logged once and not on every retry.
+        self._failed: dict[str, str] = {}
         self._telemetry: dict[str, tuple[float, dict[str, Any]]] = {}
 
     def start(self) -> None:
@@ -229,7 +232,13 @@ class MeuralPublisher:
         with self._lock:
             frames = [d for d in self._devices.devices.values() if d.kind_of == KIND]
             live = {d.id for d in frames}
-            for cache in (self._sent, self._images, self._retry_at, self._telemetry):
+            for cache in (
+                self._sent,
+                self._images,
+                self._retry_at,
+                self._telemetry,
+                self._failed,
+            ):
                 for key in set(cache) - live:
                     cache.pop(key, None)
             for device in frames:
@@ -240,8 +249,16 @@ class MeuralPublisher:
                 try:
                     self._visit(device)
                     self._retry_at.pop(device.id, None)
+                    if self._failed.pop(device.id, None) is not None:
+                        logger.info("meural %s: reachable again", device.id)
                 except Exception as exc:
                     self._retry_at[device.id] = self._clock() + POLL_INTERVAL_S
+                    # The retry is every few seconds. A frame switched off at
+                    # the wall would otherwise fill the log and the History
+                    # page with the same line until it came back.
+                    if self._failed.get(device.id) == str(exc):
+                        continue
+                    self._failed[device.id] = str(exc)
                     logger.warning("meural %s: %s", device.id, exc)
                     events = self._app.config.get("EVENT_LOG")
                     if events is not None:
