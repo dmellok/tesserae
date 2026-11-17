@@ -58,8 +58,8 @@ class Consent:
     @classmethod
     def from_form(cls, form: Any) -> Consent:
         also = frozenset(_ids(form.getlist("bind_also")))
-        keep = _display_choices(form.getlist("bind_keep"))
-        remove = _display_choices(form.getlist("bind_remove"))
+        keep = _keep(form.getlist("bind_keep"))
+        remove = _keep(form.getlist("bind_remove"))
         return cls(
             frozenset(_ids(form.getlist("bind_pages"))) | also | set(keep) | set(remove),
             also,
@@ -70,8 +70,8 @@ class Consent:
     @classmethod
     def from_json(cls, body: Mapping[str, Any]) -> Consent:
         also = frozenset(_ids(body.get("bind_also")))
-        keep = _display_choices(body.get("bind_keep"))
-        remove = _display_choices(body.get("bind_remove"))
+        keep = _keep(body.get("bind_keep"))
+        remove = _keep(body.get("bind_remove"))
         return cls(
             frozenset(_ids(body.get("bind_pages"))) | also | set(keep) | set(remove),
             also,
@@ -80,7 +80,7 @@ class Consent:
         )
 
 
-def _display_choices(raw: Any) -> dict[str, frozenset[str]]:
+def _keep(raw: Any) -> dict[str, frozenset[str]]:
     """``bind_keep`` / ``bind_remove``: a ``{page id: [display ids]}`` object, a JSON string of
     one, or a list of either (a form sends one field per dashboard). Bad
     entries are ignored; empty lists are valid explicit choices."""

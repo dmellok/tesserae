@@ -29,8 +29,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
-- Keep bindings added elsewhere when adding a lineup dashboard, and warn before removing one used by other lineups.
-
+- Fix lineup binding races and warnings, and load picker previews on demand with an inline fallback.
 - Duplicating a dashboard with a status bar keeps the copy's status bar under its own control. The copy pointed at the original's bar, so switching it off on the copy left it in place.
 - Home Assistant: entity and service widgets no longer drop out for five minutes in every fifteen when the access token belongs to a user who is not an administrator. The OpenDisplay check asked Home Assistant an admin-only question every 15 minutes, even with no OpenDisplay tags set up, and the refusal was treated as a rejected token. With no tags linked it now asks nothing, and a refusal from an admin-only request no longer holds back the requests the token is allowed to make. (#553)
 - Lineup thumbnail files close before transmission, so disconnected browsers cannot leave them open.

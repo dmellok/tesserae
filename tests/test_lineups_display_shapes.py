@@ -206,3 +206,44 @@ def test_latest_pushes_matches_the_whole_device_id(app: Flask) -> None:
     targets = ["for-reterminal_a", "for-reterminalXa", "for-reterminal_ab"]
     assert set(log.latest_pushes(targets, "reterminal_a")) == {"for-reterminal_a"}
     assert set(log.latest_pushes(targets)) == set(targets)
+
+
+def test_editor_defers_unused_display_renders_until_picker_open(app, client, monkeypatch):
+    pages = app.config["PAGE_STORE"]
+    pages.save(Page(id="unused", name="Unused", device_ids=["wide", "tall"]))
+    pages.save(Page(id="hidden", name="Hidden", device_ids=["wide", "tall"], archived=True))
+    asked = _keep_previews(monkeypatch)
+    client.get("/decks/all/edit")
+    assert not any(job["page_id"] == "unused" for job in asked)
+    asked.clear()
+    response = client.post(
+        "/decks/picker-previews",
+        json={"display_id": "tall", "page_ids": ["unused"]},
+    )
+    assert response.status_code == 200
+    assert {job["page_id"] for job in asked} == {"unused"}
+    assert all(job["query"] == "&device_id=tall" for job in asked)
+    assert response.json == {"ok": True, "pages": {}}
+
+
+def test_picker_previews_return_ready_display_picture(app, client):
+    digest = _composition(app, 480, 800, "tall")
+    response = client.post(
+        "/decks/picker-previews", json={"display_id": "tall", "page_ids": ["photos"]}
+    )
+    assert response.status_code == 200
+    shot = response.json["pages"]["photos"]
+    assert digest in shot["thumb"]
+    assert (shot["w"], shot["h"]) == (480, 800)
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "bad",
+        {"display_id": "missing", "page_ids": []},
+        {"display_id": "tall", "page_ids": "photos"},
+    ],
+)
+def test_picker_previews_reject_invalid_choices(client, body):
+    assert client.post("/decks/picker-previews", json=body).status_code == 400

@@ -909,7 +909,9 @@ def test_editor_tile_shows_the_lineups_display_its_own_picture(
     monkeypatch.setattr(routes, "_display_shots", fake_shots)
     client = app.test_client()
     _sign_in(client)
-    state = _state(client.get("/decks/new", query_string={"display": "door"}).text)
+    state = _state(
+        client.get("/decks/new", query_string={"display": "door", "page_id": "photos"}).text
+    )
     assert seen["device"] == "door" and seen["size"] == (1200, 1600)
     page = state["pages"]["photos"]
     assert (page["thumb"], page["w"], page["h"]) == ("/compose/thumbs/portrait.png", 1200, 1600)

@@ -1495,6 +1495,13 @@ main.page.dxe-page {
   height: min(720px, calc(100dvh - 48px));
   overflow: hidden;
 }
+.lu.dxe .dxe-pick-dlg.is-inline {
+  position: relative;
+  width: min(640px, 100%);
+  margin: 24px auto;
+  display: flex;
+  flex-direction: column;
+}
 .lu.dxe .dxe-pick-dlg .wizard-head {
   align-items: center;
   padding-bottom: 12px;
