@@ -6,8 +6,6 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
-- Keep lineup tiles level when a NEXT or QUEUED tag appears.
-
 ### Security
 
 - Zero-touch pairing: a display's MAC address collects its access token only once. Before, any request to `/api/v1/device/discover` carrying the MAC of a registered display was given that display's token, and a MAC can be read by anything on the network. Now the match stops working after the display's first request with its token. A display that is re-flashed or factory reset shows **This display is asking to pair again** on its page and on Settings › Devices, and **Allow re-pair** lets it collect its token again with its pages and history kept. Displays you already have are not affected until they lose their token. (#515)
@@ -27,6 +25,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - Lineup thumbnail files close before transmission, so disconnected browsers cannot leave them open.
 - Font atlases for touch and overlay displays build in about a second instead of 25. Each build waited out a timeout and logged `composer mount wait timed out`, which on a fresh start looked like the server had hung.
 - Windows: the server starts again. The kie.ai image service used a file lock that only exists on Linux and macOS, so `run.ps1` stopped with `ModuleNotFoundError: No module named 'fcntl'`.
+- Keep lineup tiles level when a NEXT or QUEUED tag appears.
 - Fraimic closes HTTP error responses after reading the frame error.
 - Windows installer: a failed check (git or Python missing) now shows its message and leaves the PowerShell window open. Before, the window closed before the message could be read.
 - Lineups show the delivered, queued and waiting states, with separate lanes for overlapping windows.
