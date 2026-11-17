@@ -61,17 +61,24 @@ def test_add_dashboard_offers_optional_conditions(real, conditional, width):
         browser, page, errors = _open(p, base, "/decks/morning/edit", width=width)
         page.locator("[data-picker]").click()
         page.locator('[data-add="clock"]').click()
+        # Optional, in the picker, closed until asked for.
+        cond = page.locator("#dxe-picker .dxe-pick-cond")
+        assert cond.get_by_text("Only show while", exact=False).is_visible()
+        assert cond.get_attribute("open") is None
+        assert "clock" not in _steps(page)
+        if conditional:
+            cond.locator("> summary").click()
+            assert "Skipped while a condition fails" in cond.inner_text()
+            page.locator("#dxe-picker").get_by_role(
+                "button", name="Add condition", exact=True
+            ).click()
+            page.locator("#dxe-picker .cp-row input[list]").fill("sensor.example_state")
+        page.locator("[data-add-confirm]").click()
         assert "clock" in _steps(page)
         assert page.locator("[data-add-confirm]").count() == 0
         assert page.locator("#dxe-picker").count() == 0
         assert page.locator('[data-panel="clock"]').is_visible()
         assert page.locator("#dxe-live").inner_text() == "Added Clock."
-        if conditional:
-            page.locator('[data-edit="clock"]').click()
-            page.locator('[data-add-cond="clock"]').click()
-            picker = page.locator('[data-panel="clock"] [data-condition-picker]')
-            picker.get_by_role("button", name="Add condition", exact=True).click()
-            picker.locator(".cp-row input[list]").fill("sensor.example_state")
         # Adding a conditioned dashboard never changes how the lineup picks,
         # and the legacy pick mode is not offered where it isn't already set.
         assert page.locator("[data-add-mode]").count() == 0
@@ -405,6 +412,11 @@ def test_dashboards_reorder_items_add_remove_and_discard(real: tuple[str, Flask]
         page.locator("[data-picker]").click()
         assert page.locator('#dxe-picker [data-add="photos"]').count() == 1
         page.locator('#dxe-picker [data-add="photos"]').click()
+        page.locator("#dxe-picker .wizard-footer [data-add-cancel]").click()
+        assert _steps(page) == ["clock", "climate"]
+        page.locator("[data-picker]").click()
+        page.locator('#dxe-picker [data-add="photos"]').click()
+        page.locator("[data-add-confirm]").click()
         assert _steps(page) == ["clock", "climate", "photos"]
         page.locator("[data-discard]").click()
         assert _steps(page) == ["photos", "clock", "climate"]
@@ -472,14 +484,17 @@ def test_new_lineup_steps_and_creates(real: tuple[str, Flask]) -> None:
         assert "No dashboards yet" in page.locator(".dxe-none").inner_text()
         assert create.is_disabled()
         page.locator("[data-picker]").click()
-        page.locator('[data-add="photos"]').click()
+        page.locator('#dxe-picker [data-add="photos"]').click()
+        page.locator("[data-add-confirm]").click()
         page.locator("[data-picker]").click()
-        page.locator('[data-add="clock"]').click()
-        page.locator('[data-add-cond="clock"]').click()
-        picker = page.locator('[data-panel="clock"] [data-condition-picker]')
-        picker.get_by_role("button", name="Add condition", exact=True).click()
-        picker.locator(".cp-row").get_by_role("combobox").first.select_option("time_window")
+        page.locator('#dxe-picker [data-add="clock"]').click()
+        page.locator("#dxe-picker .dxe-pick-cond > summary").click()
+        page.locator("#dxe-picker").get_by_role("button", name="Add condition", exact=True).click()
+        page.locator("#dxe-picker .cp-row").get_by_role("combobox").first.select_option(
+            "time_window"
+        )
         assert page.locator("[data-add-mode]").count() == 0
+        page.locator("[data-add-confirm]").click()
         assert create.is_enabled()
         page.locator("#dxe-title").fill("Day art")
         with page.expect_navigation():
@@ -528,8 +543,11 @@ def test_new_lineup_adds_a_picked_dashboard_in_one_step(
         assert page.evaluate("() => document.activeElement.dataset.picker !== undefined")
         # Picking a dashboard adds it, selected, with nothing else to confirm.
         page.locator("[data-picker]").click()
-        assert "added as you pick" in page.locator(".dxe-pick-head").inner_text()
+        assert (
+            page.locator("#dxe-picker").get_by_role("heading", name="Add a dashboard").is_visible()
+        )
         page.locator('#dxe-picker [data-add="photos"]').click()
+        page.locator("[data-add-confirm]").click()
         assert _steps(page) == ["photos"]
         assert page.locator("#dxe-picker").count() == 0
         assert page.locator("[data-add-confirm], [data-add-cancel]").count() == 0
@@ -1133,7 +1151,7 @@ def test_collection_widgets_stack_and_plain_ones_do_not(
     monkeypatch.setattr(
         routes,
         "_recent_sent",
-        lambda page_id, limit=8: recent[:limit] if page_id != "list_cold" else [],
+        lambda page_id, limit=8, device_id=None: recent[:limit] if page_id != "list_cold" else [],
     )
     pages = app.config["PAGE_STORE"]
     decks = app.config["DECK_STORE"]
