@@ -11,6 +11,10 @@
       "type": "string",
       "description": "Anchors the spec to the frame's LAYOUT, stable across data-only redraws (a clock tick does not invalidate it)."
     },
+    "turn": {
+      "enum": [90, 180, 270],
+      "description": "How far the page was turned, clockwise, to reach the framebuffer the rects are in. Absent means upright. A device that reports touch.turn draws each control's label, value and direction turned to match, inside the same rect; a device that does not know the field ignores it."
+    },
     "atlases": {
       "type": "array",
       "description": "Glyph atlases referenced by primitive text refs.",
