@@ -36,6 +36,11 @@ from app.wake_alignment import MIN_DELTA_S, WakeAlignment
 
 ALL_DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 WAKE_WINDOW_S = 120  # max_idle Tesserae asks for (Fraimic's default)
+# How far ahead of a wake's time the frame may boot and still be on that
+# wake. Seen on the 31.5" frame: up and answering 19 s before a chain slot
+# (so booted near half a minute early), which a 15-20 s allowance read as
+# a tap at every wake.
+WAKE_EARLY_S = 60
 
 MODE_INTERVAL = "interval"
 MODE_TIMES = "times"
@@ -114,7 +119,7 @@ def to_frame_times(times: Iterable[str], *, now: float, tz: tzinfo, offset_s: in
 
 
 def on_schedule_clock(
-    schedule: dict[str, Any], at: float, offset_s: int | None, *, early_s: int = 20
+    schedule: dict[str, Any], at: float, offset_s: int | None, *, early_s: int = WAKE_EARLY_S
 ) -> bool:
     """Whether ``at`` is a moment the frame's schedule wakes it: within
     ``early_s`` before or a wake window after one of its times, or a point
