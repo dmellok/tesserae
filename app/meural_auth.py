@@ -120,6 +120,8 @@ class NetgearAuthenticator:
                     "Authorization": f"Bearer {refresh_token}",
                     "appkey": MEURAL_OAUTH_CLIENT_ID,
                     "Accept": "application/json",
+                    # Netgear's firewall refuses urllib's default User-Agent here.
+                    "User-Agent": "Mozilla/5.0",
                 },
             )
         except HttpError as exc:

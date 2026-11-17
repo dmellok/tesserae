@@ -62,6 +62,32 @@ def test_refresh_keeps_existing_refresh_token_when_not_rotated(monkeypatch):
     assert requests[0].get_header("Appkey") == "3ui6nklcaqoij8inrkm06gfk4s"
 
 
+def test_netgear_headers_go_out_lowercase(monkeypatch):
+    # Netgear Accounts answers "App key is empty" to a title-cased "Appkey" header.
+    import http.client
+
+    from app.meural_http import _LowercaseHeaderConnection
+
+    sent = []
+    monkeypatch.setattr(
+        http.client.HTTPSConnection, "putheader", lambda self, name, *v: sent.append(name)
+    )
+    _LowercaseHeaderConnection("accounts2.netgear.com").putheader("Appkey", "id")
+    assert sent == ["appkey"]
+
+
+def test_refresh_sends_a_browser_user_agent(monkeypatch):
+    requests = []
+
+    def urlopen(request, timeout):
+        requests.append(request)
+        return response({"accessToken": "renewed"})
+
+    monkeypatch.setattr("app.meural_auth.open_request", urlopen)
+    NetgearAuthenticator().refresh("old-refresh")
+    assert requests[0].get_header("User-agent") == "Mozilla/5.0"
+
+
 @pytest.mark.parametrize(
     "status,body,error",
     [
