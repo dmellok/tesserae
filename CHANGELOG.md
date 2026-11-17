@@ -17,6 +17,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - Let unreadable Home Assistant conditions count as not met when requested.
 - The lineup editor shows display wake times and warns about renders between wakes.
 - Choose a test display panel type and preview each display at exact pixel sizes.
+- Add dashboards to a new lineup in one click.
 - Lineups on phones start collapsed, with a filter toggle and compact rows.
 - Add kie.ai as a selectable image service, with saved tasks and shared spending limits.
 - Add a dashboard editor with guided steps, live preview and widget option examples. Switch back to classic from its help menu.

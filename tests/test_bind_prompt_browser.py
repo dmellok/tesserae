@@ -159,17 +159,18 @@ def test_adding_a_dashboard_from_another_display_asks_first(real: tuple[str, Fla
         page.locator("dialog.bind-dialog").wait_for(state="detached")
         assert _steps(page) == ["clock"]
 
-        # Binding consent comes before adding; the display binding waits for Save.
+        # Binding consent comes before adding; the pick then adds it at once
+        # (no second confirm), and the display binding waits for Save.
         chip.click()
         _answer(page, _BIND)
-        # Binding consent comes first; conditions are optional and can be cancelled.
-        assert page.locator("#dxe-add-conditions").input_value() == ""
+        assert _steps(page) == ["clock", "photos"]
+        assert page.locator("[data-add-confirm]").count() == 0
+        # Removed before Save: nothing is bound. Added again: it asks again.
+        page.locator('[data-remove="photos"]').click()
         assert _steps(page) == ["clock"]
-        page.locator("[data-add-cancel]").click()
         assert _bound(app, "photos") == ["frame"]
         _other(page, "photos").click()
         _answer(page, _BIND)
-        page.locator("[data-add-confirm]").click()
         assert _steps(page) == ["clock", "photos"]
         assert _bound(app, "photos") == ["frame"]  # nothing changes until Save
         _save(page)
@@ -187,12 +188,12 @@ def test_bind_to_both_keeps_the_other_display(real: tuple[str, Flask]) -> None:
         browser, page, errors = _editor(p, base)
         _other(page, "photos").click()
         _answer(page, "Bind to both")
-        assert _steps(page) == ["clock"]
-        page.locator("#dxe-picker").get_by_role("button", name="Add condition", exact=True).click()
-        page.locator("#dxe-picker .cp-row").get_by_role("combobox").first.select_option(
-            "time_window"
-        )
-        page.locator("[data-add-confirm]").click()
+        assert _steps(page) == ["clock", "photos"]
+        page.locator('[data-edit="photos"]').click()
+        page.locator('[data-add-cond="photos"]').click()
+        picker = page.locator('[data-panel="photos"] [data-condition-picker]')
+        picker.get_by_role("button", name="Add condition", exact=True).click()
+        picker.locator(".cp-row").get_by_role("combobox").first.select_option("time_window")
         _save(page)
         assert _members(app) == ["clock", "photos"]
         assert _bound(app, "photos") == ["frame", "hallway"]
