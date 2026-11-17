@@ -54,7 +54,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.device_loader import DeviceRegistry
 from app.device_preview import retained_device_preview, write_device_preview
-from app.dither_regions import has_nearest_region, regions_from_page
+from app.dither_regions import has_nearest_region, regions_from_page, renderer_takes_regions
 from app.http_headers import header_summary, split_user_agent
 from app.image_upload import orient_for_panel
 from app.net_guard import (
@@ -3188,10 +3188,13 @@ class PushManager:
             # Reused by _publish_artifact below, so no double resolution.
             render_settings = self._resolve_render_settings(renderer, image_fit=image_fit)
             # Per-cell dither map (issue #86) only reaches the server-side
-            # quantise packers (the .bin family). PNG renderers (pi_png,
-            # trmnl_*) quantise on the client, so the key is meaningless to
-            # them and is left off to keep their render signature stable.
-            if dither_regions is not None and renderer.extension == "bin":
+            # quantise renderers (the .bin family and the CircuitPython
+            # indexed files). PNG renderers (pi_png, trmnl_*) quantise on the
+            # client, so the key is meaningless to them and is left off to
+            # keep their render signature stable.
+            if dither_regions is not None and renderer_takes_regions(
+                renderer.id, renderer.extension
+            ):
                 render_settings = {**render_settings, "_dither_regions": dither_regions}
             signature = self._render_signature(
                 comp_digest=comp_digest, panel=panel, settings=render_settings

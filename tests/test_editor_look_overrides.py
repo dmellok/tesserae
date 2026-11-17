@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -240,3 +241,17 @@ def test_saved_page_effects_keep_look_editable_for_independent_widgets(settings)
         id="p", name="P", cells=[Cell(id="c", plugin="test", x=0, y=0, w=800, h=480)], **settings
     )
     assert editor_look_context(page, [widget])["look_visible"] is True
+
+
+@pytest.mark.parametrize(
+    ("dither", "pressed"),
+    [(None, "Display setting"), ("auto", "Display setting"), ("none", "Flat")],
+)
+def test_dither_control_offers_display_setting_or_flat(app, dither, pressed):
+    """Issue #572: the control offered "Use dashboard" with no dashboard
+    setting behind it, and "Smooth", which rendered the same. A saved
+    "auto" shows as the display's setting."""
+    _, body, _ = _render(app, dither=dither)
+    found = re.findall(r'data-ev2-dither-set="[a-z]*" aria-pressed="(true|false)">([^<]+)<', body)
+    buttons = {label: state == "true" for state, label in found}
+    assert buttons == {name: name == pressed for name in ("Display setting", "Flat")}

@@ -69,9 +69,9 @@ STATE_FILE = "fraimic.json"
 TICK_S = 2.0
 IDLE_POLL_S = 60.0
 HUNT_POLL_S = 3.0
-# Start probing this long before a reported wake: the frame is reachable
-# "within a few seconds" of the time and may come up a little early.
-HUNT_LEAD_S = 15.0
+# Start probing this long before a reported wake, and count a boot this
+# far ahead of it as that wake: the frame can come up well before the time.
+HUNT_LEAD_S = float(fraimic_wakes.WAKE_EARLY_S)
 INFO_TIMEOUT_S = 3.0
 UPLOAD_TIMEOUT_S = 120.0
 # The frame must have been up this long before it is put back to sleep.
