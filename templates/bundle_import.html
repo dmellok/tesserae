@@ -1,0 +1,116 @@
+{% extends "_base.html" %}
+{% block title %}Import, Tesserae{% endblock %}
+{% block main %}
+{# Import dashboards and lineups from an export file (#541). Two steps: choose
+   the file, then confirm what it will add or replace. Nothing is written
+   until the second step. #}
+<header class="page-head">
+  <div>
+    <h1><i class="ph ph-upload-simple" aria-hidden="true"></i> Import</h1>
+    <p class="lede">Bring in dashboards and lineups exported from another Tesserae. Displays, API keys and passwords are never part of an export, so set those here.</p>
+  </div>
+</header>
+
+{% if not plan %}
+<section class="card">
+  <form method="post" action="{{ url_for('bundles.import_read') }}" enctype="multipart/form-data" class="form">
+    <label for="bundle-file">Export file</label>
+    <input type="file" id="bundle-file" name="file" accept="application/json,.json" required>
+    <p class="field-help">A <code>.json</code> file from Export on the Dashboards or Lineups page. You will see what it contains before anything changes.</p>
+    <div class="actions">
+      <button type="submit" class="dx-btn is-primary"><i class="ph ph-magnifying-glass" aria-hidden="true"></i><span>Read file</span></button>
+      <a class="dx-btn" href="{{ url_for('pages.index') }}">Cancel</a>
+    </div>
+  </form>
+</section>
+{% else %}
+<form method="post" action="{{ url_for('bundles.import_apply') }}" class="form" data-bundle-plan>
+  <input type="hidden" name="token" value="{{ token }}">
+
+  {% if plan.dashboards %}
+  <section class="card">
+    <h2>Dashboards ({{ plan.dashboards|length }})</h2>
+    <table class="dx-table">
+      <thead><tr><th>Name</th><th>Kind</th><th>On this server</th></tr></thead>
+      <tbody>
+      {% for d in plan.dashboards %}
+        <tr>
+          <td>{{ d.name }}{% if d.missing %}<br><span class="field-help"><i class="ph ph-warning" aria-hidden="true"></i> Needs widgets not installed here: {{ d.missing|join(', ') }}</span>{% endif %}</td>
+          <td>{{ 'Freeform' if d.kind == 'canvas' else 'Grid' }}{% if d.assets %}, {{ d.assets }} picture{{ '' if d.assets == 1 else 's' }}{% endif %}</td>
+          <td>
+            {% if d.exists %}
+            <label><input type="radio" name="page_mode_{{ loop.index }}" value="replace" data-replace="replace_page" data-id="{{ d.id }}" checked> Replace “{{ d.existing_name }}” (keeps its displays)</label><br>
+            <label><input type="radio" name="page_mode_{{ loop.index }}" value="copy"> Add as a copy</label>
+            {% else %}New{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+
+  {% if plan.lineups %}
+  <section class="card">
+    <h2>Lineups ({{ plan.lineups|length }})</h2>
+    <table class="dx-table">
+      <thead><tr><th>Name</th><th>Dashboards</th><th>On this server</th></tr></thead>
+      <tbody>
+      {% for l in plan.lineups %}
+        <tr>
+          <td>{{ l.name }}</td>
+          <td>{{ l.pages }}</td>
+          <td>
+            {% if l.exists %}
+            <label><input type="radio" name="lineup_mode_{{ loop.index }}" value="replace" data-replace="replace_lineup" data-id="{{ l.id }}" checked> Replace “{{ l.existing_name }}” (keeps its displays)</label><br>
+            <label><input type="radio" name="lineup_mode_{{ loop.index }}" value="copy"> Add as a copy</label>
+            {% else %}New{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+
+  {% if plan.left_out %}
+  <section class="card">
+    <h2>Left out of the file</h2>
+    <p class="field-help">The export removed these because they are private to the server it came from. Fill them in after importing.</p>
+    <ul>{% for line in plan.left_out %}<li>{{ line }}</li>{% endfor %}</ul>
+  </section>
+  {% endif %}
+
+  {# The radios above are named per row; these hidden fields are what the
+     server reads. Without script every existing item is replaced, which is
+     the checked default shown. #}
+  <div data-replace-fields>
+    {% for d in plan.dashboards if d.exists %}<input type="hidden" name="replace_page" value="{{ d.id }}">{% endfor %}
+    {% for l in plan.lineups if l.exists %}<input type="hidden" name="replace_lineup" value="{{ l.id }}">{% endfor %}
+  </div>
+
+  <div class="actions">
+    <button type="submit" class="dx-btn is-primary"><i class="ph ph-upload-simple" aria-hidden="true"></i><span>Import</span></button>
+    <a class="dx-btn" href="{{ url_for('bundles.import_form') }}">Choose another file</a>
+  </div>
+</form>
+<script>
+  (function () {
+    var form = document.querySelector("[data-bundle-plan]");
+    var box = form.querySelector("[data-replace-fields]");
+    function sync() {
+      box.replaceChildren();
+      form.querySelectorAll("input[data-replace]:checked").forEach(function (radio) {
+        var field = document.createElement("input");
+        field.type = "hidden";
+        field.name = radio.dataset.replace;
+        field.value = radio.dataset.id;
+        box.append(field);
+      });
+    }
+    form.addEventListener("change", sync);
+    sync();
+  })();
+</script>
+{% endif %}
+{% endblock %}

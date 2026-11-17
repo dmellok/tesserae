@@ -1342,6 +1342,7 @@ def _lineup_input(
             name=url_for("decks.edit_name", deck_id=deck.id),
             order=url_for("decks.edit_order", deck_id=deck.id),
             bind=url_for("decks.bind_pages", deck_id=deck.id),
+            export=url_for("bundles.export", lineup=deck.id),
         )
     return LineupInput(
         id=deck.id,

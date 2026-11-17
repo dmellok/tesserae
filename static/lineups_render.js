@@ -350,6 +350,7 @@
       : (a.primary === "push" ? a.fire_url : a.play_url) || a.fire_url || a.play_url || "";
     let menu = "";
     if (a.edit_url) menu += `<a href="${esc(a.edit_url)}">Edit</a>`;
+    if (a.export_url) menu += `<a href="${esc(a.export_url)}" download>Export</a>`;
     if (assigned && l.kind === "manual" && a.play_url)
       menu += `<form method="post" action="${esc(a.play_url)}" class="lu-inline"><input type="hidden" name="dir" value="prev"><button type="submit">Step back</button></form>`;
     if (assigned && l.kind === "cycle" && a.fire_url)

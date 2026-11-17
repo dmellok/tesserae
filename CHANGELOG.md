@@ -12,6 +12,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Export dashboards and lineups to a file and import them on another server. An export leaves out displays, passwords and keys; an import shows what it will add or replace before anything changes, and replacing keeps the displays already assigned. (#541)
 - Offer optional conditions when adding a dashboard to a lineup.
 - Add Netgear Meural local-network previews and quiet-hours sleep control.
 - Widget choices can be shown as unavailable in the editors, with a reason, and can depend on saved cell options. The flag guides the editors only; saves are not checked against it.
@@ -28,6 +29,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- Duplicating a dashboard with a status bar keeps the copy's status bar under its own control. The copy pointed at the original's bar, so switching it off on the copy left it in place.
 - Home Assistant: entity and service widgets no longer drop out for five minutes in every fifteen when the access token belongs to a user who is not an administrator. The OpenDisplay check asked Home Assistant an admin-only question every 15 minutes, even with no OpenDisplay tags set up, and the refusal was treated as a rejected token. With no tags linked it now asks nothing, and a refusal from an admin-only request no longer holds back the requests the token is allowed to make. (#553)
 - Lineup thumbnail files close before transmission, so disconnected browsers cannot leave them open.
 - Font atlases for touch and overlay displays build in about a second instead of 25. Each build waited out a timeout and logged `composer mount wait timed out`, which on a fresh start looked like the server had hung.
