@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 from collections.abc import Iterator
 from pathlib import Path
@@ -47,9 +48,154 @@ pytestmark = pytest.mark.skipif(not _HAS_CHROMIUM, reason="Playwright Chromium n
 ALL_DAYS = [0, 1, 2, 3, 4, 5, 6]
 
 
+@pytest.mark.parametrize("width", [1280, 390])
+def test_duplicate_dashboard_copies_the_step_and_keeps_tile_controls(real, width):
+    from playwright.sync_api import expect, sync_playwright
+
+    base, app = real
+    decks = app.config["DECK_STORE"]
+    deck = decks.get("morning")
+    deck.pages[0] = DeckPage(
+        page_id="weather",
+        dwell_minutes=45,
+        refresh_interval_minutes=60,
+        conditions=[
+            {
+                "source_kind": "ha_entity",
+                "source_id": "sensor.example_state",
+                "operator": "==",
+                "value": "on",
+            }
+        ],
+    )
+    decks.upsert(deck)
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/morning/edit", width, touch=width == 390)
+        duplicate = page.get_by_role("button", name="Duplicate Weather", exact=True)
+        expect(duplicate).to_be_visible()
+        assert float(duplicate.evaluate("e => getComputedStyle(e).opacity")) > 0
+        assert duplicate.get_attribute("title") == "Duplicate Weather"
+        if width == 390:
+            box = duplicate.bounding_box()
+            assert box["width"] >= 44 and box["height"] >= 44
+        if width == 1280:
+            duplicate.focus()
+            page.keyboard.press("Enter")
+        else:
+            duplicate.tap()
+        expect(page.locator("[data-step]")).to_have_count(3)
+        copy_id = _steps(page)[1]
+        assert _steps(page) == ["weather", copy_id, "agenda"]
+        copied = app.config["PAGE_STORE"].get(copy_id)
+        assert copied.name == "Weather copy"
+        assert decks.get("morning").page_ids == ["weather", "agenda"]
+        expect(page.locator("#dxe-save-state")).to_have_text("Unsaved changes")
+        expect(page.locator("#dxe-live")).to_have_text("Duplicated Weather.")
+        expect(page.locator(f'[data-step="{copy_id}"] .dxe-sel')).to_be_focused()
+        assert (
+            page.get_by_role("link", name="Edit dashboard Weather copy", exact=True)
+            .get_attribute("href")
+            .endswith(copy_id)
+        )
+        page.locator(f'[data-step="{copy_id}"] .dxe-sel').press("Alt+ArrowRight")
+        assert _steps(page) == ["weather", "agenda", copy_id]
+        page.locator(f'[data-step="{copy_id}"] .dxe-sel').click()
+        expect(page.locator(f'[data-panel="{copy_id}"]')).to_have_count(0)
+        page.locator(f'[data-step="{copy_id}"] .dxe-sel').click()
+        expect(page.locator(f'[data-panel="{copy_id}"]')).to_be_visible()
+        page.get_by_role("button", name="Zoom Weather copy", exact=True).click()
+        expect(page.locator(".lu-lb")).to_be_visible()
+        page.keyboard.press("Escape")
+        _save(page)
+        saved = decks.get("morning")
+        assert saved.page_ids == ["weather", "agenda", copy_id]
+        assert saved.pages[-1].dwell_minutes == 45
+        assert saved.pages[-1].refresh_interval_minutes == 60
+        assert saved.pages[-1].conditions == deck.pages[0].conditions
+        assert not errors
+        browser.close()
+
+
+def test_duplicate_dashboard_in_a_new_lineup(real):
+    from playwright.sync_api import expect, sync_playwright
+
+    base, app = real
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/new?display=hall&page_id=weather")
+        page.locator("[data-goto='3']").click()
+        page.get_by_role("button", name="Duplicate Weather", exact=True).click()
+        expect(page.locator("[data-step]")).to_have_count(2)
+        copy_id = _steps(page)[1]
+        assert app.config["PAGE_STORE"].get(copy_id).name == "Weather copy"
+        assert len(app.config["DECK_STORE"].all()) == 2
+        assert not errors
+        _settle(page)
+        browser.close()
+
+
+def test_duplicate_missing_dashboard_is_hidden_and_deleted_source_explained(real):
+    from playwright.sync_api import expect, sync_playwright
+
+    base, app = real
+    app.config["PAGE_STORE"].delete("agenda")
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/morning/edit")
+        assert page.locator('[data-step="agenda"] [data-duplicate]').count() == 0
+        app.config["PAGE_STORE"].delete("weather")
+        page.get_by_role("button", name="Duplicate Weather", exact=True).click()
+        expect(page.locator("#dxe-save-state")).to_contain_text("deleted")
+        assert _steps(page) == ["weather", "agenda"]
+        expect(page.get_by_role("button", name="Duplicate Weather", exact=True)).to_be_enabled()
+        assert not errors
+        _settle(page)
+        browser.close()
+
+
+@pytest.mark.parametrize("offline", [False, True])
+def test_duplicate_failure_keeps_edits_and_allows_retry(real, offline):
+    from playwright.sync_api import expect, sync_playwright
+
+    base, _app = real
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/morning/edit")
+        page.locator("#dxe-title").fill("Changed lineup")
+        page.locator("#dxe-title").blur()
+        pending = []
+        page.route("**/pages/weather/duplicate", lambda route: pending.append(route))
+        page.get_by_role("button", name="Duplicate Weather", exact=True).click()
+        expect(page.locator("[data-save]")).to_be_disabled()
+        expect(page.locator("[data-discard]")).to_be_disabled()
+        expect(page.get_by_role("button", name="Duplicate Weather", exact=True)).to_be_disabled()
+        assert len(pending) == 1
+        if offline:
+            pending[0].abort()
+        else:
+            pending[0].fulfill(
+                status=500,
+                content_type="application/json",
+                body=json.dumps(
+                    {"ok": False, "error": "Storage is full. Free some space and try again."}
+                ),
+            )
+        expect(page.locator("#dxe-save-state")).to_contain_text("Couldn't duplicate Weather")
+        assert _steps(page) == ["weather", "agenda"]
+        assert page.locator("#dxe-title").input_value() == "Changed lineup"
+        expect(page.get_by_role("button", name="Duplicate Weather", exact=True)).to_be_enabled()
+        expect(page.locator("[data-save]")).to_be_enabled()
+        page.unroute("**/pages/weather/duplicate")
+        page.get_by_role("button", name="Duplicate Weather", exact=True).click()
+        expect(page.locator("[data-step]")).to_have_count(3)
+        assert page.locator("#dxe-title").input_value() == "Changed lineup"
+        assert not errors
+        _settle(page)
+        browser.close()
+
+
 @pytest.mark.parametrize("conditional", [False, True])
 @pytest.mark.parametrize("width", [1280, 390])
 def test_add_dashboard_offers_optional_conditions(real, conditional, width):
+    """Picking a dashboard adds it at once, selected; a condition is optional
+    and lives in its details."""
     from playwright.sync_api import sync_playwright
 
     base, app = real
@@ -59,16 +205,24 @@ def test_add_dashboard_offers_optional_conditions(real, conditional, width):
         browser, page, errors = _open(p, base, "/decks/morning/edit", width=width)
         page.locator("[data-picker]").click()
         page.locator('[data-add="clock"]').click()
-        assert page.get_by_text("Only show while", exact=False).is_visible()
-        assert "Skipped while conditions fail" in page.locator("#dxe-picker").inner_text()
+        # Optional, in the picker, closed until asked for.
+        cond = page.locator("#dxe-picker .dxe-pick-cond")
+        assert cond.get_by_text("Only show while", exact=False).is_visible()
+        assert cond.get_attribute("open") is None
         assert "clock" not in _steps(page)
         if conditional:
+            cond.locator("> summary").click()
+            assert "Skipped while a condition fails" in cond.inner_text()
             page.locator("#dxe-picker").get_by_role(
                 "button", name="Add condition", exact=True
             ).click()
             page.locator("#dxe-picker .cp-row input[list]").fill("sensor.example_state")
         page.locator("[data-add-confirm]").click()
         assert "clock" in _steps(page)
+        assert page.locator("[data-add-confirm]").count() == 0
+        assert page.locator("#dxe-picker").count() == 0
+        assert page.locator('[data-panel="clock"]').is_visible()
+        assert page.locator("#dxe-live").inner_text() == "Added Clock."
         # Adding a conditioned dashboard never changes how the lineup picks,
         # and the legacy pick mode is not offered where it isn't already set.
         assert page.locator("[data-add-mode]").count() == 0
@@ -156,9 +310,13 @@ def real(tmp_path: Path) -> Iterator[tuple[str, Flask]]:
         thread.join(timeout=10)
 
 
-def _open(p: Any, base: str, path: str, width: int = 1280) -> tuple[Any, Any, list[str]]:
+def _open(
+    p: Any, base: str, path: str, width: int = 1280, *, touch: bool = False
+) -> tuple[Any, Any, list[str]]:
     browser = _launch(p)
-    page = browser.new_page(viewport={"width": width, "height": 900})
+    page = browser.new_page(
+        viewport={"width": width, "height": 900}, has_touch=touch, is_mobile=touch
+    )
     errors: list[str] = []
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.goto(base + path, wait_until="load")
@@ -402,8 +560,9 @@ def test_dashboards_reorder_items_add_remove_and_discard(real: tuple[str, Flask]
         page.locator("[data-picker]").click()
         assert page.locator('#dxe-picker [data-add="photos"]').count() == 1
         page.locator('#dxe-picker [data-add="photos"]').click()
-        page.locator("[data-add-cancel]").click()
+        page.locator("#dxe-picker .wizard-footer [data-add-cancel]").click()
         assert _steps(page) == ["clock", "climate"]
+        page.locator("[data-picker]").click()
         page.locator('#dxe-picker [data-add="photos"]').click()
         page.locator("[data-add-confirm]").click()
         assert _steps(page) == ["clock", "climate", "photos"]
@@ -459,7 +618,7 @@ def test_new_lineup_steps_and_creates(real: tuple[str, Flask]) -> None:
         browser, page, errors = _open(p, base, "/decks/new")
         create = page.locator("[data-create]")
         assert create.is_disabled()
-        assert page.locator("#dxe-save-state").inner_text() == "Step 1 of 3"
+        assert page.locator("#dxe-save-state").inner_text() == "Step 1 of 3: pick a display."
         page.locator('[data-pick-display="tv"]').click()
         assert page.locator(".dxe-done").first.inner_text().startswith("")
         assert "Display" in page.locator(".dxe-done").first.inner_text()
@@ -470,11 +629,14 @@ def test_new_lineup_steps_and_creates(real: tuple[str, Flask]) -> None:
         page.locator('[data-time="end"]').dispatch_event("change")
         page.locator("[data-goto='3']").click()
         assert page.locator(".dxe-done").count() == 2
-        assert "No dashboards yet." in page.locator(".dxe-empty").first.inner_text()
+        assert "No dashboards yet" in page.locator(".dxe-none").inner_text()
         assert create.is_disabled()
-        page.locator('[data-add="photos"]').click()
+        page.locator("[data-picker]").click()
+        page.locator('#dxe-picker [data-add="photos"]').click()
         page.locator("[data-add-confirm]").click()
-        page.locator('[data-add="clock"]').click()
+        page.locator("[data-picker]").click()
+        page.locator('#dxe-picker [data-add="clock"]').click()
+        page.locator("#dxe-picker .dxe-pick-cond > summary").click()
         page.locator("#dxe-picker").get_by_role("button", name="Add condition", exact=True).click()
         page.locator("#dxe-picker .cp-row").get_by_role("combobox").first.select_option(
             "time_window"
@@ -498,6 +660,80 @@ def test_new_lineup_steps_and_creates(real: tuple[str, Flask]) -> None:
             "07:00",
             "16:30",
         )
+        assert errors == []
+        browser.close()
+
+
+@pytest.mark.parametrize("width", [1440, 390])
+def test_new_lineup_adds_a_picked_dashboard_in_one_step(
+    real: tuple[str, Flask], width: int
+) -> None:
+    """The new lineup's Dashboards step: picking adds at once (no second
+    confirm), the condition is optional and closed, and Create lineup is the
+    one primary action, saying what is missing until it can run."""
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    before = {d.id for d in app.config["DECK_STORE"].all()}
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/new", width=width)
+        page.locator('[data-pick-display="tv"]').click()
+        page.locator('[data-time="start"]').fill("07:00")
+        page.locator("[data-goto='3']").click()
+        create = page.locator("[data-create]")
+        state = page.locator("#dxe-save-state")
+        # Empty: one add tile and a line; Create can't run and says why.
+        assert "No dashboards yet" in page.locator(".dxe-none").inner_text()
+        assert create.is_disabled()
+        assert state.inner_text() == "Add at least one dashboard to create it."
+        create.click(force=True)
+        assert page.url.endswith("/decks/new")
+        assert page.evaluate("() => document.activeElement.dataset.picker !== undefined")
+        # Picking a dashboard adds it, selected, with nothing else to confirm.
+        page.locator("[data-picker]").click()
+        assert (
+            page.locator("#dxe-picker").get_by_role("heading", name="Add a dashboard").is_visible()
+        )
+        page.locator('#dxe-picker [data-add="photos"]').click()
+        page.locator("[data-add-confirm]").click()
+        assert _steps(page) == ["photos"]
+        assert page.locator("#dxe-picker").count() == 0
+        assert page.locator("[data-add-confirm], [data-add-cancel]").count() == 0
+        assert page.locator('[data-step="photos"]').get_attribute("class").count("is-open")
+        assert (
+            page.evaluate("() => document.activeElement.closest('[data-step]')?.dataset.step")
+            == "photos"
+        )
+        assert page.locator("#dxe-live").inner_text() == "Added Photos."
+        # The condition is optional and closed: no editor, no raw JSON, until asked.
+        panel = page.locator('[data-panel="photos"]')
+        assert panel.locator("[data-condition-picker]").count() == 0
+        assert page.get_by_text("Edit raw JSON").count() == 0
+        panel.locator('[data-add-cond="photos"]').click()
+        assert panel.locator("[data-condition-picker]").is_visible()
+        panel.locator('[data-clear-cond="photos"]').click()
+        assert panel.locator("[data-condition-picker]").count() == 0
+        # Ready: one primary action on the page, the Cancel link before it.
+        assert create.is_enabled()
+        ready = " ".join(state.inner_text().replace("\u202f", " ").split())
+        assert ready == "Ready: 1 dashboard on tv, at 7 AM, every day."
+        prim = page.locator("#deck-editor .lu-btn-primary:visible")
+        assert prim.count() == 1 and prim.get_attribute("data-create") is not None
+        cancel = page.locator('[data-fk="f-cancel"]')
+        assert cancel.evaluate("e => e.tagName") == "A"
+        c, b = cancel.bounding_box(), create.bounding_box()
+        assert c and b and c["x"] + c["width"] <= b["x"]
+        assert b["height"] >= 44 and c["height"] >= 44
+        over = page.evaluate(
+            "() => document.documentElement.scrollWidth - document.documentElement.clientWidth"
+        )
+        assert over <= 0, over
+        with page.expect_navigation():
+            create.click()
+        _settle(page)
+        made = [d for d in app.config["DECK_STORE"].all() if d.id not in before]
+        assert len(made) == 1 and made[0].page_ids == ["photos"]
+        assert not made[0].pages[0].conditions
         assert errors == []
         browser.close()
 
@@ -1063,7 +1299,7 @@ def test_collection_widgets_stack_and_plain_ones_do_not(
     monkeypatch.setattr(
         routes,
         "_recent_sent",
-        lambda page_id, limit=8: recent[:limit] if page_id != "list_cold" else [],
+        lambda page_id, limit=8, device_id=None: recent[:limit] if page_id != "list_cold" else [],
     )
     pages = app.config["PAGE_STORE"]
     decks = app.config["DECK_STORE"]
@@ -1218,7 +1454,7 @@ def test_move_stages_shows_pending_saves_and_cancel_and_discard_reset(
         # Confirm asks to bind the dashboards, then only stages it.
         dlg = _open_move(page)
         dlg.locator("[data-ok]").click()
-        page.locator("dialog.bind-dialog:not(.dxe-move-dialog) button.primary").click()
+        _bind_move(page)
         page.locator("#dxe-loc .is-pending").wait_for()
         assert _loc(page).startswith("Moving to tv")
         assert page.locator(state).inner_text() == "Unsaved changes"
@@ -1232,7 +1468,7 @@ def test_move_stages_shows_pending_saves_and_cancel_and_discard_reset(
         # Undo drops it too.
         dlg = _open_move(page)
         dlg.locator("[data-ok]").click()
-        page.locator("dialog.bind-dialog:not(.dxe-move-dialog) button.primary").click()
+        _bind_move(page)
         page.locator("[data-move-undo]").click()
         assert _loc(page).startswith("On hall")
         assert page.locator(state).inner_text() == "All changes saved"
@@ -1240,13 +1476,24 @@ def test_move_stages_shows_pending_saves_and_cancel_and_discard_reset(
         dlg = _open_move(page)
         dlg.locator("[data-ok]").click()
         page.locator("dialog.bind-dialog:not(.dxe-move-dialog)").wait_for(state="visible")
-        page.locator("dialog.bind-dialog:not(.dxe-move-dialog) button.primary").click()
+        _bind_move(page)
         _save(page)
         assert store.get("morning").device_ids == ["tv"]
         assert app.config["PAGE_STORE"].get("weather").device_ids == ["tv"]
         assert _loc(page).startswith("On tv")
         assert errors == []
         browser.close()
+
+
+def _bind_move(page: Any) -> None:
+    """Answer the bind prompt with a move: untick every display but the
+    lineup's own (they start ticked, which keeps them), then confirm."""
+    dlg = page.locator("dialog.bind-dialog:not(.dxe-move-dialog)")
+    dlg.wait_for(state="visible")
+    for box in dlg.locator(".bind-row:not(.is-target) input").all():
+        box.uncheck()
+    dlg.get_by_role("button", name=re.compile(r"^Move to ")).click()
+    dlg.wait_for(state="detached")
 
 
 def test_move_cancelled_at_the_bind_prompt_stays_put(real: tuple[str, Flask]) -> None:
@@ -1257,7 +1504,9 @@ def test_move_cancelled_at_the_bind_prompt_stays_put(real: tuple[str, Flask]) ->
         browser, page, errors = _open(p, base, "/decks/morning/edit")
         dlg = _open_move(page)
         dlg.locator("[data-ok]").click()
-        page.locator("dialog.bind-dialog:not(.dxe-move-dialog) button.ghost").click()
+        page.locator("dialog.bind-dialog:not(.dxe-move-dialog)").get_by_role(
+            "button", name="Cancel"
+        ).click()
         page.locator("dialog.bind-dialog:not(.dxe-move-dialog)").wait_for(state="detached")
         assert _loc(page).startswith("On hall")
         assert page.locator("#dxe-save-state").inner_text() == "All changes saved"
@@ -2136,3 +2385,36 @@ def test_now_and_next_pills_sit_above_the_stack_and_the_selection_outline(
                 _settle(page)
                 assert errors == []
                 browser.close()
+
+
+@pytest.mark.parametrize("width", [1280, 390])
+def test_unreadable_condition_choice_survives_save_and_reload(real, width):
+    from playwright.sync_api import sync_playwright
+
+    base, app = real
+    pages = app.config["PAGE_STORE"]
+    pages.save(pages.get("clock").model_copy(update={"device_ids": ["hall"]}))
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/morning/edit", width=width)
+        page.locator("[data-picker]").click()
+        page.locator('[data-add="clock"]').click()
+        picker = page.locator("#dxe-picker")
+        picker.get_by_role("button", name="Add condition", exact=True).click()
+        picker.locator(".cp-row input[list]").fill("sensor.example_state")
+        choice = picker.get_by_label("Not met when it can't be read")
+        assert not choice.is_checked()
+        choice.check()
+        page.locator("[data-add-confirm]").click()
+        _save(page)
+        step = next(
+            s for s in app.config["DECK_STORE"].get("morning").pages if s.page_id == "clock"
+        )
+        assert step.conditions[0].if_unknown == "fail"
+        page.reload()
+        row = page.locator('[data-panel="clock"]')
+        page.locator('[data-expand="clock"]').click()
+        page.locator('[data-edit="clock"]').click()
+        assert row.get_by_label("Not met when it can't be read").is_checked()
+        assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+        assert not errors
+        browser.close()

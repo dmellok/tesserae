@@ -54,6 +54,7 @@ def test_new_lineup_keeps_step_conditions(app):
         "source_id": "sensor.example_state",
         "operator": "==",
         "value": "active",
+        "if_unknown": "fail",
     }
     response = app.test_client().post(
         "/decks/new/lineup",
@@ -1071,6 +1072,44 @@ def test_recent_sent_lists_the_pictures_a_dashboard_sent_newest_first(app: Flask
         assert _recent_sent("elsewhere") == []
     assert len(got) == 8
     assert [r["thumb"].split("/")[-1].split(".")[0] for r in got] == digests[::-1][:8]
+
+
+def test_recent_sent_keeps_one_displays_own_frames(app: Flask) -> None:
+    """A dashboard on a portrait frame and a landscape TV: the frame's strip shows
+    the frame's pictures, not the TV's (those were the landscape bands); a display
+    it never sent to still gets what there is."""
+    import hashlib
+    import io
+
+    from PIL import Image
+
+    from app.deck_routes import _recent_sent
+
+    def sent(device: str, n: int) -> list[str]:
+        out = []
+        for i in range(n):
+            buf = io.BytesIO()
+            Image.new("RGB", (8, 8), (i * 20, len(device) * 10, 0)).save(buf, "PNG")
+            digest = hashlib.sha256(buf.getvalue()).hexdigest()[:16]
+            (app.config["RENDERS_DIR"] / f"{digest}.png").write_bytes(buf.getvalue())
+            app.config["EVENT_LOG"].record(
+                type="push", source="lineup", target="art", status="sent",
+                extra={"composition_digest": digest, "device_ids": [device]},
+            )  # fmt: skip
+            out.append(digest)
+        return out
+
+    tv = sent("tv", 3)
+    frame = sent("frame", 2)
+
+    def key(rows: list[dict[str, Any]]) -> list[str]:
+        return [str(r["thumb"]).split("/")[-1].split(".")[0] for r in rows]
+
+    with app.test_request_context():
+        assert key(_recent_sent("art", device_id="frame")) == frame[::-1]
+        assert key(_recent_sent("art", device_id="tv")) == tv[::-1]
+        assert key(_recent_sent("art", device_id="other")) == (tv + frame)[::-1]
+        assert key(_recent_sent("art")) == (tv + frame)[::-1]
 
 
 def test_widget_thumbs_follow_the_ingress_prefix(

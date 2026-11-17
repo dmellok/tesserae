@@ -24,6 +24,14 @@ After installing, [set up the device](devices.md).
 See [Screens & compatibility](../compatibility.md) for which renderer feeds each
 client and what's been tested on real hardware.
 
+## Netgear Meural
+
+Open **Settings → Devices → Add device → Netgear Meural**, enter a device id and display name, then click **Add Netgear Meural**. On its page, enter its LAN address under **Frame address** and save. Tesserae sends a temporary preview through the frame's local API and renews it while running. Set **Renew preview every** shorter than your frame's preview duration. When renewal stops, the frame returns to its own artwork.
+
+Enable **Sleep through quiet hours** to put the frame to sleep during that window. Tesserae wakes it afterward only if it put it to sleep; a frame asleep through its own controls stays asleep. Keep the frame's unauthenticated local API on a trusted network.
+
+Local network mode is untested on a physical frame. Automated tests use fake transports. Cloud sign-in and persistent artwork delivery are separate work.
+
 ## tesserae-device-firmware
 
 [:material-github: dmellok/tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware)

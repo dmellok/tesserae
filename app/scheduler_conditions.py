@@ -60,6 +60,9 @@ class ConditionEvaluator:
         self._loc_provider = location_provider or (lambda: (None, None))
         self._ha_cache: dict[str, dict[str, Any]] = {}
         self._ha_cache_ts: float = 0.0
+        # False while the last refresh couldn't read Home Assistant (the cache
+        # is then a stale snapshot); conditions with ``if_unknown="fail"`` fail.
+        self._ha_fresh = False
         self._ha_lock = threading.Lock()
         self._sun_cache: dict[
             tuple[date, float, float], tuple[datetime | None, datetime | None]
@@ -89,6 +92,8 @@ class ConditionEvaluator:
             states = list(self._ha_get_states())
         except Exception as err:
             logger.warning("HA state refresh failed: %s", err)
+            with self._ha_lock:
+                self._ha_fresh = False
             return False
         new_cache = {s["entity_id"]: s for s in states if "entity_id" in s}
         with self._ha_lock:
@@ -101,8 +106,10 @@ class ConditionEvaluator:
                     "of %d entities to avoid fail-open avalanche.",
                     len(self._ha_cache),
                 )
+                self._ha_fresh = False
                 return False
             self._ha_cache = new_cache
+            self._ha_fresh = bool(new_cache)
         return True
 
     def ha_state(self, entity_id: str) -> dict[str, Any] | None:
@@ -139,7 +146,9 @@ class ConditionEvaluator:
         except Exception as err:
             return ConditionResult(
                 condition=cond,
-                passed=True,  # fail-open
+                passed=not (
+                    cond.is_ha_entity() and cond.if_unknown == "fail"
+                ),  # fail-open unless the row says otherwise
                 observed="evaluation error",
                 reason=f"{type(err).__name__}: {err}",
             )
@@ -153,7 +162,26 @@ class ConditionEvaluator:
     # -- HA entity resolver --------------------------------------------
 
     def _eval_ha(self, cond: Condition) -> ConditionResult:
-        state = self.ha_state(cond.source_id)
+        with self._ha_lock:
+            state = self._ha_cache.get(cond.source_id)
+            fresh = self._ha_fresh
+        if cond.if_unknown == "fail":
+            raw_state = str((state or {}).get("state", ""))
+            if not fresh:
+                why = "Home Assistant unreachable"
+            elif state is None:
+                why = "entity not found"
+            elif raw_state in ("unavailable", "unknown", ""):
+                why = f"state {raw_state}"
+            else:
+                why = ""
+            if why:
+                return ConditionResult(
+                    condition=cond,
+                    passed=False,
+                    observed=f"{cond.source_id}: {why}",
+                    reason=f"{why} (counts as not met)",
+                )
         if state is None:
             # Unknown entity = fail-open. Logging the miss helps the
             # user notice a typo in the entity_id without breaking

@@ -4422,7 +4422,8 @@ def test_a_displays_plus_starts_a_lineup_for_that_display(real: tuple[str, Flask
         # 06:00-09:00: a new lineup that meets it is refused.)
         page.locator('[data-time="start"]').fill("10:00")
         page.locator("[data-goto='3']").click()
-        page.locator('[data-add="free"]').click()
+        page.locator("[data-picker]").first.click()
+        page.locator('#dxe-picker [data-add="free"]').click()
         page.locator("[data-add-confirm]").click()
         with page.expect_navigation():
             page.locator("[data-create]").click()

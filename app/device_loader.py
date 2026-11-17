@@ -557,6 +557,12 @@ def has_touch(device: Any) -> bool:
     return isinstance(manifest, dict) and manifest.get("touch") is True
 
 
+def supports_capability(device: Any, name: str) -> bool:
+    """Opt out of legacy device controls without changing existing kinds."""
+    manifest = getattr(device, "manifest", {})
+    return not (isinstance(manifest, dict) and manifest.get(name) is False)
+
+
 def has_battery(device: Any) -> bool:
     """Whether the device may run on a battery. ``"battery": false`` in its
     kind's manifest says it is mains powered; absent means it may."""

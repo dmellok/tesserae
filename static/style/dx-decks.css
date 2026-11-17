@@ -828,6 +828,36 @@ main.page.dxe-page {
   outline: 2px solid var(--t-fg);
   outline-offset: 4px;
 }
+.lu.dxe .dxe-duplicate {
+  left: 4px;
+  right: auto;
+  cursor: pointer;
+}
+.lu.dxe .dxe-duplicate:disabled {
+  cursor: progress;
+  opacity: 0.4;
+}
+@media (max-width: 600px), (pointer: coarse) {
+  .lu.dxe .dxe-duplicate {
+    top: 0;
+    left: 0;
+    width: 44px;
+    height: 44px;
+    background: none;
+  }
+  .lu.dxe .dxe-duplicate .lu-ico {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    right: auto;
+    box-sizing: border-box;
+    width: 26px;
+    height: 26px;
+    padding: 5px;
+    border-radius: var(--lu-r-xs);
+    background: rgba(21, 20, 18, 0.62);
+  }
+}
 /* The open dashboard: an accent frame round the whole tile, its stack
    included (the tile's own button grows over the back cards), so it never
    cuts through them; the accent is the primary buttons', in both themes. */
@@ -944,8 +974,7 @@ main.page.dxe-page {
   width: 20px;
   height: 20px;
 }
-.lu.dxe .dxe-add-tile:hover,
-.lu.dxe .dxe-add-tile[aria-expanded="true"] {
+.lu.dxe .dxe-add-tile:hover {
   border-color: var(--t-fg);
   color: var(--t-fg);
   background: color-mix(in oklab, var(--t-fg) 4%, transparent);
@@ -1256,8 +1285,10 @@ main.page.dxe-page {
   width: var(--dxe-tw);
   aspect-ratio: var(--dxe-arw, 16) / var(--dxe-arh, 10);
 }
+/* A sent picture fills its box too: one of this display's own shape fits exactly;
+   one sent to a display of another shape is cropped, never a thin band. */
 .lu.dxe .dxe-it.is-render .dxe-it-pic img {
-  object-fit: contain;
+  object-fit: cover;
 }
 .lu.dxe .dxe-it-word {
   display: -webkit-box;
@@ -1448,47 +1479,266 @@ main.page.dxe-page {
   color: var(--t-fg);
   font-weight: 500;
 }
-.lu.dxe .dxe-picker {
-  --dxe-tw: min(80px, calc(60px * var(--dxe-arw, 16) / var(--dxe-arh, 10)));
-  padding: 14px 16px 16px;
-  border-top: 1px solid var(--t-border);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.lu.dxe .dxe-add-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-top: 16px;
-}
-.lu.dxe .dxe-sec > .dxe-picker {
-  padding: 16px 0 0;
+/* "+ Add dashboard" under the new lineup's dashboards: opens the picker. */
+.lu.dxe .dxe-sec > .dxe-add-open {
+  padding: 12px 0 0;
   border-top: 0;
 }
-.lu.dxe .dxe-picks {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 10px;
+
+/* The add-dashboard picker (deck_editor.js openPicker): the wizard's dialog shell.
+   One list of dashboards, each with a picture the display's shape; pick one,
+   then Add. A sheet from the bottom on a phone. */
+.lu.dxe .dxe-pick-dlg {
+  --pk-h: 56px; /* a preview's height on a portrait display */
+  --dxe-tw: min(108px, calc(var(--pk-h) * var(--dxe-arw, 16) / var(--dxe-arh, 10)));
+  width: min(640px, calc(100vw - 32px));
+  height: min(720px, calc(100dvh - 48px));
+  overflow: hidden;
 }
-.lu.dxe .dxe-pick {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+.lu.dxe .dxe-pick-dlg .wizard-head {
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--t-border);
-  border-radius: var(--lu-r);
-  background: var(--t-surface);
+  padding-bottom: 12px;
+  border-bottom: 1px solid color-mix(in oklab, var(--t-border) 70%, transparent);
 }
-.lu.dxe .dxe-pick-more {
-  margin: 0;
-  font-size: 13px;
+.lu.dxe .dxe-pick-dlg .wizard-head-text {
+  padding-top: 0;
 }
-.lu.dxe .dxe-pick-more a {
-  color: var(--lu-acc-text);
+.lu.dxe .dxe-pick-dlg .wizard-progress {
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-pick-dlg .wizard-close .lu-ico {
+  width: 14px;
+  height: 14px;
+}
+.lu.dxe .dxe-pick-find {
+  flex: none;
+  padding: 12px 18px 4px;
+}
+.lu.dxe .dxe-pick-find .dxe-search {
+  width: 100%;
+}
+.lu.dxe .dxe-pick-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 8px 10px 12px;
+  gap: 0;
+  overscroll-behavior: contain;
+}
+.lu.dxe .dxe-pick-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.lu.dxe .dxe-pick-g {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lu.dxe .dxe-pick-gh {
+  margin: 6px 8px 4px;
+  font-size: var(--t-size-sm);
   font-weight: 600;
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-pick-opt {
+  display: grid;
+  grid-template-columns: calc(var(--dxe-tw) + 8px) minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 14px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  outline: none;
+  transition: background-color 0.12s;
+}
+.lu.dxe .dxe-pick-opt .dxe-pick-th {
+  justify-self: start;
+  padding: 7px 7px 0 0;
+}
+.lu.dxe .dxe-pick-opt:hover {
+  background: color-mix(in oklab, var(--t-fg) 5%, transparent);
+}
+.lu.dxe .dxe-pick-opt:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--t-fg);
+}
+.lu.dxe .dxe-pick-opt[aria-selected="true"] {
+  background: color-mix(in oklab, var(--lu-acc) 12%, transparent);
+  box-shadow: inset 0 0 0 1.5px var(--lu-acc);
+}
+.lu.dxe .dxe-pick-opt[aria-selected="true"]:focus-visible {
+  box-shadow:
+    inset 0 0 0 1.5px var(--lu-acc),
+    inset 0 0 0 3px var(--t-surface),
+    inset 0 0 0 4.5px var(--t-fg);
+}
+.lu.dxe .dxe-pick-opt.is-taken {
+  cursor: default;
+}
+.lu.dxe .dxe-pick-opt.is-taken:hover {
+  background: none;
+}
+.lu.dxe .dxe-pick-opt.is-taken .dxe-pick-th,
+.lu.dxe .dxe-pick-opt.is-taken b {
+  opacity: 0.5;
+}
+.lu.dxe .dxe-pick-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.lu.dxe .dxe-pick-text b {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lu.dxe .dxe-pick-sub,
+.lu.dxe .dxe-pick-note,
+.lu.dxe .dxe-pick-tag {
+  font-size: var(--t-size-sm);
+  color: var(--t-fg-soft);
+}
+.lu.dxe .dxe-pick-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lu.dxe .dxe-pick-note {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: color-mix(in oklab, var(--t-warn) 70%, var(--t-fg));
+}
+.lu.dxe .dxe-pick-note .lu-ico {
+  flex: none;
+  width: 13px;
+  height: 13px;
+}
+.lu.dxe .dxe-pick-mark {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid var(--t-border-strong);
+  color: transparent;
+}
+.lu.dxe .dxe-pick-mark .lu-ico {
+  width: 12px;
+  height: 12px;
+}
+.lu.dxe .dxe-pick-opt[aria-selected="true"] .dxe-pick-mark {
+  border-color: var(--lu-acc);
+  background: var(--lu-acc);
+  color: var(--t-accent-fg, #fff);
+}
+.lu.dxe .dxe-pick-opt.is-taken .dxe-pick-mark {
+  visibility: hidden;
+}
+.lu.dxe .dxe-pick-none,
+.lu.dxe .dxe-pick-allin {
+  margin: 8px;
+}
+.lu.dxe .dxe-pick-body > .dxe-empty {
+  margin: 8px;
+}
+/* Only show while…: closed until asked for, applies to the one picked. */
+.lu.dxe .dxe-pick-cond {
+  flex: none;
+  max-height: 45%;
+  overflow-y: auto;
+  padding: 10px 18px;
+  border-top: 1px solid color-mix(in oklab, var(--t-border) 70%, transparent);
+  font-size: 13.5px;
+}
+.lu.dxe .dxe-pick-cond summary {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-weight: 500;
+}
+.lu.dxe .dxe-pick-cond[open] summary {
+  margin-bottom: 8px;
+}
+.lu.dxe .dxe-pick-cond p {
+  margin: 6px 0 0;
+}
+.lu.dxe .dxe-pick-dlg .wizard-footer {
+  gap: 8px;
+}
+.lu.dxe .dxe-pick-make {
+  color: var(--lu-acc-text);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+/* The stack's badge, centred under a small picture rather than past its edge. */
+.lu.dxe .dxe-pick-opt .dxe-badge {
+  right: auto;
+  left: 50%;
+  bottom: -4px;
+  height: 17px;
+  min-width: 0;
+  padding: 0 5px;
+  font-size: 9.5px;
+  line-height: 17px;
+  transform: translateX(calc(-50% - 3.5px));
+}
+.lu.dxe .dxe-pick-dlg .wizard-footer .lu-btn-primary {
+  max-width: 60%;
+  display: inline-block;
+  line-height: 34px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 600px) {
+  /* A sheet from the bottom, the whole width. */
+  .lu.dxe .dxe-pick-dlg {
+    --pk-h: 52px;
+    width: 100vw;
+    max-width: 100vw;
+    height: calc(100dvh - 40px);
+    max-height: calc(100dvh - 40px);
+    margin: auto 0 0;
+    border-radius: 16px 16px 0 0;
+  }
+  .lu.dxe .dxe-pick-dlg .wizard-close,
+  .lu.dxe .dxe-pick-dlg .wizard-footer button,
+  .lu.dxe .dxe-pick-cond summary {
+    min-height: 44px;
+  }
+  .lu.dxe .dxe-pick-dlg .wizard-close {
+    min-width: 44px;
+  }
+  .lu.dxe .dxe-pick-dlg .wizard-footer .lu-btn-primary {
+    line-height: 42px;
+  }
+  .lu.dxe .dxe-pick-find .dxe-search {
+    min-height: 44px;
+  }
+  .lu.dxe .dxe-pick-dlg .wizard-footer {
+    padding-bottom: max(11px, env(safe-area-inset-bottom));
+  }
+  .lu.dxe .dxe-pick-make {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .lu.dxe .dxe-pick-dlg[open] {
+    animation: dxe-pick-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @keyframes dxe-pick-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
 }
 .lu.dxe .dxe-empty {
   display: flex;
@@ -1666,8 +1916,101 @@ main.page.dxe-page {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--t-space-1) var(--t-space-3);
-  margin-top: var(--t-space-6);
+  min-height: 44px;
+  margin-top: var(--t-space-3);
   font-size: var(--t-size-base);
+}
+.lu.dxe .dxe-done + .dxe-done {
+  margin-top: 0;
+}
+.lu.dxe .dxe-done .dxe-soft {
+  color: var(--t-fg);
+}
+/* The done steps are one line each; Change keeps a finger-sized target. */
+.lu.dxe .dxe-done .dxe-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 4px;
+}
+/* The open step leads: its number in the accent. */
+.lu.dxe .dxe-sec.is-current .dxe-n {
+  background: var(--lu-acc);
+  border-color: var(--lu-acc);
+  color: var(--lu-acc-fg);
+}
+.lu.dxe .dxe-done + .dxe-sec.is-current {
+  margin-top: var(--t-space-6);
+}
+
+/* No dashboards yet: the add tile where the first one goes, and a line. */
+.lu.dxe .dxe-none {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--t-space-4) var(--t-space-5);
+  padding: var(--dxe-pad);
+}
+.lu.dxe .dxe-none .dxe-add-tile {
+  --th: 120px;
+  border-color: var(--lu-acc);
+  color: var(--lu-acc-text);
+}
+.lu.dxe .dxe-none .dxe-add-tile:hover,
+.lu.dxe .dxe-none .dxe-add-tile[aria-expanded="true"] {
+  border-style: solid;
+  color: var(--lu-acc-text);
+  background: color-mix(in oklab, var(--lu-acc) 6%, transparent);
+}
+.lu.dxe .dxe-none .dxe-add-tile:disabled {
+  border-color: var(--t-border-strong);
+  color: var(--t-fg-soft);
+  cursor: not-allowed;
+}
+.lu.dxe .dxe-none-t {
+  display: flex;
+  flex: 1 1 220px;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  font-size: var(--t-size-md);
+}
+.lu.dxe .dxe-none-t b {
+  font-size: var(--t-size-base);
+  font-weight: 600;
+}
+
+/* The picker, inside the card under the tiles, with a line that says a pick adds. */
+.lu.dxe .dxe-pick-wrap {
+  border-top: 1px solid var(--t-border);
+}
+.lu.dxe .dxe-pick-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px var(--t-space-2);
+  margin: 0;
+  padding: 14px 16px 0;
+  font-size: var(--t-size-md);
+}
+.lu.dxe .dxe-pick-wrap > .dxe-picker {
+  border-top: 0;
+}
+
+/* A new dashboard's optional condition, opened from its details. */
+.lu.dxe .dxe-cond-new {
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-2);
+  font-size: var(--t-size-md);
+}
+.lu.dxe .dxe-cond-new > small {
+  font-size: var(--t-size-sm);
+}
+.lu.dxe .dxe-sum-r .dxe-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
 }
 .lu.dxe .dxe-done b {
   font-weight: 600;
@@ -1760,6 +2103,17 @@ main.page.dxe-page {
 .lu.dxe .dxe-actionbar-btns .lu-btn-ghost {
   color: var(--t-fg);
 }
+/* The new lineup's Cancel: a link, left of Create, finger-sized. */
+.lu.dxe .dxe-actionbar-btns .dxe-cancel {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--t-space-3);
+}
+.lu.dxe .dxe-actionbar-btns .lu-btn-primary[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 /* narrow: one column */
 @container dxe (max-width: 640px) {
@@ -1840,9 +2194,6 @@ main.page.dxe-page {
     flex-wrap: nowrap;
     width: max-content;
   }
-  .lu.dxe .dxe-picks {
-    grid-template-columns: minmax(0, 1fr);
-  }
   .lu.dxe .dxe-it {
     width: 84px;
   }
@@ -1863,14 +2214,12 @@ main.page.dxe-page {
   }
 }
 
-/* "Bind to this display?" prompt (static/bind_prompt.js), on the wizard's
-   dialog shell. */
+/* "Show it on this display?" prompt (static/bind_prompt.js), on the wizard's
+   dialog shell. One row per display, ticked = the dashboard stays there.
+   The Move dialog (.dxe-move-dialog) borrows .bind-dialog for its width and
+   body padding only. */
 .bind-dialog {
-  width: min(460px, calc(100vw - 24px));
-}
-.bind-dialog .wizard-head-icon {
-  background: color-mix(in oklab, var(--t-warn) 16%, var(--t-surface));
-  color: color-mix(in oklab, var(--t-warn) 75%, var(--t-fg));
+  width: min(480px, calc(100vw - 24px));
 }
 .bind-dialog-body {
   display: flex;
@@ -1879,23 +2228,194 @@ main.page.dxe-page {
   padding: 2px 18px 16px;
   font-size: 13.5px;
   line-height: 1.5;
+  overflow-y: auto;
+  min-height: 0;
 }
 .bind-dialog-body p {
   margin: 0;
   max-width: 62ch;
 }
+.bind-dialog .bind-dialog-lead {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--t-fg-soft);
+}
+.bind-dialog-set {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.bind-dialog-legend {
+  padding: 0;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t-muted);
+}
+.bind-dialog-rows {
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-md, 10px);
+  overflow: hidden;
+}
+.bind-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.14s;
+}
+.bind-row + .bind-row {
+  border-top: 1px solid color-mix(in oklab, var(--t-border) 70%, transparent);
+}
+.bind-row:hover {
+  background: color-mix(in oklab, var(--t-fg) 3.5%, transparent);
+}
+.bind-row:has(input:focus-visible) {
+  background: color-mix(in oklab, var(--t-accent) 6%, var(--t-surface));
+}
+.bind-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  flex: none;
+  accent-color: var(--t-accent);
+  cursor: pointer;
+}
+.bind-row.is-target {
+  cursor: default;
+  background: color-mix(in oklab, var(--t-accent) 5%, var(--t-surface));
+}
+.bind-row.is-target input[type="checkbox"] {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+.bind-row-shape {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  color: var(--t-fg-soft);
+}
+.bind-row-shape-frame {
+  display: block;
+  border: 1.5px solid currentColor;
+  border-radius: 2.5px;
+  box-sizing: border-box;
+}
+.bind-row-shape-frame.is-unknown {
+  width: 18px;
+  height: 18px;
+  border-style: dashed;
+}
+.bind-row-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.bind-row-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 550;
+  color: var(--t-fg);
+}
+.bind-row-meta {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  color: var(--t-muted);
+  font-variant-numeric: tabular-nums;
+}
+.bind-row-state {
+  flex: none;
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--t-muted);
+}
+.bind-row-state:empty {
+  display: none;
+}
+.bind-row.is-target .bind-row-state {
+  color: var(--t-accent-ink, var(--t-accent));
+}
+.bind-row.is-off .bind-row-name {
+  color: var(--t-muted);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in oklab, var(--t-muted) 60%, transparent);
+}
+.bind-row.is-off .bind-row-shape {
+  opacity: 0.5;
+}
+.bind-row.is-off .bind-row-state {
+  color: var(--t-pill-warn-fg, var(--t-warn));
+}
+:root[data-theme="dark"] .bind-row.is-target .bind-row-state {
+  color: var(--t-accent);
+}
+:root[data-theme="dark"] .bind-row.is-off .bind-row-state {
+  color: var(--t-warn);
+}
+.bind-row.is-nudged input[type="checkbox"] {
+  animation: bind-nudge 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes bind-nudge {
+  0%,
+  100% {
+    transform: none;
+  }
+  30% {
+    transform: translateX(-3px);
+  }
+  65% {
+    transform: translateX(2px);
+  }
+}
+.bind-dialog-summary {
+  color: var(--t-fg);
+}
+.bind-dialog .bind-dialog-hint {
+  padding: 8px 10px;
+  border-radius: var(--t-radius-sm, 6px);
+  background: var(--t-pill-warn-bg, var(--t-warn-bg));
+  color: var(--t-pill-warn-fg, var(--t-fg));
+  font-size: 12.5px;
+}
+.bind-dialog .bind-dialog-hint:empty {
+  display: none;
+}
+:root[data-theme="dark"] .bind-dialog .bind-dialog-hint {
+  background: color-mix(in oklab, var(--t-warn) 16%, var(--t-surface));
+  color: var(--t-fg);
+}
 .bind-dialog-note {
   color: var(--t-fg-soft);
   font-size: 12.5px;
 }
-.bind-dialog-list {
-  margin: 0;
-  padding-left: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+.bind-dialog .wizard-footer button {
+  min-height: 36px;
+}
+.bind-dialog-ok {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 /* The Move dialog (deck_editor.js askMove): the warn tint, not red. */
+.dxe-move-dialog {
+  width: min(460px, calc(100vw - 24px));
+}
+.dxe-move-dialog .wizard-head-icon {
+  background: color-mix(in oklab, var(--t-warn) 16%, var(--t-surface));
+  color: color-mix(in oklab, var(--t-warn) 75%, var(--t-fg));
+}
 .dxe-move-dialog .dxe-move-lines {
   display: flex;
   flex-direction: column;
@@ -1917,15 +2437,46 @@ html .dxe-move-dialog .wizard-footer button.primary.dxe-caution {
 html .dxe-move-dialog .wizard-footer button.primary.dxe-caution:hover {
   background: color-mix(in oklab, var(--t-warn) 42%, var(--t-surface));
 }
+/* Phone: a bottom sheet with 44px targets. Cancel stays left of the one
+   button, in the order Tab goes. */
 @media (max-width: 480px) {
-  .bind-dialog .wizard-footer {
+  .bind-dialog:not(.dxe-move-dialog) {
+    width: 100vw;
+    max-width: 100vw;
+    max-height: min(88vh, 88dvh);
+    margin: auto 0 0;
+    border-radius: var(--t-radius-lg, 16px) var(--t-radius-lg, 16px) 0 0;
+  }
+  .bind-dialog:not(.dxe-move-dialog) .wizard-footer {
+    padding-bottom: max(11px, env(safe-area-inset-bottom));
+  }
+  .bind-dialog:not(.dxe-move-dialog) .wizard-footer button {
+    min-height: 44px;
+  }
+  .bind-dialog:not(.dxe-move-dialog) .bind-dialog-ok {
+    flex: 1 1 auto;
+  }
+  .bind-row {
+    min-height: 56px;
+  }
+  .dxe-move-dialog .wizard-footer {
     flex-wrap: wrap;
   }
-  .bind-dialog .wizard-footer-spacer {
+  .dxe-move-dialog .wizard-footer-spacer {
     display: none;
   }
-  .bind-dialog .wizard-footer button {
+  .dxe-move-dialog .wizard-footer button {
     flex: 1 1 100%;
+  }
+}
+@media (pointer: coarse) {
+  .bind-dialog .wizard-footer button {
+    min-height: 44px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bind-row.is-nudged input[type="checkbox"] {
+    animation: none;
   }
 }
 
@@ -2005,4 +2556,14 @@ html .dxe-move-dialog .wizard-footer button.primary.dxe-caution:hover {
     animation: none;
     box-shadow: 0 0 0 3px var(--lu-acc);
   }
+}
+
+/* The new lineup's one primary action: finger-sized. */
+.lu.dxe.is-new .dxe-actionbar-btns .lu-btn-primary {
+  height: 44px;
+  padding: 0 20px;
+}
+.lu.dxe.is-new .dxe-actionbar-btns .lu-btn-primary[aria-disabled="true"]:hover {
+  background: var(--lu-acc);
+  border-color: var(--lu-acc);
 }

@@ -14,11 +14,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 - Export dashboards and lineups to a file and import them on another server. An export leaves out displays, passwords and keys; an import shows what it will add or replace before anything changes, and replacing keeps the displays already assigned. (#541)
 - Offer optional conditions when adding a dashboard to a lineup.
+- Add Netgear Meural local-network previews and quiet-hours sleep control.
 - Widget choices can be shown as unavailable in the editors, with a reason, and can depend on saved cell options. The flag guides the editors only; saves are not checked against it.
+- Let unreadable Home Assistant conditions count as not met when requested.
 - The lineup editor shows display wake times and warns about renders between wakes.
 - Choose a test display panel type and preview each display at exact pixel sizes.
+- Choose which displays keep a dashboard when binding it; keep all by default.
+- Pick dashboards in a popup with previews shaped for the display.
+- Add dashboards to a new lineup in one click.
 - Lineups on phones start collapsed, with a filter toggle and compact rows.
 - Add kie.ai as a selectable image service, with saved tasks and shared spending limits.
+- Add dashboard duplication from lineup tiles.
 - Add a dashboard editor with guided steps, live preview and widget option examples. Switch back to classic from its help menu.
 
 ### Fixed
@@ -27,8 +33,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - Lineup thumbnail files close before transmission, so disconnected browsers cannot leave them open.
 - Font atlases for touch and overlay displays build in about a second instead of 25. Each build waited out a timeout and logged `composer mount wait timed out`, which on a fresh start looked like the server had hung.
 - Windows: the server starts again. The kie.ai image service used a file lock that only exists on Linux and macOS, so `run.ps1` stopped with `ModuleNotFoundError: No module named 'fcntl'`.
+- Keep lineup tiles level when a NEXT or QUEUED tag appears.
 - Fraimic closes HTTP error responses after reading the frame error.
 - Windows installer: a failed check (git or Python missing) now shows its message and leaves the PowerShell window open. Before, the window closed before the message could be read.
+- Show calibrated panel previews in their measured inks.
 - Lineups show the delivered, queued and waiting states, with separate lanes for overlapping windows.
 - The dashboard editor warns when a Home Assistant theme overrides the dashboard appearance.
 - Smart sync: button wakes no longer reset wake-time trust.

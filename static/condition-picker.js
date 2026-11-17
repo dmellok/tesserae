@@ -438,9 +438,34 @@ function init(picker) {
           ),
       },
     });
+    // Off by default: an entity Home Assistant can't read counts as met, so
+    // an HA outage doesn't blank dashboards. Ticked, it counts as not met,
+    // which keeps an interrupting lineup (a print page) off instead.
+    const unknownBox = el("input", {
+      type: "checkbox",
+      ...(cond.if_unknown === "fail" ? { checked: true } : {}),
+      on: {
+        change: (e) =>
+          editRows((rows) =>
+            rows.map((r, i) =>
+              i === idx ? { ...r, if_unknown: e.target.checked ? "fail" : "pass" } : r
+            )
+          ),
+      },
+    });
+    const unknownLabel = el(
+      "label",
+      {
+        class: "cond-unknown",
+        title: "Home Assistant unreachable, the entity missing, or its state unavailable",
+      },
+      unknownBox,
+      " Not met when it can't be read"
+    );
     body.appendChild(entityInput);
     body.appendChild(opSelect);
     body.appendChild(valueInput);
+    body.appendChild(unknownLabel);
   }
 
   function renderTimeBody(body, cond, idx) {

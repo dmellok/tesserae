@@ -40,6 +40,15 @@ KOReader's `trmnl-display` plugin needs a short token instead:
 2. Type the token into the KOReader plugin config. It calls `/api/setup` to exchange it for a permanent device id and token. It then checks `/api/display` at your configured interval.
 3. Set the orientation and dashboard as above. The device appears in Devices as soon as setup finishes.
 
+## Add a Netgear Meural
+
+1. Open **Settings → Devices → Add device → Netgear Meural**.
+2. Enter a device id and display name, then click **Add Netgear Meural**.
+3. On the new device's page, enter its **Frame address** and save.
+
+The panel starts at 1080×1920 in portrait. Change its orientation if the frame hangs sideways.
+See [Meural setup](clients.md#netgear-meural) for preview renewal and quiet hours.
+
 ## Per-device settings
 
 Each device has its own dashboard width and height, orientation, saturation, and contrast.
@@ -179,6 +188,10 @@ Choose a preset to save immediately.
 For **custom**, enter the interval and press **Set**.
 
 Choose **device's own interval** to let the device decide when to wake.
+
+### Unreadable Home Assistant conditions
+
+In a lineup's Home Assistant condition, select **Not met when it can't be read** to keep it from running when Home Assistant is unreachable, the entity is missing, or its state is `unknown` or `unavailable`. In saved conditions this is `if_unknown: "fail"`; omitted or `"pass"` keeps the existing behavior.
 
 ## Multiple panels
 

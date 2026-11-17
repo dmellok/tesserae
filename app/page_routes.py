@@ -42,6 +42,7 @@ from flask import (
     current_app,
     flash,
     jsonify,
+    make_response,
     redirect,
     render_template,
     request,
@@ -1878,8 +1879,13 @@ def duplicate(page_id: str) -> Response:
     the editor for the copy. Preserves cells, theme, font, style, device
     bindings, panel override, and per-cell options; regenerates ids
     (page + every cell) so the copy is fully independent of the source."""
+    wants_json = request.form.get("respond") == "json"
     src = _store().get(page_id)
     if src is None:
+        if wants_json:
+            return make_response(
+                jsonify(ok=False, error="This dashboard was deleted. Reload the lineup."), 404
+            )
         flash(f"No page with id {page_id!r}.", "error")
         return redirect(url_for("pages.index"))
 
@@ -1892,7 +1898,7 @@ def duplicate(page_id: str) -> Response:
     # Fresh cell ids so the copy is independent: a cell-level update on
     # the copy must never reach into the source's pages.json entry.
     cell_ids = {c.id: uuid.uuid4().hex[:8] for c in src.cells}
-    new_cells = [c.model_copy(update={"id": cell_ids[c.id]}) for c in src.cells]
+    new_cells = [c.model_copy(update={"id": cell_ids[c.id]}, deep=True) for c in src.cells]
     # A copy is a fresh start, so it lands in the working list even when the
     # source is archived (duplicating is the way to pick a parked design up).
     copy = src.model_copy(
@@ -1900,12 +1906,21 @@ def duplicate(page_id: str) -> Response:
             "id": new_id,
             "name": new_name,
             "cells": new_cells,
-            # The status bar is found by its cell id, which just changed.
-            "status_bar_cell_id": cell_ids.get(src.status_bar_cell_id or ""),
             "archived": False,
-        }
+            "status_bar_cell_id": cell_ids.get(src.status_bar_cell_id or ""),
+        },
+        deep=True,
     )
     _store().save(copy)
+    if wants_json:
+        return jsonify(
+            ok=True,
+            page={
+                "id": new_id,
+                "name": new_name,
+                "thumb": url_for("composer.compose_preview", page_id=new_id) + "?refresh=300",
+            },
+        )
     flash(f"Duplicated as {new_name!r}.", "ok")
     return redirect(url_for("pages.edit", page_id=new_id))
 

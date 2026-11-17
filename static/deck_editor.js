@@ -2,10 +2,10 @@
  *
  * One state, one draw: the server's JSON island (app.deck_routes._editor_state)
  * becomes `st`, every control edits `st`, and draw() repaints the sections from
- * it. Nothing is sent until Save lineup, which posts the whole lineup to
+ * it. The lineup waits for Save lineup, which posts the whole lineup to
  * /decks/editor-save (respond=json) and reloads; the new-lineup flow posts to
  * /decks/new/lineup and opens the editor of what it made. Push now (a row, or
- * the footer) and Draw another act at once, like on the Lineups page.
+ * the footer), Draw another and Duplicate dashboard act at once.
  *
  * The day bar, day tiles and thumbnails are the Lineups page's own
  * (window.TesseraeLineupsRender): same markup, same dx-lineups.css.
@@ -142,17 +142,16 @@
     // {mode: "pick", idx, key, label, state, thumb, large, note} or
     // {mode: "draw", hist: [{key, state, thumb, large, note, sig}], pos, n, note}
     choice: {},
-    picker: false,
-    adding: null,
-    elsewhere: false,
+    picker: false, // the add-dashboard picker is open
     step: S.isNew ? (S.display ? 2 : 1) : 0, // the new flow's open step
     saving: false,
+    duplicating: null,
     pushing: false,
     reload: false,
     msg: "",
     msgKind: "",
     justDay: null,
-    consent: {}, // page id -> "move" | "also", for the display chosen
+    consent: {}, // page id -> the bind prompt's answer ({mode, modes, keep}), for the display chosen
     consentDisplay: S.display,
   };
   const snapshot = () => JSON.stringify(Object.assign({}, st, { whenChanged: false }));
@@ -494,8 +493,7 @@
   function consentFields(fd) {
     st.steps.forEach((s) => {
       if (!strandedFor(s.id, st.display) || !ui.consent[s.id]) return;
-      fd.append("bind_pages", s.id);
-      if (ui.consent[s.id] === "also") fd.append("bind_also", s.id);
+      window.TesseraeBindPrompt.fields(ui.consent[s.id], s.id).forEach(([k, v]) => fd.append(k, v));
     });
   }
 
@@ -1173,6 +1171,7 @@
     });
     const hooks = {
       pushOverlay: false,
+      zoomBeside: true,
       itemChoice: (_d, _l, vm) => choiceView(vm.dashboard_id),
       stepKey: (vm) => vm.dashboard_id,
       stepAttrs: () => ` draggable="true"`,
@@ -1186,7 +1185,10 @@
           .join(" "),
       tileExtra: (vm) => {
         const open = ui.open.has(vm.dashboard_id);
-        return `<button type="button" class="dxe-sel" data-expand="${esc(vm.dashboard_id)}" data-grip data-fk="sel-${esc(vm.dashboard_id)}" aria-expanded="${open}" aria-controls="dxe-detail" aria-label="${esc(vm.name)}, ${vm.index + 1} of ${n}. ${open ? "Hide" : "Show"} its details; Alt+arrows move it"></button>`;
+        const duplicate = vm.missing
+          ? ""
+          : `<button type="button" class="lu-zoom dxe-duplicate" data-duplicate="${esc(vm.dashboard_id)}" data-fk="dup-${esc(vm.dashboard_id)}" title="Duplicate ${esc(vm.name)}" aria-label="Duplicate ${esc(vm.name)}"${ui.duplicating ? " disabled" : ""}>${ico("copy")}</button>`;
+        return `<button type="button" class="dxe-sel" data-expand="${esc(vm.dashboard_id)}" data-grip data-fk="sel-${esc(vm.dashboard_id)}" aria-expanded="${open}" aria-controls="dxe-detail" aria-label="${esc(vm.name)}, ${vm.index + 1} of ${n}. ${open ? "Hide" : "Show"} its details; Alt+arrows move it"></button>${duplicate}`;
       },
       captionExtra: (vm) => {
         const tags = stepTags(st.steps[vm.index], vm.index);
@@ -1198,10 +1200,9 @@
       .map((s, i) => R.stepHtml(d, lineup(s.id), vms[i], hooks))
       .join("")
       .replaceAll(' loading="lazy"', ' loading="eager"');
-    const addTile =
-      st.display && !S.isNew
-        ? `<li class="lu-step dxe-add-step"><figure><span class="lu-slot"></span><button type="button" class="dxe-add-tile" data-picker data-fk="picker" aria-expanded="${ui.picker}" aria-controls="dxe-picker">${ico(ui.picker ? "x" : "plus")}<span>${ui.picker ? "Close" : "Add dashboard"}</span></button></figure></li>`
-        : "";
+    const addTile = st.display
+      ? `<li class="lu-step dxe-add-step"><figure><span class="lu-slot"></span><button type="button" class="dxe-add-tile" data-picker data-fk="picker" aria-haspopup="dialog">${ico("plus")}<span>Add dashboard</span></button></figure></li>`
+      : "";
     const now = vms.some((x) => x.pill) ? " has-now" : "";
     return (
       `<div class="dxe-tiles-scroll"><ol class="lu-strip dxe-tiles ${d.orientation}${now}" id="dxe-steps" aria-label="Dashboards in order">${tiles}${addTile}</ol>` +
@@ -1236,9 +1237,7 @@
       drawBtn = `<button type="button" class="lu-btn-ghost lu-btn-line dxe-act dxe-draw" data-draw="${esc(id)}" data-fk="draw-${esc(id)}"${ok && !busy ? "" : ` disabled title="${ok ? "Drawing…" : "Save first to draw"}"`}>${ico("refresh")}<span>Draw another</span></button>`;
     }
     const sub = p.subtitle && p.subtitle !== p.name ? p.subtitle : "";
-    const body = S.isNew
-      ? `<div class="dxe-sum"><span class="dxe-sum-r"><button type="button" class="dxe-link quiet" data-remove="${esc(id)}" data-fk="rm-${esc(id)}" aria-label="Remove ${esc(p.name)}">Remove</button></span></div>`
-      : `${childrenHtml(s, p)}${settingsHtml(s, p, i)}`;
+    const body = S.isNew ? newStepBody(s, p) : `${childrenHtml(s, p)}${settingsHtml(s, p, i)}`;
     return (
       `<section class="dxe-detail" id="dxe-detail" data-panel="${esc(id)}" aria-label="${esc(p.name)}">` +
       `<div class="dxe-detail-head"><span class="dxe-plug" aria-hidden="true"><i class="ph ${esc(p.icon || "ph-squares-four")}"></i></span>` +
@@ -1246,6 +1245,26 @@
       `<span class="dxe-detail-acts">${drawBtn}${push}</span><button type="button" class="lu-ibtn dxe-close" data-expand="${esc(id)}" data-fk="close-${esc(id)}" aria-label="Close ${esc(p.name)} details" title="Close (Esc)">${ico("x")}</button></div>` +
       body +
       `</section>`
+    );
+  }
+
+  // A new lineup's dashboard: what it does, an optional condition (closed
+  // until asked for) and Remove.
+  function newStepBody(s, p) {
+    const id = esc(s.id);
+    const open = showConditions(s);
+    const rm = `<button type="button" class="dxe-link quiet" data-remove="${id}" data-fk="rm-${id}" aria-label="Remove ${esc(p.name)}">Remove</button>`;
+    if (!open)
+      return (
+        `<div class="dxe-sum"><span class="dxe-soft dxe-sum-t">Shows whenever the lineup runs.</span>` +
+        `<span class="dxe-sum-r"><button type="button" class="dxe-link" data-add-cond="${id}" data-fk="addcond-${id}" aria-label="Add a condition for ${esc(p.name)}">Add a condition</button>${rm}</span></div>`
+      );
+    return (
+      `<div class="dxe-sum"><span class="dxe-sum-t"><b id="dxe-cond-t-${id}">Only show while…</b> <span class="dxe-soft">optional</span></span>` +
+      `<span class="dxe-sum-r"><button type="button" class="dxe-link quiet" data-clear-cond="${id}" data-fk="clearcond-${id}" aria-label="Clear the condition for ${esc(p.name)}">Clear condition</button>${rm}</span></div>` +
+      `<div class="dxe-cond dxe-cond-new" role="group" aria-labelledby="dxe-cond-t-${id}">` +
+      `<small class="dxe-soft">Skipped while a condition fails. If none pass, the display keeps its last picture.</small>` +
+      `<div class="condition-picker" data-condition-picker data-empty-message="No condition yet."><textarea rows="2" spellcheck="false" data-cond="${id}" data-fk="cond-${id}" placeholder="[]" aria-label="Conditions for ${esc(p.name)}">${esc(s.conditions)}</textarea></div></div>`
     );
   }
 
@@ -1495,72 +1514,260 @@
     );
   }
 
-  /* --- the add-dashboard picker */
+  /* --- the add-dashboard picker: a dialog over the page. Pick one, Add puts it in
+     the lineup at once (asking to bind it first when it is on another display);
+     Cancel, Esc or a click outside add nothing. */
+  // Every dashboard, those on this display (or on none) first; the ones already in
+  // the lineup stay listed, greyed, after the rest of their group.
   function candidates() {
     const inList = new Set(st.steps.map((s) => s.id));
-    const all = Object.values(S.pages).filter((p) => !p.missing && !inList.has(p.id));
-    const here = all.filter((p) => !strandedFor(p.id, st.display));
-    const other = all.filter((p) => strandedFor(p.id, st.display));
-    return { here, other };
+    const all = Object.values(S.pages).filter((p) => !p.missing);
+    const last = (a, b) => Number(inList.has(a.id)) - Number(inList.has(b.id));
+    const here = all.filter((p) => !strandedFor(p.id, st.display)).sort(last);
+    const other = all.filter((p) => strandedFor(p.id, st.display)).sort(last);
+    return { here, other, inList };
   }
-  function pickerHtml() {
-    if (ui.adding) {
-      const a = ui.adding;
-      return `<div class="dxe-picker" id="dxe-picker"><b>Add ${esc(pageOf(a.id).name)}</b>
-        <div class="dxe-cond"><label for="dxe-add-conditions">Only show while... <span class="dxe-soft">optional</span></label>
-          <div class="condition-picker" data-condition-picker data-empty-message="No conditions: this dashboard can show whenever the lineup runs."><textarea id="dxe-add-conditions" data-cond="__adding__" rows="2" aria-label="Conditions for new dashboard" spellcheck="false">${esc(a.conditions)}</textarea></div>
-          <p class="dxe-soft">Leave empty to show it without conditions. Skipped while conditions fail; if none pass, the display keeps its last image.</p>
-        </div>
-        <div class="dxe-add-actions"><button type="button" class="dxe-link quiet" data-add-cancel>Cancel</button><button type="button" class="lu-btn-primary" data-add-confirm>Add dashboard</button></div></div>`;
-    }
-    const { here, other } = candidates();
-    const dev = deviceOf(st.display);
-    const cards = (list, elsewhere) =>
-      list
-        .map((p) => {
-          const where = elsewhere
-            ? `<span class="dxe-soft dxe-where">On ${esc(p.devices.map((d) => (deviceOf(d) || { name: d }).name).join(", "))}</span>`
-            : "";
-          return (
-            `<li class="dxe-pick"><span class="dxe-pick-th">${stackedThumb(p)}</span><span class="dxe-step-text"><b>${esc(p.name)}</b><span class="dxe-step-sub">${esc(p.subtitle || "")}</span>${where}</span>` +
-            `<button type="button" class="lu-btn-ghost lu-btn-line sm dxe-add-btn" data-add="${esc(p.id)}" data-fk="add-${esc(p.id)}"${elsewhere ? " data-elsewhere" : ""} aria-label="Add ${esc(p.name)}">${ico("plus")}<span>Add</span></button></li>`
-          );
-        })
-        .join("");
-    const none = !here.length
-      ? `<p class="dxe-empty">${ico("layers")}<span>${dev ? `No more dashboards for ${esc(dev.name)}.` : "Pick a display first."}</span></p>`
+  const PICK_SEARCH_FROM = 7; // a search field once the list is longer than a glance
+  function pickOption(p, inList, elsewhere) {
+    const taken = inList.has(p.id);
+    const where = elsewhere
+      ? `<span class="dxe-pick-note">${ico("screen")}<span>Not on this display (on ${esc(p.devices.map((d) => (deviceOf(d) || { name: d }).name).join(", "))})</span></span>`
       : "";
-    const more =
-      `<p class="dxe-soft dxe-pick-more">Not here? ` +
-      (S.urls.newDashboard
-        ? `<a href="${esc(S.urls.newDashboard)}">Make a new dashboard</a>`
-        : "") +
-      (other.length
-        ? `${S.urls.newDashboard ? " or " : ""}<button type="button" class="dxe-link" data-elsewhere-toggle data-fk="elsewhere" aria-expanded="${ui.elsewhere}">${ui.elsewhere ? "hide" : "show"} dashboards from other displays (${other.length})</button>`
-        : "") +
-      `</p>`;
+    const tag = taken ? `<span class="dxe-pick-tag">Already in this lineup</span>` : "";
+    const hay = `${p.name} ${p.subtitle || ""}`.toLowerCase();
     return (
-      `<div class="dxe-picker" id="dxe-picker"${shapeVars()}>${none}<ul class="dxe-picks">${cards(here, false)}</ul>${more}` +
-      (ui.elsewhere && other.length
-        ? `<ul class="dxe-picks is-other">${cards(other, true)}</ul>`
-        : "") +
-      `</div>`
+      `<div class="dxe-pick-opt${taken ? " is-taken" : ""}" role="option" id="dxe-opt-${esc(p.id)}" tabindex="-1" data-add="${esc(p.id)}"${elsewhere ? " data-elsewhere" : ""} data-hay="${esc(hay)}" aria-selected="false"${taken ? ' aria-disabled="true"' : ""}>` +
+      `<span class="dxe-pick-th">${stackedThumb(p)}</span>` +
+      `<span class="dxe-pick-text"><b>${esc(p.name)}</b>${p.subtitle && p.subtitle !== p.name ? `<span class="dxe-pick-sub">${esc(p.subtitle)}</span>` : ""}${where}${tag}</span>` +
+      `<span class="dxe-pick-mark" aria-hidden="true">${ico("check")}</span></div>`
     );
+  }
+  function pickerDialogHtml() {
+    const { here, other, inList } = candidates();
+    const dev = deviceOf(st.display) || { name: st.display };
+    const total = here.length + other.length;
+    const free = total - inList.size;
+    const group = (id, title, list, elsewhere) =>
+      list.length
+        ? `<div class="dxe-pick-g" role="group" aria-labelledby="${id}"><p class="dxe-pick-gh" id="${id}">${esc(title)}</p>${list.map((p) => pickOption(p, inList, elsewhere)).join("")}</div>`
+        : "";
+    const search =
+      total >= PICK_SEARCH_FROM
+        ? `<div class="dxe-pick-find"><label class="lu-tb-search dxe-search">${ico("search")}<input type="search" data-pick-q placeholder="Search dashboards" aria-label="Search dashboards" aria-controls="dxe-pick-list" autocomplete="off" spellcheck="false"></label></div>`
+        : "";
+    const empty = !total
+      ? `<p class="dxe-empty">${ico("layers")}<span>No dashboards yet.</span></p>`
+      : !free
+        ? `<p class="dxe-soft dxe-pick-allin">Every dashboard is in this lineup already.</p>`
+        : "";
+    const make = S.urls.newDashboard
+      ? `<a class="dxe-pick-make" href="${esc(S.urls.newDashboard)}">Make a new dashboard</a>`
+      : "";
+    return (
+      `<div class="wizard-head"><div class="wizard-head-text"><h2 id="dxe-pick-title">Add a dashboard</h2><p class="wizard-progress">To ${esc(dev.name)}</p></div>` +
+      `<button type="button" class="wizard-close" data-add-cancel aria-label="Close">${ico("x")}</button></div>` +
+      search +
+      `<div class="wizard-body dxe-pick-body">${empty}` +
+      (total
+        ? `<div class="dxe-pick-list" id="dxe-pick-list" role="listbox" aria-labelledby="dxe-pick-title">` +
+          group("dxe-pg-here", `On ${dev.name}`, here, false) +
+          group("dxe-pg-other", "On other displays", other, true) +
+          `</div><p class="dxe-soft dxe-pick-none" data-pick-none hidden>No dashboards match.</p>`
+        : "") +
+      `</div>` +
+      `<details class="dxe-pick-cond"><summary>Only show while… <span class="dxe-soft">optional</span></summary>` +
+      `<div class="condition-picker" data-condition-picker data-empty-message="No conditions: it can show whenever the lineup runs."><textarea id="dxe-add-conditions" rows="2" aria-label="Conditions for the new dashboard" spellcheck="false"></textarea></div>` +
+      `<p class="dxe-soft">Skipped while a condition fails; if none pass, the display keeps its last image.</p></details>` +
+      `<div class="wizard-footer">${make}<span class="wizard-footer-spacer"></span>` +
+      `<button type="button" class="lu-btn-ghost" data-add-cancel>Cancel</button>` +
+      `<button type="button" class="lu-btn-primary" data-add-confirm disabled>Add</button></div>`
+    );
+  }
+  // Opens the picker; resolves when it closes (added or not).
+  function openPicker() {
+    if (!st.display || typeof HTMLDialogElement === "undefined") return;
+    const old = document.getElementById("dxe-picker");
+    if (old && old.open) return;
+    if (old) old.remove(); // closed, its close event still to come
+    const opener = document.activeElement;
+    const dlg = document.createElement("dialog");
+    dlg.id = "dxe-picker";
+    dlg.className = "wizard-dialog dxe-pick-dlg";
+    dlg.setAttribute("aria-labelledby", "dxe-pick-title");
+    const v = viewOf(st.display) || {};
+    dlg.style.cssText = `--dxe-arw:${Number(v.width) || 16};--dxe-arh:${Number(v.height) || 10}`;
+    dlg.innerHTML = pickerDialogHtml();
+    ui.picker = true;
+    let sel = null;
+    let busy = false;
+    let added = false;
+    const q = dlg.querySelector("[data-pick-q]");
+    const ok = dlg.querySelector("[data-add-confirm]");
+    const opts = () => [...dlg.querySelectorAll(".dxe-pick-opt:not([hidden])")];
+    const usable = () => opts().filter((o) => o.getAttribute("aria-disabled") !== "true");
+    const choose = (o, focus) => {
+      if (!o) return;
+      dlg.querySelectorAll(".dxe-pick-opt").forEach((x) => {
+        x.setAttribute("aria-selected", String(x === o));
+        x.tabIndex = x === o ? 0 : -1;
+      });
+      if (o.getAttribute("aria-disabled") === "true") {
+        sel = null;
+        ok.disabled = true;
+        ok.textContent = "Add";
+      } else {
+        sel = o.dataset.add;
+        ok.disabled = false;
+        ok.textContent = `Add ${pageOf(sel).name}`;
+      }
+      if (focus) {
+        o.focus();
+        o.scrollIntoView({ block: "nearest" });
+      }
+    };
+    const filter = () => {
+      const words = (q ? q.value : "").trim().toLowerCase().split(/\s+/).filter(Boolean);
+      dlg.querySelectorAll(".dxe-pick-opt").forEach((o) => {
+        o.hidden = !words.every((w) => o.dataset.hay.includes(w));
+      });
+      dlg.querySelectorAll(".dxe-pick-g").forEach((g) => {
+        g.hidden = !g.querySelector(".dxe-pick-opt:not([hidden])");
+      });
+      const none = dlg.querySelector("[data-pick-none]");
+      if (none) none.hidden = !!opts().length;
+      // A choice the search hid is no choice.
+      const cur = sel && dlg.querySelector(`[data-add="${CSS.escape(sel)}"]`);
+      if (cur && cur.hidden) {
+        sel = null;
+        cur.setAttribute("aria-selected", "false");
+        ok.disabled = true;
+        ok.textContent = "Add";
+      }
+      const first = usable()[0] || opts()[0];
+      if (first && !opts().some((o) => o.tabIndex === 0)) first.tabIndex = 0;
+    };
+    const confirm = async () => {
+      if (!sel || busy) return;
+      busy = true;
+      const id = sel;
+      // Bound to another display: the bind prompt comes over the picker; its Cancel
+      // goes back to the picker with the choice kept.
+      const yes = await confirmBind([id], st.display);
+      busy = false;
+      if (!yes) {
+        dlg.querySelector(`[data-add="${CSS.escape(id)}"]`)?.focus();
+        return;
+      }
+      const ta = dlg.querySelector("#dxe-add-conditions");
+      added = true;
+      shut();
+      addStep(id, ta ? ta.value.trim() : "");
+    };
+    // The page's own handlers never see what happens in here.
+    ["click", "keydown", "input", "change", "dblclick"].forEach((type) =>
+      dlg.addEventListener(type, (e) => e.stopPropagation())
+    );
+    // Closed is gone: nothing half-open is left in the page.
+    const shut = () => {
+      if (dlg.open) dlg.close();
+      dlg.remove();
+    };
+    dlg.addEventListener("cancel", (e) => {
+      e.preventDefault(); // Esc
+      shut();
+    });
+    dlg.addEventListener("click", (e) => {
+      if (e.target === dlg) return shut(); // the backdrop
+      const t = e.target.closest("[data-add-cancel], [data-add-confirm], .dxe-pick-opt");
+      if (!t) return;
+      if (t.matches("[data-add-cancel]")) return shut();
+      if (t.matches("[data-add-confirm]")) return confirm();
+      choose(t, true);
+      if (t.getAttribute("aria-disabled") === "true")
+        live(`${pageOf(t.dataset.add).name} is already in this lineup.`);
+    });
+    dlg.addEventListener("dblclick", (e) => {
+      const o = e.target.closest(".dxe-pick-opt");
+      if (o && o.dataset.add === sel) confirm();
+    });
+    dlg.addEventListener("keydown", (e) => {
+      const o = e.target.closest && e.target.closest(".dxe-pick-opt");
+      const inQ = e.target === q;
+      if (!o && !inQ) return;
+      const all = opts();
+      const at = o ? all.indexOf(o) : -1;
+      const go = (i) => {
+        if (!all.length) return;
+        e.preventDefault();
+        choose(all[Math.max(0, Math.min(all.length - 1, i))], true);
+      };
+      if (e.key === "ArrowDown") {
+        if (inQ) {
+          const cur = all.find((x) => x.dataset.add === sel);
+          return go(cur ? all.indexOf(cur) : 0);
+        }
+        return go(at + 1);
+      }
+      if (e.key === "ArrowUp") {
+        if (o && at === 0 && q) {
+          e.preventDefault();
+          return q.focus();
+        }
+        return o ? go(at - 1) : undefined;
+      }
+      if (o && e.key === "Home") return go(0);
+      if (o && e.key === "End") return go(all.length - 1);
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (o) {
+          choose(o, false);
+          return confirm();
+        }
+        // In the search: Enter adds the choice when one shows, else picks the first match.
+        const cur = all.find((x) => x.dataset.add === sel);
+        if (cur) return confirm();
+        const first = usable()[0];
+        if (first) choose(first, true);
+        return;
+      }
+      if (o && e.key === " ") {
+        e.preventDefault();
+        return choose(o, true);
+      }
+      // Typing on the list searches.
+      if (o && q && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) q.focus();
+    });
+    if (q) q.addEventListener("input", filter);
+    dlg.addEventListener("close", () => {
+      dlg.remove();
+      ui.picker = false;
+      if (added) return; // the new tile takes the focus
+      window.setTimeout(() => {
+        const back =
+          opener && document.contains(opener) && opener.matches("[data-picker]")
+            ? opener
+            : root.querySelector("[data-picker]");
+        back?.focus({ preventScroll: true });
+      }, 0);
+    });
+    root.append(dlg);
+    filter();
+    dlg.showModal();
+    // Search first on a long list; else the first dashboard that can be added.
+    if (q) q.focus();
+    else {
+      const first = usable()[0];
+      if (first) first.focus();
+      else ok.closest(".wizard-footer").querySelector("[data-add-cancel]").focus();
+    }
   }
 
+  function emptyHtml() {
+    return `<div class="dxe-none"><button type="button" class="dxe-add-tile dxe-add-first" data-picker data-fk="picker" aria-haspopup="dialog"${st.display ? "" : " disabled"}>${ico("plus")}<span>Add a dashboard</span></button><p class="dxe-none-t"><b>No dashboards yet</b><span class="dxe-soft">${st.display ? "Add one or more. They show in the order you add them." : "Pick a display first."}</span></p></div>`;
+  }
   function stepsCard() {
-    const empty = st.steps.length
-      ? ""
-      : `<p class="dxe-empty">${ico("layers")}<span>No dashboards yet.</span></p>`;
-    const addRow = st.steps.length
-      ? ""
-      : `<div class="dxe-add-row"><button type="button" class="lu-btn-ghost dxe-add" data-picker data-fk="picker" aria-expanded="${ui.picker}" aria-controls="dxe-picker"${st.display ? "" : " disabled"}>${ico(ui.picker ? "x" : "plus")}<span>${ui.picker ? "Close" : "Add dashboard"}</span></button></div>`;
-    return (
-      `<div class="dxe-card dxe-steps-card"${shapeVars()}>${empty}${st.steps.length ? stripHtml() : ""}` +
-      (ui.picker ? pickerHtml() : "") +
-      addRow +
-      `</div>`
-    );
+    const n = st.steps.length;
+    return `<div class="dxe-card dxe-steps-card${n ? "" : " is-empty"}"${shapeVars()}>${n ? stripHtml() : emptyHtml()}</div>`;
   }
 
   /* ------------------------------------------------------------ 3 Timing */
@@ -1955,6 +2162,31 @@
   const whenReady = () =>
     st.when.mode === "manual" ||
     (st.when.days.some(Boolean) && Number.isFinite(T(st.when.start)) && !endBeforeStart());
+  const newReady = () => !!st.display && whenReady() && st.steps.length > 0;
+  // The save bar's line: the step that is open, what is missing, or what Create
+  // will make.
+  function newStatus() {
+    const dev = deviceOf(st.display);
+    if (!dev) return "Step 1 of 3: pick a display.";
+    if (ui.step < 3) return "Step 2 of 3: choose when it runs.";
+    if (!st.steps.length) return "Add at least one dashboard to create it.";
+    if (!whenReady()) return "Choose when it runs to create it.";
+    const when = whenSummary();
+    return `Ready: ${plural(st.steps.length, "dashboards")} on ${dev.name}, ${when.charAt(0).toLowerCase()}${when.slice(1)}.`;
+  }
+  // Create pressed before it can be: say what is missing and go there.
+  function missingStep() {
+    ui.msg = newStatus();
+    ui.msgKind = "err";
+    drawFooter();
+    live(ui.msg);
+    const to = !st.display
+      ? "[data-pick-display]"
+      : ui.step < 3
+        ? "[data-goto='3']"
+        : "[data-picker]";
+    root.querySelector(to)?.focus();
+  }
   function newFlowHtml() {
     const dev = deviceOf(st.display);
     let html = "";
@@ -1962,23 +2194,23 @@
     // A lineup started from a display's + is for that display: no Change.
     if (ui.step > 1 && dev) html += doneLine(1, "Display", dev.name, 1, S.displayLocked);
     else
-      html += `<section class="dxe-sec">${secHead(1, "Display", "Pick the display it runs on.", "dxe-h-display")}${displayCards()}</section>`;
+      html += `<section class="dxe-sec is-current" aria-labelledby="dxe-h-display" aria-current="step">${secHead(1, "Display", "Pick the display it runs on.", "dxe-h-display")}${displayCards()}</section>`;
     // 2 When
     if (ui.step > 2) html += doneLine(2, "When it runs", whenSummary(), 2);
     else if (ui.step === 2)
       html +=
-        `<section class="dxe-sec" aria-labelledby="dxe-h-when">${secHead(2, "When it runs", whenLead(), "dxe-h-when")}${whenCard()}` +
+        `<section class="dxe-sec is-current" aria-labelledby="dxe-h-when" aria-current="step">${secHead(2, "When it runs", whenLead(), "dxe-h-when")}${whenCard()}` +
         `<div class="dxe-next-step"><button type="button" class="lu-btn-primary" data-goto="3" data-fk="goto-3"${whenReady() ? "" : ' aria-disabled="true"'}>Continue</button></div></section>`;
     else html += waitingHead(2, "When it runs", "Pick a display first.");
     // 3 Dashboards
     if (ui.step === 3) {
-      const chosen = st.steps.length
-        ? stripHtml()
-        : `<p class="dxe-empty">${ico("layers")}<span>No dashboards yet.</span></p>`;
+      const n = st.steps.length;
+      const lead = n
+        ? `${plural(n, "dashboards")}, shown in this order.${n > 1 ? "" : " Add more if you like."}`
+        : "Pick what it shows.";
       html +=
-        `<section class="dxe-sec" aria-labelledby="dxe-h-dash">${secHead(3, "Dashboards", "Pick what it shows, in order.", "dxe-h-dash")}` +
-        `<div class="dxe-card dxe-steps-card"${shapeVars()}>${chosen}</div>` +
-        pickerHtml() +
+        `<section class="dxe-sec is-current" aria-labelledby="dxe-h-dash" aria-current="step">${secHead(3, "Dashboards", lead, "dxe-h-dash")}` +
+        stepsCard() +
         `</section>`;
     } else html += waitingHead(3, "Dashboards", "Choose when it runs first.");
     return html;
@@ -2079,7 +2311,7 @@
     // saved and lost.
     const sections = $("dxe-sections");
     const hero = $("dxe-hero");
-    if (sections) sections.inert = ui.saving;
+    if (sections) sections.inert = ui.saving || !!ui.duplicating;
     if (hero) hero.inert = ui.saving;
     const on = $("dxe-enabled");
     if (on) on.disabled = ui.saving;
@@ -2099,19 +2331,16 @@
     const btns = $("dxe-actionbar-btns");
     const state = $("dxe-save-state");
     if (S.isNew) {
-      const ready = !!st.display && st.steps.length > 0;
-      state.className = "dxe-actionbar-status" + (ui.msgKind ? ` is-${ui.msgKind}` : "");
-      state.textContent =
-        ui.msg ||
-        (ready
-          ? "Ready to create."
-          : ui.step < 3
-            ? `Step ${ui.step} of 3`
-            : "Add a dashboard to create it.");
+      const ready = newReady();
+      state.className =
+        "dxe-actionbar-status" + (ui.msgKind ? ` is-${ui.msgKind}` : ready ? " is-ok" : "");
+      state.textContent = ui.msg || newStatus();
+      // One Cancel link, then the one primary action. It stays focusable while it
+      // can't be used, and says why (the line beside it, and on a press).
       setButtons(
         btns,
-        `<a class="lu-btn-ghost lu-btn-line" href="${esc(S.urls.back)}" data-fk="f-cancel">Cancel</a>` +
-          `<button type="button" class="lu-btn-primary" data-create data-fk="f-create"${ready && !ui.saving ? "" : " disabled"}>${ui.saving ? "Creating…" : "Create lineup"}</button>`
+        `<a class="dxe-link quiet dxe-cancel" href="${esc(S.urls.back)}" data-fk="f-cancel">Cancel</a>` +
+          `<button type="button" class="lu-btn-primary" data-create data-fk="f-create" aria-describedby="dxe-save-state"${ui.saving || ui.duplicating ? " disabled" : ready ? "" : ' aria-disabled="true"'}>${ui.saving ? "Creating…" : "Create lineup"}</button>`
       );
       return;
     }
@@ -2124,8 +2353,8 @@
       (ui.reload
         ? `<button type="button" class="lu-btn-ghost lu-btn-line" data-reload data-fk="f-reload">Reload</button>`
         : "") +
-        `<button type="button" class="lu-btn-ghost lu-btn-line" data-discard data-fk="f-discard"${d && !ui.saving ? "" : " disabled"}>Discard</button>` +
-        `<button type="button" class="lu-btn-primary" data-save data-fk="f-save"${ui.saving ? " disabled" : ""}>${ui.saving ? "Saving…" : "Save lineup"}</button>`
+        `<button type="button" class="lu-btn-ghost lu-btn-line" data-discard data-fk="f-discard"${d && !ui.saving && !ui.duplicating ? "" : " disabled"}>Discard</button>` +
+        `<button type="button" class="lu-btn-primary" data-save data-fk="f-save"${ui.saving || ui.duplicating ? " disabled" : ""}>${ui.saving ? "Saving…" : "Save lineup"}</button>`
     );
   }
 
@@ -2197,30 +2426,74 @@
     live(`Moved ${pageOf(id).name} to ${j + 1} of ${st.steps.length}.`);
   }
 
-  async function addStep(id, elsewhere) {
-    if (elsewhere && !(await confirmBind([id], st.display))) return;
-    const adds = [...root.querySelectorAll("[data-add]")];
-    const at = Math.max(
-      0,
-      adds.findIndex((b) => b.dataset.add === id)
-    );
+  async function duplicateStep(id) {
+    const source = stepOf(id);
+    const p = pageOf(id);
+    if (!source || p.missing || ui.saving || ui.duplicating) return;
+    const copy = { ...source };
+    ui.duplicating = id;
+    draw();
+    live(`Duplicating ${p.name}.`);
+    try {
+      const body = new FormData();
+      body.append("respond", "json");
+      const data = await request(S.urls.duplicatePage.replace("__ID__", encodeURIComponent(id)), {
+        method: "POST",
+        body,
+        headers: { Accept: "application/json" },
+      });
+      ui.duplicating = null;
+      change(() => {
+        S.pages[data.page.id] = { ...p, ...data.page, shared: 0, recent: [] };
+        copy.id = data.page.id;
+        st.steps.splice(st.steps.findIndex((s) => s.id === id) + 1, 0, copy);
+        if (hasConditions(source)) stepHadConditions.add(copy.id);
+        if (ui.consent[id]) ui.consent[copy.id] = ui.consent[id];
+        ui.open = new Set([copy.id]);
+      });
+      const tile = root.querySelector(`[data-step="${CSS.escape(copy.id)}"] .dxe-sel`);
+      tile?.focus();
+      live(`Duplicated ${p.name}.`);
+    } catch (err) {
+      ui.duplicating = null;
+      ui.msg = `Couldn't duplicate ${p.name}: ${err.message}`;
+      ui.msgKind = "err";
+      draw();
+      root.querySelector(`[data-duplicate="${CSS.escape(id)}"]`)?.focus();
+      live(ui.msg);
+    }
+  }
+
+  // A dashboard picked in the picker (its bind already agreed): it joins the end of
+  // the lineup, and its tile takes the focus.
+  function addStep(id, conditions) {
     change(() => {
       st.steps.push({
         id,
         dwell: null,
         override: null,
-        conditions: ui.adding.conditions,
+        conditions: conditions || "",
         refresh: pageOf(id).refresh || 0,
         pin: undefined,
       });
-      if (ui.adding.conditions.trim()) stepHadConditions.add(id);
-      ui.adding = null;
+      if ((conditions || "").trim()) stepHadConditions.add(id);
       if (!st.home) st.home = "";
+      ui.picker = false;
+      ui.elsewhere = false;
+      ui.open.clear();
+      ui.open.add(id);
     });
+    if (!S.isNew) loadStrip(id);
     live(`Added ${pageOf(id).name}.`);
-    // The card it was on is gone: the next Add takes its place.
-    const left = [...root.querySelectorAll("[data-add]")];
-    (left[Math.min(at, left.length - 1)] || root.querySelector("[data-picker]"))?.focus();
+    // After the closing dialog hands the focus back to what opened it.
+    window.setTimeout(() => {
+      const tile = root.querySelector(`[data-step="${CSS.escape(id)}"]`);
+      if (!tile) return root.querySelector("[data-picker]")?.focus();
+      tile.querySelector(".dxe-sel")?.focus({ preventScroll: true });
+      tile.scrollIntoView({ block: "nearest", inline: "nearest" });
+      tile.classList.add("is-flash");
+      window.setTimeout(() => tile.classList.remove("is-flash"), 1800);
+    }, 0);
   }
 
   function removeStep(id) {
@@ -2229,7 +2502,9 @@
       st.steps = st.steps.filter((s) => s.id !== id);
       if (st.home === id) st.home = "";
       ui.open.delete(id);
+      ui.condOpen.delete(id);
       delete ui.choice[id];
+      delete ui.consent[id];
     });
     live(`Removed ${pageOf(id).name}.`);
     const next = root.querySelectorAll("[data-step]")[Math.max(0, i - 1)];
@@ -2637,7 +2912,7 @@
   }
 
   async function save() {
-    if (ui.saving) return;
+    if (ui.saving || ui.duplicating) return;
     if (!st.steps.length) {
       ui.msg = "Add at least one dashboard.";
       ui.msgKind = "err";
@@ -2689,7 +2964,7 @@
   }
 
   async function create() {
-    if (ui.saving || !st.display || !st.steps.length || !whenReady()) return;
+    if (ui.saving || ui.duplicating || !st.display || !st.steps.length || !whenReady()) return;
     if (
       !(await confirmBind(
         st.steps.map((s) => s.id),
@@ -2738,9 +3013,6 @@
     st = initial();
     ui.consent = {};
     ui.consentDisplay = S.display;
-    ui.picker = false;
-    ui.adding = null;
-    ui.elsewhere = false;
     const title = $("dxe-title");
     if (title) title.value = st.name;
     const on = $("dxe-enabled");
@@ -2764,7 +3036,6 @@
     ui.open.clear();
     if (!open) {
       ui.open.add(id);
-      ui.picker = false;
       loadStrip(id);
     }
     draw();
@@ -2781,6 +3052,7 @@
     }
     if (t.disabled) return;
     const d = t.dataset;
+    if (d.duplicate) return duplicateStep(d.duplicate);
     if (d.day !== undefined && t.classList.contains("lu-dt")) {
       const i = Number(d.day);
       if (st.when.days[i] && st.when.days.filter(Boolean).length === 1) {
@@ -2897,46 +3169,12 @@
             ? "[data-pick-display]"
             : n === 2
               ? '[data-when][aria-pressed="true"]'
-              : "[data-add]"
+              : "[data-picker]"
         ) || root
       ).focus();
       return;
     }
-    if (d.picker !== undefined) {
-      ui.picker = !ui.picker;
-      if (ui.adding) delete ui.consent[ui.adding.id];
-      ui.adding = null;
-      if (ui.picker) ui.open.clear(); // one panel under the strip at a time
-      draw();
-      (ui.picker ? root.querySelector("[data-add]") : root.querySelector("[data-picker]"))?.focus();
-      return;
-    }
-    if (d.elsewhereToggle !== undefined) {
-      ui.elsewhere = !ui.elsewhere;
-      draw();
-      root.querySelector("[data-elsewhere-toggle]")?.focus();
-      return;
-    }
-    if (d.add) {
-      if (d.elsewhere !== undefined && !(await confirmBind([d.add], st.display))) return;
-      ui.adding = {
-        id: d.add,
-        elsewhere: d.elsewhere !== undefined,
-        conditions: "",
-      };
-      draw();
-      queueMicrotask(() => root.querySelector("#dxe-picker .cp-actions button")?.focus());
-      return;
-    }
-    if (d.addCancel !== undefined) {
-      const id = ui.adding.id;
-      delete ui.consent[id];
-      ui.adding = null;
-      draw();
-      root.querySelector(`[data-add="${CSS.escape(id)}"]`)?.focus();
-      return;
-    }
-    if (d.addConfirm !== undefined && ui.adding) return addStep(ui.adding.id, ui.adding.elsewhere);
+    if (d.picker !== undefined) return openPicker();
     if (d.remove) return removeStep(d.remove);
     if (d.home) {
       if (t.getAttribute("aria-disabled") === "true") return; // already home
@@ -2963,6 +3201,19 @@
       if (pos < 0) delete ui.choice[d.drawPos];
       else if (c && c.mode === "draw") c.pos = pos;
       return itemChanged();
+    }
+    if (d.clearCond) {
+      const s = stepOf(d.clearCond);
+      if (!s) return;
+      change(() => {
+        s.conditions = "";
+        stepHadConditions.delete(s.id);
+        ui.condOpen.delete(s.id);
+        ui.rawOpen.delete(s.id);
+      });
+      live(`${pageOf(s.id).name} shows whenever the lineup runs.`);
+      root.querySelector(`[data-add-cond="${CSS.escape(s.id)}"]`)?.focus();
+      return;
     }
     if (d.addCond) {
       ui.condOpen.add(d.addCond);
@@ -3034,7 +3285,10 @@
     if (d.pushLineup !== undefined) return pushNow(st.home || st.steps[0].id);
     if (d.reload !== undefined) return window.location.reload();
     if (d.save !== undefined) return save();
-    if (d.create !== undefined) return create();
+    if (d.create !== undefined) {
+      if (t.getAttribute("aria-disabled") === "true") return missingStep();
+      return create();
+    }
     if (d.discard !== undefined) return discard();
     if (d.delete !== undefined) {
       if (window.confirm(`Delete ${st.name || "this lineup"}?`)) $("dxe-delete-form").submit();
@@ -3072,10 +3326,6 @@
       return;
     }
     if (d.cond) {
-      if (d.cond === "__adding__" && ui.adding) {
-        ui.adding.conditions = t.value;
-        return;
-      }
       const s = stepOf(d.cond);
       if (s) change(() => (s.conditions = t.value), { draw: false });
       return;
@@ -3106,10 +3356,6 @@
     }
     if (d.time) return draw();
     if (d.cond) {
-      if (d.cond === "__adding__" && ui.adding) {
-        ui.adding.conditions = t.value;
-        return;
-      }
       const s = stepOf(d.cond);
       if (s) change(() => (s.conditions = t.value), { draw: false });
       return;
@@ -3156,6 +3402,17 @@
       e.preventDefault();
       move(row.dataset.step, e.key === "ArrowUp" || e.key === "ArrowLeft" ? -1 : 1);
       return;
+    }
+    // Esc closes the picker and goes back to its button.
+    if (e.key === "Escape" && ui.picker && !(LB && LB.isOpen())) {
+      const inside = e.target.closest && e.target.closest("#dxe-picker, [data-picker]");
+      if (inside) {
+        e.preventDefault();
+        ui.picker = false;
+        draw();
+        root.querySelector("[data-picker]")?.focus();
+        return;
+      }
     }
     // Esc closes the open details and goes back to its tile.
     if (e.key === "Escape" && ui.open.size && !(LB && LB.isOpen())) {

@@ -2688,14 +2688,16 @@ def bind_devices(page_id: str) -> Response:
 
 
 def _bind_consent() -> tuple[Any, dict[str, Any]]:
-    """The caller's explicit ``bind_pages`` / ``bind_also`` consent and the
-    record body without them (neither key belongs to the model)."""
+    """The caller's explicit ``bind_pages`` / ``bind_also`` / ``bind_keep``
+    consent and the record body without them (none belong to the model)."""
     from app.lineup_binding import Consent
 
     raw = request.get_json(silent=True)
     body = raw if isinstance(raw, dict) else {}
     consent = Consent.from_json(body)
-    return consent, {k: v for k, v in body.items() if k not in ("bind_pages", "bind_also")}
+    return consent, {
+        k: v for k, v in body.items() if k not in ("bind_pages", "bind_also", "bind_keep")
+    }
 
 
 def _model_errors(exc: ValidationError) -> list[dict[str, Any]]:

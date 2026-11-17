@@ -44,6 +44,7 @@ LOOP_THREAD_NAMES: frozenset[str] = frozenset(
         "opendisplay-ha-telemetry",
         "ha-discovery-ticker",
         "visionect-listener",
+        "meural-poll",
     }
 )
 

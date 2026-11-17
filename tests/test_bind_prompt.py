@@ -137,6 +137,67 @@ def test_editor_save_bind_both(app: Flask) -> None:
     assert _bound(app, "photos") == ["frame", "hallway"]
 
 
+# -- per-display choices (bind_keep) -------------------------------------------------
+
+
+def _three_displays(app: Flask) -> None:
+    """Add a `door` display and an `art` dashboard bound to frame + door."""
+    code = app.config["PAIRING_STORE"].issue(note="t").code
+    resp = app.test_client().post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+        data=json.dumps({"device_id": "door", "kind": "esp32_client"}),
+    )
+    assert resp.status_code == 201
+    app.config["PAGE_STORE"].save(Page(id="art", name="Art", device_ids=["frame", "door"]))
+
+
+def test_bind_keep_keeps_only_the_ticked_displays(app: Flask) -> None:
+    _three_displays(app)
+    form = _editor_form(pages="art", bind_pages="art", bind_keep=json.dumps({"art": ["door"]}))
+    app.test_client().post("/decks/editor-save", data=form, follow_redirects=True)
+    assert [d.page_ids for d in app.config["DECK_STORE"].all()] == [["art"]]
+    assert _bound(app, "art") == ["door", "hallway"]
+
+
+def test_bind_keep_alone_is_consent_and_empty_means_move(app: Flask) -> None:
+    _three_displays(app)
+    form = _editor_form(pages="art", bind_keep=json.dumps({"art": []}))
+    app.test_client().post("/decks/editor-save", data=form, follow_redirects=True)
+    assert len(app.config["DECK_STORE"].all()) == 1
+    assert _bound(app, "art") == ["hallway"]
+
+
+def test_bind_keep_cannot_add_a_display_and_garbage_is_no_consent(app: Flask) -> None:
+    _three_displays(app)
+    c = app.test_client()
+    c.post("/decks/editor-save", data=_editor_form(pages="art", bind_keep="{nope"))
+    assert app.config["DECK_STORE"].all() == []
+    assert _bound(app, "art") == ["frame", "door"]
+    keep = json.dumps({"art": ["frame", "nowhere"]})
+    c.post("/decks/editor-save", data=_editor_form(pages="art", bind_keep=keep))
+    assert _bound(app, "art") == ["frame", "hallway"]
+
+
+def test_bind_keep_wins_over_bind_also_and_works_over_json(app: Flask) -> None:
+    _three_displays(app)
+    resp = app.test_client().post(
+        "/decks/new/lineup",
+        data=_lineup_form(
+            page_ids=["art"], bind_also=["art"], bind_keep=json.dumps({"art": ["frame"]})
+        ),
+    )
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    assert _bound(app, "art") == ["frame", "hallway"]
+    app.config["PAGE_STORE"].save(Page(id="art", name="Art", device_ids=["frame", "door"]))
+    sched = {
+        "id": "s", "name": "S", "page_id": "art", "type": "interval",
+        "interval_minutes": 60, "device_ids": ["hallway"], "bind_keep": {"art": ["door"]},
+    }  # fmt: skip
+    assert app.test_client().post("/api/mcp/schedules", json=sched).status_code == 200
+    assert _bound(app, "art") == ["door", "hallway"]
+
+
 def test_editor_display_switch_is_enforced(app: Flask) -> None:
     # A lineup on `hallway` holding only hallway dashboards is switched to `frame`:
     # `clock` would be stranded there, so the save needs consent for it.
