@@ -44,17 +44,40 @@ def test_preview_roundtrips_panel_pixel_values(app, renderer_id, gamut, size):
     assert repacked == original
 
 
+def test_preview_paints_a_calibrated_device_in_its_measured_inks(app):
+    """A device with a palette profile is previewed in the profile's colours, as the glass shows
+    them; the pixel decisions (which ink goes where) stay the packer's."""
+    from app.palette_profiles.bundled import bundled_profile
+
+    profile = bundled_profile("paperlesspaper-spectra6")
+    assert profile is not None
+    renderer = app.config["RENDERER_REGISTRY"].get("esp32_bin")
+    image = Image.new("RGB", (16, 8), (255, 255, 255))
+    image.paste((0, 0, 0), (0, 0, 8, 8))
+    out = io.BytesIO()
+    image.save(out, "PNG")
+    panel = Panel(w=16, h=8, gamut="waveshare_e6")
+    settings = {"dither": "floyd-steinberg", "_palette_override": profile.palette.as_tuples()}
+    preview = render_panel_preview(
+        out.getvalue(), renderer=renderer, panel=panel, settings=settings
+    )
+    with Image.open(io.BytesIO(preview)) as decoded:
+        assert decoded.convert("RGB").getpixel((2, 2)) == (0x1F, 0x22, 0x26)
+        assert decoded.convert("RGB").getpixel((12, 2)) == (0xB9, 0xC7, 0xC9)
+
+
 @pytest.mark.parametrize(
-    "renderer_id,gamut,bits",
+    "renderer_id,gamut,bits,profile",
     [
-        ("esp32_bin", "waveshare_e6", 4),
-        ("esp32_gray_bin", "gray_16", 4),
-        ("esp32_bw_bin", "mono", 1),
+        ("esp32_bin", "waveshare_e6", 4, None),
+        ("esp32_bin", "waveshare_e6", 4, "paperlesspaper-spectra6"),
+        ("esp32_gray_bin", "gray_16", 4, None),
+        ("esp32_bw_bin", "mono", 1, None),
     ],
 )
 @pytest.mark.parametrize("rotated,flipped", [(False, False), (True, False), (False, True)])
 def test_preview_pixels_match_the_real_push_artifact(
-    app, monkeypatch, renderer_id, gamut, bits, rotated, flipped
+    app, monkeypatch, renderer_id, gamut, bits, profile, rotated, flipped
 ):
     """Compare decoded preview pixels with the bytes written by a real push.
 
@@ -64,12 +87,18 @@ def test_preview_pixels_match_the_real_push_artifact(
 
     import numpy as np
 
-    from app.quantizer import palette_for_gamut
+    from app.palette_profiles.bundled import bundled_profile
+    from app.quantizer import align_palette_override, palette_for_gamut
 
     registry = app.config["RENDERER_REGISTRY"]
     renderer = registry.get(renderer_id)
     renderer = replace(renderer, manifest={**renderer.manifest, "device": "target"})
     registry.renderers[renderer_id] = renderer
+    if profile:
+        app.config["SETTINGS_STORE"].patch_section(
+            "devices", {"target": {"palette_profile_slug": profile}}
+        )
+        app.config["SETTINGS_STORE"].patch_section("renderers", {renderer_id: {"calibrated": True}})
     panel = Panel(
         w=32,
         h=24,
@@ -123,6 +152,8 @@ def test_preview_pixels_match_the_real_push_artifact(
     values = ((packed[:, None] >> np.arange(8 - bits, -1, -bits)) & ((1 << bits) - 1)).ravel()
     palette = [(0, 0, 0)] * (1 << bits)
     colours = palette_for_gamut(gamut)
+    if profile:
+        colours = align_palette_override(bundled_profile(profile).palette.as_tuples(), colours)
     wires = (0, 1, 2, 3, 5, 6) if gamut == "waveshare_e6" else range(len(colours))
     for wire, colour in zip(wires, colours, strict=True):
         palette[wire] = colour
@@ -138,3 +169,17 @@ def test_preview_pixels_match_the_real_push_artifact(
     with Image.open(io.BytesIO(response.data)) as actual:
         assert actual.size == expected.size
         assert actual.convert("RGB").tobytes() == expected.tobytes()
+
+
+def test_grey_panel_preview_uses_measured_grey_inks(app):
+    renderer = app.config["RENDERER_REGISTRY"].get("esp32_gray_bin")
+    source = io.BytesIO()
+    Image.new("RGB", (32, 24), "white").save(source, "PNG")
+    preview = render_panel_preview(
+        source.getvalue(),
+        renderer=renderer,
+        panel=Panel(w=32, h=24, gamut="gray_16"),
+        settings={"dither": "none", "_gray_ramp": ["#242424", "#ddddcc"]},
+    )
+    with Image.open(io.BytesIO(preview)) as image:
+        assert image.convert("RGB").getpixel((0, 0)) == (221, 221, 204)

@@ -28,6 +28,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - Keep lineup tiles level when a NEXT or QUEUED tag appears.
 - Fraimic closes HTTP error responses after reading the frame error.
 - Windows installer: a failed check (git or Python missing) now shows its message and leaves the PowerShell window open. Before, the window closed before the message could be read.
+- Show calibrated panel previews in their measured inks.
 - Lineups show the delivered, queued and waiting states, with separate lanes for overlapping windows.
 - The dashboard editor warns when a Home Assistant theme overrides the dashboard appearance.
 - Smart sync: button wakes no longer reset wake-time trust.
