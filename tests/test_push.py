@@ -1288,6 +1288,38 @@ def _wired_bound(tmp_path: Path, composition_png: bytes):
     return manager, fakes["client"], page_store
 
 
+@pytest.mark.parametrize("source", ["page_refresh", "deck", "scheduler"])
+def test_automatic_push_drops_target_that_changed_lineup_while_rendering(
+    tmp_path: Path, composition_png: bytes, source: str
+) -> None:
+    manager, client, _ = _wired_bound(tmp_path, composition_png)
+    eligible = True
+    manager._automatic_delivery_eligible_fn = lambda page_id, device_id, source: eligible
+
+    def capture(*args, **kwargs):
+        nonlocal eligible
+        eligible = False  # the printer starts while the photo capture is in flight
+        return composition_png, []
+
+    with patch("app.push.capture_composed", side_effect=capture):
+        manager.push("home", source=source, respect_quiet_hours=True)
+    assert manager.latest_render_for("kitchen") is None
+    assert client.published == []
+    # The same eligibility result must not block an explicit Push now.
+    with patch("app.push.capture_composed", return_value=(composition_png, [])):
+        result = manager.push("home", bypass_coalesce=True)
+    assert result.status == "sent"
+    assert manager.latest_render_for("kitchen")["page_id"] == "home"
+
+
+def test_page_refresh_of_inactive_step_does_no_rendering(tmp_path: Path, composition_png: bytes):
+    manager, _, _ = _wired_bound(tmp_path, composition_png)
+    manager._automatic_delivery_eligible_fn = lambda page_id, device_id, source: False
+    with patch("app.push.capture_composed", side_effect=AssertionError("inactive page rendered")):
+        result = manager.push("home", source="page_refresh", respect_quiet_hours=True)
+    assert result.status == "held"
+
+
 def test_touch_repush_of_unchanged_content_keeps_digest(
     tmp_path: Path, composition_png: bytes
 ) -> None:
@@ -1680,3 +1712,42 @@ def test_broadcast_pushes_mark_the_devices_they_deliver_to(
         manager.push("home")  # unbound page, legacy broadcast on
     assert seen == [(True, False)]
     assert not manager.render_in_progress("pi_png")
+
+
+@pytest.mark.parametrize("kind", ["schedule", "unbound_rotation"])
+def test_quiet_hours_with_priority_gate_keep_catchup(tmp_path, composition_png, monkeypatch, kind):
+    from datetime import UTC, datetime
+
+    from app.scheduler import Scheduler
+    from app.state.rotation_model import Rotation, RotationStep
+    from app.state.schedule_model import Schedule
+    from app.state.schedule_store import ScheduleStore
+
+    manager, client, pages = _wired_bound(tmp_path, composition_png)
+    scheduler = Scheduler(
+        store=ScheduleStore(tmp_path / "schedules.json"),
+        push_manager=lambda: manager,
+        device_ids_for_page=lambda pid: pages.get(pid).device_ids,
+    )
+    manager._automatic_delivery_eligible_fn = scheduler.automatic_delivery_eligible
+    monkeypatch.setattr(manager, "device_in_quiet_hours", lambda did: True)
+    # The push path uses the same quiet predicate for per-renderer filtering.
+    monkeypatch.setattr("app.push.device_is_quiet", lambda *args, **kwargs: True)
+    now = datetime(2026, 11, 17, 1, tzinfo=UTC)
+    with patch("app.push.capture_composed", side_effect=AssertionError("quiet render")):
+        if kind == "schedule":
+            record = Schedule(
+                id="s", name="S", page_id="home", type="interval", interval_minutes=15
+            )
+            result = scheduler._fire(record, now, respect_quiet_hours=True)
+            assert scheduler._last_fired["s"] == now.timestamp()
+            assert scheduler._last_status["s"] == "quiet"
+        else:
+            record = Rotation(
+                id="r", name="R", steps=[RotationStep(page_id="home", dwell_minutes=15)]
+            )
+            result = scheduler._fire_rotation(record, 0, now, respect_quiet_hours=True)
+            assert scheduler._rotation_last_status["r"] == "quiet"
+    assert result.status == "quiet"
+    assert "kitchen" in scheduler._pause_catchups
+    assert client.published == []

@@ -40,6 +40,7 @@ LOOP_THREAD_NAMES: frozenset[str] = frozenset(
     {
         "tesserae-scheduler",
         "tesserae-scheduler-watchdog",
+        "tesserae-priority",
         "relay-pairing",
         "opendisplay-ha-telemetry",
         "ha-discovery-ticker",

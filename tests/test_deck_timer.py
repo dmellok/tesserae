@@ -3,7 +3,7 @@ and the scheduler branch that walks a deck's pages on a wall-clock anchor."""
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -111,6 +111,182 @@ def test_quiet_hours_skips_advance(wiring) -> None:
     store.upsert(_deck())
     scheduler._tick_once(datetime(2026, 6, 15, 0, 0, tzinfo=UTC))
     push.push.assert_not_called()
+
+
+def test_priority_minimum_hold_blocks_sensor_flaps(wiring) -> None:
+    from app.scheduler_conditions import ConditionEvaluator
+    from app.state.conditions import Condition
+
+    scheduler, push, store, _nav = wiring
+    states = [{"entity_id": "sensor.activity", "state": "idle"}]
+    scheduler._condition_evaluator = ConditionEvaluator(ha_get_states=lambda: states)
+    store.upsert(
+        _deck(
+            advance_mode="priority",
+            advance_min_hold_minutes=30,
+            pages=[
+                DeckPage(
+                    page_id="active",
+                    conditions=[
+                        Condition(
+                            source_kind="ha_entity",
+                            source_id="sensor.activity",
+                            operator="==",
+                            value="running",
+                        )
+                    ],
+                ),
+                DeckPage(page_id="photos", dwell_minutes=60),
+            ],
+        )
+    )
+    now = datetime(2026, 11, 16, 11, 0, 47, tzinfo=UTC)
+    scheduler._tick_once(now)
+    push.push.reset_mock()
+    for minutes, value in [(1, "running"), (2, "idle"), (3, "running")]:
+        states[0]["state"] = value
+        scheduler._condition_evaluator.refresh_ha_states()
+        scheduler._reevaluate_priority_lineups(now + timedelta(minutes=minutes))
+    push.push.assert_not_called()
+    assert scheduler._priority_pass(now + timedelta(minutes=29, seconds=59)) == 1
+    scheduler._priority_pass(now + timedelta(minutes=30))
+    assert push.push.call_args.args[0] == "active"
+
+
+@pytest.mark.parametrize("status", ["failed", "busy"])
+def test_priority_worker_respects_send_attempt_cap(wiring, status):
+    from app.scheduler import _CYCLE_SEND_ATTEMPTS
+
+    scheduler, push, store, _nav = wiring
+    store.upsert(_deck(advance_mode="priority", advance_min_hold_minutes=0))
+    push.push.return_value = MagicMock(status=status, error="unavailable")
+    now = datetime(2026, 6, 15, 0, 0, tzinfo=UTC)
+    for tick in range(10):
+        scheduler._reevaluate_priority_lineups(now + timedelta(seconds=30 * tick))
+    assert push.push.call_count == _CYCLE_SEND_ATTEMPTS
+    scheduler._reevaluate_priority_lineups(now + timedelta(minutes=30))
+    assert push.push.call_count == _CYCLE_SEND_ATTEMPTS + 1
+
+
+@pytest.fixture
+def priority_frame(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from app.push import PushResult
+    from app.scheduler_conditions import ConditionEvaluator
+    from app.state.conditions import Condition
+    from app.state.deck_nav_store import DeckNavStore
+    from app.state.page_store import Page, PageStore
+
+    class RetainedTransport:
+        def __init__(self):
+            self.sent = []
+            self.latest = {}
+            self.quiet = False
+
+        def push(self, page_id, *, device_ids=None, source="page", **kwargs):
+            for device_id in device_ids or {"panel"}:
+                self.sent.append((device_id, page_id, source))
+                self.latest[device_id] = {"page_id": page_id}
+            return PushResult(status="sent", page_id=page_id)
+
+        def latest_render_for(self, device_id):
+            return self.latest.get(device_id)
+
+        def device_in_quiet_hours(self, device_id):
+            return self.quiet
+
+    pages = PageStore(tmp_path / "pages.json")
+    for pid in ("print", "photos"):
+        pages.save(Page(id=pid, name=pid, device_ids=["panel"], refresh_minutes=15))
+    decks = DeckStore(tmp_path / "decks.json")
+    decks.upsert(
+        _deck(
+            advance_mode="priority",
+            advance_min_hold_minutes=0,
+            advance_smart_sync=True,
+            advance_smart_sync_lead_s=30,
+            pages=[
+                DeckPage(
+                    page_id="print",
+                    conditions=[
+                        Condition(
+                            source_kind="ha_entity",
+                            source_id="sensor.printer",
+                            operator="==",
+                            value="running",
+                        )
+                    ],
+                ),
+                DeckPage(page_id="photos", dwell_minutes=60),
+            ],
+        )
+    )
+    states = [{"entity_id": "sensor.printer", "state": "idle"}]
+    evaluator = ConditionEvaluator(ha_get_states=lambda: states)
+    evaluator.refresh_ha_states()
+    pusher = RetainedTransport()
+    nav = DeckNavStore(tmp_path / "nav.json")
+    telemetry = SimpleNamespace(always_on=False, is_trusted=True, predicted_next_wake_at=None)
+    scheduler = Scheduler(
+        store=ScheduleStore(tmp_path / "s.json"),
+        deck_store=decks,
+        deck_nav_store=nav,
+        page_store=pages,
+        condition_evaluator=evaluator,
+        push_manager=lambda: pusher,
+        device_telemetry=SimpleNamespace(get=lambda did: telemetry),
+        timezone_provider=lambda: UTC,
+    )
+    monkeypatch.setattr(scheduler, "_maybe_warm_decks", lambda now: None)
+    monkeypatch.setattr(scheduler, "_maybe_warm_ahead", lambda now: None)
+    return scheduler, pusher, nav, states, telemetry
+
+
+def test_unpredicted_wake_queues_selection_without_rendering_in_request(priority_frame):
+    scheduler, transport, nav, states, telemetry = priority_frame
+    now = datetime(2026, 11, 16, 11, 0, tzinfo=UTC)
+    scheduler._tick_once(now)
+    telemetry.predicted_next_wake_at = (now + timedelta(hours=1)).timestamp()
+    states[0] = {"entity_id": "sensor.printer", "state": "running"}
+    scheduler.prepare_device_wake("panel", now=now + timedelta(minutes=21))
+    assert transport.latest_render_for("panel")["page_id"] == "photos"
+    assert nav.current_page("panel", "d1") == "photos"
+    scheduler._priority_pass(now + timedelta(minutes=21))
+    assert transport.latest_render_for("panel")["page_id"] == "print"
+    assert nav.current_page("panel", "d1") == "print"
+
+
+@pytest.mark.parametrize("gate", ["quiet", "global_pause", "device_pause", "manual_hold"])
+def test_event_and_wake_checks_preserve_automation_holds(priority_frame, tmp_path, gate):
+    from app.state.device_rotation_state_model import DeviceRotationState
+    from app.state.device_rotation_state_store import DeviceRotationStateStore
+
+    scheduler, transport, nav, states, _telemetry = priority_frame
+    now = datetime(2026, 11, 16, 11, 0, tzinfo=UTC)
+    scheduler._tick_once(now)
+    states[0] = {"entity_id": "sensor.printer", "state": "running"}
+    if gate == "quiet":
+        transport.quiet = True
+    elif gate == "global_pause":
+        scheduler._paused_provider = lambda: True
+    else:
+        store = DeviceRotationStateStore(tmp_path / "holds.json")
+        field = "automation_pause_until" if gate == "device_pause" else "override_until"
+        store.upsert(
+            DeviceRotationState(
+                device_id="panel",
+                rotation_id="d1",
+                step_index=1,
+                **{field: now + timedelta(hours=1)},
+            )
+        )
+        scheduler._rotation_state_store = store
+    transport.sent.clear()
+    scheduler.prepare_device_wake("panel", now=now + timedelta(minutes=1))
+    scheduler._priority_pass(now + timedelta(minutes=1))
+    assert transport.sent == []
+    assert nav.current_page("panel", "d1") == "photos"
 
 
 # -- parity: windows, min-hold (Tier A + B via the rotation engine) -------

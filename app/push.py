@@ -559,12 +559,14 @@ class PushManager:
         plugin_registry_fn: Callable[[], Any] | None = None,
         atlas_warm_fn: Callable[[list[tuple[Any, ...]]], None] | None = None,
         automation_eligible_fn: Callable[[str | None, str], bool] | None = None,
+        automatic_delivery_eligible_fn: Callable[[str, str, str], bool] | None = None,
     ) -> None:
         self._registry = registry
         # Called with the overlay atlases a fresh render will be asked for
         # (app.atlas_warm jobs), so they are built before a device asks.
         self._atlas_warm_fn = atlas_warm_fn
         self._automation_eligible_fn = automation_eligible_fn
+        self._automatic_delivery_eligible_fn = automatic_delivery_eligible_fn
         self._page_store = page_store
         self._transport = transport
         self._settings = settings
@@ -2067,6 +2069,16 @@ class PushManager:
         left the push returns ``status="held"`` without rendering or
         writing a History row (the caller retries on its own cadence)."""
         waited: tuple[float, int] = (0.0, 0)
+        if respect_quiet_hours and self._automatic_delivery_eligible_fn:
+            targets = self._page_push_targets(page_id, device_ids)
+            if targets:
+                device_ids = {
+                    did
+                    for did in targets
+                    if self._automatic_delivery_eligible_fn(page_id, did, source)
+                }
+                if not device_ids:
+                    return PushResult(status="held", page_id=page_id)
         if settle and followup == 0 and source not in ("follow-up", "deck_warm", "album_warm"):
             waited = self.settle_page(
                 page_id, max_s=settle_max_s, respect_quiet_hours=respect_quiet_hours
@@ -2859,6 +2871,21 @@ class PushManager:
 
         all_renderers: list[RendererResult] = []
         group_results: list[PushResult] = []
+        refresh_gate = (
+            self._automatic_delivery_eligible_fn
+            if respect_quiet_hours or automated_followup
+            else None
+        )
+        if refresh_gate is not None:
+            virtual = [(panel, dids) for panel, dids in groups if not dids]
+            bound = [
+                (panel, [did for did in dids if refresh_gate(page_id, did, source)])
+                for panel, dids in groups
+                if dids
+            ]
+            groups = virtual + [(panel, dids) for panel, dids in bound if dids]
+            if not groups:
+                return PushResult(status="held", page_id=page_id)
         # v0.71.x: pages carrying a widget that declares
         # ``render.per_device_id: true`` (e.g. the tesserae_status bar
         # with its per-device battery + wifi chips) must render once per
@@ -2952,6 +2979,12 @@ class PushManager:
                     image_warning = _broken_images_warning(broken)
                 else:
                     self._broken_image_holds.pop(page_id, None)
+                if refresh_gate is not None and device_filter is not None:
+                    device_filter = {
+                        did for did in device_filter if refresh_gate(page_id, did, source)
+                    }
+                    if not device_filter:
+                        continue
                 result = self._fan_out(
                     composition_png,
                     panel.model_dump(),
@@ -2988,7 +3021,7 @@ class PushManager:
                 automated=respect_quiet_hours or automated_followup,
             )
         if not group_results:
-            status: PushStatus = "failed"
+            status: PushStatus = "held" if refresh_gate is not None else "failed"
         elif failed:
             status = "failed"
         elif all(r.status == "no_change" for r in group_results):

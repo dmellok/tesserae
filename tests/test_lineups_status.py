@@ -238,6 +238,8 @@ def app(tmp_path: Path) -> Flask:
         plugins_dir=REPO_ROOT / "plugins",
         renderers_dir=REPO_ROOT / "renderers",
     )
+    # These tests inspect seeded state; the event worker must not deliver it.
+    a.config["SCHEDULER"].stop()
     a.config["TESTING"] = True
     a.config["SETTINGS_STORE"].patch_section("app", {"locale": "en-GB"})
     for pid in ("photos", "alpha", "beta"):
