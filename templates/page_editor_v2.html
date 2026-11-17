@@ -310,12 +310,14 @@
         </div>
       </div>
       <div class="ev2-of" data-ev2-dither>
-        <span class="ev2-lbl"><span id="ev2-{{ cell.id }}-dith-l">Dithering</span>{{ info_pop('Flat is cleaner for solid blocks and line art. Only on e-ink panels the server converts.') }}</span>
-        <input type="checkbox" name="dither_override_enabled" value="1" hidden {% if cell.dither is not none %}checked{% endif %} data-ev2-dither-on>
+        <span class="ev2-lbl"><span id="ev2-{{ cell.id }}-dith-l">Dithering</span>{{ info_pop('Display setting dithers this cell the way the display\'s Calibration tab says. Flat maps each pixel to the nearest ink with no dithering, which is cleaner for solid blocks and line art. Only on e-ink panels the server converts.') }}</span>
+        <input type="checkbox" name="dither_override_enabled" value="1" hidden {% if cell.dither == 'none' %}checked{% endif %} data-ev2-dither-on>
         <input type="hidden" name="dither_mode" value="{{ cell.dither or 'none' }}" data-ev2-dither-mode>
         <div class="ev2-seg ev2-seg--sm" role="group" aria-labelledby="ev2-{{ cell.id }}-dith-l">
-          <button type="button" data-ev2-dither-set="" aria-pressed="{{ 'true' if cell.dither is none else 'false' }}">Use dashboard</button>
-          <button type="button" data-ev2-dither-set="auto" aria-pressed="{{ 'true' if cell.dither == 'auto' else 'false' }}">Smooth</button>
+          {#- Two choices, not three: there is no dashboard-level dither, and
+              a saved "auto" renders the same as no override, so both show as
+              the display's own setting (issue #572). -#}
+          <button type="button" data-ev2-dither-set="" aria-pressed="{{ 'false' if cell.dither == 'none' else 'true' }}">Display setting</button>
           <button type="button" data-ev2-dither-set="none" aria-pressed="{{ 'true' if cell.dither == 'none' else 'false' }}">Flat</button>
         </div>
       </div>
