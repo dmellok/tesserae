@@ -334,6 +334,40 @@ class MeuralCloudClient:
         self.request("POST", f"devices/{target}/items/{resource_id(item)}", timeout=60)
         self.request("POST", f"devices/{target}/sync", timeout=60)
 
+    def get_playback(self, target: str) -> dict[str, Any]:
+        data = self._data(self.request("GET", f"devices/{resource_id(target)}"))
+        if not isinstance(data, dict):
+            raise ValueError("Meural did not return the frame's playback settings")
+        settings = {"galleryRotation": data.get("galleryRotation", True)}
+        if not isinstance(settings["galleryRotation"], bool):
+            raise ValueError("Meural did not return the frame's rotation setting")
+        if "imageDuration" in data:
+            if type(data["imageDuration"]) is not int:
+                raise ValueError("Meural did not return the frame's image duration")
+            settings["imageDuration"] = data["imageDuration"]
+        return {"settings": settings}
+
+    def pause_rotation(self, target: str) -> None:
+        self.request(
+            "PUT",
+            f"devices/{resource_id(target)}",
+            json_data={"galleryRotation": False, "imageDuration": 0},
+            timeout=60,
+        )
+
+    def restore_playback(self, target: str, original: dict[str, Any]) -> None:
+        settings = {"galleryRotation": original["settings"]["galleryRotation"]}
+        if not isinstance(settings["galleryRotation"], bool):
+            raise ValueError("Invalid saved Meural rotation setting")
+        if "imageDuration" in original["settings"]:
+            duration = original["settings"]["imageDuration"]
+            if type(duration) is not int:
+                raise ValueError("Invalid saved Meural image duration")
+            settings["imageDuration"] = duration
+        target = resource_id(target)
+        self.request("PUT", f"devices/{target}", json_data=settings, timeout=60)
+        self.request("POST", f"devices/{target}/sync", timeout=60)
+
 
 def get_cloud_client(app: Flask, device_id: str) -> MeuralCloudClient:
     clients: dict[str, MeuralCloudClient] = app.config.setdefault("MEURAL_CLOUD_CLIENTS", {})
@@ -381,7 +415,15 @@ class CloudDelivery:
 
     def release(self, target: str) -> None:
         state = self._state(resource_id(target))
+        if state.get("original"):
+            try:
+                self.client.restore_playback(target, state["original"])
+                state.pop("original")
+            except (MeuralAuthError, HttpError, OSError, ValueError):
+                logger.warning("Meural playback restore failed; removal remains available")
         state.update(
+            paused=False,
+            image_duration_paused=False,
             last_key=None,
             current_item=None,
             current_key=None,
@@ -405,6 +447,13 @@ class CloudDelivery:
         state = self._state(target)
         if self.cancelled():
             return False
+        if not state.get("original"):
+            state["original"] = self.client.get_playback(target)
+            self._save(state)
+        if not state.get("paused") or not state.get("image_duration_paused"):
+            self.client.pause_rotation(target)
+            state.update(paused=True, image_duration_paused=True)
+            self._save(state)
         if state.get("last_key") == key:
             return False
         started_at = state.get("delivery_started_at")

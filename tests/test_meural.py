@@ -149,6 +149,12 @@ def test_cloud_is_default_and_unchanged_images_are_not_uploaded_again(setup, mon
             self.uploads = []
             self.loads = []
 
+        def get_playback(self, target):
+            return {"settings": {"galleryRotation": True, "imageDuration": 300}}
+
+        def pause_rotation(self, target):
+            pass
+
         def upload(self, image, name):
             self.uploads.append(image)
             return "100"

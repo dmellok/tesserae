@@ -225,6 +225,15 @@ class Cloud:
         self.deleted = []
         self.fail_load = False
 
+    def get_playback(self, target):
+        return {"settings": {"galleryRotation": True, "imageDuration": 300}}
+
+    def pause_rotation(self, target):
+        pass
+
+    def restore_playback(self, target, original):
+        pass
+
     def upload(self, image, name):
         item = str(100 + len(self.uploads))
         self.uploads.append((item, image, name))
@@ -426,6 +435,12 @@ def test_cloud_delivery_interval_persists_and_coalesces_latest(tmp_path):
         def __init__(self):
             self.uploads = []
 
+        def get_playback(self, target):
+            return {"settings": {"galleryRotation": True, "imageDuration": 300}}
+
+        def pause_rotation(self, target):
+            pass
+
         def upload(self, jpeg, name):
             self.uploads.append(jpeg)
             return str(len(self.uploads))
@@ -454,6 +469,7 @@ def test_cloud_interval_is_configurable(tmp_path):
     from unittest.mock import Mock
 
     cloud = Mock(account_id="17")
+    cloud.get_playback.return_value = {"settings": {"galleryRotation": True, "imageDuration": 300}}
     cloud.upload.return_value = "1"
     clock = [1000.0]
     delivery = CloudDelivery(
@@ -464,3 +480,57 @@ def test_cloud_interval_is_configurable(tmp_path):
     assert not delivery.deliver(b"next", "next", "101")
     clock[0] += 300
     assert delivery.deliver(b"next", "next", "101")
+
+
+@pytest.mark.parametrize("duration", [300, None])
+def test_timer_snapshot_pause_and_restore_supports_legacy_states(store, monkeypatch, duration):
+    session(store)
+    sent = []
+
+    def urlopen(request, **kwargs):
+        sent.append(request)
+        return response({"data": {"galleryRotation": True, "imageDuration": 300}})
+
+    monkeypatch.setattr("app.meural_auth.open_request", urlopen)
+    client = MeuralCloudClient(store, "test_frame")
+    original = client.get_playback("101")
+    assert original == {"settings": {"galleryRotation": True, "imageDuration": 300}}
+    client.pause_rotation("101")
+    assert json.loads(sent[1].data) == {"galleryRotation": False, "imageDuration": 0}
+    if duration is None:
+        original["settings"].pop("imageDuration")
+    client.restore_playback("101", original)
+    expected = {"galleryRotation": True}
+    if duration is not None:
+        expected["imageDuration"] = duration
+    assert json.loads(sent[2].data) == expected
+
+
+def test_legacy_delivery_pauses_the_slideshow_once_and_restores_it(store, monkeypatch, tmp_path):
+    session(store)
+    sent = []
+
+    def urlopen(request, **kwargs):
+        sent.append(request)
+        return response({"data": {"galleryRotation": True, "imageDuration": 300}})
+
+    monkeypatch.setattr("app.meural_auth.open_request", urlopen)
+    client = MeuralCloudClient(store, "test_frame")
+    delivery = CloudDelivery(tmp_path / "delivery.json", client)
+    delivery.path.write_text(
+        json.dumps(
+            {
+                "scope": "17:101",
+                "owner": "old",
+                "owned": [],
+                "paused": True,
+                "last_key": "first",
+            }
+        )
+    )
+    assert not delivery.deliver(b"first", "first", "101")
+    assert not delivery.deliver(b"first", "first", "101")
+    assert len(sent) == 2
+    assert json.loads(sent[1].data) == {"galleryRotation": False, "imageDuration": 0}
+    delivery.release("101")
+    assert json.loads(sent[2].data) == {"galleryRotation": True, "imageDuration": 300}
