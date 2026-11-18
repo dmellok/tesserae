@@ -559,13 +559,17 @@ class PushManager:
         plugin_registry_fn: Callable[[], Any] | None = None,
         atlas_warm_fn: Callable[[list[tuple[Any, ...]]], None] | None = None,
         automation_eligible_fn: Callable[[str | None, str], bool] | None = None,
-        automatic_delivery_eligible_fn: Callable[[str, str, str], bool] | None = None,
+        automatic_delivery_eligible_fn: Callable[[str, set[str], str], set[str]] | None = None,
     ) -> None:
         self._registry = registry
         # Called with the overlay atlases a fresh render will be asked for
         # (app.atlas_warm jobs), so they are built before a device asks.
         self._atlas_warm_fn = atlas_warm_fn
         self._automation_eligible_fn = automation_eligible_fn
+        # Called with (page_id, device_ids, source) for an automated push and
+        # answers with the devices that should still get it: the scheduler's
+        # ``automatic_delivery_eligible_devices``. Asked once per check for
+        # the whole target set, never per device.
         self._automatic_delivery_eligible_fn = automatic_delivery_eligible_fn
         self._page_store = page_store
         self._transport = transport
@@ -2070,14 +2074,21 @@ class PushManager:
         writing a History row (the caller retries on its own cadence)."""
         waited: tuple[float, int] = (0.0, 0)
         if respect_quiet_hours and self._automatic_delivery_eligible_fn:
-            targets = self._page_push_targets(page_id, device_ids)
-            if targets:
-                device_ids = {
-                    did
-                    for did in targets
-                    if self._automatic_delivery_eligible_fn(page_id, did, source)
-                }
-                if not device_ids:
+            # Skip the settle wait and the render when no display would take
+            # the frame. Only an explicit target list is narrowed here: a push
+            # for "the page's displays" must stay one, or an unbound page on
+            # the legacy broadcast loses its virtual-panel group and fails.
+            # ``_push_page_locked`` filters the bound groups itself.
+            if device_ids:
+                kept = self._automatic_delivery_eligible_fn(page_id, set(device_ids), source)
+                if not kept:
+                    return PushResult(status="held", page_id=page_id)
+                if kept != set(device_ids):
+                    device_ids = kept
+            else:
+                page = self._page_store.get(page_id)
+                bound = set(getattr(page, "device_ids", None) or [])
+                if bound and not self._automatic_delivery_eligible_fn(page_id, bound, source):
                     return PushResult(status="held", page_id=page_id)
         if settle and followup == 0 and source not in ("follow-up", "deck_warm", "album_warm"):
             waited = self.settle_page(
@@ -2876,16 +2887,23 @@ class PushManager:
             if respect_quiet_hours or automated_followup
             else None
         )
+        # Set when the gate, not a render or publish failure, is why a group
+        # produced nothing: that push is held, anything else is a failure.
+        gate_dropped = False
         if refresh_gate is not None:
-            virtual = [(panel, dids) for panel, dids in groups if not dids]
-            bound = [
-                (panel, [did for did in dids if refresh_gate(page_id, did, source)])
-                for panel, dids in groups
-                if dids
-            ]
-            groups = virtual + [(panel, dids) for panel, dids in bound if dids]
-            if not groups:
-                return PushResult(status="held", page_id=page_id)
+            asked = {did for _panel, dids in groups for did in dids}
+            if asked:
+                eligible = refresh_gate(page_id, asked, source)
+                if eligible != asked:
+                    # The legacy virtual group (no devices) has nobody to ask
+                    # about and stays.
+                    groups = [
+                        (panel, [did for did in dids if did in eligible])
+                        for panel, dids in groups
+                        if not dids or any(did in eligible for did in dids)
+                    ]
+                    if not groups:
+                        return PushResult(status="held", page_id=page_id)
         # v0.71.x: pages carrying a widget that declares
         # ``render.per_device_id: true`` (e.g. the tesserae_status bar
         # with its per-device battery + wifi chips) must render once per
@@ -2979,11 +2997,12 @@ class PushManager:
                     image_warning = _broken_images_warning(broken)
                 else:
                     self._broken_image_holds.pop(page_id, None)
-                if refresh_gate is not None and device_filter is not None:
-                    device_filter = {
-                        did for did in device_filter if refresh_gate(page_id, did, source)
-                    }
+                if refresh_gate is not None and device_filter:
+                    # Asked again after the render: the selection can change
+                    # while the browser is busy.
+                    device_filter = refresh_gate(page_id, set(device_filter), source)
                     if not device_filter:
+                        gate_dropped = True
                         continue
                 result = self._fan_out(
                     composition_png,
@@ -3021,7 +3040,7 @@ class PushManager:
                 automated=respect_quiet_hours or automated_followup,
             )
         if not group_results:
-            status: PushStatus = "held" if refresh_gate is not None else "failed"
+            status: PushStatus = "held" if gate_dropped else "failed"
         elif failed:
             status = "failed"
         elif all(r.status == "no_change" for r in group_results):
