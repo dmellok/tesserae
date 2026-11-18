@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, time, timedelta, tzinfo
 from functools import partial
@@ -562,6 +562,11 @@ class Scheduler:
         # schedule.
         self._rotation_force_state: dict[str, tuple[datetime, int]] = {}
         self._lock = threading.Lock()
+        self._priority_lock = threading.RLock()
+        self._priority_thread: threading.Thread | None = None
+        self._priority_signal = threading.Event()
+        self._condition_due_at: float | None = None
+        self._pending_wakes: set[str] = set()
 
     # A tick still running after this long is reported as stuck, then again
     # every ``_STUCK_TICK_REPEAT_S`` while it stays that way.
@@ -581,10 +586,18 @@ class Scheduler:
         )
         watchdog.start()
         self._watchdog_thread = watchdog
+        self._priority_thread = threading.Thread(
+            target=self._run_priority, name="tesserae-priority", daemon=True
+        )
+        self._priority_thread.start()
         background_loops.track(self)
 
     def stop(self) -> None:
         self._stop.set()
+        self._priority_signal.set()
+        if self._priority_thread is not None:
+            self._priority_thread.join(timeout=5)
+        self._priority_thread = None
         if self._thread is not None:
             self._thread.join(timeout=5)
             self._thread = None
@@ -613,6 +626,80 @@ class Scheduler:
             # so a 1-minute clock page drifted through the minute and skipped
             # one every few minutes (#39 on the firmware repo).
             self._stop.wait(self._tick - (_wall_clock_s() % self._tick))
+
+    def _run_priority(self) -> None:
+        while not self._stop.is_set():
+            self._priority_signal.clear()
+            try:
+                wait = self._priority_pass(datetime.now(UTC))
+            except Exception:
+                logger.exception("priority lineup evaluation failed")
+                wait = float(self._tick)
+            self._priority_signal.wait(wait)
+
+    def _priority_pass(self, now: datetime) -> float:
+        with self._lock:
+            wakes = self._pending_wakes
+            self._pending_wakes = set()
+            due = self._condition_due_at
+            if not wakes and due is not None and now.timestamp() < due:
+                return min(float(self._tick), due - now.timestamp())
+            self._condition_due_at = None
+        if (wakes or due is not None) and self._condition_evaluator is not None:
+            self._condition_evaluator.refresh_ha_states()
+        for device_id in wakes:
+            self._reevaluate_priority_lineups(now, device_id=device_id, at_wake=True)
+        if not wakes:
+            self._reevaluate_priority_lineups(now)
+        with self._lock:
+            due = self._condition_due_at
+        return min(float(self._tick), max(0.0, due - now.timestamp())) if due else float(self._tick)
+
+    def _priority_recheck_at(self, timestamp: float) -> None:
+        with self._lock:
+            if self._condition_due_at is None or timestamp < self._condition_due_at:
+                self._condition_due_at = timestamp
+        self._priority_signal.set()
+
+    def _reevaluate_priority_lineups(
+        self, now: datetime, *, device_id: str | None = None, at_wake: bool = False
+    ) -> None:
+        if self.is_paused():
+            return
+        with self._priority_lock:
+            for rotation in sorted(self._cycle_records(), key=lambda r: (r.priority, r.id)):
+                if not rotation.enabled or rotation.mode != "priority":
+                    continue
+                if device_id is not None and not self._cycle_reaches(rotation, device_id):
+                    continue
+                # Bound lineups have per-display transition bookkeeping. A
+                # wake on one display must not mark every sibling as sent.
+                deck = self._deck_store.get(rotation.id) if self._deck_store is not None else None
+                if deck is None or not deck.device_ids or self._deck_nav_store is None:
+                    continue
+                state = self.compute_step_state(rotation, now)
+                if state is None:
+                    continue
+                index = self._pick_eligible_step(rotation, state.step_index, now)
+                self._record_rotation_condition_decision(rotation, state.step_index, index, now)
+                if index is None:
+                    continue
+                if self._page_exists is not None and not self._page_exists(
+                    rotation.steps[index].page_id
+                ):
+                    continue
+                self._fire_cycle(rotation, index, now, only_device=device_id, at_wake=at_wake)
+
+    def prepare_device_wake(self, device_id: str, *, now: datetime | None = None) -> None:
+        """Queue selection work; /frame can serve the retained slot immediately."""
+        if self.is_paused() or not any(
+            r.enabled and r.mode == "priority" and self._cycle_reaches(r, device_id)
+            for r in self._cycle_records()
+        ):
+            return
+        with self._lock:
+            self._pending_wakes.add(device_id)
+        self._priority_signal.set()
 
     def _note_tick_duration(self, elapsed_s: float) -> None:
         """Warn when a tick overran its own interval. Every automated push
@@ -993,6 +1080,83 @@ class Scheduler:
             if (schedule.page_id if passed else schedule.fallback_page_id) == page_id:
                 return True
         return not named
+
+    # What the delivery gate answers for. A lineup step and a refresh of what a
+    # display shows are the scheduler's own work, and go stale when a priority
+    # lineup picks another dashboard. A schedule, a webhook, a Home Assistant
+    # command or a follow-up finishing a frame already sent names its page on
+    # purpose: those are never vetoed here.
+    _GATED_LINEUP_SOURCES: frozenset[str] = frozenset({"deck", "rotation"})
+    _GATED_REFRESH_SOURCES: frozenset[str] = frozenset(
+        {"page_refresh", "data_change", "widget_schedule"}
+    )
+
+    def automatic_delivery_eligible_devices(
+        self,
+        page_id: str,
+        device_ids: Iterable[str],
+        source: str,
+        *,
+        now: datetime | None = None,
+        paused: set[str] | None = None,
+    ) -> set[str]:
+        """The displays among ``device_ids`` that should still get an
+        automated push of ``page_id``. Asked again after settle and render so
+        stale lineup or refresh work cannot paint over a newer priority pick.
+
+        Only lineup and refresh sources are judged (see the source sets
+        above); any other source gets every display back. Quiet hours are not
+        looked at: the push path owns them.
+
+        The lineup's preflight may reuse the tick's pause snapshot. The push
+        worker omits it so its post-render check reads the current pauses.
+        One call reads the lineups and the showing map once, however many
+        displays are asked about.
+        """
+        devices = set(device_ids)
+        refresh = source in self._GATED_REFRESH_SOURCES
+        if not devices or not (refresh or source in self._GATED_LINEUP_SOURCES):
+            return devices
+        now = now or datetime.now(UTC)
+        if self.is_paused():
+            return set()
+        devices -= self._paused_or_read(now, paused)
+        for rotation in self._cycle_records():
+            if not devices:
+                break
+            if (
+                not rotation.enabled
+                or rotation.mode != "priority"
+                or not any(step.page_id == page_id for step in rotation.steps)
+            ):
+                continue
+            reached = {did for did in devices if self._cycle_reaches(rotation, did)}
+            if not reached:
+                continue
+            picked = self.live_step_index(rotation, now)
+            if picked is not None and rotation.steps[picked].page_id == page_id:
+                continue
+            # Not this lineup's pick: only a display on a manual hold keeps it.
+            devices -= reached - self._held_device_ids(rotation.id, now)
+        if refresh and devices:
+            devices &= self._devices_showing_pages(now).get(page_id, set())
+        return devices
+
+    def automatic_delivery_eligible(
+        self,
+        page_id: str,
+        device_id: str,
+        source: str,
+        *,
+        now: datetime | None = None,
+        paused: set[str] | None = None,
+    ) -> bool:
+        """:meth:`automatic_delivery_eligible_devices` for one display."""
+        return bool(
+            self.automatic_delivery_eligible_devices(
+                page_id, {device_id}, source, now=now, paused=paused
+            )
+        )
 
     def _page_can_warm(self, page_id: str) -> bool:
         """Whether a warm-ahead of ``page_id`` could be seen on any display
@@ -1493,8 +1657,17 @@ class Scheduler:
                         continue
                     page_id = rec.get("page_id")
                     if isinstance(page_id, str) and page_id:
-                        showing.setdefault(page_id, set()).add(device_id)
                         claimed.add(device_id)
+                        # A priority change can be waiting for smart sync;
+                        # its previous nav page must not refresh over it.
+                        rotation = _deck_to_rotation(deck)
+                        if rotation is not None and rotation.mode == "priority":
+                            picked = self.live_step_index(rotation, now)
+                            if (
+                                picked is None or rotation.steps[picked].page_id != page_id
+                            ) and device_id not in self._held_device_ids(rotation.id, now):
+                                continue
+                        showing.setdefault(page_id, set()).add(device_id)
 
         if self._device_ids_for_page is not None:
             for rotation in self._cycle_records():
@@ -1936,6 +2109,32 @@ class Scheduler:
         step_index: int,
         now: datetime,
         paused: set[str] | None = None,
+        *,
+        only_device: str | None = None,
+        at_wake: bool = False,
+    ) -> None:
+        if rotation.mode != "priority":
+            self._fire_cycle_locked(rotation, step_index, now, paused)
+            return
+        with self._priority_lock:
+            state = self.compute_step_state(rotation, now)
+            picked = self._pick_eligible_step(rotation, state.step_index, now) if state else None
+            if picked is None:
+                return
+            step_index = picked
+            self._fire_cycle_locked(
+                rotation, step_index, now, paused, only_device=only_device, at_wake=at_wake
+            )
+
+    def _fire_cycle_locked(
+        self,
+        rotation: Rotation,
+        step_index: int,
+        now: datetime,
+        paused: set[str] | None,
+        *,
+        only_device: str | None = None,
+        at_wake: bool = False,
     ) -> None:
         """Fire one due cycle record (#167 decommission). A cycle backed by a
         deck with explicit bindings advances each panel deck-style: promoted
@@ -1968,6 +2167,10 @@ class Scheduler:
         state = self.compute_step_state(rotation, now)
         if state is None:
             return  # window closed between find and fire; next tick recovers
+        with self._lock:
+            retry_window, attempts = self._cycle_retry.get(rotation.id, (0.0, 0))
+        if retry_window == state.step_started_at.timestamp() and attempts >= _CYCLE_SEND_ATTEMPTS:
+            return
         held = self._held_device_ids(rotation.id, now)
         on_pause = self._paused_or_read(now, paused) & set(deck.device_ids)
         failed: set[str] = set()
@@ -1980,6 +2183,8 @@ class Scheduler:
             held=held,
             paused=on_pause,
             failed=failed,
+            only_device=only_device,
+            at_wake=at_wake,
         )
         window_start = state.step_started_at.timestamp()
         if failed:
@@ -2004,6 +2209,8 @@ class Scheduler:
                 )
             if attempts < _CYCLE_SEND_ATTEMPTS:
                 return
+        if rotation.mode == "priority" and not fired and not failed:
+            return
         with self._lock:
             if not failed:
                 self._cycle_retry.pop(rotation.id, None)
@@ -2062,6 +2269,7 @@ class Scheduler:
         only_device: str | None = None,
         failed: set[str] | None = None,
         fresh: bool = False,
+        at_wake: bool = False,
     ) -> bool:
         """Advance one bound timer deck's panels to the target page. Pushes
         only at a step transition (or a new dwell window, for a keep-fresh
@@ -2109,16 +2317,27 @@ class Scheduler:
                 # is held from the last paint (#167).
                 min_hold_s = rot.min_hold_minutes * 60
                 window_start = state.step_started_at.timestamp()
-                if last_at < window_start:
+                if rot.mode == "priority" and now.timestamp() < last_at + min_hold_s:
+                    self._priority_recheck_at(last_at + min_hold_s)
+                    self._log_deck_skip(device_id, deck.id, target, "min-hold")
+                    continue
+                if rot.mode != "priority" and last_at < window_start:
                     base = self._deck_last_advance_window.get(key, last_at)
                     if window_start < base + min_hold_s:
                         self._log_deck_skip(device_id, deck.id, target, "min-hold")
                         continue  # min-hold anti-flap
-                elif now.timestamp() < last_at + min_hold_s:
+                elif rot.mode != "priority" and now.timestamp() < last_at + min_hold_s:
                     self._log_deck_skip(device_id, deck.id, target, "min-hold")
                     continue  # min-hold anti-flap
-            if rot.smart_sync and self._smart_sync_should_wait(
-                target, rot.smart_sync_lead_s, now, device_ids=deck.device_ids
+            if (
+                not at_wake
+                and rot.smart_sync
+                and self._smart_sync_should_wait(
+                    target,
+                    rot.smart_sync_lead_s,
+                    now,
+                    device_ids=[device_id] if rot.mode == "priority" else deck.device_ids,
+                )
             ):
                 self._log_deck_skip(device_id, deck.id, target, "smart-sync wait")
                 continue
@@ -2127,7 +2346,7 @@ class Scheduler:
                 # display's navigation lock, so a button press or Home
                 # Assistant's Next / Previous can't land in between.
                 if self._advance_device(
-                    deck, target, state, now, device_id, key, failed, fresh=fresh
+                    deck, target, state, now, device_id, key, failed, fresh=fresh, paused=paused
                 ):
                     fired_any = True
         return fired_any
@@ -2143,6 +2362,7 @@ class Scheduler:
         failed: set[str] | None = None,
         *,
         fresh: bool = False,
+        paused: set[str] | None = None,
     ) -> bool:
         """Deliver one lineup advance to one display and record it (see
         :meth:`_fire_deck_advance`); the caller holds its navigation
@@ -2153,6 +2373,9 @@ class Scheduler:
         if callable(quiet_check) and quiet_check(device_id):
             self._log_deck_skip(device_id, deck.id, target, "quiet hours")
             self._note_quiet_skip({device_id}, now)
+            return False
+        if not self.automatic_delivery_eligible(target, device_id, "deck", now=now, paused=paused):
+            self._log_deck_skip(device_id, deck.id, target, "selection changed")
             return False
         promoter = getattr(pusher, "promote_deck_page", None)
         promoted = (
@@ -2629,7 +2852,11 @@ class Scheduler:
                 min_hold_s = rotation.min_hold_minutes * 60
                 if min_hold_s > 0 and last_pushed_at is not None:
                     crossed_boundary = last_pushed_at < state.step_started_at.timestamp()
-                    if crossed_boundary:
+                    if rotation.mode == "priority":
+                        if now.timestamp() < last_pushed_at + min_hold_s:
+                            self._priority_recheck_at(last_pushed_at + min_hold_s)
+                            continue
+                    elif crossed_boundary:
                         base = self._rotation_last_window_start.get(rotation.id, last_pushed_at)
                         if state.step_started_at.timestamp() < base + min_hold_s:
                             continue

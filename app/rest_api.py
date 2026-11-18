@@ -1195,6 +1195,18 @@ def get_frame(device_id: str) -> Response:
     touch_stroke = _parse_touch_query()
     if touch_stroke is not None and request.args.get("touch_space", "").strip().lower() == "fb":
         touch_stroke = _touch_stroke_to_canvas(device, touch_stroke)
+    # A plain timer poll rechecks the priority selection. Interactive wakes
+    # keep the frame the user touched until the action has been dispatched.
+    if not button_raw and not request.args.get("page", "").strip() and touch_stroke is None:
+        scheduler = current_app.config.get("SCHEDULER")
+        prepare = getattr(scheduler, "prepare_device_wake", None)
+        if callable(prepare):
+            try:
+                prepare(device.id)
+            except Exception:
+                current_app.logger.exception(
+                    "rest /frame: lineup wake check failed for %s", device.id
+                )
     if button_svc is not None:
         if button_raw or request.args.get("page", "").strip():
             button_result = _dispatch_query_button(device, route="/frame")

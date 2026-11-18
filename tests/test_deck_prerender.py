@@ -746,16 +746,15 @@ def test_update_reaches_the_showing_display_once_while_another_is_paused(wired, 
         assert wired.latest_render_for("panel")["page_id"] == "p_a"
 
 
-def test_page_refresh_keeps_a_shown_page_fresh_when_its_step_stops_passing(wired, tmp_path):
-    """A page on the glass keeps its own refresh even while no step of its
-    lineup would pick it: only speculative renders are skipped."""
+def test_page_refresh_does_not_repaint_a_stale_priority_step(wired, tmp_path):
+    """The recorded page must not refresh over the priority selection."""
     scheduler, now, _, _ = _automation(wired, tmp_path, printing=False)
     page = wired._page_store.get("p_a")
     wired._page_store.save(page.model_copy(update={"refresh_minutes": 1}))
     scheduler._deck_nav_store.set("panel", "lineup", "p_a")
     with patch("app.push.capture_composed", return_value=(_png((1, 2, 3)), [])) as render:
         scheduler._maybe_refresh_pages(now)
-        assert render.call_count == 1
+        assert render.call_count == 0
 
 
 def test_button_prewarm_runs_while_automation_is_paused(wired, tmp_path):
