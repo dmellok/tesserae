@@ -404,7 +404,7 @@ def _frame_shape(options: dict[str, Any], ctx: dict[str, Any]) -> str | None:
     ``frame`` always and for ``auto`` only when the dashboard is on both
     portrait and landscape frames (``ctx["frame_shapes"]``). None means no
     filter."""
-    orientation = (options.get("orientation") or "any").lower()
+    orientation = (options.get("orientation") or "auto").lower()
     if orientation == "auto":
         shapes = set(ctx.get("frame_shapes") or ())
         if not {"landscape", "portrait"} <= shapes:
@@ -418,6 +418,48 @@ def _frame_shape(options: dict[str, Any], ctx: dict[str, Any]) -> str | None:
     if h > w:
         return "portrait"
     return None
+
+
+def _shown_images(
+    images: list[Path],
+    folder_segment: str,
+    options: dict[str, Any],
+    ctx: dict[str, Any],
+    data_dir: Path,
+) -> tuple[list[Path], str]:
+    """``(the pictures this render picks from, the shape they were narrowed
+    to or "any")``. Portrait / Landscape / Square keep that shape (none left
+    is the caller's error); Auto and Match the frame keep the frame's shape
+    and square pictures, or every picture when none have it. Unset reads as
+    the manifest's default, Auto: a render gets it filled in, a Lineups
+    listing reads the saved options as they are."""
+    orientation = (options.get("orientation") or "auto").lower()
+    if orientation in ("portrait", "landscape", "square"):
+        return _filter_by_orientation(images, folder_segment, orientation, data_dir), orientation
+    shape = _frame_shape(options, ctx) if orientation in ("auto", "frame") else None
+    if shape:
+        matching = _filter_by_orientation(
+            images, folder_segment, frozenset({shape, "square"}), data_dir
+        )
+        if matching:
+            return matching, shape
+    return images, "any"
+
+
+def shown_files(
+    folder: str, names: list[str], options: dict[str, Any], ctx: dict[str, Any]
+) -> list[str]:
+    """Of ``names`` in ``folder``, the ones a render with these options and
+    ``ctx`` picks from, in order: what the Lineups page lists for a frame."""
+    data_dir = _data_dir()
+    path = _folder_path(folder, data_dir)
+    if path is None:
+        return names
+    images = [path / name for name in names]
+    shown, _shape = _shown_images(
+        images, folder if folder else ROOT_FOLDER_VALUE, options, ctx, data_dir
+    )
+    return [p.name for p in shown]
 
 
 def _cursor_token(device_id: str) -> str:
@@ -476,26 +518,12 @@ def fetch(
                 "folder": folder_segment,
                 "count": len(images),
             }
-    orientation = (options.get("orientation") or "any").lower()
-    if orientation in ("portrait", "landscape", "square"):
-        images = _filter_by_orientation(images, folder_segment, orientation, data_dir)
-        if not images:
-            return {
-                "error": f"No {orientation} images in '{folder_name or ROOT_FOLDER_VALUE}'.",
-                "url": None,
-            }
-    elif orientation in ("auto", "frame"):
-        # Pictures of the frame's shape, square ones too; a folder with none
-        # shows any picture rather than an error.
-        shape = _frame_shape(options, ctx)
-        if shape:
-            matching = _filter_by_orientation(
-                images, folder_segment, frozenset({shape, "square"}), data_dir
-            )
-            images = matching or images
-            orientation = shape if matching else "any"
-        else:
-            orientation = "any"
+    images, orientation = _shown_images(images, folder_segment, options, ctx, data_dir)
+    if not images:
+        return {
+            "error": f"No {orientation} images in '{folder_name or ROOT_FOLDER_VALUE}'.",
+            "url": None,
+        }
 
     mode = options.get("mode", "random")
     if mode == "sequential":

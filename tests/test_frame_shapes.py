@@ -73,3 +73,45 @@ def test_a_page_on_one_shape(app: Flask, monkeypatch: pytest.MonkeyPatch) -> Non
 def test_a_page_on_no_frame_adds_nothing(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
     ctx = _render(app, monkeypatch, [])
     assert "frame_shapes" not in ctx
+
+
+def test_lineups_ctx_carries_the_frame_shapes(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    from app import step_items
+
+    monkeypatch.setattr(
+        panel,
+        "_selected_device_panels",
+        lambda page, devices: [
+            (types.SimpleNamespace(id="d0"), types.SimpleNamespace(w=1600, h=1200)),
+            (types.SimpleNamespace(id="d1"), types.SimpleNamespace(w=1200, h=1600)),
+        ],
+    )
+    cell = Cell(id="c1", plugin="picture_gallery", x=0, y=0, w=400, h=300)
+    page = Page(id="pg", name="PG", device_ids=["d0", "d1"], cells=[cell])
+    with app.test_request_context("/"):
+        ctx = step_items._item_ctx(page, page.cells[0], "picture_gallery", None)
+    assert ctx["frame_shapes"] == ["landscape", "portrait"]
+
+
+def test_a_gallery_lists_only_the_pictures_a_frame_is_shown(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from PIL import Image
+
+    from app import step_items
+
+    folder = app.config["PLUGIN_REGISTRY"].get("picture_gallery").data_dir
+    for name, size in (("wide.jpg", (90, 60)), ("tall.jpg", (60, 90)), ("sq.jpg", (70, 70))):
+        Image.new("RGB", size).save(folder / name)
+    monkeypatch.setattr(step_items, "_GALLERY_CACHE", {})
+    cell = Cell(id="c1", plugin="picture_gallery", x=0, y=0, w=400, h=300, options={})
+    mixed = {"frame_shapes": ["landscape", "portrait"]}
+    with app.test_request_context("/"):
+        wide = step_items._gallery_items(cell, {**mixed, "cell_w": 800, "cell_h": 480})
+        tall = step_items._gallery_items(cell, {**mixed, "cell_w": 480, "cell_h": 800})
+        one_shape = step_items._gallery_items(
+            cell, {"frame_shapes": ["landscape"], "cell_w": 800, "cell_h": 480}
+        )
+    assert sorted(i.key for i in wide.items) == ["sq.jpg", "wide.jpg"]
+    assert sorted(i.key for i in tall.items) == ["sq.jpg", "tall.jpg"]
+    assert one_shape.count == 3

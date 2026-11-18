@@ -611,7 +611,7 @@ def _frame_shapes(page_id: str) -> list[str]:
     unsaved editor copy (the preview cache) wins, as in ``compose``."""
     if not page_id:
         return []
-    from app.panel import _selected_device_panels
+    from app.panel import frame_shapes
 
     page = current_app.config.get("PREVIEW_CACHE", {}).get(page_id)
     store = current_app.config.get("PAGE_STORE")
@@ -619,11 +619,7 @@ def _frame_shapes(page_id: str) -> list[str]:
         page = store.get(page_id)
     if page is None:
         return []
-    shapes = set()
-    for _device, panel in _selected_device_panels(page, current_app.config.get("DEVICE_REGISTRY")):
-        w, h = int(panel.w), int(panel.h)
-        shapes.add("landscape" if w > h else "portrait" if h > w else "square")
-    return sorted(shapes)
+    return frame_shapes(page, current_app.config.get("DEVICE_REGISTRY"))
 
 
 def _placement_id(page_id: str, cell_id: str, target_device_id: str = "") -> str:
