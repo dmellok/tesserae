@@ -186,3 +186,39 @@ def test_images_inside_a_shadow_root_are_covered() -> None:
     )
     assert result["failed"] == 1
     assert any("in-shadow.png" in u for u in result["failed_urls"])
+
+
+def test_a_picture_still_loading_is_named_as_slow() -> None:
+    from app.renderer import _image_failures
+
+    (failure,) = _image_failures(
+        {
+            "failed": 1,
+            "failed_urls": ["https://art.example/big.jpg"],
+            "slow_urls": ["https://art.example/big.jpg"],
+        },
+        None,
+    )
+    assert failure.error == "still loading after 5 s"
+
+
+@requires_chromium
+def test_a_picture_still_loading_when_the_wait_ends_counts_as_failed() -> None:
+    """A capture taken then shows the picture's box empty (a white frame)."""
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        try:
+            page = browser.new_page()
+            page.route("**/never.png", lambda route: None)  # never answered
+            page.set_content(
+                '<img src="https://art.example/never.png" alt="">',
+                wait_until="domcontentloaded",
+            )
+            result = page.evaluate(_IMAGE_WAIT_JS)
+        finally:
+            browser.close()
+    assert result["timed_out"]
+    assert result["failed"] == 1
+    assert result["slow_urls"] == ["https://art.example/never.png"]
