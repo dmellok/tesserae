@@ -1180,6 +1180,16 @@ def circuitpython_indexed_image(
     """
     settings = settings or {}
     img: Image.Image = Image.open(io.BytesIO(png_bytes))
+    # Per-cell dither map (issue #86): cells set to Flat. Rasterised at the
+    # incoming image's dims (composition space) and turned alongside the
+    # image further down. Absent or empty keeps the file byte-identical.
+    regions = settings.get("_dither_regions")
+    region_mask: Image.Image | None = None
+    rotated = False
+    if isinstance(regions, list) and regions:
+        from app.dither_regions import rasterize_region_mask
+
+        region_mask = rasterize_region_mask(regions, img.width, img.height)
 
     if flip:
         # Upside-down physical mount: turn the whole image 180° so it
@@ -1202,6 +1212,7 @@ def circuitpython_indexed_image(
             # the canvas's left edge lands on the panel's top edge. PIL
             # ``rotate`` is counter-clockwise, so -90 gives CW.
             img = img.rotate(-90, expand=True)
+            rotated = True
         if img.size != (native_w, native_h):
             # Bounded fallback for a client whose declared buffer isn't
             # the exact composition pair (mismatched dims, not just a
@@ -1213,6 +1224,21 @@ def circuitpython_indexed_image(
         # Per-device underscan: inset rendered content so it clears a
         # physical bezel or mat covering the panel edge.
         img = underscan_image(img, underscan=underscan)
+
+    if region_mask is not None:
+        from app.dither_regions import transform_mask
+
+        # A 180° flip and a quarter turn commute, so the mask helper's fixed
+        # rotate -> flip -> fit -> underscan order lands on the same pixels
+        # as the flip -> fit -> rotate -> fit -> underscan order above.
+        region_mask = transform_mask(
+            region_mask,
+            native_w=img.width,
+            native_h=img.height,
+            rotate=-90 if rotated else 0,
+            flip=flip,
+            underscan=int(underscan or 0),
+        )
 
     edges = settings.get("_profile_edges") or {}
     if not isinstance(edges, dict):
@@ -1268,7 +1294,7 @@ def circuitpython_indexed_image(
     if tolerance > 0:
         native = _native_colour_mask(rgb, palette, tolerance)
         extra_mask = native if extra_mask is None else (extra_mask | native)
-    if extra_mask is not None and extra_mask.any():
+    if region_mask is not None or (extra_mask is not None and extra_mask.any()):
         width_px, height_px = quantised.size
         merged = _apply_nearest_override(
             quantised.tobytes(),
@@ -1276,7 +1302,7 @@ def circuitpython_indexed_image(
             palette,
             width=width_px,
             height=height_px,
-            region_nearest_mask=None,
+            region_nearest_mask=region_mask,
             extra_mask=extra_mask,
         )
         # Load the merged indices back into the same image so the mode and

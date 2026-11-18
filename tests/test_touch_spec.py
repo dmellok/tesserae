@@ -17,6 +17,7 @@ from app.touch_spec import (
     touch_layout_digest,
     wire_is_upright,
     wire_transform,
+    wire_turn,
 )
 
 _SCHEMA_DIR = Path(__file__).resolve().parents[1] / "schema"
@@ -245,3 +246,57 @@ def test_is_spec_primitive_matches_the_spec() -> None:
     for upright in (True, False):
         in_spec = {p["id"] for p in build_frame_spec(els, upright=upright)["primitives"]}
         assert {e.id for e in els if is_spec_primitive(e, upright=upright)} == in_spec
+
+
+# -- turn (firmware #73) -----------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("panel", "turn"),
+    [
+        ({"w": 480, "h": 800, "native_w": 480, "native_h": 800}, 0),
+        ({"w": 800, "h": 480, "native_w": 480, "native_h": 800}, 90),
+        ({"w": 800, "h": 480, "orientation": "landscape_flipped"}, 180),
+        (
+            {
+                "w": 800,
+                "h": 480,
+                "native_w": 480,
+                "native_h": 800,
+                "orientation": "landscape_flipped",
+            },
+            270,
+        ),
+        ({}, 0),
+    ],
+)
+def test_wire_turn(panel: dict[str, object], turn: int) -> None:
+    assert wire_turn(panel) == turn
+    assert (turn == 0) is wire_is_upright(panel)
+
+
+def test_wire_turn_matches_the_rect_transform() -> None:
+    """``turn`` is clockwise, composition to framebuffer: at 90 the top-left
+    of a landscape page lands at the top-right of the portrait framebuffer,
+    which is where :func:`wire_transform` puts it."""
+    panel = {"w": 800, "h": 480, "native_w": 480, "native_h": 800}
+    wire = wire_transform(panel, 800, 480)
+    assert wire is not None
+    assert wire_turn(panel) == 90
+    assert wire(0, 0, 100, 40) == (440, 0, 40, 100)
+
+
+def test_spec_carries_turn_and_moves_the_digest() -> None:
+    upright = build_frame_spec(_mixed_els())
+    assert "turn" not in upright
+    assert build_frame_spec(_mixed_els(), turn=0) == upright
+    turned = build_frame_spec(_mixed_els(), turn=90)
+    assert turned["turn"] == 90
+    assert turned["primitives"] == upright["primitives"]
+    assert turned["layout_digest"] != upright["layout_digest"]
+    assert build_frame_spec(_mixed_els(), turn=270)["layout_digest"] != turned["layout_digest"]
+    assert build_frame_spec(_mixed_els(), turn=90) == turned
+
+
+def test_turned_spec_validates_against_the_schema() -> None:
+    _validator().validate(build_frame_spec(_mixed_els(), upright=False, turn=90))

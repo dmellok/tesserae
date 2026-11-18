@@ -1294,7 +1294,9 @@ def test_automatic_push_drops_target_that_changed_lineup_while_rendering(
 ) -> None:
     manager, client, _ = _wired_bound(tmp_path, composition_png)
     eligible = True
-    manager._automatic_delivery_eligible_fn = lambda page_id, device_id, source: eligible
+    manager._automatic_delivery_eligible_fn = lambda page_id, device_ids, source: (
+        set(device_ids) if eligible else set()
+    )
 
     def capture(*args, **kwargs):
         nonlocal eligible
@@ -1314,7 +1316,7 @@ def test_automatic_push_drops_target_that_changed_lineup_while_rendering(
 
 def test_page_refresh_of_inactive_step_does_no_rendering(tmp_path: Path, composition_png: bytes):
     manager, _, _ = _wired_bound(tmp_path, composition_png)
-    manager._automatic_delivery_eligible_fn = lambda page_id, device_id, source: False
+    manager._automatic_delivery_eligible_fn = lambda page_id, device_ids, source: set()
     with patch("app.push.capture_composed", side_effect=AssertionError("inactive page rendered")):
         result = manager.push("home", source="page_refresh", respect_quiet_hours=True)
     assert result.status == "held"
@@ -1729,7 +1731,7 @@ def test_quiet_hours_with_priority_gate_keep_catchup(tmp_path, composition_png, 
         push_manager=lambda: manager,
         device_ids_for_page=lambda pid: pages.get(pid).device_ids,
     )
-    manager._automatic_delivery_eligible_fn = scheduler.automatic_delivery_eligible
+    manager._automatic_delivery_eligible_fn = scheduler.automatic_delivery_eligible_devices
     monkeypatch.setattr(manager, "device_in_quiet_hours", lambda did: True)
     # The push path uses the same quiet predicate for per-renderer filtering.
     monkeypatch.setattr("app.push.device_is_quiet", lambda *args, **kwargs: True)
@@ -1751,3 +1753,65 @@ def test_quiet_hours_with_priority_gate_keep_catchup(tmp_path, composition_png, 
     assert result.status == "quiet"
     assert "kitchen" in scheduler._pause_catchups
     assert client.published == []
+
+
+@pytest.mark.parametrize("source", ["scheduler", "rotation", "webhook"])
+def test_unbound_broadcast_push_is_untouched_by_the_delivery_gate(
+    tmp_path: Path, composition_png: bytes, source: str
+) -> None:
+    """An unbound page with the legacy broadcast on has no bound display.
+    The gate turned its "no particular device" push into an explicit device
+    list, the virtual-panel group was dropped and the push failed with
+    "dashboard targets none of the requested device(s)". With the gate wired
+    the push must come back exactly as it does without one, and nobody is
+    asked about: there is no bound display to ask about."""
+    renderers = [_make_renderer(tmp_path, "pi_png", "png", retain=False)]
+    manager, _client, png = _wired(tmp_path, composition_png, renderers)
+    assert manager._broadcast_recipients()
+    with patch("app.push.capture_composed", return_value=(png, [])):
+        ungated = manager.push(
+            "home", source=source, respect_quiet_hours=True, bypass_coalesce=True
+        )
+    asked: list[set[str]] = []
+
+    def gate(page_id, device_ids, source):
+        asked.append(set(device_ids))
+        return set(device_ids)
+
+    manager._automatic_delivery_eligible_fn = gate
+    with patch("app.push.capture_composed", return_value=(png, [])):
+        gated = manager.push("home", source=source, respect_quiet_hours=True, bypass_coalesce=True)
+    assert gated.status == ungated.status != "failed", gated.error
+    assert gated.error == ungated.error
+    assert asked == []
+
+
+def test_delivery_gate_is_asked_for_the_whole_target_set_at_once(
+    tmp_path: Path, composition_png: bytes
+) -> None:
+    """One question per check (before the settle wait, before the render,
+    after it), each for every target together, never one per display."""
+    manager, _client, _ = _wired_bound(tmp_path, composition_png)
+    asked: list[set[str]] = []
+
+    def gate(page_id, device_ids, source):
+        asked.append(set(device_ids))
+        return set(device_ids)
+
+    manager._automatic_delivery_eligible_fn = gate
+    with patch("app.push.capture_composed", return_value=(composition_png, [])):
+        result = manager.push("home", source="deck", respect_quiet_hours=True)
+    assert result.status == "sent"
+    assert asked == [{"kitchen"}] * 3
+
+
+def test_render_failure_under_the_gate_is_still_a_failure(
+    tmp_path: Path, composition_png: bytes
+) -> None:
+    """Only the gate dropping every display makes a push ``held``. A render
+    that fails is ``failed``, as it is without a gate."""
+    manager, _client, _ = _wired_bound(tmp_path, composition_png)
+    manager._automatic_delivery_eligible_fn = lambda page_id, device_ids, source: set(device_ids)
+    with patch("app.push.capture_composed", side_effect=RuntimeError("browser gone")):
+        result = manager.push("home", source="scheduler", respect_quiet_hours=True)
+    assert result.status == "failed"

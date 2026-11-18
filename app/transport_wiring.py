@@ -976,10 +976,10 @@ def _rebuild_transport(
             if app.config.get("SCHEDULER") is not None
             else True
         ),
-        automatic_delivery_eligible_fn=lambda page_id, device_id, source: (
-            app.config["SCHEDULER"].automatic_delivery_eligible(page_id, device_id, source)
+        automatic_delivery_eligible_fn=lambda page_id, device_ids, source: (
+            app.config["SCHEDULER"].automatic_delivery_eligible_devices(page_id, device_ids, source)
             if app.config.get("SCHEDULER") is not None
-            else True
+            else set(device_ids)
         ),
         # Overlay atlases a fresh render will be asked for are built right
         # after it, off the device's request (#359). Off under pytest, where a

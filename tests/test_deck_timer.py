@@ -510,3 +510,97 @@ def test_event_sensor_flaps_wait_for_minimum_hold_expiry(priority_frame):
     scheduler._priority_pass(now + timedelta(minutes=30))
     assert transport.sent == [("panel", "print", "deck")]
     assert nav.current_page("panel", "d1") == "print"
+
+
+@pytest.mark.parametrize("source", ["scheduler", "scheduler_fallback", "webhook", "home_assistant"])
+def test_gate_leaves_a_named_send_of_an_unselected_priority_step_alone(priority_frame, source):
+    """ "print" is in the priority lineup and not its pick. A lineup step or a
+    refresh of it is stale, but a schedule, a webhook or a Home Assistant
+    command names that dashboard on purpose and must still go out."""
+    scheduler, _transport, _nav, _states, _telemetry = priority_frame
+    now = datetime(2026, 11, 16, 11, 0, tzinfo=UTC)
+    scheduler._tick_once(now)
+    assert scheduler.automatic_delivery_eligible_devices("print", {"panel"}, source, now=now) == {
+        "panel"
+    }
+    for stale in ("deck", "rotation", "page_refresh"):
+        assert scheduler.automatic_delivery_eligible_devices(
+            "print", {"panel"}, stale, now=now
+        ) == (set())
+
+
+def test_schedule_for_an_unselected_priority_step_fires_once(priority_frame):
+    """With the gate wired the way the app wires it, such a schedule came
+    back ``held`` before ``_last_fired`` was set: it re-fired on every 30 s
+    tick and its pill said the displays were paused."""
+    from app.push import PushResult
+    from app.state.schedule_model import Schedule
+
+    scheduler, transport, _nav, _states, _telemetry = priority_frame
+    now = datetime(2026, 11, 16, 11, 0, tzinfo=UTC)
+    scheduler._tick_once(now)
+    sent = transport.push
+
+    def gated_push(page_id, *, device_ids=None, source="page", **kwargs):
+        targets = set(device_ids or {"panel"})
+        if not scheduler.automatic_delivery_eligible_devices(page_id, targets, source, now=now):
+            return PushResult(status="held", page_id=page_id)
+        return sent(page_id, device_ids=device_ids, source=source, **kwargs)
+
+    transport.push = gated_push
+    transport.sent.clear()
+    record = Schedule(id="s", name="S", page_id="print", type="interval", interval_minutes=15)
+    result = scheduler._fire(record, now, respect_quiet_hours=True)
+    assert result.status == "sent"
+    assert ("panel", "print", "scheduler") in transport.sent
+    assert scheduler._last_fired["s"] == now.timestamp()
+    assert scheduler._last_status["s"] != "held"
+
+
+def test_gate_does_not_veto_a_follow_up(priority_frame):
+    """A follow-up finishes the frame already on the display. A schedule can
+    put a dashboard on a display whose lineup shows another one, so the
+    "showing" map is the wrong question: the push manager already drops a
+    follow-up once a newer frame has landed."""
+    scheduler, _transport, nav, _states, _telemetry = priority_frame
+    now = datetime(2026, 11, 16, 11, 0, tzinfo=UTC)
+    scheduler._tick_once(now)
+    assert nav.current_page("panel", "d1") == "photos"
+    showing = scheduler._devices_showing_pages(now)
+    assert "panel" not in showing.get("print", set())
+    assert scheduler.automatic_delivery_eligible_devices("print", {"panel"}, "follow-up", now=now)
+    assert scheduler.automatic_delivery_eligible("print", "panel", "follow-up", now=now)
+
+
+def test_gate_reads_the_showing_map_once_for_any_number_of_displays(priority_frame, monkeypatch):
+    scheduler, _transport, _nav, _states, _telemetry = priority_frame
+    now = datetime(2026, 11, 16, 11, 0, tzinfo=UTC)
+    scheduler._tick_once(now)
+    reads = []
+    real = scheduler._devices_showing_pages
+
+    def counted(when):
+        reads.append(when)
+        return real(when)
+
+    monkeypatch.setattr(scheduler, "_devices_showing_pages", counted)
+    kept = scheduler.automatic_delivery_eligible_devices(
+        "photos", {"panel", "hall", "study", "porch"}, "page_refresh", now=now
+    )
+    assert kept == {"panel"}
+    assert len(reads) == 1
+    # A lineup step is not a refresh: the map is not read at all.
+    reads.clear()
+    assert scheduler.automatic_delivery_eligible_devices("photos", {"panel"}, "deck", now=now)
+    assert reads == []
+
+
+def test_gate_is_inert_without_a_priority_lineup(tmp_path):
+    """No priority lineup, no Home Assistant: every source gets every display
+    back, apart from the refresh sources' own "is it showing" check."""
+    scheduler = Scheduler(store=ScheduleStore(tmp_path / "s.json"), push_manager=lambda: None)
+    now = datetime(2026, 11, 16, 11, 0, tzinfo=UTC)
+    for source in ("scheduler", "webhook", "rotation", "deck", "follow-up", "home_assistant"):
+        assert scheduler.automatic_delivery_eligible_devices(
+            "home", {"kitchen", "hall"}, source, now=now
+        ) == {"kitchen", "hall"}

@@ -2460,7 +2460,7 @@ def get_frame_spec(device_id: str) -> Response:
     info = _frame_info_for_digest(device, str(latest.get("digest") or ""))
     page_id = str(info.get("page_id") or "") if info else ""
 
-    from app.touch_spec import build_frame_spec, wire_is_upright, wire_transform
+    from app.touch_spec import build_frame_spec, wire_is_upright, wire_transform, wire_turn
 
     canvas = _canvas_for_page(page_id)
     if canvas is None:
@@ -2468,7 +2468,12 @@ def get_frame_spec(device_id: str) -> Response:
     wire = wire_transform(device.panel or {}, int(canvas.w), int(canvas.h))
     # On a turned frame buttons are left out and the renderer paints them
     # (#343); composer._build_canvas_els makes the same call per element.
-    spec = build_frame_spec(canvas.els, wire=wire, upright=wire_is_upright(device.panel or {}))
+    # The rects below are already in framebuffer space; ``turn`` tells the
+    # firmware which way up to draw inside them (firmware #73).
+    panel = device.panel or {}
+    spec = build_frame_spec(
+        canvas.els, wire=wire, upright=wire_is_upright(panel), turn=wire_turn(panel)
+    )
     _attach_touch_atlases(spec, device)
     return jsonify(spec)
 

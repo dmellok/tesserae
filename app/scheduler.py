@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, time, timedelta, tzinfo
 from functools import partial
@@ -1129,6 +1129,67 @@ class Scheduler:
                 return True
         return not named
 
+    # What the delivery gate answers for. A lineup step and a refresh of what a
+    # display shows are the scheduler's own work, and go stale when a priority
+    # lineup picks another dashboard. A schedule, a webhook, a Home Assistant
+    # command or a follow-up finishing a frame already sent names its page on
+    # purpose: those are never vetoed here.
+    _GATED_LINEUP_SOURCES: frozenset[str] = frozenset({"deck", "rotation"})
+    _GATED_REFRESH_SOURCES: frozenset[str] = frozenset(
+        {"page_refresh", "data_change", "widget_schedule"}
+    )
+
+    def automatic_delivery_eligible_devices(
+        self,
+        page_id: str,
+        device_ids: Iterable[str],
+        source: str,
+        *,
+        now: datetime | None = None,
+        paused: set[str] | None = None,
+    ) -> set[str]:
+        """The displays among ``device_ids`` that should still get an
+        automated push of ``page_id``. Asked again after settle and render so
+        stale lineup or refresh work cannot paint over a newer priority pick.
+
+        Only lineup and refresh sources are judged (see the source sets
+        above); any other source gets every display back. Quiet hours are not
+        looked at: the push path owns them.
+
+        The lineup's preflight may reuse the tick's pause snapshot. The push
+        worker omits it so its post-render check reads the current pauses.
+        One call reads the lineups and the showing map once, however many
+        displays are asked about.
+        """
+        devices = set(device_ids)
+        refresh = source in self._GATED_REFRESH_SOURCES
+        if not devices or not (refresh or source in self._GATED_LINEUP_SOURCES):
+            return devices
+        now = now or datetime.now(UTC)
+        if self.is_paused():
+            return set()
+        devices -= self._paused_or_read(now, paused)
+        for rotation in self._cycle_records():
+            if not devices:
+                break
+            if (
+                not rotation.enabled
+                or rotation.mode != "priority"
+                or not any(step.page_id == page_id for step in rotation.steps)
+            ):
+                continue
+            reached = {did for did in devices if self._cycle_reaches(rotation, did)}
+            if not reached:
+                continue
+            picked = self.live_step_index(rotation, now)
+            if picked is not None and rotation.steps[picked].page_id == page_id:
+                continue
+            # Not this lineup's pick: only a display on a manual hold keeps it.
+            devices -= reached - self._held_device_ids(rotation.id, now)
+        if refresh and devices:
+            devices &= self._devices_showing_pages(now).get(page_id, set())
+        return devices
+
     def automatic_delivery_eligible(
         self,
         page_id: str,
@@ -1138,31 +1199,12 @@ class Scheduler:
         now: datetime | None = None,
         paused: set[str] | None = None,
     ) -> bool:
-        """Recheck after settle/render so stale automatic work cannot win.
-
-        The lineup's preflight may reuse the tick's pause snapshot. The push
-        worker omits it so its post-render check reads the current pauses.
-        """
-        now = now or datetime.now(UTC)
-        if self.is_paused() or device_id in self._paused_or_read(now, paused):
-            return False
-        for rotation in self._cycle_records():
-            if (
-                not rotation.enabled
-                or rotation.mode != "priority"
-                or not self._cycle_reaches(rotation, device_id)
-            ):
-                continue
-            if not any(step.page_id == page_id for step in rotation.steps):
-                continue
-            if device_id in self._held_device_ids(rotation.id, now):
-                continue
-            picked = self.live_step_index(rotation, now)
-            if picked is None or rotation.steps[picked].page_id != page_id:
-                return False
-        if source in {"page_refresh", "data_change", "widget_schedule", "follow-up"}:
-            return device_id in self._devices_showing_pages(now).get(page_id, set())
-        return True
+        """:meth:`automatic_delivery_eligible_devices` for one display."""
+        return bool(
+            self.automatic_delivery_eligible_devices(
+                page_id, {device_id}, source, now=now, paused=paused
+            )
+        )
 
     def _page_can_warm(self, page_id: str) -> bool:
         """Whether a warm-ahead of ``page_id`` could be seen on any display
