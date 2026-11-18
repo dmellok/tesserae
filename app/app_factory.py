@@ -1210,10 +1210,12 @@ def create_app(
 
     def _listen_ha_states(stop: Any) -> None:
         retry_delay = 30.0
+        connected = False
 
         def snapshot(states: list[dict[str, Any]]) -> None:
-            nonlocal retry_delay
+            nonlocal retry_delay, connected
             retry_delay = 30.0
+            connected = True
             condition_evaluator.receive_ha_snapshot(states)
             scheduler.conditions_changed()
 
@@ -1222,7 +1224,7 @@ def create_app(
             module = plugin.server_module if plugin else None
             watch = getattr(module, "watch_state_changes", None)
             delay = 30.0
-            listening = False
+            connected = False
             try:
                 with app.app_context():
                     if (
@@ -1236,7 +1238,6 @@ def create_app(
                             # Check for edited credentials/lineups without another login or warning.
                             stop.wait(min(30.0, cooldown))
                             continue
-                        listening = True
                         watch(
                             stop,
                             snapshot,
@@ -1248,7 +1249,11 @@ def create_app(
                 delay = retry_delay
                 retry_delay = min(retry_delay * 2, 300.0)
             finally:
-                if listening:
+                # Only a session that got as far as its snapshot was feeding
+                # the cache. A connection that never came up (a proxy that
+                # does not forward WebSockets, say) must not mark the states
+                # REST polling is still reading as stale on every retry.
+                if connected:
                     condition_evaluator.ha_stream_disconnected()
                     scheduler.conditions_changed()
             stop.wait(delay)

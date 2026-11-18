@@ -604,3 +604,64 @@ def test_gate_is_inert_without_a_priority_lineup(tmp_path):
         assert scheduler.automatic_delivery_eligible_devices(
             "home", {"kitchen", "hall"}, source, now=now
         ) == {"kitchen", "hall"}
+
+
+def test_unwatched_ha_events_do_not_read_the_lineups(priority_frame, monkeypatch):
+    """Every Home Assistant state change arrives here. One for an entity no
+    priority lineup watches must not re-read the lineups from disk or queue a
+    recheck; the state cache still follows it."""
+    scheduler, _transport, _nav, _states, _telemetry = priority_frame
+    now = datetime(2026, 11, 16, 11, 0, tzinfo=UTC)
+    scheduler._tick_once(now)
+    scheduler._priority_pass(now)
+    reads = []
+    real = scheduler._cycle_records
+
+    def counted():
+        reads.append(1)
+        return real()
+
+    monkeypatch.setattr(scheduler, "_cycle_records", counted)
+    with scheduler._lock:
+        scheduler._condition_due_at = None
+    for i in range(200):
+        scheduler.on_ha_state_changed(
+            f"sensor.noise_{i % 7}", {"entity_id": f"sensor.noise_{i % 7}", "state": str(i)}
+        )
+    assert len(reads) <= 1
+    assert scheduler._condition_due_at is None
+    assert scheduler._condition_evaluator.ha_state("sensor.noise_3")["state"] == "199"
+    # The watched entity still queues the one-second recheck.
+    scheduler.on_ha_state_changed(
+        "sensor.printer", {"entity_id": "sensor.printer", "state": "running"}, now=now
+    )
+    assert scheduler._condition_due_at == now.timestamp() + 1.0
+    assert len(reads) <= 1
+
+
+def test_watched_ha_entities_follow_a_lineup_edit(priority_frame, monkeypatch):
+    from app.state.conditions import Condition
+
+    scheduler, _transport, _nav, _states, _telemetry = priority_frame
+    assert scheduler._priority_ha_entities() == {"sensor.printer"}
+    deck = scheduler._deck_store.get("d1")
+    pages = [
+        deck.pages[0].model_copy(
+            update={
+                "conditions": [
+                    Condition(
+                        source_kind="ha_entity",
+                        source_id="sensor.door",
+                        operator="==",
+                        value="open",
+                    )
+                ]
+            }
+        ),
+        *deck.pages[1:],
+    ]
+    scheduler._deck_store.upsert(deck.model_copy(update={"pages": pages}))
+    # Inside the reuse window the old answer stands; after it the edit shows.
+    assert scheduler._priority_ha_entities() == {"sensor.printer"}
+    monkeypatch.setattr(scheduler, "_HA_WATCH_TTL_S", 0.0)
+    assert scheduler._priority_ha_entities() == {"sensor.door"}

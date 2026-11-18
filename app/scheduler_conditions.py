@@ -118,12 +118,28 @@ class ConditionEvaluator:
             self._ha_fresh = bool(new_cache)
         return True
 
-    def receive_ha_snapshot(self, states: list[dict[str, Any]]) -> None:
-        """Adopt the authenticated event stream's initial/reconnect snapshot."""
+    def receive_ha_snapshot(self, states: list[dict[str, Any]]) -> bool:
+        """Adopt the authenticated event stream's initial/reconnect snapshot.
+
+        An empty snapshot is not adopted, for the reason ``refresh_ha_states``
+        gives: wiping the cache makes every condition fail open. The stream
+        does not take over from REST polling either, so the next poll decides
+        what is fresh. Returns whether the snapshot was adopted."""
+        new_cache = {s["entity_id"]: s for s in states if "entity_id" in s}
         with self._ha_lock:
-            self._ha_cache = {s["entity_id"]: s for s in states if "entity_id" in s}
+            if not new_cache:
+                if self._ha_cache:
+                    logger.warning(
+                        "HA state events sent a snapshot of 0 entities; keeping the "
+                        "previous cache of %d entities.",
+                        len(self._ha_cache),
+                    )
+                self._ha_streaming = False
+                return False
+            self._ha_cache = new_cache
             self._ha_fresh = True
             self._ha_streaming = True
+        return True
 
     def receive_ha_state(self, entity_id: str, state: dict[str, Any] | None) -> None:
         with self._ha_lock:
@@ -133,7 +149,13 @@ class ConditionEvaluator:
                 self._ha_cache[entity_id] = state
 
     def ha_stream_disconnected(self) -> None:
+        """The event stream that was feeding the cache has gone. A stream that
+        never took over (a connection that failed, an empty snapshot) changes
+        nothing: REST polling was in charge throughout and its verdict on
+        freshness stands."""
         with self._ha_lock:
+            if not self._ha_streaming:
+                return
             self._ha_streaming = False
             self._ha_fresh = False
 

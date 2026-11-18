@@ -29,7 +29,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
-- Priority lineups follow Home Assistant state changes through a shared event subscription.
+- Priority lineups follow Home Assistant state changes through a shared event subscription, within about a second. Events for entities no lineup watches cost nothing on disk, and a subscription that cannot connect leaves the regular state polling in charge.
 - Fix lineup binding races and warnings, and load picker previews on demand with an inline fallback.
 - Sync painting budgets and spending records to disk, serialize charges across server processes, and let Repaint recover a failed picture's saved payload.
 - Touch switches, sliders and steppers read the right way up on a panel mounted a quarter turn from its native orientation, such as a reTerminal Sticky set to landscape. The server now tells the panel how far the page was turned. Needs panel firmware that draws turned controls (tesserae-device-firmware#73); older firmware ignores it and draws as before.

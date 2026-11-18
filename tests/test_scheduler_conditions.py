@@ -739,3 +739,33 @@ def test_failed_inflight_rest_refresh_keeps_healthy_stream_fresh():
     evaluator._ha_get_states = rest
     assert evaluator.refresh_ha_states()
     assert evaluator.all_pass([condition])
+
+
+def test_empty_event_snapshot_neither_wipes_the_cache_nor_takes_over():
+    """Same guard as the REST path: an empty snapshot would make every
+    condition fail open. The stream must not claim the cache as fresh on it
+    either, so REST polling stays in charge."""
+    evaluator = ConditionEvaluator(
+        ha_get_states=lambda: [{"entity_id": "sensor.printer", "state": "idle"}]
+    )
+    assert evaluator.refresh_ha_states()
+    assert not evaluator.receive_ha_snapshot([])
+    assert evaluator.ha_state("sensor.printer") == {"entity_id": "sensor.printer", "state": "idle"}
+    assert not evaluator._ha_streaming
+    # REST still refreshes: the stream did not take over.
+    evaluator._ha_get_states = lambda: [{"entity_id": "sensor.printer", "state": "running"}]
+    assert evaluator.refresh_ha_states()
+    assert evaluator.ha_state("sensor.printer")["state"] == "running"
+    # With nothing cached either, an empty snapshot is still not "fresh".
+    blank = ConditionEvaluator()
+    assert not blank.receive_ha_snapshot([])
+    assert not blank._ha_fresh and not blank._ha_streaming
+
+
+def test_stream_that_never_took_over_does_not_mark_states_stale():
+    evaluator = ConditionEvaluator(
+        ha_get_states=lambda: [{"entity_id": "sensor.printer", "state": "idle"}]
+    )
+    assert evaluator.refresh_ha_states()
+    evaluator.ha_stream_disconnected()
+    assert evaluator._ha_fresh

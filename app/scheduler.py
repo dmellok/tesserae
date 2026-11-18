@@ -564,6 +564,8 @@ class Scheduler:
         self._rotation_force_state: dict[str, tuple[datetime, int]] = {}
         self._lock = threading.Lock()
         self._ha_state_listener = ha_state_listener
+        # (monotonic time read, entity ids): see ``_priority_ha_entities``.
+        self._ha_watched: tuple[float, frozenset[str]] | None = None
         self._ha_thread: threading.Thread | None = None
         self._priority_lock = threading.RLock()
         self._priority_thread: threading.Thread | None = None
@@ -656,19 +658,38 @@ class Scheduler:
     def on_ha_state_changed(
         self, entity_id: str, state: dict[str, Any] | None, *, now: datetime | None = None
     ) -> None:
+        """One Home Assistant ``state_changed`` event. Called for every
+        entity that changes, tens of times a second on a busy instance, so an
+        entity no priority lineup watches costs a cache write and a set
+        lookup, nothing read from disk."""
         if self._condition_evaluator is None:
             return
         self._condition_evaluator.receive_ha_state(entity_id, state)
-        if not any(
-            c.source_id == entity_id
+        if entity_id in self._priority_ha_entities():
+            self.conditions_changed(now=now)
+
+    # How long the set of entities priority lineups watch is reused before the
+    # lineups are read again. An edited lineup is picked up within this.
+    _HA_WATCH_TTL_S = 1.0
+
+    def _priority_ha_entities(self) -> frozenset[str]:
+        """Entity ids in the conditions of enabled priority lineups."""
+        checked = monotonic()
+        with self._lock:
+            cached = self._ha_watched
+            if cached is not None and checked - cached[0] < self._HA_WATCH_TTL_S:
+                return cached[1]
+        watched = frozenset(
+            c.source_id
             for rotation in self._cycle_records()
             if rotation.enabled and rotation.mode == "priority"
             for step in rotation.steps
             for c in step.conditions
             if c.is_ha_entity()
-        ):
-            return
-        self.conditions_changed(now=now)
+        )
+        with self._lock:
+            self._ha_watched = (checked, watched)
+        return watched
 
     def conditions_changed(self, *, now: datetime | None = None) -> None:
         # A fixed one-second coalescing window cannot be postponed forever

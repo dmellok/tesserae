@@ -444,10 +444,19 @@ def watch_state_changes(
         ws.send(json.dumps({"id": 2, "type": "get_states"}))
         snapshot_due = time.monotonic() + 10
         have_snapshot = False
-        while not stop.is_set() and (is_needed is None or is_needed()):
-            # Reconnect after a settings change, without logging credentials.
-            if (base_url(), token()) != (url, access_token):
-                return
+        next_check = 0.0
+        while not stop.is_set():
+            # At most once a second, however many events arrive: both checks
+            # read settings or lineups from disk, and a busy Home Assistant
+            # sends tens of events a second. A quiet stream still gets here
+            # once a second through the receive timeout below.
+            if time.monotonic() >= next_check:
+                if is_needed is not None and not is_needed():
+                    return
+                # Reconnect after a settings change, without logging credentials.
+                if (base_url(), token()) != (url, access_token):
+                    return
+                next_check = time.monotonic() + 1.0
             try:
                 message = json.loads(ws.recv(timeout=1))
             except TimeoutError:

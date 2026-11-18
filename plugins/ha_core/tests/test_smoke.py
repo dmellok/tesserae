@@ -657,6 +657,10 @@ def test_event_stream_closes_when_last_ha_lineup_is_disabled(app, monkeypatch):
     def snapshot(states):
         app.config["DECK_STORE"].upsert(deck.model_copy(update={"enabled": False}))
 
+    # The loop asks whether it is still needed once a second, not once per
+    # message: let a second pass on every reading of the clock.
+    clock = iter(range(1000, 2000))
+    monkeypatch.setattr(core.time, "monotonic", lambda: float(next(clock)))
     with app.app_context():
         _configure(app)
         assert scheduler.has_ha_lineup_conditions()
@@ -668,3 +672,104 @@ def test_event_stream_closes_when_last_ha_lineup_is_disabled(app, monkeypatch):
         )
         assert not scheduler.has_ha_lineup_conditions()
         assert socket.replies == []
+
+
+def test_event_stream_checks_lineups_and_settings_once_a_second_not_per_event(app, monkeypatch):
+    """A busy Home Assistant sends tens of state events a second. ``is_needed``
+    and the credentials check read lineups and settings from disk, so they run
+    on a one-second clock, never once per event."""
+    import threading
+
+    core = _core(app)
+    stop = threading.Event()
+    events = [
+        {
+            "id": 1,
+            "type": "event",
+            "event": {"data": {"entity_id": f"sensor.s{i}", "new_state": {"state": str(i)}}},
+        }
+        for i in range(200)
+    ]
+    socket = _FakeSocket(
+        [
+            {"type": "auth_required"},
+            {"type": "auth_ok"},
+            {"id": 1, "success": True},
+            {"id": 2, "type": "result", "success": True, "result": _STATES},
+            *events,
+        ]
+    )
+    _fake_connect(monkeypatch, socket)
+    seen: list[str] = []
+    asked: list[float] = []
+    settings_reads: list[float] = []
+    now = [1000.0]
+    monkeypatch.setattr(core.time, "monotonic", lambda: now[0])
+
+    def changed(entity_id, state):
+        seen.append(entity_id)
+        if len(seen) == 100:
+            now[0] += 1.0  # a second passes halfway through the burst
+        if len(seen) == len(events):
+            stop.set()
+
+    def needed():
+        asked.append(now[0])
+        return True
+
+    with app.app_context():
+        _configure(app)
+        url, access_token = core.base_url(), core.token()
+
+        def counted_url():
+            settings_reads.append(now[0])
+            return url
+
+        monkeypatch.setattr(core, "base_url", counted_url)
+        monkeypatch.setattr(core, "token", lambda: access_token)
+        core.watch_state_changes(stop, lambda states: None, changed, is_needed=needed)
+    assert len(seen) == 200
+    assert asked == [1000.0, 1001.0]
+    # A handful to open the session, then one per second of the stream:
+    # nowhere near one per event.
+    assert settings_reads.count(1001.0) == 1
+    assert len(settings_reads) < 10
+
+
+def test_failed_event_connection_does_not_mark_rest_states_stale(app, monkeypatch):
+    """A connection that never comes up (a proxy that does not forward
+    WebSockets) was reported as a dropped stream on every retry, which marked
+    the states REST polling had just read as stale."""
+    core = _core(app)
+    _conditioned_lineup(app)
+    with app.app_context():
+        _configure(app)
+    evaluator = app.config["CONDITION_EVALUATOR"]
+    evaluator._ha_get_states = lambda: [{"entity_id": "sensor.activity", "state": "on"}]
+    assert evaluator.refresh_ha_states()
+    assert evaluator._ha_fresh
+
+    def failed(*args, **kwargs):
+        raise OSError("handshake refused")
+
+    monkeypatch.setattr(core, "watch_state_changes", failed)
+    app.config["SCHEDULER"]._ha_state_listener(_RetryStop(3))
+    assert evaluator._ha_fresh
+
+
+def test_dropped_event_stream_hands_back_to_rest(app, monkeypatch):
+    core = _core(app)
+    _conditioned_lineup(app)
+    with app.app_context():
+        _configure(app)
+    evaluator = app.config["CONDITION_EVALUATOR"]
+
+    def connected_then_dropped(stop, on_snapshot, on_change, *, is_needed=None):
+        on_snapshot([{"entity_id": "sensor.activity", "state": "on"}])
+        assert evaluator._ha_streaming and evaluator._ha_fresh
+        raise OSError("connection lost")
+
+    monkeypatch.setattr(core, "watch_state_changes", connected_then_dropped)
+    app.config["SCHEDULER"]._ha_state_listener(_RetryStop(1))
+    assert not evaluator._ha_streaming
+    assert not evaluator._ha_fresh
