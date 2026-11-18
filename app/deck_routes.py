@@ -1546,6 +1546,7 @@ def _upcoming_inputs(device: Any, now_utc: datetime) -> tuple[UpcomingInput, ...
             at=ev.scheduled_at.timestamp(),
             lineup_id=ev.lineup_id,
             dashboard_id=ev.dashboard_id,
+            cause=ev.cause,
         )
         for ev in events
     )
@@ -1716,6 +1717,7 @@ def _build_lineups_view(
             draw_count=_step_draw_count(page) if draws and page is not None else 0,
             item_fit=_step_fit(page) if page is not None else False,
             empty_list=_step_empty(page) if page is not None else False,
+            refresh_minutes=int(page.refresh_minutes) if page is not None else 0,
         )
 
     by_display: dict[str, list[LineupInput]] = {d.id: [] for d in devices}

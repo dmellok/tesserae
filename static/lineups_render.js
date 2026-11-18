@@ -594,12 +594,14 @@
               zoomH
             )
           : `<span class="thumb-frame lu-thumb ${d.orientation || "l"} empty note-${esc(ph.state)}" style="--ar:${d.width || 16}/${d.height || 10};--arw:${d.width || 16};--arh:${d.height || 10}" role="img" aria-label="${esc(ph.title)}" title="${esc(ph.title)}"><span class="lu-thumb-note">${ico(phIcon[ph.state] || "screen")}<b>${esc(ph.label)}</b>${ph.sub ? `<small>${esc(ph.sub)}</small>` : ""}</span></span>`;
-    let tags = `<span class="lu-im" title="${esc(d.link.title)}">${ico(linkIcon)}<span>${esc(d.link.label)}</span></span>`;
+    let tags = d.link.label
+      ? `<span class="lu-im" title="${esc(d.link.title)}">${ico(linkIcon)}<span>${esc(d.link.label)}</span></span>`
+      : "";
     if (d.size_label)
       tags += `<span class="lu-im" title="${esc(d.spec)}">${ico(d.orientation === "p" ? "portrait" : "landscape")}<span>${esc(d.size_label)}</span></span>`;
     if (d.pause)
       tags += `<span class="lu-im" title="${esc(d.pause.title)}">${ico("moon")}<span>${esc(d.pause.label)}</span></span>`;
-    tags += `<span class="lu-im" title="${d.refreshes_today} refreshes projected today">${ico("refresh")}<span>${d.refreshes_today}</span></span>`;
+    tags += `<span class="lu-im" title="${esc(d.refreshes_title)}">${ico("refresh")}<span>${d.refreshes_today}</span></span>`;
     const show = op
       ? `<p class="lu-show ${d.in_sync ? "sync" : "queued"}" title="${esc(d.show_title)}"><i class="lu-sdot" aria-hidden="true" title="${esc(d.status_title || d.show_title)}"></i><span class="lu-sr-only">${d.in_sync ? "Synced" : "Waiting to land"}</span><span class="k">Showing</span><b>${esc(op.name)}</b>${d.show_suffix ? `<span class="k">${esc(d.show_suffix)}</span>` : ""}</p>`
       : fr

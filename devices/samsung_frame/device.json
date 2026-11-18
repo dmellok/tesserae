@@ -4,6 +4,7 @@
   "icon": "frame-corners",
   "version": "0.1.0",
   "description": "Samsung The Frame TV, shown through its own Art Mode. Tesserae renders the page at 4K, uploads it to the Art app's My Photos over the TV's local network API and makes it the current artwork, then deletes its older uploads so only a few frames use the TV's storage. Art Mode keeps doing the display: it starts when the TV is switched off, follows the room light with its brightness sensor and draws the mat chosen below. Enter the TV's address, save, then press Allow on the TV the first time Tesserae connects. It switches the TV off for quiet hours and back on for new frames, with the TV's own power or a Home Assistant switch. No developer mode or app install on the TV.",
+  "always_on": true,
   "renderers": [
     "pi_png"
   ],
