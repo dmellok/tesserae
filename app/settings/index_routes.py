@@ -26,6 +26,8 @@ from app import (
     device_service,
     device_timetable,
     fraimic,
+    meural,
+    meural_pending,
     next_update,
     palette_profiles,
     samsung_frame,
@@ -311,6 +313,7 @@ def settings_area(area: str) -> str | Response:
         discovered_sig=discovered_sig,
         visionect_kinds=visionect_kinds,
         fraimic_kinds=fraimic_kinds,
+        meural_pending=_meural_pending_view() if area == "devices" else {},
         visionect_listener=visionect_listener,
         default_transport=default_transport,
         broker_configured=broker_configured,
@@ -1214,6 +1217,7 @@ def _build_device_section(store: Any, device: Device) -> dict[str, Any] | None:
         # operator's to pick (see ``_palette_view``); None hides it.
         "palette": _palette_view(device) if is_instance else None,
         "opendisplay_delivery": _opendisplay_delivery(device) if is_instance else None,
+        "meural_account": _meural_account_view(device) if is_instance else None,
         "delete_endpoint": (
             url_for("auth.devices_delete", instance_id=device.id) if is_instance else None
         ),
@@ -2411,6 +2415,40 @@ def _device_meta_block(device: Device, is_instance: bool) -> dict[str, Any]:
 _TRANSPORT_BADGE = {"rest": "REST", "mqtt": "MQTT", "push": "HA"}
 
 
+def _meural_pending_view() -> dict[str, Any]:
+    from app.meural_pending import pending_state
+
+    return {
+        **pending_state(),
+        "login_url": url_for("auth.meural_login"),
+        "state_url": url_for("auth.meural_account"),
+        "frame_url": url_for("auth.meural_pending_frame"),
+        "logout_url": url_for("auth.meural_pending_logout"),
+    }
+
+
+def _meural_account_view(device: Device) -> dict[str, Any] | None:
+    if device.kind_of != "meural":
+        return None
+    cfg = (settings_store().get_section("devices") or {}).get(device.id) or {}
+    return {
+        "signed_in": bool(cfg.get("meural_refresh_token_secret"))
+        and not cfg.get("meural_auth_failed"),
+        "expired": bool(cfg.get("meural_auth_failed")),
+        "has_session": bool(cfg.get("meural_refresh_token_secret")),
+        "email": cfg.get("meural_email", ""),
+        "frames": cfg.get("meural_devices", []),
+        "selected": str(cfg.get("cloud_device_id") or ""),
+        "login_url": url_for("auth.meural_login", instance_id=device.id),
+        "logout_url": url_for("auth.meural_logout", instance_id=device.id),
+        "frame_url": url_for("auth.meural_select_frame", instance_id=device.id),
+        "state_url": url_for("auth.meural_account", instance_id=device.id),
+        "manage_url": url_for("auth.meural_manage", instance_id=device.id),
+        "paused": bool(cfg.get("meural_management_paused")),
+        "notice": meural_pending.PLAYBACK_NOTICE if cfg.get("meural_playback_unrestored") else "",
+    }
+
+
 def _transport_switchable(device: Device) -> bool:
     """Whether the instance's kind has a client that could follow a
     switch to MQTT (see ``device_service.transport_switchable``)."""
@@ -2431,7 +2469,8 @@ def _transport_badge(device: Device) -> str:
         return "REST"
     if device.transport == "push":
         if device.kind_of == "meural":
-            return "LAN"
+            cfg = (settings_store().get_section("devices") or {}).get(device.id) or {}
+            return "LAN" if meural.delivery_method(cfg) == "local" else "Cloud"
         if samsung_frame.is_samsung_frame_device(device) or fraimic.is_fraimic_device(device):
             return "LAN"
         return "TCP" if visionect_routes.is_visionect_device(device) else "HA"

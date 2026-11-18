@@ -241,7 +241,7 @@
   {
    "name": "GuySie/ha-meural",
    "url": "https://github.com/GuySie/ha-meural",
-   "used_for": "Meural LAN protocol reference (MIT)"
+   "used_for": "Meural LAN protocol and Netgear sign-in reference (MIT)"
   },
   {
    "name": "TRMNL",

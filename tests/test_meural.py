@@ -71,6 +71,7 @@ def setup(app):
     settings = app.config["SETTINGS_STORE"]
     cfg = dict((settings.get_section("devices") or {}).get("test_frame") or {})
     cfg["host"] = "192.0.2.10"
+    cfg["delivery_method"] = "local"
     settings.patch_section("devices", {"test_frame": cfg})
     frame = Frame()
     clock = [100.0]
@@ -114,10 +115,12 @@ def test_device_is_native_lan_and_preserves_portrait(setup):
         assert image.size == (108, 192)
     from app.settings.index_routes import _transport_badge
 
-    assert _transport_badge(setup.device) == "LAN"
+    with setup.app.app_context():
+        assert _transport_badge(setup.device) == "LAN"
 
 
 def test_renews_unchanged_preview_before_expiry(setup):
+    setup.settings.update_item("devices", "test_frame", {"refresh_interval_s": 15})
     pub = setup.publisher()
     pub.poll_once()
     setup.clock[0] = 110
@@ -136,6 +139,67 @@ def test_new_composition_is_sent_without_waiting(setup):
     pub.on_push()
     assert len(setup.frame.uploads) == 2
     assert setup.frame.uploads[0] != setup.frame.uploads[1]
+
+
+def test_cloud_is_default_and_unchanged_images_are_not_uploaded_again(setup, monkeypatch):
+    class Cloud:
+        account_id = "17"
+
+        def __init__(self):
+            self.uploads = []
+            self.loads = []
+
+        def get_playback(self, target):
+            return {"settings": {"galleryRotation": True, "imageDuration": 300}}
+
+        def pause_rotation(self, target):
+            pass
+
+        def upload(self, image, name):
+            self.uploads.append(image)
+            return "100"
+
+        def show_item(self, target, item):
+            self.loads.append((target, item))
+
+    cloud = Cloud()
+    cfg = dict(setup.settings.get_section("devices")["test_frame"])
+    cfg.pop("delivery_method")
+    cfg["cloud_device_id"] = "101"
+    setup.settings.patch_section("devices", {"test_frame": cfg})
+    monkeypatch.setattr("app.meural_cloud.get_cloud_client", lambda *a: cloud)
+    for moment in (100, 115, 200):
+        setup.clock[0] = moment
+        setup.publisher().poll_once()
+    assert len(cloud.uploads) == 1
+    assert cloud.loads == [("101", "100")]
+    assert setup.frame.uploads == []
+    with setup.app.app_context():
+        from app.settings.index_routes import _transport_badge
+
+        assert _transport_badge(setup.device) == "Cloud"
+
+
+def test_released_frame_is_not_sent_new_previews(setup):
+    setup.settings.update_item("devices", "test_frame", {"meural_management_paused": True})
+    setup.publisher().poll_once()
+    assert setup.frame.uploads == []
+    setup.settings.update_item("devices", "test_frame", {"meural_management_paused": False})
+    setup.publisher().poll_once()
+    assert len(setup.frame.uploads) == 1
+
+
+def test_cloud_error_does_not_silently_enable_local_previews(setup, monkeypatch):
+    cfg = dict(setup.settings.get_section("devices")["test_frame"])
+    cfg.update(delivery_method="cloud", cloud_device_id="101")
+    setup.settings.patch_section("devices", {"test_frame": cfg})
+
+    def unavailable(*args):
+        raise MeuralError("cloud unavailable")
+
+    monkeypatch.setattr("app.meural_cloud.get_cloud_client", unavailable)
+    setup.publisher().poll_once()
+    assert setup.frame.uploads == []
 
 
 def test_failed_upload_can_retry_and_is_not_marked_delivered(setup):
@@ -333,7 +397,9 @@ def test_stopping_does_not_wait_for_an_inflight_upload(setup, monkeypatch):
         release.set()
         stopper.join(3)
         pub.stop()
+        pub._thread.join(3)
         if replacement is not None:
+            replacement.on_push()
             assert replacement_entered.wait(3)
             replacement.stop()
     assert len(setup.frame.uploads) == 2
@@ -346,7 +412,7 @@ def test_rejects_invalid_address(setup, host):
     assert not valid
 
 
-@pytest.mark.parametrize("interval", [0, -5, True, 1.5, "oops"])
+@pytest.mark.parametrize("interval", [-5, True, 1.5, "oops"])
 def test_rejects_invalid_preview_interval(setup, interval):
     valid, _ = setup.device.module.validate_config({"refresh_interval_s": interval})
     assert not valid
@@ -520,6 +586,125 @@ def test_a_frame_that_stays_unreachable_is_reported_once(setup, caplog):
     pub.poll_once()
     assert len(setup.frame.uploads) == 1
     setup.frame.fail_upload = True
+    setup.latest["composition_digest"] = "second"
+    Image.new("RGB", (108, 192), "blue").save(setup.app.config["RENDERS_DIR"] / "second.png")
     setup.clock[0] += 60
     pub.poll_once()
     assert len(errors()) == 2
+
+
+def test_cloud_sleep_ownership_survives_frame_ip_change(setup):
+    setup.app.config["SETTINGS_STORE"].update_item(
+        "devices", "test_frame", {"cloud_device_id": "101", "meural_account_id": "17"}
+    )
+    setup.quiet[0] = True
+    setup.publisher().poll_once()
+    assert setup.frame.sleeping
+    setup.app.config["SETTINGS_STORE"].update_item("devices", "test_frame", {"host": "192.0.2.11"})
+    setup.quiet[0] = False
+    setup.publisher().poll_once()
+    assert not setup.frame.sleeping
+
+
+def test_unchanged_local_image_and_orientation_are_not_resent(setup):
+    setup.settings.update_item("devices", "test_frame", {"refresh_interval_s": 0})
+    pub = setup.publisher()
+    for moment in (100, 115, 300):
+        setup.clock[0] = moment
+        pub.poll_once()
+    assert len(setup.frame.uploads) == 1
+    assert setup.frame.orientations == ["portrait"]
+    setup.latest["composition_digest"] = "second"
+    Image.new("RGB", (108, 192), "blue").save(setup.app.config["RENDERS_DIR"] / "second.png")
+    pub.poll_once()
+    assert len(setup.frame.uploads) == 2
+    assert setup.frame.orientations == ["portrait"]
+
+
+def test_busy_frame_does_not_hold_the_global_lock_or_block_other_frames(setup, monkeypatch):
+    from app.meural import frame_lock
+
+    entered, release = threading.Event(), threading.Event()
+
+    def hold():
+        with frame_lock(setup.app, setup.device.id):
+            entered.set()
+            assert release.wait(5)
+
+    thread = threading.Thread(target=hold)
+    thread.start()
+    assert entered.wait(1)
+    try:
+        other = device_service.create_instance(
+            devices=setup.app.config["DEVICE_REGISTRY"],
+            renderers=setup.app.config["RENDERER_REGISTRY"],
+            data_root=setup.app.config["DATA_ROOT"],
+            instance_id="other_frame",
+            kind_id="meural",
+            name="Other frame",
+        ).device
+        seen = []
+        pub = setup.publisher()
+        monkeypatch.setattr(pub, "_visit", lambda device: seen.append(device.id))
+        pub.poll_once()
+        assert seen == [other.id]
+    finally:
+        release.set()
+        thread.join(3)
+
+
+def _legacy_lan_frame(setup):
+    """A frame added when Meural was LAN-only: an address and nothing else."""
+    setup.settings.patch_section("devices", {"test_frame": {"host": "192.0.2.10"}})
+
+
+def test_frame_added_before_cloud_delivery_keeps_getting_local_previews(setup):
+    """Without a saved delivery method the frame was treated as a cloud
+    frame, found no cloud frame chosen, and silently stopped updating."""
+    _legacy_lan_frame(setup)
+    setup.publisher().poll_once()
+    assert len(setup.frame.uploads) == 1
+    with setup.app.app_context():
+        from app.settings.index_routes import _transport_badge
+
+        assert _transport_badge(setup.device) == "LAN"
+
+
+def test_startup_writes_down_the_delivery_method_in_use(setup):
+    """The settings page shows the schema default (cloud) for an unset
+    value; saving it would have switched a LAN frame to cloud delivery."""
+    _legacy_lan_frame(setup)
+    register(setup.app)
+    assert setup.settings.get_section("devices")["test_frame"]["delivery_method"] == "local"
+    setup.settings.patch_section("devices", {"test_frame": {"cloud_device_id": "101"}})
+    register(setup.app)
+    assert setup.settings.get_section("devices")["test_frame"]["delivery_method"] == "cloud"
+
+
+@pytest.mark.parametrize(
+    ("cfg", "method"),
+    [
+        ({"host": "192.0.2.10"}, "local"),
+        ({"host": "192.0.2.10", "cloud_device_id": "101"}, "cloud"),
+        ({}, "cloud"),
+        ({"host": "192.0.2.10", "delivery_method": "cloud"}, "cloud"),
+        ({"cloud_device_id": "101", "delivery_method": "local"}, "local"),
+    ],
+)
+def test_delivery_method_without_a_saved_choice(cfg, method):
+    from app.meural import delivery_method
+
+    assert delivery_method(cfg) == method
+
+
+def test_local_preview_renews_every_15_seconds_unless_told_otherwise(setup):
+    """The renewal default had dropped to "never"; a local preview expires
+    on the frame, which then goes back to its own artwork."""
+    _legacy_lan_frame(setup)
+    pub = setup.publisher()
+    for moment in (100, 110, 115):
+        setup.clock[0] = moment
+        pub.poll_once()
+    assert len(setup.frame.uploads) == 2
+    kind = setup.app.config["DEVICE_REGISTRY"].get("meural")
+    assert kind.config_schema["refresh_interval_s"]["default"] == 15

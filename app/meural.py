@@ -1,9 +1,4 @@
-"""Stock Meural LAN control and renewable postcard delivery.
-
-The postcard is a temporary preview, not a library upload. Keep renewing it
-while Tesserae is running; when renewal stops the frame returns to its artwork.
-The protocol is documented by GuySie/ha-meural (MIT). No cloud login is used.
-"""
+"""Meural cloud artwork delivery with an optional local preview transport."""
 
 from __future__ import annotations
 
@@ -36,7 +31,6 @@ from app.quantizer import apply_underscan, rotate_png
 logger = logging.getLogger(__name__)
 KIND = "meural"
 POLL_INTERVAL_S = 5
-DEFAULT_REFRESH_S = 15
 _HOSTNAME = re.compile(
     r"^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
     r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$"
@@ -138,6 +132,65 @@ class MeuralClient:
         return out
 
 
+def _sleep_identity(host: str, cfg: dict[str, Any]) -> dict[str, str]:
+    if cfg.get("cloud_device_id"):
+        return {
+            "frame": str(cfg["cloud_device_id"]),
+            "account": str(cfg.get("meural_account_id") or ""),
+        }
+    return {"host": host}
+
+
+def release_sleep(device: Device, host: str, *, config: dict[str, Any] | None = None) -> None:
+    """Wake only a frame Tesserae put to sleep; account ids survive IP changes."""
+    path = Path(device.data_dir) / "meural_sleep.json"
+    try:
+        owned = json.loads(path.read_text()) in (
+            _sleep_identity(host, config or {}),
+            {"host": host},
+        )
+    except (OSError, ValueError):
+        return
+    if owned:
+        client = MeuralClient(host)
+        if client.is_sleeping():
+            client.set_sleep(False)
+        path.unlink(missing_ok=True)
+
+
+# Seconds between local uploads of an unchanged page when the device has no
+# saved renewal setting. Local previews expire on the frame (often after 30 s),
+# which then drops back to its own artwork.
+DEFAULT_REFRESH_S = 15
+
+
+def delivery_method(cfg: dict[str, Any]) -> str:
+    """``"local"`` or ``"cloud"`` for a Meural's saved config.
+
+    A frame added before cloud delivery existed has a ``host`` and no
+    ``delivery_method``: it is a LAN frame and must stay one. Without the
+    key, a device is cloud only when a cloud frame has been chosen for it or
+    it has nothing to reach locally."""
+    method = cfg.get("delivery_method")
+    if method in ("local", "cloud"):
+        return str(method)
+    if cfg.get("cloud_device_id") or not str(cfg.get("host") or "").strip():
+        return "cloud"
+    return "local"
+
+
+def refresh_interval(cfg: dict[str, Any]) -> int:
+    """Seconds between local uploads of an unchanged page; 0 sends a page
+    once. An unset value renews every ``DEFAULT_REFRESH_S``."""
+    value = cfg.get("refresh_interval_s")
+    if value in (None, ""):
+        return DEFAULT_REFRESH_S
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return DEFAULT_REFRESH_S
+
+
 class MeuralPublisher:
     """One worker owns uploads, renewals and quiet-hours transitions."""
 
@@ -165,15 +218,16 @@ class MeuralPublisher:
         self._run_async = run_async
         self._stop = threading.Event()
         self._wake = threading.Event()
-        self._lock = app.config.setdefault("MEURAL_IO_LOCK", threading.Lock())
         self._thread: threading.Thread | None = None
         self._sent: dict[str, tuple[str, float]] = {}
+        self._orientations: dict[str, tuple[str, str]] = {}
         self._images: dict[str, tuple[str, bytes]] = {}
         self._retry_at: dict[str, float] = {}
         # device id -> the failure last reported, so a frame that stays
         # unreachable is logged once and not on every retry.
         self._failed: dict[str, str] = {}
         self._telemetry: dict[str, tuple[float, dict[str, Any]]] = {}
+        self._cloud_checks: dict[str, tuple[tuple[str, bool, str], float, bool]] = {}
 
     def start(self) -> None:
         if not self._run_async or self._thread is not None:
@@ -191,6 +245,9 @@ class MeuralPublisher:
             self._wake.set()
         else:
             self.poll_once()
+
+    def wake(self) -> None:
+        self._wake.set()
 
     def _loop(self) -> None:
         while not self._stop.is_set():
@@ -214,7 +271,11 @@ class MeuralPublisher:
 
     def _owns_sleep(self, device: Device, host: str) -> bool:
         try:
-            return bool(json.loads(self._sleep_path(device).read_text()) == {"host": host})
+            cfg = (self._settings.get_section("devices") or {}).get(device.id) or {}
+            return json.loads(self._sleep_path(device).read_text()) in (
+                _sleep_identity(host, cfg),
+                {"host": host},
+            )
         except (OSError, ValueError):
             return False
 
@@ -225,63 +286,146 @@ class MeuralPublisher:
         else:
             path.parent.mkdir(parents=True, exist_ok=True)
             temporary = path.with_suffix(".tmp")
-            temporary.write_text(json.dumps({"host": host}))
+            cfg = (self._settings.get_section("devices") or {}).get(device.id) or {}
+            temporary.write_text(json.dumps(_sleep_identity(host, cfg)))
             temporary.replace(path)
 
     def poll_once(self) -> None:
-        with self._lock:
-            frames = [d for d in self._devices.devices.values() if d.kind_of == KIND]
-            live = {d.id for d in frames}
-            for cache in (
-                self._sent,
-                self._images,
-                self._retry_at,
-                self._telemetry,
-                self._failed,
-            ):
-                for key in set(cache) - live:
-                    cache.pop(key, None)
-            for device in frames:
-                if self._stop.is_set():
-                    return
-                if self._clock() < self._retry_at.get(device.id, 0):
+        frames = [d for d in list(self._devices.devices.values()) if d.kind_of == KIND]
+        live = {d.id for d in frames}
+        for cache in (
+            self._sent,
+            self._images,
+            self._retry_at,
+            self._telemetry,
+            self._failed,
+            self._cloud_checks,
+        ):
+            for key in set(cache) - live:
+                cache.pop(key, None)
+        for device in frames:
+            if self._stop.is_set():
+                return
+            if self._clock() < self._retry_at.get(device.id, 0):
+                continue
+            lock = frame_lock(self._app, device.id)
+            if not lock.acquire(blocking=False):
+                continue
+            try:
+                self._visit(device)
+                self._retry_at.pop(device.id, None)
+                if self._failed.pop(device.id, None) is not None:
+                    logger.info("meural %s: reachable again", device.id)
+            except Exception as exc:
+                cfg = (self._settings.get_section("devices") or {}).get(device.id) or {}
+                delay = POLL_INTERVAL_S if delivery_method(cfg) == "local" else 60
+                self._retry_at[device.id] = self._clock() + delay
+                # The retry is every few seconds. A frame switched off at
+                # the wall would otherwise fill the log and the History
+                # page with the same line until it came back.
+                if self._failed.get(device.id) == str(exc):
                     continue
-                try:
-                    self._visit(device)
-                    self._retry_at.pop(device.id, None)
-                    if self._failed.pop(device.id, None) is not None:
-                        logger.info("meural %s: reachable again", device.id)
-                except Exception as exc:
-                    self._retry_at[device.id] = self._clock() + POLL_INTERVAL_S
-                    # The retry is every few seconds. A frame switched off at
-                    # the wall would otherwise fill the log and the History
-                    # page with the same line until it came back.
-                    if self._failed.get(device.id) == str(exc):
-                        continue
-                    self._failed[device.id] = str(exc)
-                    logger.warning("meural %s: %s", device.id, exc)
-                    events = self._app.config.get("EVENT_LOG")
-                    if events is not None:
-                        try:
-                            events.record(
-                                type="device",
-                                source=device.id,
-                                target=f"meural://{device.id}",
-                                status="error",
-                                error=str(exc),
-                            )
-                        except Exception:
-                            logger.exception("meural %s: recording failure failed", device.id)
+                self._failed[device.id] = str(exc)
+                logger.warning("meural %s: %s", device.id, exc)
+                events = self._app.config.get("EVENT_LOG")
+                if events is not None:
+                    try:
+                        events.record(
+                            type="device",
+                            source=device.id,
+                            target=f"meural://{device.id}",
+                            status="error",
+                            error=str(exc),
+                        )
+                    except Exception:
+                        logger.exception("meural %s: recording failure failed", device.id)
+
+            finally:
+                lock.release()
 
     def _visit(self, device: Device) -> None:
         cfg = (self._settings.get_section("devices") or {}).get(device.id) or {}
+        if cfg.get("meural_management_paused"):
+            return
+        if delivery_method(cfg) != "local":
+            self._visit_cloud(device, cfg)
+            return
         host = str(cfg.get("host") or "").strip()
         if not host:
             return
+        sleeping = self._control(device, host)
+        if sleeping or self._quiet(device) or self._stop.is_set():
+            return
+        image = self._image(device)
+        if image is None:
+            return
+        image_key, orientation, jpeg = image
+        key = f"{host}:{image_key}"
+        sent_key, sent_at = self._sent.get(device.id, ("", 0.0))
+        interval = refresh_interval(cfg)
+        if key == sent_key and (interval <= 0 or self._clock() - sent_at < interval):
+            return
+        client = self._client(host)
+        if self._orientations.get(device.id) != (host, orientation):
+            client.set_orientation(orientation)
+            self._orientations[device.id] = (host, orientation)
+        if self._stop.is_set() or self._devices.devices.get(device.id) is not device:
+            return
+        client.upload(jpeg)
+        self._sent[device.id] = (key, self._clock())
+        if key != sent_key:
+            logger.info("meural %s: sent frame over LAN", device.id)
+
+    def _visit_cloud(self, device: Device, cfg: dict[str, Any]) -> None:
+        from app.meural_cloud import CloudDelivery, get_cloud_client, resource_id
+
+        if cfg.get("meural_auth_failed") or time.time() < float(
+            cfg.get("meural_auth_retry_at") or 0
+        ):
+            return
+        target = str(cfg.get("cloud_device_id") or "")
+        if not target:
+            return
+        client = get_cloud_client(self._app, device.id)
+        if not client.account_id:
+            return
+        image = self._image(device)
+        if image is None:
+            return
+        key, _orientation, jpeg = image
+        host = str(cfg.get("host") or "").strip()
+        quiet = self._quiet(device)
+        check_key = (f"{target}:{host}", quiet, key)
+        checked_key, checked_at, sleeping = self._cloud_checks.get(device.id, (None, -60.0, False))
+        if check_key != checked_key or self._clock() - checked_at >= 60:
+            sleeping = False
+            if host:
+                try:
+                    sleeping = self._control(device, host)
+                except MeuralError:
+                    logger.debug(
+                        "meural %s: LAN control unavailable; cloud delivery continues", device.id
+                    )
+            self._cloud_checks[device.id] = (check_key, self._clock(), sleeping)
+        if sleeping or quiet or self._stop.is_set():
+            return
+        delivery = CloudDelivery(
+            Path(device.data_dir)
+            / f"meural_cloud_{resource_id(client.account_id)}_{resource_id(target)}.json",
+            client,
+            min_interval_s=int(cfg.get("cloud_interval_s") or 300),
+            cancelled=lambda: (
+                self._stop.is_set() or self._devices.devices.get(device.id) is not device
+            ),
+        )
+        if delivery.deliver(jpeg, key, target):
+            logger.info("meural %s: changed the cloud artwork", device.id)
+
+    def _control(self, device: Device, host: str) -> bool:
         client = self._client(host)
         sleeping = client.is_sleeping()
         if self._stop.is_set() or self._devices.devices.get(device.id) is not device:
-            return
+            return True
         owned = self._owns_sleep(device, host)
         quiet = self._quiet(device)
         if quiet and not sleeping:
@@ -311,27 +455,23 @@ class MeuralPublisher:
                 else ("sleeping" if sleeping else ""),
             },
         )
-        if sleeping or quiet or self._stop.is_set():
-            return
+        return bool(sleeping)
+
+    def _image(self, device: Device) -> tuple[str, str, bytes] | None:
         latest = self._latest(device.id) or {}
         digest = str(latest.get("composition_digest") or "")
         if not re.fullmatch(r"[A-Za-z0-9_-]+", digest):
-            return
+            return None
         panel = device_panel(device)
         orientation = "portrait" if panel and panel.h > panel.w else "landscape"
         flip = bool(panel and panel.flip)
         underscan = panel.underscan if panel else 0
-        key = f"{host}:{digest}:{orientation}:{flip}:{underscan}"
-        sent_key, sent_at = self._sent.get(device.id, ("", 0.0))
-        interval = int(cfg.get("refresh_interval_s") or DEFAULT_REFRESH_S)
-        if key == sent_key and now - sent_at < interval:
-            return
         image_key = f"{digest}:{flip}:{underscan}"
         cached_key, jpeg = self._images.get(device.id, ("", b""))
         if cached_key != image_key:
             path = self._renders_dir / f"{digest}.png"
             if not path.is_file():
-                return
+                return None
             png = path.read_bytes()
             if flip:
                 png = rotate_png(png, quarters=2)
@@ -344,14 +484,7 @@ class MeuralPublisher:
                 image.save(output, "JPEG", quality=90)
                 jpeg = output.getvalue()
             self._images[device.id] = (image_key, jpeg)
-        if key != sent_key:
-            client.set_orientation(orientation)
-        if self._stop.is_set() or self._devices.devices.get(device.id) is not device:
-            return
-        client.upload(jpeg)
-        self._sent[device.id] = (key, self._clock())
-        if key != sent_key:
-            logger.info("meural %s: sent frame %s over LAN", device.id, digest)
+        return f"{image_key}:{orientation}", orientation, jpeg
 
     def _record(self, device: Device, heartbeat: dict[str, Any]) -> None:
         from app.transport_wiring import record_status_heartbeat
@@ -375,10 +508,35 @@ class MeuralPublisher:
             logger.exception("meural %s: recording status failed", device.id)
 
 
+def frame_lock(app: Flask, device_id: str) -> Any:
+    """Shared across publisher restarts; unrelated frames never share an I/O lock."""
+    return app.config.setdefault("MEURAL_FRAME_LOCKS", {}).setdefault(device_id, threading.RLock())
+
+
+def _save_delivery_methods(app: Flask) -> None:
+    """Write down how each Meural without a saved delivery method is being
+    delivered to, so its settings page shows the method in use and saving
+    that page cannot switch a LAN frame to cloud delivery."""
+    settings = app.config["SETTINGS_STORE"]
+    saved = settings.get_section("devices") or {}
+    for device in list(app.config["DEVICE_REGISTRY"].devices.values()):
+        cfg = saved.get(device.id)
+        if device.kind_of != KIND or not isinstance(cfg, dict):
+            continue
+        if cfg.get("delivery_method") not in ("local", "cloud"):
+            try:
+                settings.update_item(
+                    "devices", device.id, {"delivery_method": delivery_method(cfg)}
+                )
+            except (OSError, ValueError):
+                logger.warning("meural %s: could not save its delivery method", device.id)
+
+
 def register(app: Flask) -> None:
     push = app.config.get("PUSH_MANAGER")
     if push is None:
         return
+    _save_delivery_methods(app)
     old = app.config.get("MEURAL_PUBLISHER")
     if old is not None:
         old.stop()

@@ -42,12 +42,20 @@ KOReader's `trmnl-display` plugin needs a short token instead:
 
 ## Add a Netgear Meural
 
+Meural cloud delivery uses an unofficial Netgear API and client ids from Netgear's app. Netgear can change them or block access, so this path can stop working.
+
 1. Open **Settings → Devices → Add device → Netgear Meural**.
-2. Enter a device id and display name, then click **Add Netgear Meural**.
-3. On the new device's page, enter its **Frame address** and save.
+2. Enter a device id and display name.
+3. Click **Sign in to Netgear**. Complete sign-in and any verification challenge in the tab that opens.
+4. Back on the Add device card, choose a frame from your account, then click **Add Netgear Meural**.
+
+Sign in before adding: the device is created together with its account and frame. If the sign-in expires on an existing device, sign in again from **Connection** on its page. For **Local preview (backup)** there is no sign-in; enter the frame's LAN address and add it.
+
+Cloud delivery waits at least five minutes between updates by default. Change the minimum interval in Connection settings; renders in between are combined and the latest page wins. While it delivers, Tesserae turns off the frame's gallery rotation and sets its image duration to 0, so the frame holds the page instead of shuffling it with other artwork. Stopping delivery, signing out, changing frame or deleting the device puts both back as they were. If Netgear cannot be reached at that point (an expired sign-in, for one), the device page says so; turn gallery rotation on again in the Meural app. Native sleep schedules are not synced; manage them in the Meural app. Cloud cleanup failures never block sign-out, frame changes, stopping delivery or deletion.
+
 
 The panel starts at 1080×1920 in portrait. Change its orientation if the frame hangs sideways.
-See [Meural setup](clients.md#netgear-meural) for preview renewal and quiet hours.
+See [Meural setup](clients.md#netgear-meural) for cloud delivery, local preview backup and quiet hours.
 
 ## Per-device settings
 

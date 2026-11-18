@@ -12,6 +12,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Add Meural cloud sign-in and single-image delivery with a per-device delivery interval. A frame added for local previews before this keeps local delivery. Adding a cloud frame before signing in returns to the Devices page with the reason. Deleting a cloud frame frees it for another display. Local previews renew every 15 seconds by default, as before.
 - Export dashboards and lineups to a file and import them on another server. An export leaves out displays, passwords and keys; an import shows what it will add or replace before anything changes, and replacing keeps the displays already assigned. (#541)
 - Offer optional conditions when adding a dashboard to a lineup.
 - Add Netgear Meural local-network previews and quiet-hours sleep control.
@@ -30,6 +31,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 ### Fixed
 
 - Priority lineups follow Home Assistant state changes through a shared event subscription, within about a second. Events for entities no lineup watches cost nothing on disk, and a subscription that cannot connect leaves the regular state polling in charge.
+- Pause the Meural slideshow timer during cloud delivery and restore it on release. If the restore cannot reach Netgear, the device page says to turn gallery rotation back on in the Meural app.
+
 - Fix lineup binding races and warnings, and load picker previews on demand with an inline fallback.
 - Sync painting budgets and spending records to disk, serialize charges across server processes, and let Repaint recover a failed picture's saved payload.
 - Touch switches, sliders and steppers read the right way up on a panel mounted a quarter turn from its native orientation, such as a reTerminal Sticky set to landscape. The server now tells the panel how far the page was turned. Needs panel firmware that draws turned controls (tesserae-device-firmware#73); older firmware ignores it and draws as before.
