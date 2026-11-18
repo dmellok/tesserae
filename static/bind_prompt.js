@@ -10,12 +10,14 @@
  *
  * The dialog lists the target display (always ticked: the add needs it) and
  * every display the dashboards are bound to now (ticked; untick to take them
- * off). It resolves to {mode, modes, keep}: keep maps page id -> the current
- * display ids it stays on; modes maps page id -> "move" (keeps none), "also"
+ * off). It resolves to {mode, modes, keep, remove}: remove maps page id ->
+ * unticked display ids; keep maps page id -> the current display ids it stays
+ * on; modes maps page id -> "move" (keeps none), "also"
  * (keeps all) or "some"; mode is the shared one ("some" when they differ).
  * null means cancelled. TesseraeBindPrompt.fields(choice, id)
  * turns a choice into the form fields the server reads (bind_pages,
- * bind_also, bind_keep). Native <dialog>: Escape cancels, focus is trapped
+ * bind_also, bind_remove; legacy choices still support bind_keep).
+ * Native <dialog>: Escape cancels, focus is trapped
  * while open and restored to the opener.
  */
 (function () {
@@ -153,7 +155,9 @@
       const summary = el("p", "bind-dialog-summary");
       summary.id = "bind-dialog-summary";
       summary.setAttribute("aria-live", "polite");
-      body.append(set, hint, summary);
+      const warning = el("p", "bind-dialog-warning");
+      warning.setAttribute("aria-live", "polite");
+      body.append(set, hint, summary, warning);
 
       // Reuse the old fact: on another size the dashboard is scaled to fit.
       const target = size(display);
@@ -192,6 +196,18 @@
         let line = `${subject} will be on ${join(on)}.`;
         if (off.length) line += ` Removed from ${join(off)}.`;
         summary.textContent = line;
+        const affected = dropped().flatMap((r) => {
+          const names = r.pages
+            .filter((p) => (p.bound_to || []).some((b) => b.id === r.d.id && b.shared))
+            .map((p) => p.name);
+          return names.length
+            ? [
+                `Other lineups on ${r.d.name} use ${join(names)} and will stop showing ${names.length === 1 ? "it" : "them"}.`,
+              ]
+            : [];
+        });
+        warning.textContent = affected.join(" ");
+        warning.hidden = !affected.length;
         boxes.forEach((b) => {
           if (b.row.target) return;
           b.label.classList.toggle("is-off", !b.box.checked);
@@ -229,10 +245,12 @@
         if (!valid()) return;
         const ids = new Set(kept().map((r) => r.d.id));
         const keep = {};
+        const remove = {};
         const modes = {};
         pages.forEach((p) => {
           const had = (p.bound_to || []).map((b) => b.id);
           keep[p.id] = had.filter((id) => ids.has(id));
+          remove[p.id] = had.filter((id) => !ids.has(id));
           modes[p.id] = !keep[p.id].length
             ? "move"
             : keep[p.id].length === had.length
@@ -241,7 +259,7 @@
         });
         const all = Object.values(modes);
         const mode = all.every((m) => m === all[0]) ? all[0] : "some";
-        answer = { mode, modes, keep };
+        answer = { mode, modes, keep, remove };
         dlg.close();
       });
       dlg.addEventListener("close", () => {
@@ -275,15 +293,16 @@
     });
   }
 
-  /* The form fields for one page's answer: always bind_pages; bind_also when
-     it keeps every display it had; bind_keep ({"page": [display ids]}) when
-     it keeps only some. A plain "move" is bind_pages alone. */
+  /* New prompts send only the unticked displays, so a binding added elsewhere
+     after the prompt loaded survives. Keep accepting legacy choice objects. */
   function fields(choice, pageId) {
     if (!choice) return [];
     if (typeof choice === "string") choice = { mode: choice };
     const mode = (choice.modes && choice.modes[pageId]) || choice.mode;
     const out = [["bind_pages", pageId]];
-    if (mode === "also") out.push(["bind_also", pageId]);
+    if (choice.remove && Object.hasOwn(choice.remove, pageId)) {
+      out.push(["bind_remove", JSON.stringify({ [pageId]: choice.remove[pageId] })]);
+    } else if (mode === "also") out.push(["bind_also", pageId]);
     else if (mode === "some") {
       const ids = (choice.keep && choice.keep[pageId]) || [];
       out.push(["bind_keep", JSON.stringify({ [pageId]: ids })]);

@@ -540,7 +540,12 @@ def test_edge_cases_none_one_many_and_long_names(real: tuple[str, Flask], phone:
         assert _summary(dlg) == "Loose will be on Meural Lounge Frame."
         assert dlg.locator(".bind-dialog-note").count() == 0
         _answer(page, "Show on Meural Lounge Frame")
-        assert answer() == {"mode": "move", "modes": {"n": "move"}, "keep": {"n": []}}
+        assert answer() == {
+            "mode": "move",
+            "modes": {"n": "move"},
+            "keep": {"n": []},
+            "remove": {"n": []},
+        }
 
         # Bound to one, then unticked: a move, with the size note.
         dlg = ask([{"id": "w", "name": "Weather", "bound_to": [_DOOR]}])
@@ -574,8 +579,8 @@ def test_edge_cases_none_one_many_and_long_names(real: tuple[str, Flask], phone:
             "(a) => [TesseraeBindPrompt.fields(a, 'a'), TesseraeBindPrompt.fields(a, 'w')]", got
         )
         assert fields == [
-            [["bind_pages", "a"], ["bind_keep", '{"a":["door"]}']],
-            [["bind_pages", "w"], ["bind_also", "w"]],
+            [["bind_pages", "a"], ["bind_remove", '{"a":["mini"]}']],
+            [["bind_pages", "w"], ["bind_remove", '{"w":[]}']],
         ]
 
         # Long names truncate inside the row; nothing spills sideways.
@@ -595,4 +600,43 @@ def test_edge_cases_none_one_many_and_long_names(real: tuple[str, Flask], phone:
         dlg.wait_for(state="detached")
         assert answer() is None
         assert errors == []
+        browser.close()
+
+
+def test_unticking_warns_about_other_lineups_and_preserves_later_binding(real):
+    from playwright.sync_api import expect, sync_playwright
+
+    base, app = real
+    app.config["DECK_STORE"].upsert(
+        Deck(id="other", name="Other", device_ids=["frame"], pages=[DeckPage(page_id="photos")])
+    )
+    with sync_playwright() as p:
+        browser, page, errors = _editor(p, base)
+        client = app.test_client()
+        code = app.config["PAIRING_STORE"].issue(note="test").code
+        assert (
+            client.post(
+                "/api/v1/device/register",
+                headers={"X-Pairing-Code": code},
+                json={"device_id": "later", "kind": "esp32_client"},
+            ).status_code
+            == 201
+        )
+        pages = app.config["PAGE_STORE"]
+        pages.save(pages.get("photos").model_copy(update={"device_ids": ["frame", "later"]}))
+        _add_other(page, "photos")
+        dlg = _prompt(page)
+        warning = dlg.locator(".bind-dialog-warning")
+        expect(warning).to_be_hidden()
+        dlg.get_by_role("checkbox", name="frame", exact=True).uncheck()
+        expect(warning).to_contain_text("Other lineups on frame use Google Photos")
+        expect(warning).to_contain_text("will stop showing it")
+        dlg.get_by_role("checkbox", name="frame", exact=True).check()
+        expect(warning).to_be_hidden()
+        dlg.get_by_role("checkbox", name="frame", exact=True).uncheck()
+        _answer(page, "Move to hallway")
+        page.locator("#dxe-picker").wait_for(state="detached")
+        _save(page)
+        assert _bound(app, "photos") == ["later", "hallway"]
+        assert not errors
         browser.close()

@@ -3533,11 +3533,14 @@ def _editor_state(deck: Deck | None) -> dict[str, Any]:
     # How many other lineups show each dashboard: a pin or Updates changes
     # it for them too.
     shared: dict[str, int] = {}
+    shared_displays: dict[str, set[str]] = {}
+    page_devices = {p.id: p.device_ids for p in _pages().list()}
     for other in all_decks:
         if deck is not None and other.id == deck.id:
             continue
         for pid in set(other.page_ids):
             shared[pid] = shared.get(pid, 0) + 1
+            shared_displays.setdefault(pid, set()).update(_deck_displays(other, page_devices))
     page_meta: dict[str, dict[str, Any]] = {}
     for p in pages:
         try:
@@ -3550,6 +3553,7 @@ def _editor_state(deck: Deck | None) -> dict[str, Any]:
                 p, dims, token, deck.device_ids[0] if deck and deck.device_ids else None
             ),
             "shared": shared.get(p.id, 0),
+            "shared_displays": sorted(shared_displays.get(p.id, set())),
         }
     # A dashboard shared by displays of different shapes has one preview, drawn at its
     # largest panel (a 16:9 TV's landscape picture cropped into a portrait frame's
@@ -3559,9 +3563,10 @@ def _editor_state(deck: Deck | None) -> dict[str, Any]:
     )
     shot_device = devices_reg.get(shot_device_id) if devices_reg and shot_device_id else None
     if shot_device is not None:
+        shown_members = members if deck is not None else {request.args.get("page_id") or ""}
         sw, sh, _spec = _device_size(shot_device)
         for pid, shot in _display_shots(
-            shot_device, sw, sh, [p for p in pages if p.id in page_meta]
+            shot_device, sw, sh, [p for p in pages if p.id in shown_members]
         ).items():
             # No URL means that picture is still being drawn. Keep the shared
             # preview until it is ready: the editor reads its tiles once, so an
@@ -3716,6 +3721,7 @@ def _editor_state(deck: Deck | None) -> dict[str, Any]:
             "save": url_for("decks.editor_save"),
             "create": url_for("decks.create_lineup"),
             "items": url_for("decks.dashboard_items"),
+            "pickerPreviews": url_for("decks.picker_previews"),
             "lineups": url_for("decks.index"),
             "back": return_to or url_for("decks.index"),
             "view": url_for("decks.view_json"),
@@ -3728,6 +3734,36 @@ def _editor_state(deck: Deck | None) -> dict[str, Any]:
             "editor": url_for("decks.editor", deck_id=deck.id) if deck is not None else "",
         },
     }
+
+
+@bp.post("/picker-previews")
+def picker_previews() -> Response | tuple[Response, int]:
+    """Queue display-shaped pictures only for dashboards in the open picker.
+
+    Ready pictures replace shared previews; queued ones leave the shared
+    picture visible until the next open.
+    """
+    body = request.get_json(silent=True) or {}
+    if not isinstance(body, dict):
+        return jsonify(ok=False, error="Expected an object."), 400
+    device_id = body.get("display_id")
+    registry = current_app.config.get("DEVICE_REGISTRY")
+    device = registry.get(device_id) if registry and isinstance(device_id, str) else None
+    ids = body.get("page_ids")
+    if device is None or not isinstance(ids, list):
+        return jsonify(ok=False, error="Choose a display and dashboards."), 400
+    wanted = {pid for pid in ids if isinstance(pid, str)}
+    pages = [p for p in _pages().list() if p.id in wanted]
+    w, h, _spec = _device_size(device)
+    shots = _display_shots(device, w, h, pages)
+    return jsonify(
+        ok=True,
+        pages={
+            pid: {"thumb": shot.thumb_url, "w": shot.width, "h": shot.height}
+            for pid, shot in shots.items()
+            if shot.thumb_url
+        },
+    )
 
 
 @bp.get("/dashboard-items")

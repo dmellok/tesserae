@@ -2,7 +2,7 @@
  * bound to (see bind_prompt.js). The server refuses such a save without
  * consent, so this only has to ask: it checks the picked dashboards against
  * the picked displays, shows the prompt, and submits again with the answer as
- * hidden `bind_pages` / `bind_also` / `bind_keep` fields. Cancelling saves nothing.
+ * hidden `bind_pages` / `bind_remove` fields. Cancelling saves nothing.
  *
  * Opt in with `data-bind-guard` (+ `data-bind-check-url`) on a form that has `page_id` (and optionally
  * `fallback_page_id`) selects and `device_ids` checkboxes. A form with no

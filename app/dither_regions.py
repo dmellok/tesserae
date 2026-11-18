@@ -79,6 +79,19 @@ def regions_from_page(page: Page) -> list[dict[str, Any]]:
     return regions
 
 
+# Renderers outside the ``.bin`` family that also quantise on the server and
+# apply the region mask. Every other non-``.bin`` renderer (pi_png, trmnl_*)
+# leaves quantising to the client, so the regions mean nothing to it.
+_INDEXED_REGION_RENDERERS = frozenset({"circuitpython_png", "circuitpython_bmp"})
+
+
+def renderer_takes_regions(renderer_id: str, extension: str) -> bool:
+    """True when the renderer quantises on the server and so can honour a
+    cell's Flat override. ``renderer_id`` may carry a ``__<device>`` suffix
+    (per-device renderer instances); only the base id is compared."""
+    return extension == "bin" or renderer_id.split("__", 1)[0] in _INDEXED_REGION_RENDERERS
+
+
 def has_nearest_region(regions: list[dict[str, Any]]) -> bool:
     """True when at least one region forces nearest-colour, i.e. the mask
     would actually change the packed output. When False, callers skip the

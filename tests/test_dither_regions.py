@@ -147,6 +147,9 @@ def _gradient_png(width: int, height: int) -> bytes:
     "name,gamut",
     [
         ("pi_bin", "waveshare_e6"),
+        ("pico_bin", "waveshare_e6"),
+        ("circuitpython_png", "inky_7colour"),
+        ("circuitpython_bmp", "inky_7colour"),
         ("esp32_bin", "waveshare_e6"),
         ("esp32_bw_bin", "waveshare_e6"),
         ("esp32_gray_bin", "waveshare_e6"),
@@ -168,3 +171,60 @@ def test_renderer_consumes_dither_regions(name: str, gamut: str) -> None:
     regions = [{"x": 0, "y": 0, "w": 64, "h": 16, "nearest": True}]
     masked = mod.transform(png, panel=panel, settings={"_dither_regions": regions})
     assert masked != base
+
+
+def _decode_indexed(data: bytes) -> np.ndarray:
+    with Image.open(io.BytesIO(data)) as im:
+        return np.asarray(im.convert("RGB")).copy()
+
+
+@pytest.mark.parametrize("name", ["circuitpython_png", "circuitpython_bmp"])
+def test_circuitpython_flat_region_is_limited_to_its_cell(name: str) -> None:
+    """Issue #572: Flat on a status bar or a widget cell did nothing on a
+    CircuitPython display. The flat cell must match an undithered render and
+    the rest of the frame must keep the display's dither."""
+    mod = _load_renderer(name)
+    png = _gradient_png(64, 32)
+    panel = Panel(w=64, h=32, gamut="inky_7colour")
+    dithered = _decode_indexed(mod.transform(png, panel=panel, settings={}))
+    flat = _decode_indexed(mod.transform(png, panel=panel, settings={"dither": "none"}))
+    assert not np.array_equal(dithered, flat)
+    # The top 8 rows are a flat "status bar"; the cell below keeps dithering.
+    regions = [
+        {"x": 0, "y": 0, "w": 64, "h": 8, "nearest": True},
+        {"x": 0, "y": 8, "w": 64, "h": 24, "nearest": False},
+    ]
+    out = _decode_indexed(mod.transform(png, panel=panel, settings={"_dither_regions": regions}))
+    assert np.array_equal(out[:8], flat[:8])
+    assert np.array_equal(out[8:], dithered[8:])
+
+
+def test_circuitpython_flat_region_follows_rotation_and_flip() -> None:
+    """A client that declared a landscape framebuffer gets a portrait
+    dashboard turned 90° CW, and a flipped mount turns it 180°. The flat
+    cell has to land on the same pixels as the image."""
+    mod = _load_renderer("circuitpython_png")
+    png = _gradient_png(32, 64)
+    panel = Panel(
+        w=32, h=64, gamut="inky_7colour", native_w=64, native_h=32, native_declared=True, flip=True
+    )
+    dithered = _decode_indexed(mod.transform(png, panel=panel, settings={}))
+    flat = _decode_indexed(mod.transform(png, panel=panel, settings={"dither": "none"}))
+    # Top 16 rows of the portrait composition. Turned 90° CW they are the
+    # rightmost 16 columns; the 180° flip moves them to the leftmost 16.
+    regions = [{"x": 0, "y": 0, "w": 32, "h": 16, "nearest": True}]
+    out = _decode_indexed(mod.transform(png, panel=panel, settings={"_dither_regions": regions}))
+    assert out.shape[:2] == (32, 64)
+    assert np.array_equal(out[:, :16], flat[:, :16])
+    assert np.array_equal(out[:, 16:], dithered[:, 16:])
+
+
+def test_only_server_quantising_renderers_take_regions() -> None:
+    from app.dither_regions import renderer_takes_regions
+
+    assert renderer_takes_regions("esp32_bin", "bin")
+    assert renderer_takes_regions("pico_bin__kitchen", "bin")
+    assert renderer_takes_regions("circuitpython_png", "png")
+    assert renderer_takes_regions("circuitpython_bmp__frame", "bmp")
+    assert not renderer_takes_regions("pi_png", "png")
+    assert not renderer_takes_regions("trmnl_png", "png")
