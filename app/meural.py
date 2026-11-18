@@ -34,6 +34,9 @@ logger = logging.getLogger(__name__)
 KIND = "meural"
 POLL_INTERVAL_S = 5
 SWIPE_GRACE_S = 10
+# Netgear rate-limits; one artwork is looked up at most this often, this many times.
+EXTERNAL_RETRY_S = 60
+EXTERNAL_TRIES = 5
 _HOSTNAME = re.compile(
     r"^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
     r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$"
@@ -257,6 +260,7 @@ class MeuralPublisher:
         self._shown: dict[str, tuple[tuple[str, str, float], float, bool]] = {}
         self._swiped: dict[str, tuple[str, str, float]] = {}
         self._external_items: dict[str, str] = {}
+        self._external_tries: dict[str, tuple[str, int, float]] = {}
 
     def start(self) -> None:
         if not self._run_async or self._thread is not None:
@@ -338,6 +342,7 @@ class MeuralPublisher:
             self._shown,
             self._swiped,
             self._external_items,
+            self._external_tries,
         ):
             for key in set(cache) - live:
                 cache.pop(key, None)
@@ -559,6 +564,11 @@ class MeuralPublisher:
         push = self._app.config.get("PUSH_MANAGER")
         if push is None or self._external_items.get(device.id) == item:
             return
+        tried, tries, next_at = self._external_tries.get(device.id, ("", 0, 0.0))
+        if tried == item and (tries >= EXTERNAL_TRIES or self._clock() < next_at):
+            return
+        tries = tries + 1 if tried == item else 1
+        self._external_tries[device.id] = (item, tries, self._clock() + EXTERNAL_RETRY_S)
         try:
             png = client.download_current_image(target, item)
             if not png:
@@ -567,6 +577,7 @@ class MeuralPublisher:
             (self._renders_dir / f"{digest}.png").write_bytes(png)
             push.record_frame_served(device.id, {"digest": digest, "composition_digest": digest})
             self._external_items[device.id] = item
+            self._external_tries.pop(device.id, None)
         except Exception:
             # A stale signed URL or an unavailable thumbnail must not lose a gesture.
             _note(self._app, device.id, "note", "Current artwork thumbnail unavailable")

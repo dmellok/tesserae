@@ -382,3 +382,18 @@ def test_queued_cloud_render_does_not_replace_the_held_thumbnail(swipe):
     assert len(swipe.cloud.loads) == 1
     held = swipe.app.config["PUSH_MANAGER"].last_served_render_for("test_frame")
     assert held["composition_digest"] == "first"
+
+
+def test_artwork_lookup_is_throttled_while_the_cloud_lags(setup):
+    calls = []
+    cloud = SimpleNamespace(download_current_image=lambda target, item: calls.append(item))
+    publisher = setup.publisher()
+    for _ in range(3):
+        publisher._record_external(setup.device, cloud, "101", "999")
+    assert calls == ["999"]
+    for _ in range(10):
+        setup.clock[0] += 61
+        publisher._record_external(setup.device, cloud, "101", "999")
+    assert calls == ["999"] * 5
+    publisher._record_external(setup.device, cloud, "101", "1000")
+    assert calls[-1] == "1000"
