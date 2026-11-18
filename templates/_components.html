@@ -548,18 +548,32 @@ macro here instead.
     {%- set ns.rest = ns.rest + [opt] -%}
   {%- endfor -%}
   {%- set real = ns.selected + ns.rest -%}
+{#- A long list (more than eight) is compact: it shows only the picks under
+   a search box and opens the whole list while the box is in use, so a
+   165-album picker stays one line tall until you search it. -#}
+{%- set compact = real | length > 8 -%}
 <div class="field">
-  <label>{{ label }}{{ info_pop(help) }}</label>
-  <div class="multiselect" data-multiselect>
+  <label for="{{ field_id }}-filter">{{ label }}{{ info_pop(help) }}</label>
+  <div class="multiselect" data-multiselect{% if compact %} data-ms-compact{% endif %}>
     {% set hint = (options | rejectattr('value') | map(attribute='label') | first) if options else None %}
     {% if real %}
     {% if hint %}<p class="multiselect-hint">{{ hint }}</p>{% endif %}
     <div class="multiselect-search">
       <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
-      <input type="search" placeholder="Filter…" data-ms-filter autocomplete="off" spellcheck="false" aria-label="Filter {{ label }}">
+      <input type="search" id="{{ field_id }}-filter"
+             placeholder="{{ ('Search ' ~ (label | lower) ~ '…') if compact else 'Filter…' }}"
+             data-ms-filter autocomplete="off" spellcheck="false"
+             aria-controls="{{ field_id }}-list"{% if compact %} aria-expanded="false"{% endif %}>
       <span class="multiselect-count" data-ms-count></span>
+      {% if compact %}
+      <button type="button" class="multiselect-toggle" data-ms-toggle
+              aria-controls="{{ field_id }}-list" aria-expanded="false"
+              aria-label="Show all {{ label | lower }}" title="Show all {{ label | lower }}">
+        <i class="ph ph-caret-down" aria-hidden="true"></i>
+      </button>
+      {% endif %}
     </div>
-    <div class="multiselect-list" data-ms-list>
+    <div class="multiselect-list" id="{{ field_id }}-list" data-ms-list>
       {% for opt in real %}
       {% set checked = opt.value | string in sel_str %}
       <div class="multiselect-opt{% if checked %} is-selected{% endif %}" data-ms-text="{{ opt.label | lower }}">

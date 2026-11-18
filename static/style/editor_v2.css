@@ -295,6 +295,19 @@
   padding: 0 var(--t-space-3);
   justify-self: stretch;
 }
+#ev2 .multiselect {
+  border-color: var(--ev2-field-border);
+  border-radius: var(--ev2-r);
+}
+/* The multi-select's search box is bare too; the picker takes the ring. */
+#ev2 .multiselect:has(.multiselect-search input:focus) {
+  border-color: var(--t-fg-soft);
+  box-shadow: var(--ev2-ring);
+}
+#ev2 .multiselect-search input:focus {
+  border: 0;
+  box-shadow: none;
+}
 #ev2 :is(.ev2-numu, .slider-value-wrap, .field-unit-wrap, .location-search-input):focus-within {
   border-color: var(--t-fg-soft);
   box-shadow: var(--ev2-ring);
