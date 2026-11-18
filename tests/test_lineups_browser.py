@@ -541,8 +541,28 @@ def _shape(markup: str) -> list[tuple[Any, ...]]:
 
 
 @pytest.mark.parametrize("cycle", ["h23", "h12"])
-def test_client_render_matches_the_server_markup(live: str, cycle: str) -> None:
+@pytest.mark.parametrize("linked", [False, True])
+def test_client_render_matches_the_server_markup(
+    live: str, cycle: str, linked: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from playwright.sync_api import sync_playwright
+
+    if linked:
+        original = _sample_vm
+
+        def sample(cycle: str = "h23") -> dict[str, Any]:
+            vm = original(cycle)
+            d = vm["displays"][0]
+            d.update(show_lineup_name="Dinner & photos", show_lineup_url="/decks/dinner/edit")
+            d["next_line"]["before_parts"] = [
+                {"text": "Photos & art", "dashboard_id": "art"},
+                {"text": " refreshes every 15 min · ", "dashboard_id": None},
+                {"text": "Family", "dashboard_id": "family"},
+                {"text": " at", "dashboard_id": None},
+            ]
+            return vm
+
+        monkeypatch.setitem(globals(), "_sample_vm", sample)
 
     with sync_playwright() as p:
         browser, nojs, _ = _open(p, live, js=False, cycle=cycle)
@@ -560,6 +580,10 @@ def test_client_render_matches_the_server_markup(live: str, cycle: str) -> None:
     assert len(server) == len(client) == 2
     for s, c in zip(server, client, strict=True):
         assert _shape(s) == _shape(c)
+    if linked:
+        assert '<a href="/decks/dinner/edit">Dinner &amp; photos</a>' in client[0]
+        assert '<a href="/pages/art">Photos &amp; art</a>' in client[0]
+        assert '<a href="/pages/family">Family</a>' in client[0]
     if cycle == "h12":
         assert "\u202fPM" in "".join(server)  # the 12-hour labels really drew
 
@@ -1153,6 +1177,8 @@ _SMALL_TARGETS = """() => {
     const cs = getComputedStyle(el);
     if (cs.visibility === 'hidden' || cs.display === 'none' || cs.pointerEvents === 'none') return;
     if (el.matches('.lu-strip-scroll, .lu-lanes-scroll')) return;  // scroll regions, not buttons
+    // WCAG 2.5.5 exempts links within sentences from the 44px control size.
+    if (el.matches('.lu-show a, .lu-nextl a')) return;
     const blk = el.matches('.lu-blk');
     if (r.height < 44 || (!blk && r.width < 44)) {
       out.push(`${el.className.baseVal ?? el.className} ${el.dataset.toggleDay || el.textContent.trim().slice(0, 16)} ${Math.round(r.width)}x${Math.round(r.height)}`);
@@ -1183,7 +1209,7 @@ def _open_device(
 
 
 @pytest.mark.parametrize("device", DEVICES)
-def test_touch_devices_fit_and_every_target_is_44px(live: str, device: str) -> None:
+def test_touch_devices_fit_and_controls_are_44px(live: str, device: str) -> None:
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:
