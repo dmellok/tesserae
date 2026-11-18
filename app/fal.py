@@ -191,6 +191,35 @@ MODELS.update(
         },
     }
 )
+# The same three on Atlas Cloud, priced from its model list (3.8 and 14 cents).
+MODELS.update(
+    {
+        "nano_banana_atlas": {
+            "endpoint": "atlascloud:google/nano-banana/edit",
+            "label": "Nano Banana (Atlas Cloud)",
+            "cents": 4,
+            "kind": "edit",
+            "refs": 10,
+            "direct": "atlascloud",
+        },
+        "nano_banana_atlas_t2i": {
+            "endpoint": "atlascloud:google/nano-banana/text-to-image",
+            "label": "Nano Banana (Atlas Cloud)",
+            "cents": 4,
+            "kind": "t2i",
+            "refs": 0,
+            "direct": "atlascloud",
+        },
+        "nano_banana_pro_atlas": {
+            "endpoint": "atlascloud:google/nano-banana-pro/edit",
+            "label": "Nano Banana Pro (Atlas Cloud)",
+            "cents": 14,
+            "kind": "edit",
+            "refs": 10,
+            "direct": "atlascloud",
+        },
+    }
+)
 DEFAULT_EDIT_MODEL = "nano_banana"
 EDIT_MODELS = tuple(k for k, v in MODELS.items() if v["kind"] == "edit" and not v.get("direct"))
 # What :func:`painting_key` answers when there is no fal.ai key but an OpenAI
@@ -262,15 +291,31 @@ def resolve_key(settings: dict[str, Any] | None = None) -> str:
     return os.environ.get("FAL_KEY", "").strip() or os.environ.get("FAL_API_KEY", "").strip()
 
 
+def _saved_provider(path: Path) -> str:
+    """Which service a saved paid task belongs to; tasks saved before Atlas
+    Cloud was added carry no name and are kie.ai's."""
+    try:
+        record = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return "kie"
+    return (
+        "atlascloud"
+        if isinstance(record, dict) and record.get("provider") == "atlascloud"
+        else "kie"
+    )
+
+
 def painting_key(settings: dict[str, Any] | None = None) -> str:
     """What a painting is started with: the fal.ai key from
     :func:`resolve_key`, else :data:`DIRECT_ONLY` when an OpenAI or Gemini
     key is set (every picture then goes straight to one of them), else empty."""
-    from app import kie_images
+    from app import atlas_images, kie_images
 
     service, kie_key = kie_images.configuration()
     if service == "kie":
         return (resolve_key(settings) or DIRECT_ONLY) if kie_key else ""
+    if service == "atlascloud":
+        return (resolve_key(settings) or DIRECT_ONLY) if atlas_images.configuration()[1] else ""
     if service in ("gemini", "openai"):
         from app import gemini_images, openai_images
 
@@ -446,11 +491,13 @@ class FalClient:
         refund: Callable[[int, str], None] | None = None,
         image_service: str | None = None,
         kie_key: str | None = None,
+        atlas_key: str | None = None,
         task_dir: Path | None = None,
     ) -> None:
-        from app import kie_images
+        from app import atlas_images, kie_images
 
         service, stored_kie_key = kie_images.configuration()
+        self.atlas_key = atlas_key if atlas_key is not None else atlas_images.configuration()[1]
         self.image_service = image_service if image_service is not None else service
         self.kie_key = kie_key if kie_key is not None else stored_kie_key
         self.task_dir = task_dir
@@ -500,12 +547,19 @@ class FalClient:
         slot = self._image_call
         self._image_call += 1
         # A paid task keeps its provider even if the account choice changes.
-        saved = self.task_dir is not None and (self.task_dir / f"{slot}.json").exists()
-        if (self.image_service == "kie" or saved or spec.get("direct") == "kie") and spec[
-            "kind"
-        ] != "mask":
-            from app import kie_images
+        provider = ""
+        if spec["kind"] != "mask":
+            saved = self.task_dir is not None and (self.task_dir / f"{slot}.json").exists()
+            if saved and self.task_dir is not None:
+                provider = _saved_provider(self.task_dir / f"{slot}.json")
+            elif spec.get("direct") in ("kie", "atlascloud"):
+                provider = str(spec["direct"])
+            elif self.image_service in ("kie", "atlascloud"):
+                provider = self.image_service
+        if provider:
+            from app import atlas_images, kie_images
 
+            atlas = provider == "atlascloud"
             folder = self.task_dir
             if folder is None:
                 import hashlib
@@ -528,8 +582,8 @@ class FalClient:
                 self.spent_cents -= cents
 
             try:
-                return kie_images.generate(
-                    self.kie_key,
+                return (atlas_images.generate if atlas else kie_images.generate)(
+                    self.atlas_key if atlas else self.kie_key,
                     prompt,
                     refs=refs,
                     aspect=aspect,
@@ -541,7 +595,7 @@ class FalClient:
                     stop=self._stop,
                     refund=refund,
                 )
-            except kie_images.KieError as err:
+            except (kie_images.KieError, atlas_images.AtlasError) as err:
                 self._kie_failure = str(err)
                 raise FalError(str(err)) from err
         if spec["kind"] != "t2i" and not refs:

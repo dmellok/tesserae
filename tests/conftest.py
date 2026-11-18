@@ -66,6 +66,7 @@ def _fresh_kie_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(kie_images, "_BOUND_STORE", None)
     monkeypatch.setattr(kie_images, "_TASK_ROOT", None)
     monkeypatch.delenv("KIE_API_KEY", raising=False)
+    monkeypatch.delenv("ATLASCLOUD_API_KEY", raising=False)
 
 
 @pytest.fixture(autouse=True)

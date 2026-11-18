@@ -36,9 +36,10 @@ PENDING_MAX_AGE_S = 24 * 3600
 logger = logging.getLogger(__name__)
 FIELDS = [
     {"name": "kie_api_key", "secret": True},
+    {"name": "atlascloud_api_key", "secret": True},
     {"name": "image_service", "type": "string", "default": "auto"},
 ]
-SERVICES = ("auto", "fal", "gemini", "openai", "kie")
+SERVICES = ("auto", "fal", "gemini", "openai", "kie", "atlascloud")
 _BOUND_STORE: Any = None
 _TASK_ROOT: Path | None = None
 

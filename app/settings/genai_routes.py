@@ -10,7 +10,16 @@ from typing import Any
 from flask import current_app, flash, redirect, render_template, request, url_for
 from werkzeug.wrappers import Response
 
-from app import artwork, commons, fal, gemini_images, genai, kie_images, openai_images
+from app import (
+    artwork,
+    atlas_images,
+    commons,
+    fal,
+    gemini_images,
+    genai,
+    kie_images,
+    openai_images,
+)
 from app.state.settings_store import SECRET_MASK
 
 from ._shared import bp, plugins, settings_store
@@ -136,6 +145,7 @@ def genai_index() -> str:
         checked_gemini=request.args.get("checked_gemini", ""),
         check_gemini_ok=request.args.get("ok_gemini") == "1",
         checked_kie=request.args.get("checked_kie", ""),
+        checked_atlascloud=request.args.get("checked_atlascloud", ""),
         daily=daily,
         monthly=monthly,
         summary=summary,
@@ -218,3 +228,15 @@ def genai_check_kie() -> Response:
         genai.save(settings_store(), {"kie_api_key": posted})
         note += " Saved."
     return redirect(url_for("auth.genai_index", checked_kie=note))
+
+
+@bp.post("/settings/genai/check-atlascloud")
+def genai_check_atlascloud() -> Response:
+    posted = str(request.form.get("atlascloud_api_key") or "").strip()
+    fresh = bool(posted) and posted != SECRET_MASK
+    key = posted if fresh else atlas_images.configuration()[1]
+    ok, note = atlas_images.check_key(key)
+    if ok and fresh:
+        genai.save(settings_store(), {"atlascloud_api_key": posted})
+        note += " Saved."
+    return redirect(url_for("auth.genai_index", checked_atlascloud=note))

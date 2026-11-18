@@ -6,7 +6,7 @@
 <header class="page-head">
   <h1><i class="ph ph-sparkle" aria-hidden="true"></i> Generative AI</h1>
   <p class="lede">
-    The fal.ai, OpenAI, Gemini and kie.ai accounts every widget that paints shares, a ceiling over all of them together,
+    The fal.ai, OpenAI, Gemini, kie.ai and Atlas Cloud accounts every widget that paints shares, a ceiling over all of them together,
     and what the paintings cost. A widget may still carry a key and a budget of its own;
     its budget applies inside the ceiling.
   </p>
@@ -25,7 +25,7 @@
     <div class="field">
       <label for="genai-service">Image service</label>
       <select id="genai-service" name="image_service">
-        {% for value, label in [('auto', 'Automatic (existing routing)'), ('fal', 'fal.ai'), ('gemini', 'Gemini'), ('openai', 'OpenAI'), ('kie', 'kie.ai (Nano Banana)')] %}
+        {% for value, label in [('auto', 'Automatic (existing routing)'), ('fal', 'fal.ai'), ('gemini', 'Gemini'), ('openai', 'OpenAI'), ('kie', 'kie.ai (Nano Banana)'), ('atlascloud', 'Atlas Cloud (Nano Banana)')] %}
         <option value="{{ value }}" {{ 'selected' if form.image_service == value else '' }}>{{ label }}</option>
         {% endfor %}
       </select>
@@ -39,6 +39,15 @@
         <button type="submit" class="btn btn-primary">Save</button>
       </div>
       <p class="help">{% if checked_kie %}{{ checked_kie }}{% elif form.has_kie_key %}Key set.{% else %}Add a key from <a href="https://kie.ai/api-key" target="_blank" rel="noopener">kie.ai</a>.{% endif %} Nano Banana costs about US$0.02 per picture, Pro about US$0.09. Paid tasks are collected on retry after a timeout.</p>
+    </div>
+    <div class="field">
+      <label for="genai-atlascloud-key">Atlas Cloud API key</label>
+      <div class="dx-genai-keyrow">
+        <input id="genai-atlascloud-key" type="password" name="atlascloud_api_key" value="{{ form.atlascloud_api_key }}" autocomplete="off" spellcheck="false">
+        <button type="submit" class="btn" formaction="{{ url_for('auth.genai_check_atlascloud') }}">Check key</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+      <p class="help">{% if checked_atlascloud %}{{ checked_atlascloud }}{% elif form.has_atlascloud_key %}Key set.{% else %}Add a key from <a href="https://console.atlascloud.ai/api-keys" target="_blank" rel="noopener">Atlas Cloud</a>.{% endif %} Nano Banana costs about US$0.04 per picture, Pro about US$0.14. Paid tasks are collected on retry after a timeout.</p>
     </div>
     <div class="field">
       <label for="genai-key">fal.ai API key</label>
