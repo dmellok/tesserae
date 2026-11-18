@@ -1,0 +1,28 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "seeed_ee05_426",
+  "name": "Seeed XIAO ePaper EE05 (4.26\" mono)",
+  "vendor": "Seeed Studio",
+  "url": "https://www.seeedstudio.com/XIAO-ePaper-DIY-Kit-ESP32-S3-EE05.html",
+  "icon": "device-tablet",
+  "description": "Seeed XIAO ePaper Display Board EE05 (XIAO ESP32-S3 Plus) driving Seeed's 4.26 inch monochrome panel on the 24-pin FPC (800x480, SSD1677). Speaks Tesserae's v1 REST device API and paints a raw 1-bpp mono buffer (48000 bytes) produced by the esp32_bw_bin renderer; byte-identical wire contract to the Seeed reTerminal E1001, the EE04 7.5 inch and the Xteink X4. Reports battery percentage via the onboard ADC divider and carries the refresh/left/right three-button set like the EE02 and EE04; no onboard temperature/humidity sensor.",
+  "protocol": "esp32_bw_client",
+  "renderers": [
+    "esp32_bw_bin"
+  ],
+  "panel": {
+    "w": 800,
+    "h": 480,
+    "orientation": "landscape",
+    "name": "4.26 inch monochrome ePaper (800x480)",
+    "gamut": "mono",
+    "native_w": 800,
+    "native_h": 480
+  },
+  "protocol_config": {
+    "model_header": "Seeed_EE05_426"
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Awaiting confirmed test on real hardware. The firmware target (tesserae-device-firmware env `seeed-ee05-426`) reuses the SSD1677 driver that is confirmed on the Xteink X4, which has the same controller and resolution, on the EE05 pin map taken from Seeed_GFX; that combination has not been run on a board yet. Flash the `seeed-ee05-426-selftest` build first.\n\nWire format is exactly 48000 bytes (800*480/8), MSB=leftmost pixel, bit-set=white, bit-clear=black; no header, no padding, no checksum. Frame is byte-identical to the seeed_reterminal_e1001, seeed_ee04_75 and xteink_x4 targets. Default device ids look like Seeed_EE05_426_<mac-suffix>.\n\nThe EE05 takes one 24-pin panel at a time; this kind is the 4.26 inch mono build, see seeed_ee05_213_bwry for the 2.13 inch four-colour one. Mono only for now: the firmware does not advertise a grey depth on this board."
+}
