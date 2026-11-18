@@ -49,7 +49,11 @@ from app import page_assets
 from app.state.deck_model import Deck
 from app.state.page_store import Page
 
-BUNDLE_VERSION = 1
+# 2 is a file with displays in it (``devices``, see :mod:`app.device_bundle`).
+# A file without them is still written as 1, so a server that predates
+# display export keeps reading it; given a 2 it says to update rather than
+# quietly importing the dashboards and dropping the displays.
+BUNDLE_VERSION = 2
 # The whole uploaded file. Page assets are capped one by one as uploads are.
 MAX_BUNDLE_BYTES = 64 * 1024 * 1024
 
@@ -166,10 +170,14 @@ def build_bundle(
     registry: Any,
     data_root: Path,
     version: str = "",
+    devices: list[dict[str, Any]] | None = None,
+    notes: list[str] | None = None,
 ) -> tuple[dict[str, Any], list[str]]:
     """The bundle for those dashboards and lineups, and notes on what was left
-    out. A lineup brings every dashboard it refers to."""
-    notes: list[str] = []
+    out. A lineup brings every dashboard it refers to. ``devices`` are display
+    entries already built by :func:`app.device_bundle.export_devices`, with
+    the ``notes`` that export made."""
+    notes = list(notes or [])
     requires: set[str] = set()
     decks = [d for d in (deck_store.get(i) for i in dict.fromkeys(deck_ids)) if d is not None]
     wanted = list(dict.fromkeys([*page_ids, *(pid for d in decks for pid in deck_page_ids(d))]))
@@ -190,14 +198,16 @@ def build_bundle(
         for key in _DECK_LOCAL_FIELDS:
             doc.pop(key, None)
         lineups.append(doc)
-    bundle = {
-        "tesserae_bundle": BUNDLE_VERSION,
+    bundle: dict[str, Any] = {
+        "tesserae_bundle": 2 if devices else 1,
         "exported_from": version,
         "exported_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "requires": sorted(requires),
         "dashboards": dashboards,
         "lineups": lineups,
     }
+    if devices:
+        bundle["devices"] = devices
     return bundle, notes
 
 
@@ -235,8 +245,15 @@ def read_bundle(raw: bytes) -> dict[str, Any]:
     for deck in lineups:
         if not isinstance(deck, dict) or not isinstance(deck.get("id"), str) or not deck["id"]:
             raise BundleError("a lineup in the file has no id")
-    if not dashboards and not lineups:
-        raise BundleError("the file has no dashboards or lineups in it")
+    devices = doc.get("devices", [])
+    if devices:
+        from app import device_bundle
+
+        problem = device_bundle.check_devices(devices)
+        if problem:
+            raise BundleError(problem)
+    if not dashboards and not lineups and not devices:
+        raise BundleError("the file has no dashboards, lineups or displays in it")
     return doc
 
 

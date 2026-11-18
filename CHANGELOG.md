@@ -8,10 +8,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Security
 
+- Zero-touch pairing: a display that has collected its token stays closed to its MAC after the server restarts or the display's settings are saved. The marker was written to the display's file and not read back, so either one let the MAC collect the token again until the display's next request. (#515)
 - Zero-touch pairing: a display's MAC address collects its access token only once. Before, any request to `/api/v1/device/discover` carrying the MAC of a registered display was given that display's token, and a MAC can be read by anything on the network. Now the match stops working after the display's first request with its token. A display that is re-flashed or factory reset shows **This display is asking to pair again** on its page and on Settings › Devices, and **Allow re-pair** lets it collect its token again with its pages and history kept. Displays you already have are not affected until they lose their token. (#515)
 
 ### Added
 
+- Export displays to a file and import them on another server, from Settings › Devices. The file holds each display's type, panel, orientation, quiet hours and settings. Access tokens are left out unless you tick **Include access tokens**, which lets a display move between two of your own servers by changing only the address it connects to; such a file works like a password, and the export and import pages say so. Importing adds a display, or updates one with the same id and keeps the token it has here. (#541)
 - Add Meural cloud sign-in and single-image delivery with a per-device delivery interval. A frame added for local previews before this keeps local delivery. Adding a cloud frame before signing in returns to the Devices page with the reason. Deleting a cloud frame frees it for another display. Local previews renew every 15 seconds by default, as before.
 - Export dashboards and lineups to a file and import them on another server. An export leaves out displays, passwords and keys; an import shows what it will add or replace before anything changes, and replacing keeps the displays already assigned. (#541)
 - Offer optional conditions when adding a dashboard to a lineup.

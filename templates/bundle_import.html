@@ -1,13 +1,13 @@
 {% extends "_base.html" %}
 {% block title %}Import, Tesserae{% endblock %}
 {% block main %}
-{# Import dashboards and lineups from an export file (#541). Two steps: choose
+{# Import dashboards, lineups and displays from an export file (#541). Two steps: choose
    the file, then confirm what it will add or replace. Nothing is written
    until the second step. #}
 <header class="page-head">
   <div>
     <h1><i class="ph ph-upload-simple" aria-hidden="true"></i> Import</h1>
-    <p class="lede">Bring in dashboards and lineups exported from another Tesserae. Displays, API keys and passwords are never part of an export, so set those here.</p>
+    <p class="lede">Bring in dashboards, lineups and displays exported from another Tesserae. API keys and passwords are never part of an export, so set those here.</p>
   </div>
 </header>
 
@@ -16,7 +16,7 @@
   <form method="post" action="{{ url_for('bundles.import_read') }}" enctype="multipart/form-data" class="form">
     <label for="bundle-file">Export file</label>
     <input type="file" id="bundle-file" name="file" accept="application/json,.json" required>
-    <p class="field-help">A <code>.json</code> file from Export on the Dashboards or Lineups page. You will see what it contains before anything changes.</p>
+    <p class="field-help">A <code>.json</code> file from Export on the Dashboards or Lineups page, or from Settings › Devices. You will see what it contains before anything changes.</p>
     <div class="actions">
       <button type="submit" class="dx-btn is-primary"><i class="ph ph-magnifying-glass" aria-hidden="true"></i><span>Read file</span></button>
       <a class="dx-btn" href="{{ url_for('pages.index') }}">Cancel</a>
@@ -73,6 +73,36 @@
   </section>
   {% endif %}
 
+  {% if plan.devices %}
+  <section class="card">
+    <h2>Displays ({{ plan.devices|length }})</h2>
+    {% if plan.holds_access_tokens %}
+    <p class="field-help"><i class="ph ph-warning" aria-hidden="true"></i> This file holds access tokens. A display added from it keeps the token it already uses, so it can connect to this server as soon as it is pointed here. Delete the file when you are done.</p>
+    {% endif %}
+    <table class="dx-table">
+      <thead><tr><th>Name</th><th>Type</th><th>On this server</th></tr></thead>
+      <tbody>
+      {% for d in plan.devices %}
+        <tr>
+          <td>{{ d.name }} <span class="field-help">({{ d.id }})</span>{% if d.dropped %}<br><span class="field-help">Settings not taken from the file: {{ d.dropped|join(', ') }}</span>{% endif %}</td>
+          <td>{{ d.kind }}</td>
+          <td>
+            {% if d.action == 'replace' %}
+            <label><input type="radio" name="device_mode_{{ loop.index }}" value="replace" data-replace="replace_device" data-id="{{ d.id }}" checked> Update “{{ d.existing_name }}” with these settings (keeps its access token)</label><br>
+            <label><input type="radio" name="device_mode_{{ loop.index }}" value="keep"> Leave it as it is</label>
+            {% elif d.action == 'add' %}
+            New{% if d.has_identity %}, with its access token{% elif d.needs_pairing %}. It gets a new access token here, so the display has to be connected again{% endif %}
+            {% else %}
+            <i class="ph ph-warning" aria-hidden="true"></i> Skipped: {{ d.why }}
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+
   {% if plan.left_out %}
   <section class="card">
     <h2>Left out of the file</h2>
@@ -87,6 +117,7 @@
   <div data-replace-fields>
     {% for d in plan.dashboards if d.exists %}<input type="hidden" name="replace_page" value="{{ d.id }}">{% endfor %}
     {% for l in plan.lineups if l.exists %}<input type="hidden" name="replace_lineup" value="{{ l.id }}">{% endfor %}
+    {% for d in plan.devices if d.action == 'replace' %}<input type="hidden" name="replace_device" value="{{ d.id }}">{% endfor %}
   </div>
 
   <div class="actions">

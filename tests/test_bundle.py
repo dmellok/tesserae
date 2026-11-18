@@ -120,7 +120,8 @@ def test_export_leaves_out_bindings_and_secrets(app: Flask) -> None:
     text = json.dumps(doc)
     assert "s3cret" not in text
     assert "panel_one" not in text and "device_ids" not in text
-    assert doc["tesserae_bundle"] == bundle.BUNDLE_VERSION
+    # No displays in it, so it is still the format an older server reads.
+    assert doc["tesserae_bundle"] == 1
     assert {"rest_service", "tesserae_status"} <= set(doc["requires"])
     grid, canvas = doc["dashboards"]
     assert grid["page"]["cells"][1]["options"] == {"url": "", "title": "Orders"}
