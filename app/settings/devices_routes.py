@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from flask import Response as FlaskResponse
-from flask import abort, current_app, flash, redirect, request, session, url_for
+from flask import abort, current_app, flash, jsonify, redirect, request, session, url_for
 from werkzeug.wrappers import Response
 
 from app import (
@@ -219,11 +219,15 @@ def _undo_add(
 
 
 @bp.post("/settings/devices/add")
-def devices_add() -> Response:
+def devices_add() -> Response | tuple[Response, int]:
     """Create a new device instance from the Devices-tab form. No restart
     needed, the new device shows up immediately in the page editor's
     Target-device dropdown."""
     form = request.form
+    if (form.get("kind") or "").strip() == "meural" and form.get("delivery_method") != "local":
+        from .meural_routes import add_pending_device
+
+        return add_pending_device()
     target_id = form.get("id") or ""
     # Check the config values the form supplies before anything is created
     # (or an orphan's state wiped). They used to be validated after the
@@ -2047,6 +2051,12 @@ def devices_delete(instance_id: str) -> Response:
     marker so a later re-register can decide whether to auto-wipe
     via the MAC-differs check (issue #48)."""
     device_to_delete = devices().get(instance_id)
+    if device_to_delete is not None and device_to_delete.kind_of == "meural":
+        from .meural_routes import _changing_frame, _release_frame
+
+        meural_before = dict((settings_store().get_section("devices") or {}).get(instance_id) or {})
+        with _changing_frame(device_to_delete):
+            meural_restored = _release_frame(device_to_delete)
     last_mac = (
         str(device_to_delete.manifest.get("mac") or "").strip()
         if device_to_delete is not None
@@ -2074,8 +2084,36 @@ def devices_delete(instance_id: str) -> Response:
         instance_id=instance_id,
     )
     if not result.ok or result.device is None:
+        if device_to_delete is not None and device_to_delete.kind_of == "meural":
+            # Releasing the frame paused delivery. The device is still here,
+            # and a LAN-only frame has no control to resume it, so put the
+            # pause back the way it was.
+            settings_store().update_item(
+                "devices",
+                instance_id,
+                {"meural_management_paused": bool(meural_before.get("meural_management_paused"))},
+            )
+            rebuild_transport_fn()()
         flash(result.error or "Delete failed.", "error")
         return redirect(url_for("auth.settings_area", area="devices"))
+    if result.device.kind_of == "meural":
+        from app.meural_cloud import clear_session
+        from app.meural_pending import PLAYBACK_NOTICE
+
+        clear_session(settings_store(), instance_id)
+        # The settings entry outlives the device (it is kept for a re-add
+        # under the same id). A frame it still named would stay reserved, and
+        # a kept pause would stop a re-added LAN frame for good.
+        settings_store().update_item(
+            "devices",
+            instance_id,
+            {},
+            remove=("cloud_device_id", "meural_management_paused", "meural_playback_unrestored"),
+        )
+        if not meural_restored:
+            flash(PLAYBACK_NOTICE, "warning")
+        current_app.config.get("MEURAL_LOGIN_SESSIONS", {}).pop(instance_id, None)
+        current_app.config.get("MEURAL_CLOUD_CLIENTS", {}).pop(instance_id, None)
     if wipe_orphan:
         wiped = device_cleanup.wipe_orphan_state(
             device_id=instance_id,
@@ -2149,6 +2187,8 @@ def devices_delete(instance_id: str) -> Response:
         status_cache.pop(instance_id, None)
     rebuild_transport_fn()()
     flash(f"Deleted device {result.device.name!r}.", "ok")
+    if result.device.kind_of == "meural" and request.accept_mimetypes.best == "application/json":
+        return jsonify(status="ok", return_url=url_for("auth.settings_area", area="devices"))
     return redirect(url_for("auth.settings_area", area="devices"))
 
 

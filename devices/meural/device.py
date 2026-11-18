@@ -1,4 +1,4 @@
-"""Status and configuration for stock Meural frames on the local network."""
+"""Status and configuration for Netgear Meural frames."""
 
 from __future__ import annotations
 
@@ -9,6 +9,8 @@ from app.meural import valid_host
 
 
 def validate_config(payload: dict[str, Any]) -> tuple[bool, str | None]:
+    if payload.get("delivery_method") not in (None, "", "cloud", "local"):
+        return False, "Delivery method must be cloud or local"
     host = payload.get("host")
     if host not in (None, "") and not (isinstance(host, str) and valid_host(host.strip())):
         return False, "Frame address must be an IPv4 address or host name"
@@ -20,8 +22,15 @@ def validate_config(payload: dict[str, Any]) -> tuple[bool, str | None]:
             seconds = int(value)
         except ValueError:
             return False, "Preview renewal must be a whole number of seconds"
-        if not 5 <= seconds <= 3600:
+        if seconds != 0 and not 5 <= seconds <= 3600:
             return False, "Preview renewal must be between 5 and 3600 seconds"
+    value = payload.get("cloud_interval_s")
+    if value not in (None, ""):
+        try:
+            if isinstance(value, bool) or not 60 <= int(value) <= 86400:
+                raise ValueError
+        except (ValueError, TypeError):
+            return False, "Cloud delivery interval must be 60 to 86400 seconds"
     return True, None
 
 
