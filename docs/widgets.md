@@ -762,6 +762,7 @@ def fetch(options: dict, settings: dict, *, ctx: dict) -> dict:
     - `home_lat` / `home_lon`: Settings location, `0.0` when unset.
     - `cell_id` and `settled`: see `app.artwork` below.
     - `placement_id` and `page_name` / `page_icon`: present when the host knows the page.
+    - `frame_shapes`: the shapes of the frames the page is on, sorted, e.g. `["landscape", "portrait"]`. Absent when the page is on no frame. A photo widget can use it to match each frame's shape (`cell_w` / `cell_h`) only when the page goes to both.
     - `fresh: True`: set on `?fresh=1` renders to request bypassing the widget's `data_dir` cache.
 
 * Network calls: use `urllib.request` with a timeout + a `User-Agent`

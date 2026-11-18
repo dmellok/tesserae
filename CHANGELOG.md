@@ -8,6 +8,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Gallery's Orientation gains Auto (the new default) and Match the frame: a dashboard on both portrait and landscape frames shows each frame pictures of its own shape. Widgets get `ctx["frame_shapes"]`.
 - Hardware: the Seeed XIAO ePaper EE05 with the 4.26" mono panel (800×480) is in the catalog as `seeed_ee05_426`. It takes the same 48,000-byte mono frame as the reTerminal E1001. The firmware target is `seeed-ee05-426` in tesserae-device-firmware. Not yet tested on real hardware.
 
 ## [0.514.0], 2026-11-18

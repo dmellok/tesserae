@@ -26,8 +26,16 @@
       "name": "orientation",
       "type": "select",
       "label": "Orientation",
-      "default": "any",
+      "default": "auto",
       "choices": [
+        {
+          "value": "auto",
+          "label": "Auto"
+        },
+        {
+          "value": "frame",
+          "label": "Match the frame"
+        },
         {
           "value": "any",
           "label": "Any"
@@ -45,7 +53,7 @@
           "label": "Square"
         }
       ],
-      "help": "Only pictures of this shape."
+      "help": "Auto matches each frame's shape when the dashboard is on both portrait and landscape frames, and shows any picture otherwise. Match the frame always does. The others show only pictures of that shape."
     },
     {
       "name": "mode",

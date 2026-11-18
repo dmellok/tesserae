@@ -605,6 +605,27 @@ def _last_good_key(
     return f"{key}::{placement}" if placement else key
 
 
+def _frame_shapes(page_id: str) -> list[str]:
+    """``landscape`` / ``portrait`` / ``square`` for each kind of frame the
+    page is on, sorted; empty when the page is unknown or on no frame. An
+    unsaved editor copy (the preview cache) wins, as in ``compose``."""
+    if not page_id:
+        return []
+    from app.panel import _selected_device_panels
+
+    page = current_app.config.get("PREVIEW_CACHE", {}).get(page_id)
+    store = current_app.config.get("PAGE_STORE")
+    if page is None and store is not None:
+        page = store.get(page_id)
+    if page is None:
+        return []
+    shapes = set()
+    for _device, panel in _selected_device_panels(page, current_app.config.get("DEVICE_REGISTRY")):
+        w, h = int(panel.w), int(panel.h)
+        shapes.add("landscape" if w > h else "portrait" if h > w else "square")
+    return sorted(shapes)
+
+
 def _placement_id(page_id: str, cell_id: str, target_device_id: str = "") -> str:
     """Name one placement: the page, the cell (or canvas element) on it, and
     the device the render is for, as ``page/cell@device``. Empty when the
@@ -700,6 +721,7 @@ def _parallel_fetch_plugin_data(
                 page_name=page_name,
                 page_icon=page_icon,
                 placement=placement,
+                page_id=page_id,
             )
 
     results: dict[int, Any] = {}
@@ -807,6 +829,7 @@ def _fetch_plugin_data(
     page_name: str = "",
     page_icon: str = "",
     placement: str = "",
+    page_id: str = "",
 ) -> Any:
     """Call the plugin's server.py fetch() if present. Returns None on miss.
 
@@ -907,6 +930,11 @@ def _fetch_plugin_data(
         ctx["page_name"] = page_name
     if page_icon:
         ctx["page_icon"] = page_icon
+    # The shapes of the frames the page is on, so a photo widget can match
+    # each frame's shape when they differ (a portrait and a landscape frame).
+    shapes = _frame_shapes(page_id)
+    if shapes:
+        ctx["frame_shapes"] = shapes
     install_uuid = current_app.config.get("INSTALL_ID")
     if isinstance(install_uuid, str) and install_uuid:
         if manifest.get("needs_install_id"):
@@ -1306,6 +1334,7 @@ def _build_canvas_els(
                 fresh=fresh,
                 target_device_id=target_device_id,
                 placement=placement,
+                page_id=page_id,
             )
         except Exception:
             fetched = None
