@@ -2255,12 +2255,12 @@ def _panel_preview_response(page_id: str) -> Response:
         # per channel to 16 levels, which this dispatches to; every other
         # gamut is a palette match.
         if renderer is not None:
-            from app.dither_regions import regions_from_page
+            from app.dither_regions import regions_from_page, renderer_takes_regions
             from app.panel_preview import render_panel_preview
 
             assert target_panel is not None
             target = target_panel.model_copy(update={"w": width, "h": height})
-            if renderer.extension == "bin":
+            if renderer_takes_regions(renderer.id, renderer.extension):
                 render_settings = {**render_settings, "_dither_regions": regions_from_page(page)}
             preview_renderer = renderer
             if renderer.id.split("__", 1)[0] == "fraimic_bin":

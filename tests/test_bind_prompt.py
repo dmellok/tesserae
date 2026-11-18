@@ -366,3 +366,33 @@ def test_unbound_unassigned_and_matching_lineups_are_not_flagged(app: Flask) -> 
     vm = app.test_client().get("/decks/view.json").get_json()
     hallway = next(d for d in vm["displays"] if d["id"] == "hallway")
     assert not any(s["off_display"] for s in hallway["lineups"][0]["steps"])
+
+
+@pytest.mark.parametrize("json_api", [False, True])
+@pytest.mark.parametrize("removed", [[], ["frame"], ["frame", "door"]])
+def test_bind_remove_preserves_new_bindings(app: Flask, json_api: bool, removed: list[str]) -> None:
+    _three_displays(app)
+    # The editor saw frame + door; another caller bound a third display later.
+    pages = app.config["PAGE_STORE"]
+    pages.save(pages.get("art").model_copy(update={"device_ids": ["frame", "door", "later"]}))
+    choice = {"art": removed}
+    if json_api:
+        resp = app.test_client().post(
+            "/api/mcp/decks",
+            json={
+                "id": "new",
+                "name": "New",
+                "device_ids": ["hallway"],
+                "pages": [{"page_id": "art"}],
+                "bind_remove": choice,
+            },
+        )
+    else:
+        resp = app.test_client().post(
+            "/decks/editor-save",
+            data=_editor_form(pages="art", bind_remove=json.dumps(choice)),
+        )
+    assert resp.status_code in (200, 302), resp.get_data(as_text=True)
+    assert _bound(app, "art") == [d for d in ["frame", "door", "later"] if d not in removed] + [
+        "hallway"
+    ]

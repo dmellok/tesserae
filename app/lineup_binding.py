@@ -6,8 +6,9 @@ fails on every fire ("dashboard targets none of the requested device(s)").
 Every write path that can put a dashboard on a display goes through here:
 it names the dashboards that would be stranded, and refuses unless the
 caller consented to bind them (``bind_pages``, optionally ``bind_also`` to
-keep the dashboard's other displays, or ``bind_keep`` to keep only some of
-them). Nothing is ever bound silently.
+keep the dashboard's other displays, or ``bind_remove`` to drop selected
+ones; legacy ``bind_keep`` still keeps only the listed displays). Nothing
+is ever bound silently.
 
 A dashboard bound to no display at all is not stranded: the existing
 "adding one binds it" rule for unassigned dashboards is unchanged.
@@ -29,19 +30,27 @@ CODE = "pages_not_bound"
 class Consent:
     """Dashboards the caller agreed to bind. ``also`` keeps all their other
     displays; ``keep`` (page id -> display ids) keeps just those of them,
-    which is how the bind prompt's per-display checkboxes arrive; the rest
-    move to the lineup's display."""
+    for legacy callers; ``remove`` drops only the listed displays, preserving
+    bindings added since the prompt opened. The rest move to the lineup's display."""
 
     pages: frozenset[str] = frozenset()
     also: frozenset[str] = frozenset()
     keep: Mapping[str, frozenset[str]] = field(default_factory=dict)
+    remove: Mapping[str, frozenset[str]] = field(default_factory=dict)
 
     def covers(self, page_id: str) -> bool:
-        return page_id in self.pages or page_id in self.also or page_id in self.keep
+        return (
+            page_id in self.pages
+            or page_id in self.also
+            or page_id in self.keep
+            or page_id in self.remove
+        )
 
     def kept(self, page_id: str, current: Iterable[str]) -> list[str]:
         """Which of the dashboard's ``current`` displays it stays on."""
         current = list(current)
+        if page_id in self.remove:
+            return [d for d in current if d not in self.remove[page_id]]
         if page_id in self.keep:
             return [d for d in current if d in self.keep[page_id]]
         return current if page_id in self.also else []
@@ -50,19 +59,31 @@ class Consent:
     def from_form(cls, form: Any) -> Consent:
         also = frozenset(_ids(form.getlist("bind_also")))
         keep = _keep(form.getlist("bind_keep"))
-        return cls(frozenset(_ids(form.getlist("bind_pages"))) | also | set(keep), also, keep)
+        remove = _keep(form.getlist("bind_remove"))
+        return cls(
+            frozenset(_ids(form.getlist("bind_pages"))) | also | set(keep) | set(remove),
+            also,
+            keep,
+            remove,
+        )
 
     @classmethod
     def from_json(cls, body: Mapping[str, Any]) -> Consent:
         also = frozenset(_ids(body.get("bind_also")))
         keep = _keep(body.get("bind_keep"))
-        return cls(frozenset(_ids(body.get("bind_pages"))) | also | set(keep), also, keep)
+        remove = _keep(body.get("bind_remove"))
+        return cls(
+            frozenset(_ids(body.get("bind_pages"))) | also | set(keep) | set(remove),
+            also,
+            keep,
+            remove,
+        )
 
 
 def _keep(raw: Any) -> dict[str, frozenset[str]]:
-    """``bind_keep``: a ``{page id: [display ids]}`` object, a JSON string of
+    """``bind_keep`` / ``bind_remove``: a ``{page id: [display ids]}`` object, a JSON string of
     one, or a list of either (a form sends one field per dashboard). Bad
-    entries are ignored; an empty list keeps none (the same as a move)."""
+    entries are ignored; empty lists are valid explicit choices."""
     items = raw if isinstance(raw, list) else [raw]
     out: dict[str, set[str]] = {}
     for item in items:
@@ -210,7 +231,8 @@ def flash_text(display_ids: list[str], pages: list[Stranded], *, retry: bool = T
 
 def apply_consent(display_ids: list[str], page_ids: Iterable[str], consent: Consent) -> None:
     """Bind the consented, stranded dashboards. ``bind_also`` ones keep their
-    other displays, ``bind_keep`` ones keep the listed ones; the rest move to
+    other displays; ``bind_remove`` drops only the named ones and legacy
+    ``bind_keep`` keeps only the listed ones. The rest move to
     the lineup's displays."""
     store = current_app.config["PAGE_STORE"]
     for s in stranded_pages(display_ids, page_ids):

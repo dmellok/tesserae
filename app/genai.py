@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import os
 import threading
 import time
 import urllib.error
@@ -208,6 +209,8 @@ class Ledger:
                 self.folder.mkdir(parents=True, exist_ok=True)
                 with self.path.open("a", encoding="utf-8") as f:
                     f.write(json.dumps(row) + "\n")
+                    f.flush()
+                    os.fsync(f.fileno())
             if now - self._kept_at > 86400:
                 self._kept_at = now
                 self._trim(now)
@@ -215,8 +218,10 @@ class Ledger:
     def _trim(self, now: float) -> None:
         keep_after = now - KEEP_DAYS * 86400
         rows = [r for r in self._rows_unlocked() if r["t"] >= keep_after]
-        with contextlib.suppress(OSError):
-            self.path.write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+        with contextlib.suppress(OSError), self.path.open("w", encoding="utf-8") as f:
+            f.write("".join(json.dumps(r) + "\n" for r in rows))
+            f.flush()
+            os.fsync(f.fileno())
 
     def _rows_unlocked(self) -> list[dict[str, Any]]:
         out: list[dict[str, Any]] = []
