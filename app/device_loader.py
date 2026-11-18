@@ -753,6 +753,12 @@ def load_instance_file(
         inst_manifest["advertised_gamuts"] = [str(g) for g in advertised if isinstance(g, str)]
     if raw_inst.get("grey_prompt_dismissed") is True:
         inst_manifest["grey_prompt_dismissed"] = True
+    # ``app.mac_claim.CLOSED_KEY``: this display has used its token, so its
+    # MAC no longer collects it from /discover (#515). Read back here, or a
+    # restart or any reload of the instance would open the claim again until
+    # the display's next request.
+    if raw_inst.get("mac_claim_closed") is True:
+        inst_manifest["mac_claim_closed"] = True
     selected_renderer = raw_inst.get("renderer_id")
     pick = (
         selected_renderer

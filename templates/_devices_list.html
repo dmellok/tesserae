@@ -187,6 +187,29 @@
   </div>
   {% endif %}
 
+  {# EXPORT / IMPORT (#541). A plain GET form: the browser downloads the file.
+     Displays are ticked one by one so a file holds only what was meant. #}
+  {% if _devices %}
+  <details class="card dx-devexport">
+    <summary><i class="ph ph-arrows-left-right" aria-hidden="true"></i> Move displays to another server</summary>
+    <form method="get" action="{{ url_for('bundles.export') }}" class="form">
+      <p class="field-help">Export writes each ticked display's panel, orientation, quiet hours, buttons and other settings to a file. <a href="{{ url_for('bundles.import_form') }}">Import</a> it on another Tesserae to add the display there, or to update one with the same id.</p>
+      <fieldset>
+        <legend>Displays</legend>
+        {% for section in _devices %}
+        <label><input type="checkbox" name="device" value="{{ section.device_id }}" checked> {{ section.device_name }} <span class="field-help">({{ section.device_id }})</span></label><br>
+        {% endfor %}
+      </fieldset>
+      <label><input type="checkbox" name="identity" value="1"> Include access tokens</label>
+      <p class="field-help"><i class="ph ph-warning" aria-hidden="true"></i> With access tokens in it, the file works like a password for these displays: anyone who has it can read their dashboards from a server that holds them. Tick this only to move a display between your own servers, where it lets the display switch by changing just the address it connects to. Keep the file private and delete it afterwards.</p>
+      <div class="actions">
+        <button type="submit" class="dx-btn"><i class="ph ph-download-simple" aria-hidden="true"></i><span>Export displays</span></button>
+        <a class="dx-btn" href="{{ url_for('bundles.import_form') }}"><i class="ph ph-upload-simple" aria-hidden="true"></i><span>Import</span></a>
+      </div>
+    </form>
+  </details>
+  {% endif %}
+
   {# DISCOVERED BANNER #}
   {% include '_discovered_strip.html' %}
 

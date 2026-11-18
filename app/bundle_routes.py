@@ -33,7 +33,7 @@ from flask import (
 )
 from werkzeug.wrappers import Response as WerkzeugResponse
 
-from app import bundle
+from app import bundle, device_bundle
 
 bp = Blueprint("bundles", __name__, url_prefix="/bundles")
 
@@ -65,9 +65,21 @@ def _sweep_pending() -> None:
                 path.unlink(missing_ok=True)
 
 
+def _device_stores() -> dict[str, Any]:
+    return {
+        "devices": current_app.config["DEVICE_REGISTRY"],
+        "renderers": current_app.config["RENDERER_REGISTRY"],
+        "data_root": Path(current_app.config["DEVICE_DATA_ROOT"]),
+        "settings": current_app.config["SETTINGS_STORE"],
+    }
+
+
 def _filename(doc: dict[str, Any]) -> str:
     names = [str(d["page"].get("name") or "") for d in doc["dashboards"]]
-    if len(doc["lineups"]) == 1:
+    displays = doc.get("devices") or []
+    if displays and not doc["dashboards"] and not doc["lineups"]:
+        base = str(displays[0].get("name") or "display") if len(displays) == 1 else "displays"
+    elif len(doc["lineups"]) == 1:
         base = str(doc["lineups"][0].get("name") or "lineup")
     elif len(names) == 1 and not doc["lineups"]:
         base = names[0] or "dashboard"
@@ -85,16 +97,35 @@ def export() -> WerkzeugResponse:
     if request.args.get("all") == "1":
         page_ids = [p.id for p in stores["page_store"].list_active()]
         deck_ids = [d.id for d in stores["deck_store"].all()]
+    # Displays are asked for by name, never swept up by ``all=1``: a file
+    # meant for sharing dashboards must not gain hardware by accident.
+    registry = current_app.config["DEVICE_REGISTRY"]
+    device_ids = request.args.getlist("device")
+    if request.args.get("devices") == "all":
+        device_ids = sorted(d.id for d in registry.devices.values() if d.kind_of is not None)
+    with_identity = request.args.get("identity") == "1"
+    device_notes: list[str] = []
+    displays = device_bundle.export_devices(
+        device_ids=device_ids,
+        devices=registry,
+        settings=current_app.config["SETTINGS_STORE"],
+        include_identity=with_identity,
+        notes=device_notes,
+    )
     doc, notes = bundle.build_bundle(
         page_ids=page_ids,
         deck_ids=deck_ids,
         data_root=Path(current_app.config["DATA_ROOT"]),
         version=str(current_app.config.get("APP_VERSION") or ""),
+        devices=displays,
+        notes=device_notes,
         **stores,
     )
-    if not doc["dashboards"] and not doc["lineups"]:
+    if not doc["dashboards"] and not doc["lineups"] and not displays:
         flash("Nothing to export.", "error")
-        return redirect(url_for("pages.index"))
+        return redirect(request.referrer or url_for("pages.index"))
+    if device_bundle.has_identity(doc):
+        doc["holds_access_tokens"] = True
     if notes:
         doc["left_out"] = notes
     response = Response(json.dumps(doc, indent=2) + "\n", mimetype="application/json")
@@ -126,6 +157,8 @@ def import_read() -> WerkzeugResponse | str:
     directory.mkdir(parents=True, exist_ok=True)
     (directory / f"{token}.json").write_bytes(raw)
     plan = bundle.describe(doc, **_stores())
+    plan["devices"] = device_bundle.describe_devices(doc, current_app.config["DEVICE_REGISTRY"])
+    plan["holds_access_tokens"] = device_bundle.has_identity(doc)
     plan["left_out"] = [str(n) for n in doc.get("left_out") or [] if isinstance(n, str)][:50]
     return render_template("bundle_import.html", plan=plan, token=token)
 
@@ -145,11 +178,21 @@ def import_apply() -> WerkzeugResponse:
             data_root=Path(current_app.config["DATA_ROOT"]),
             **_stores(),
         )
+        # Dashboards and lineups are all-or-nothing and went first. Displays
+        # are judged one by one, so a display that can't come in never undoes
+        # the dashboards beside it.
+        displays = device_bundle.apply_devices(
+            doc,
+            replace=set(request.form.getlist("replace_device")),
+            **_device_stores(),
+        )
     except bundle.BundleError as err:
         flash(f"Nothing was imported: {err}.", "error")
         return redirect(url_for("bundles.import_form"))
     finally:
         path.unlink(missing_ok=True)
+    if displays.changed:
+        current_app.config["REBUILD_TRANSPORT"]()
 
     def count(n: int, noun: str) -> str:
         return f"{n} {noun}{'' if n == 1 else 's'}"
@@ -163,14 +206,30 @@ def import_apply() -> WerkzeugResponse:
         parts.append(f"added {count(len(report.created_lineups), 'lineup')}")
     if report.replaced_lineups:
         parts.append(f"replaced {count(len(report.replaced_lineups), 'lineup')}")
+    if displays.added:
+        parts.append(f"added {count(len(displays.added), 'display')}")
+    if displays.replaced:
+        parts.append(f"updated {count(len(displays.replaced), 'display')}")
     if parts:
         summary = ", ".join(parts)
-        flash(
-            f"Import: {summary}. New dashboards and lineups are not on any display yet.",
-            "ok",
+        tail = (
+            " New dashboards and lineups are not on any display yet."
+            if report.created_pages or report.created_lineups
+            else ""
         )
+        flash(f"Import: {summary}.{tail}", "ok")
     else:
         flash("Nothing was imported.", "error")
+    if displays.needs_pairing:
+        flash(
+            "These displays were added with a new access token, because the file had none "
+            "for them. Open each one under Settings › Devices to connect it: "
+            + ", ".join(displays.needs_pairing)
+            + ".",
+            "warn",
+        )
+    for line in displays.skipped:
+        flash(f"Skipped {line}.", "warn")
     for line in report.skipped:
         flash(f"Skipped {line}.", "warn")
     if report.missing:

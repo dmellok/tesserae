@@ -698,6 +698,33 @@ def test_discover_mac_claim_closes_once_the_device_uses_its_token(app: Flask) ->
     assert _announce(client, "frame51", mac, token).get_json()["device_token"] == token
 
 
+def test_closed_mac_claim_survives_a_reload_of_the_display(app: Flask) -> None:
+    """The flag is on the instance file. A settings save reloads the display
+    from that file, as a restart does: the MAC must stay refused after it."""
+    client = app.test_client()
+    _sign_in(client)
+    devices = app.config["DEVICE_REGISTRY"]
+    mac = "aa:bb:cc:dd:ee:52"
+    token = _register_with_mac(app, client, "frame52", mac)
+    client.get("/api/v1/device/frame52/frame", headers={"Authorization": f"Bearer {token}"})
+    assert devices.get("frame52").manifest.get("mac_claim_closed") is True
+
+    from app import device_service
+
+    result = device_service.update_instance_locale(
+        devices=devices,
+        renderers=app.config["RENDERER_REGISTRY"],
+        data_root=app.config["DEVICE_DATA_ROOT"],
+        instance_id="frame52",
+        locale="en-GB",
+    )
+    assert result.device is not None
+
+    assert devices.get("frame52").manifest.get("mac_claim_closed") is True
+    refused = _announce(client, "frame52", mac).get_json()
+    assert refused["repair_required"] is True and "device_token" not in refused
+
+
 def test_allow_repair_reopens_the_mac_claim_once(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
