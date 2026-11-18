@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import logging
 import re
@@ -12,8 +13,11 @@ from collections.abc import Callable, Iterator
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
+from urllib.request import Request
 
 from flask import Flask
+from PIL import Image
 
 from app.device_loader import Device
 from app.frame_log import _note
@@ -366,6 +370,34 @@ class MeuralCloudClient:
         self.request("POST", f"devices/{target}/items/{resource_id(item)}", timeout=60)
         self.request("POST", f"devices/{target}/sync", timeout=60)
 
+    def download_current_image(self, target: str, item: str) -> bytes | None:
+        """Cache only the image of the item the LAN says is on the frame."""
+        from app.meural_http import open_request
+
+        data = self._data(self.request("GET", f"devices/{resource_id(target)}"))
+        if not isinstance(data, dict):
+            return None
+        status = data.get("frameStatus") or {}
+        if str(status.get("currentItem")) != item:
+            return None  # The cloud may still describe the previous picture.
+        url = data.get("currentImage")
+        if not isinstance(url, str):
+            return None
+        parsed = urlsplit(url)
+        if parsed.scheme != "https" or not (parsed.hostname or "").endswith(".cloudfront.net"):
+            return None
+        # The signed URL authenticates itself. Never attach the account token.
+        with open_request(Request(url), timeout=12) as response:
+            raw = response.read(20 * 1024 * 1024 + 1)
+        if len(raw) > 20 * 1024 * 1024:
+            raise ValueError("Meural artwork is too large")
+        with Image.open(io.BytesIO(raw)) as source:
+            image = source.convert("RGB")
+            image.thumbnail((1200, 1200), Image.Resampling.LANCZOS)
+            out = io.BytesIO()
+            image.save(out, "PNG")
+        return out.getvalue()
+
     def get_playback(self, target: str) -> dict[str, Any]:
         data = self._data(self.request("GET", f"devices/{resource_id(target)}"))
         if not isinstance(data, dict):
@@ -486,7 +518,7 @@ class CloudDelivery:
             self._save(state)
         return restored
 
-    def deliver(self, jpeg: bytes, key: str, target: str) -> bool:
+    def deliver(self, jpeg: bytes, key: str, target: str, *, force: bool = False) -> bool:
         target = resource_id(target)
         state = self._state(target)
         if self.cancelled():
@@ -498,11 +530,17 @@ class CloudDelivery:
             self.client.pause_rotation(target)
             state.update(paused=True, image_duration_paused=True)
             self._save(state)
-        if state.get("last_key") == key:
+        if self.cancelled():
+            return False
+        if state.get("last_key") == key and not force:
             self.note("note", "Image unchanged")
             return False
         started_at = state.get("delivery_started_at")
-        if started_at is not None and self.clock() < float(started_at) + self.min_interval_s:
+        if (
+            not force
+            and started_at is not None
+            and self.clock() < float(started_at) + self.min_interval_s
+        ):
             self.note("note", "Delivery interval not reached")
             return False
         state["delivery_started_at"] = self.clock()
@@ -531,6 +569,7 @@ class CloudDelivery:
             last_key=key,
             current_key=key,
             current_item=item,
+            shown_at=time.time(),
             pending_key=None,
             pending_item=None,
             upload_started=False,

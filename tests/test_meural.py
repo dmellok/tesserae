@@ -37,6 +37,12 @@ class Frame:
         self.power = []
         self.fail_upload = False
         self.orientations = []
+        self.item = "100"
+        self.gallery_reads = 0
+
+    def current_item(self):
+        self.gallery_reads += 1
+        return self.item
 
     def is_sleeping(self):
         return self.sleeping

@@ -2679,6 +2679,7 @@ class PushManager:
                     self._panel_dims_for_send(sorted(device_ids)[0] if device_ids else None),
                     source="resend",
                     target=page_id,
+                    page_id=page_id,
                     started=time.monotonic(),
                     device_filters=device_ids,
                     image_fit=image_fit,

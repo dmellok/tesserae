@@ -59,6 +59,10 @@ account tokens and pending IDs out of storage, URLs, and page HTML.
 
 LAN-only add uses `delivery_method=local` and `host`; it needs no pending account.
 
+## Frame swipes and thumbnails
+
+Cloud delivery with a LAN host checks `GET /remote/get_gallery_status_json/` every five seconds. A changed `current_item` advances the current dashboard's item, or the lineup when that dashboard has one item. A lineup with nowhere to advance re-shows Tesserae's image. Sleep, quiet hours, pending delivery and ten seconds after a show suppress gestures; each confirmed show allows one action. External artwork is downloaded from the cloud device's signed `currentImage` URL and cached in the shared held-frame record. A matching Tesserae item uses its existing thumbnail. Screenshot item metadata identifies the item to advance from; older screenshots without it start at the first listed item. No host means no gesture detection. A confirmed swipe delivers its next item immediately; scheduled updates keep the configured cloud interval.
+
 ## Existing device actions
 
 Use the prefix `/settings/devices/<id>/meural`:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import io
 import ipaddress
 import json
@@ -32,6 +33,7 @@ from app.quantizer import apply_underscan, rotate_png
 logger = logging.getLogger(__name__)
 KIND = "meural"
 POLL_INTERVAL_S = 5
+SWIPE_GRACE_S = 10
 _HOSTNAME = re.compile(
     r"^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
     r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$"
@@ -120,6 +122,13 @@ class MeuralClient:
         if not isinstance(value, bool):
             raise MeuralError("Frame returned an invalid sleep status")
         return value
+
+    def current_item(self) -> str:
+        value = self._request("get_gallery_status_json/")
+        item = value.get("current_item") if isinstance(value, dict) else None
+        if isinstance(item, bool) or not isinstance(item, (str, int)) or not str(item).isdigit():
+            raise MeuralError("Frame returned an invalid current item")
+        return str(item)
 
     def set_sleep(self, sleeping: bool) -> None:
         self._request("control_command/" + ("suspend" if sleeping else "resume"))
@@ -245,7 +254,9 @@ class MeuralPublisher:
         # unreachable is logged once and not on every retry.
         self._failed: dict[str, str] = {}
         self._telemetry: dict[str, tuple[float, dict[str, Any]]] = {}
-        self._cloud_checks: dict[str, tuple[tuple[str, bool, str], float, bool]] = {}
+        self._shown: dict[str, tuple[tuple[str, str, float], float, bool]] = {}
+        self._swiped: dict[str, tuple[str, str, float]] = {}
+        self._external_items: dict[str, str] = {}
 
     def start(self) -> None:
         if not self._run_async or self._thread is not None:
@@ -315,6 +326,7 @@ class MeuralPublisher:
         return client
 
     def poll_once(self) -> None:
+        swipes: list[Device] = []
         frames = [d for d in list(self._devices.devices.values()) if d.kind_of == KIND]
         live = {d.id for d in frames}
         for cache in (
@@ -323,7 +335,9 @@ class MeuralPublisher:
             self._retry_at,
             self._telemetry,
             self._failed,
-            self._cloud_checks,
+            self._shown,
+            self._swiped,
+            self._external_items,
         ):
             for key in set(cache) - live:
                 cache.pop(key, None)
@@ -337,7 +351,8 @@ class MeuralPublisher:
             if not lock.acquire(blocking=False):
                 continue
             try:
-                self._visit(device)
+                if self._visit(device):
+                    swipes.append(device)
                 self._retry_at.pop(device.id, None)
                 if self._failed.pop(device.id, None) is not None:
                     logger.info("meural %s: reachable again", device.id)
@@ -373,27 +388,51 @@ class MeuralPublisher:
 
             finally:
                 lock.release()
+        # A push notifies publishers. Do not hold the I/O lock while rendering
+        # or stepping, which can synchronously notify this worker again.
+        for device in swipes:
+            restore = True
+            try:
+                with self._app.app_context():
+                    from app.meural_swipe import advance
 
-    def _visit(self, device: Device) -> None:
+                    latest = self._latest(device.id) or {}
+                    shown_key = self._shown[device.id][0][1]
+                    if (
+                        self._stop.is_set()
+                        or self._devices.devices.get(device.id) is not device
+                        or not shown_key.startswith(str(latest.get("composition_digest")) + ":")
+                    ):
+                        continue
+                    restore = not advance(self._app, device, latest)
+            except Exception:
+                logger.exception("meural %s: swipe action failed", device.id)
+            if restore:
+                try:
+                    self._reshow(device)
+                except Exception:
+                    _note(self._app, device.id, "note", "Could not restore Tesserae's image")
+                    logger.exception("meural %s: restoring after swipe failed", device.id)
+
+    def _visit(self, device: Device) -> bool:
         cfg = (self._settings.get_section("devices") or {}).get(device.id) or {}
         if cfg.get("meural_management_paused"):
             _note(self._app, device.id, "note", "Management paused")
-            return
+            return False
         if delivery_method(cfg) != "local":
-            self._visit_cloud(device, cfg)
-            return
+            return self._visit_cloud(device, cfg)
         host = str(cfg.get("host") or "").strip()
         if not host:
-            return
+            return False
         sleeping = self._control(device, host)
         quiet = self._quiet(device)
         if sleeping or quiet or self._stop.is_set():
             if sleeping or quiet:
                 _note(self._app, device.id, "note", "Quiet hours" if quiet else "Frame asleep")
-            return
+            return False
         image = self._image(device)
         if image is None:
-            return
+            return False
         image_key, orientation, jpeg = image
         key = f"{host}:{image_key}"
         sent_key, sent_at = self._sent.get(device.id, ("", 0.0))
@@ -405,55 +444,54 @@ class MeuralPublisher:
                 "note",
                 "Image unchanged" if interval <= 0 else "Delivery interval not reached",
             )
-            return
+            return False
         client = self._lan_client(device, host)
         if self._orientations.get(device.id) != (host, orientation):
             client.set_orientation(orientation)
             self._orientations[device.id] = (host, orientation)
         if self._stop.is_set() or self._devices.devices.get(device.id) is not device:
-            return
+            return False
         client.upload(jpeg)
         self._sent[device.id] = (key, self._clock())
         if key != sent_key:
             logger.info("meural %s: sent frame over LAN", device.id)
+        return False
 
-    def _visit_cloud(self, device: Device, cfg: dict[str, Any]) -> None:
+    def _visit_cloud(self, device: Device, cfg: dict[str, Any]) -> bool:
         from app.meural_cloud import CloudDelivery, get_cloud_client, resource_id
 
         if cfg.get("meural_auth_failed"):
             _note(self._app, device.id, "note", "Session expired, sign in again")
-            return
+            return False
         if time.time() < float(cfg.get("meural_auth_retry_at") or 0):
             _note(self._app, device.id, "note", "Backoff: waiting to retry")
-            return
+            return False
         target = str(cfg.get("cloud_device_id") or "")
         if not target:
-            return
+            return False
         client = get_cloud_client(self._app, device.id)
         if not client.account_id:
-            return
+            return False
         image = self._image(device)
         if image is None:
-            return
+            return False
         key, _orientation, jpeg = image
         host = str(cfg.get("host") or "").strip()
         quiet = self._quiet(device)
-        check_key = (f"{target}:{host}", quiet, key)
-        checked_key, checked_at, sleeping = self._cloud_checks.get(device.id, (None, -60.0, False))
-        if check_key != checked_key or self._clock() - checked_at >= 60:
-            sleeping = False
-            if host:
-                try:
-                    sleeping = self._control(device, host)
-                except MeuralError:
-                    logger.debug(
-                        "meural %s: LAN control unavailable; cloud delivery continues", device.id
-                    )
-            self._cloud_checks[device.id] = (check_key, self._clock(), sleeping)
+        sleeping = False
+        reachable = False
+        if host:
+            try:
+                sleeping = self._control(device, host)
+                reachable = True
+            except MeuralError:
+                logger.debug(
+                    "meural %s: LAN control unavailable; cloud delivery continues", device.id
+                )
         if sleeping or quiet or self._stop.is_set():
             if sleeping or quiet:
                 _note(self._app, device.id, "note", "Quiet hours" if quiet else "Frame asleep")
-            return
+            return False
         delivery = CloudDelivery(
             Path(device.data_dir)
             / f"meural_cloud_{resource_id(client.account_id)}_{resource_id(target)}.json",
@@ -464,8 +502,103 @@ class MeuralPublisher:
                 self._stop.is_set() or self._devices.devices.get(device.id) is not device
             ),
         )
-        if delivery.deliver(jpeg, key, target):
-            logger.info("meural %s: changed the cloud artwork", device.id)
+        state = delivery._state(target)
+        # Finish any new/in-flight delivery before interpreting the frame.
+        pending = bool(state.get("pending_key"))
+        signature = self._remember_show(device, state)
+        swipe_render = self._swiped.get(device.id) == signature and key != state.get("current_key")
+        changed = delivery.deliver(jpeg, key, target, force=swipe_render)
+        state = delivery._state(target)
+        if changed or pending:
+            self._remember_show(device, state)
+            if changed:
+                logger.info("meural %s: changed the cloud artwork", device.id)
+            return False
+        if not reachable or not state.get("current_item"):
+            return False
+        signature = self._remember_show(device, state)
+        try:
+            actual = self._lan_client(device, host).current_item()
+        except MeuralError:
+            return False
+        if self._stop.is_set() or self._devices.devices.get(device.id) is not device:
+            return False
+        push = self._app.config.get("PUSH_MANAGER")
+        if actual == str(state["current_item"]):
+            self._shown[device.id] = (signature, self._shown[device.id][1], True)
+            self._external_items.pop(device.id, None)
+            if push is not None:
+                held = self._latest(device.id) or {}
+                if key != state.get("current_key"):
+                    digest = str(state.get("current_key") or "").split(":", 1)[0]
+                    held = {"digest": digest, "composition_digest": digest}
+                push.record_frame_served(device.id, held)
+            return False
+        self._record_external(device, client, target, actual)
+        if (
+            not self._shown[device.id][2]
+            or self._clock() - self._shown[device.id][1] < SWIPE_GRACE_S
+        ):
+            return False
+        if self._swiped.get(device.id) == signature:
+            return False
+        self._swiped[device.id] = signature
+        return True
+
+    def _remember_show(self, device: Device, state: dict[str, Any]) -> tuple[str, str, float]:
+        signature = (
+            str(state.get("current_item") or ""),
+            str(state.get("current_key") or ""),
+            float(state.get("shown_at") or 0),
+        )
+        if self._shown.get(device.id, (None, 0))[0] != signature:
+            self._shown[device.id] = (signature, self._clock(), False)
+        return signature
+
+    def _record_external(self, device: Device, client: Any, target: str, item: str) -> None:
+        push = self._app.config.get("PUSH_MANAGER")
+        if push is None or self._external_items.get(device.id) == item:
+            return
+        try:
+            png = client.download_current_image(target, item)
+            if not png:
+                return
+            digest = hashlib.sha256(png).hexdigest()[:16]
+            (self._renders_dir / f"{digest}.png").write_bytes(png)
+            push.record_frame_served(device.id, {"digest": digest, "composition_digest": digest})
+            self._external_items[device.id] = item
+        except Exception:
+            # A stale signed URL or an unavailable thumbnail must not lose a gesture.
+            _note(self._app, device.id, "note", "Current artwork thumbnail unavailable")
+
+    def _reshow(self, device: Device) -> None:
+        from app.meural_cloud import delivery_for_device
+
+        with frame_lock(self._app, device.id):
+            if self._stop.is_set() or self._devices.devices.get(device.id) is not device:
+                return
+            if self._quiet(device):
+                return
+            cfg = (self._settings.get_section("devices") or {}).get(device.id) or {}
+            host = str(cfg.get("host") or "").strip()
+            if (
+                cfg.get("meural_management_paused")
+                or delivery_method(cfg) != "cloud"
+                or not host
+                or self._lan_client(device, host).is_sleeping()
+            ):
+                return
+            resolved = delivery_for_device(self._app, device)
+            image = self._image(device)
+            if resolved is None or image is None:
+                return
+            delivery, target = resolved
+            key, _orientation, jpeg = image
+            _note(
+                self._app, device.id, "note", "Swipe on the frame: showing Tesserae's image again"
+            )
+            delivery.deliver(jpeg, key, target, force=True)
+            self._remember_show(device, delivery._state(target))
 
     def _control(self, device: Device, host: str) -> bool:
         client = self._lan_client(device, host)

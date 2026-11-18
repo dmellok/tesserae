@@ -25,6 +25,8 @@ from __future__ import annotations
 
 import concurrent.futures
 import contextlib
+import io
+import json
 import logging
 import os
 import queue
@@ -36,11 +38,51 @@ from pathlib import Path
 from typing import Any, Final, Literal, TypeVar, cast
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
+from PIL import Image, PngImagePlugin
 from playwright.sync_api import Browser, Playwright, sync_playwright
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 logger = logging.getLogger(__name__)
+
+
+def _stamp_step_items(png: bytes, page: Any) -> bytes:
+    """Keep item identity with its screenshot, including saved item previews."""
+    try:
+        items = page.evaluate("""() => {
+          const chosen = new URL(location.href).searchParams.get("item");
+          if (chosen) return {"*": [chosen]};
+          const out = {};
+          for (const el of document.querySelectorAll("[data-cell-id][data-data]")) {
+            const data = JSON.parse(el.dataset.data || "{}");
+            if (!data) continue;
+            const keys = [data.filename, data.code, data.key, data.source_key]
+              .filter(v => typeof v === "string" && v.length);
+            if (Number.isInteger(data.index)) keys.push("#" + (data.index - 1));
+            if (keys.length) out[el.dataset.cellId] = keys;
+          }
+          return out;
+        }""")
+    except PlaywrightError:
+        return png
+    if (
+        not isinstance(items, dict)
+        or not items
+        or not all(
+            isinstance(key, str)
+            and isinstance(values, list)
+            and all(isinstance(value, str) for value in values)
+            for key, values in items.items()
+        )
+    ):
+        return png
+    metadata = PngImagePlugin.PngInfo()
+    metadata.add_text("tesserae_items", json.dumps(items))
+    with Image.open(io.BytesIO(png)) as image:
+        out = io.BytesIO()
+        image.save(out, "PNG", pnginfo=metadata)
+    return out.getvalue()
+
 
 _R = TypeVar("_R")
 
@@ -1077,7 +1119,7 @@ def _screenshot_attempt(browser: Browser, request: RenderRequest, attempt: int) 
             t3 - t2,
             request.url,
         )
-        return RenderedPng(png, failures)
+        return RenderedPng(_stamp_step_items(png, page) if request.is_composer else png, failures)
     finally:
         # Closing the context tears down the page, cookies, localStorage,
         # font cache, so the next render starts clean even though the
@@ -1270,7 +1312,7 @@ def _capture_attempt(browser: Browser, request: CaptureRequest, attempt: int) ->
             result = page.evaluate(request.script)
         except PlaywrightError as err:
             logger.warning("capture script skipped: %s", err)
-        return RenderedPng(png, failures), result
+        return RenderedPng(_stamp_step_items(png, page), failures), result
     finally:
         try:
             context.close()

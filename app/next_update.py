@@ -529,7 +529,11 @@ def reports_held_frame(device: Any) -> bool:
     ETag, ``/frame`` and patch paths stay REST-only)."""
     from app import visionect
 
-    return getattr(device, "transport", "mqtt") == "rest" or visionect.is_visionect_device(device)
+    return (
+        getattr(device, "transport", "mqtt") == "rest"
+        or visionect.is_visionect_device(device)
+        or getattr(device, "kind_of", None) == "meural"
+    )
 
 
 def tracks_held_frame(push_mgr: Any, device: Any) -> bool:
