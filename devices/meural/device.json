@@ -46,10 +46,10 @@
       "type": "int",
       "group": "Delivery",
       "label": "Local preview renewal",
-      "default": 0,
+      "default": 15,
       "min": 0,
       "max": 3600,
-      "help": "0 sends only changed images. If your frame expires local previews, set seconds between renewals (5 to 3600).",
+      "help": "Seconds between local uploads of the current page (5 to 3600). Keep it shorter than the frame's preview duration, which is often 30 seconds, or the frame drops back to its own artwork. 0 sends each page once. New pages are sent immediately.",
       "show_if": {
         "delivery_method": "local"
       }

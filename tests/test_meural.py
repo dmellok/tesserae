@@ -607,6 +607,7 @@ def test_cloud_sleep_ownership_survives_frame_ip_change(setup):
 
 
 def test_unchanged_local_image_and_orientation_are_not_resent(setup):
+    setup.settings.update_item("devices", "test_frame", {"refresh_interval_s": 0})
     pub = setup.publisher()
     for moment in (100, 115, 300):
         setup.clock[0] = moment
@@ -650,3 +651,60 @@ def test_busy_frame_does_not_hold_the_global_lock_or_block_other_frames(setup, m
     finally:
         release.set()
         thread.join(3)
+
+
+def _legacy_lan_frame(setup):
+    """A frame added when Meural was LAN-only: an address and nothing else."""
+    setup.settings.patch_section("devices", {"test_frame": {"host": "192.0.2.10"}})
+
+
+def test_frame_added_before_cloud_delivery_keeps_getting_local_previews(setup):
+    """Without a saved delivery method the frame was treated as a cloud
+    frame, found no cloud frame chosen, and silently stopped updating."""
+    _legacy_lan_frame(setup)
+    setup.publisher().poll_once()
+    assert len(setup.frame.uploads) == 1
+    with setup.app.app_context():
+        from app.settings.index_routes import _transport_badge
+
+        assert _transport_badge(setup.device) == "LAN"
+
+
+def test_startup_writes_down_the_delivery_method_in_use(setup):
+    """The settings page shows the schema default (cloud) for an unset
+    value; saving it would have switched a LAN frame to cloud delivery."""
+    _legacy_lan_frame(setup)
+    register(setup.app)
+    assert setup.settings.get_section("devices")["test_frame"]["delivery_method"] == "local"
+    setup.settings.patch_section("devices", {"test_frame": {"cloud_device_id": "101"}})
+    register(setup.app)
+    assert setup.settings.get_section("devices")["test_frame"]["delivery_method"] == "cloud"
+
+
+@pytest.mark.parametrize(
+    ("cfg", "method"),
+    [
+        ({"host": "192.0.2.10"}, "local"),
+        ({"host": "192.0.2.10", "cloud_device_id": "101"}, "cloud"),
+        ({}, "cloud"),
+        ({"host": "192.0.2.10", "delivery_method": "cloud"}, "cloud"),
+        ({"cloud_device_id": "101", "delivery_method": "local"}, "local"),
+    ],
+)
+def test_delivery_method_without_a_saved_choice(cfg, method):
+    from app.meural import delivery_method
+
+    assert delivery_method(cfg) == method
+
+
+def test_local_preview_renews_every_15_seconds_unless_told_otherwise(setup):
+    """The renewal default had dropped to "never"; a local preview expires
+    on the frame, which then goes back to its own artwork."""
+    _legacy_lan_frame(setup)
+    pub = setup.publisher()
+    for moment in (100, 110, 115):
+        setup.clock[0] = moment
+        pub.poll_once()
+    assert len(setup.frame.uploads) == 2
+    kind = setup.app.config["DEVICE_REGISTRY"].get("meural")
+    assert kind.config_schema["refresh_interval_s"]["default"] == 15

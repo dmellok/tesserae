@@ -413,13 +413,18 @@ class CloudDelivery:
             raise ValueError("The saved Meural delivery state belongs to a different frame")
         return state
 
-    def release(self, target: str) -> None:
+    def release(self, target: str) -> bool:
+        """Stop delivering and clean up. False when the frame's own playback
+        settings were changed and could not be put back, so the caller can
+        tell the user to do it in the Meural app."""
         state = self._state(resource_id(target))
+        restored = True
         if state.get("original"):
             try:
                 self.client.restore_playback(target, state["original"])
                 state.pop("original")
             except (MeuralAuthError, HttpError, OSError, ValueError):
+                restored = False
                 logger.warning("Meural playback restore failed; removal remains available")
         state.update(
             paused=False,
@@ -441,6 +446,7 @@ class CloudDelivery:
                 continue
             state["owned"].remove(item)
             self._save(state)
+        return restored
 
     def deliver(self, jpeg: bytes, key: str, target: str) -> bool:
         target = resource_id(target)

@@ -2054,8 +2054,9 @@ def devices_delete(instance_id: str) -> Response:
     if device_to_delete is not None and device_to_delete.kind_of == "meural":
         from .meural_routes import _changing_frame, _release_frame
 
+        meural_before = dict((settings_store().get_section("devices") or {}).get(instance_id) or {})
         with _changing_frame(device_to_delete):
-            _release_frame(device_to_delete)
+            meural_restored = _release_frame(device_to_delete)
     last_mac = (
         str(device_to_delete.manifest.get("mac") or "").strip()
         if device_to_delete is not None
@@ -2083,12 +2084,34 @@ def devices_delete(instance_id: str) -> Response:
         instance_id=instance_id,
     )
     if not result.ok or result.device is None:
+        if device_to_delete is not None and device_to_delete.kind_of == "meural":
+            # Releasing the frame paused delivery. The device is still here,
+            # and a LAN-only frame has no control to resume it, so put the
+            # pause back the way it was.
+            settings_store().update_item(
+                "devices",
+                instance_id,
+                {"meural_management_paused": bool(meural_before.get("meural_management_paused"))},
+            )
+            rebuild_transport_fn()()
         flash(result.error or "Delete failed.", "error")
         return redirect(url_for("auth.settings_area", area="devices"))
     if result.device.kind_of == "meural":
         from app.meural_cloud import clear_session
+        from app.meural_pending import PLAYBACK_NOTICE
 
         clear_session(settings_store(), instance_id)
+        # The settings entry outlives the device (it is kept for a re-add
+        # under the same id). A frame it still named would stay reserved, and
+        # a kept pause would stop a re-added LAN frame for good.
+        settings_store().update_item(
+            "devices",
+            instance_id,
+            {},
+            remove=("cloud_device_id", "meural_management_paused", "meural_playback_unrestored"),
+        )
+        if not meural_restored:
+            flash(PLAYBACK_NOTICE, "warning")
         current_app.config.get("MEURAL_LOGIN_SESSIONS", {}).pop(instance_id, None)
         current_app.config.get("MEURAL_CLOUD_CLIENTS", {}).pop(instance_id, None)
     if wipe_orphan:

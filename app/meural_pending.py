@@ -72,6 +72,14 @@ def stage_account(
         current_app.config["MEURAL_PENDING_ADDS"][pending_key(create=True)] = entry
 
 
+# Shown after Tesserae stopped delivering but could not reach the frame's
+# playback settings to put them back.
+PLAYBACK_NOTICE = (
+    "Tesserae could not turn the frame's gallery rotation back on. "
+    "Open the Meural app and turn it on there, and set the image duration again."
+)
+
+
 def pending_tokens(entry: dict[str, Any]) -> AuthResult:
     box = current_app.config["SECRET_BOX"]
     return AuthResult(
@@ -106,6 +114,7 @@ def account_state(
         "chosen_frame": chosen,
         "saved": bool(saved and chosen),
         "paused": bool(config.get("meural_management_paused")),
+        "notice": PLAYBACK_NOTICE if config.get("meural_playback_unrestored") else "",
     }
 
 

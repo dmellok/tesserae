@@ -11,7 +11,7 @@
   // JSON replies are read by ``normalize``. Accepted today:
   //   {state: "signed_out|signing_in|signed_in|session_expired",
   //    account|email, frames: [{id, name}], chosen: {id, name},
-  //    selected (id, older), saved, paused}
+  //    selected (id, older), saved, paused, notice}
   //   {status: "ok", return_url}       (current routes, no state yet)
   //   {error: "..."}                    (any failure)
   // A plain redirect (older routes without JSON) counts as success.
@@ -47,6 +47,7 @@
       chosen,
       saved: data.saved === true,
       paused: data.paused === true,
+      notice: typeof data.notice === "string" ? data.notice : "",
       error: typeof data.error === "string" ? data.error : null,
     };
   }
@@ -177,6 +178,11 @@
     }
 
     function apply(info) {
+      const notice = $("[data-mx-notice]");
+      if (notice) {
+        notice.querySelector("[data-mx-notice-text]").textContent = info.notice || "";
+        notice.hidden = !info.notice;
+      }
       if (info.label) $$("[data-mx-label]").forEach((el) => (el.textContent = info.label));
       if (info.frames) setFrames(info.frames, info.chosen && info.chosen.id);
       if (info.chosen && info.chosen.name) setChosen(info.chosen);

@@ -2,7 +2,7 @@
 
 The cloud path is unofficial. Its Cognito and OAuth client ids come from Netgear's app (via ha-meural); Netgear can change them or block requests, and the integration can stop working.
 
-Sign-in and cloud single-image delivery have been verified against a real account and frame. Token renewal is implemented and covered by mocked tests, but is unverified against the live service. Native sleep schedule sync and playback restore are unverified and are not included. Manage native schedules and playback in the Meural app.
+Sign-in and cloud single-image delivery have been verified against a real account and frame. Token renewal has been checked against the live service by the contributor. Native sleep schedule sync is not included; manage native schedules in the Meural app. Playback is handled as described under Cleanup failures.
 
 Cloud deliveries have a per-device minimum interval (`cloud_interval_s`, default 300 seconds, range 60 to 86400). Intermediate renders are coalesced; only the latest image is delivered. The timestamp is saved in the frame journal and survives publisher and server restarts.
 
@@ -48,7 +48,7 @@ never returned.
    the updated pending `account` and `status: "ok"`.
 4. POST form data to `/settings/devices/add`: `kind=meural`, `id`, `name`, and
    `cloud_device_id`. The add consumes the pending account and redirects to the
-   new device. Missing or expired sign-in returns JSON 400 without creating it.
+   new device. Missing or expired sign-in does not create it: a request that asks for JSON gets a 400 with `error`, and the Add device form is sent back to the Devices page with the reason.
 
 The account is bound to the browser's signed session cookie. Access and refresh
 tokens are SecretBox-encrypted in server memory. It expires after 15 minutes,
@@ -75,6 +75,6 @@ form data and returns `status` and `return_url` when JSON is requested.
 
 ## Cleanup failures
 
-Sign-out, frame changes, stopping delivery and deletion attempt to remove Tesserae uploads. Cleanup is best effort; an expired session or unavailable cloud never blocks the action. No playback restoration is attempted, so there is no restoration failure or Remove anyway flow. Device deletion uses an ordinary form redirect and does not open a JSON error page when cleanup fails.
+Sign-out, frame changes, stopping delivery and deletion attempt to remove Tesserae uploads. Cleanup is best effort; an expired session or unavailable cloud never blocks the action. On first delivery Tesserae saves the frame's `galleryRotation` and `imageDuration`, then sets rotation off and the duration to 0. Release puts the saved values back, best effort: a failure never blocks the action and there is no Remove anyway flow. When the restore fails, `meural_playback_unrestored` is set on the device, the account state carries a `notice` telling the user to turn rotation back on in the Meural app, and a delete shows the same text as a flash message. Device deletion uses an ordinary form redirect and does not open a JSON error page when cleanup fails.
 
-Native sleep schedule sync and playback restore are not implemented. Quiet hours uses the existing core behavior. A configured LAN address lets Tesserae sleep and wake a frame during its own quiet hours. Deletion makes a best-effort wake only when Tesserae put the frame to sleep.
+Native sleep schedule sync is not implemented. Quiet hours uses the existing core behavior. A configured LAN address lets Tesserae sleep and wake a frame during its own quiet hours. Deletion makes a best-effort wake only when Tesserae put the frame to sleep.

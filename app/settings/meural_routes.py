@@ -13,6 +13,7 @@ from flask import (
     Response,
     abort,
     current_app,
+    flash,
     jsonify,
     redirect,
     render_template,
@@ -89,19 +90,31 @@ def _request_data() -> Any:
     return data if isinstance(data, dict) or not request.is_json else {}
 
 
-def _release_frame(device: Device) -> None:
-    """Wake owned sleep and clean up uploads without blocking removal on failure."""
+def _release_frame(device: Device) -> bool:
+    """Wake owned sleep and clean up uploads without blocking removal on failure.
+
+    False when the frame's gallery rotation and image duration could not be
+    put back: an expired sign-in can never restore them, so the account block
+    says to do it in the Meural app (``meural_playback_unrestored``)."""
     try:
         release_sleep(device, str(_config(device.id).get("host") or ""), config=_config(device.id))
     except (MeuralError, OSError, ValueError):
         current_app.logger.warning("Meural wake failed; removal remains available")
+    restored = True
+    delivery = None
     try:
         delivery = delivery_for_device(current_app, device)
         if delivery is not None:
-            delivery[0].release(delivery[1])
+            restored = delivery[0].release(delivery[1])
     except (meural_auth.MeuralAuthError, meural_auth.HttpError, OSError, ValueError):
+        restored = delivery is None
         current_app.logger.warning("Meural upload cleanup failed; removal remains available")
-    settings_store().update_item("devices", device.id, {"meural_management_paused": True})
+    settings_store().update_item(
+        "devices",
+        device.id,
+        {"meural_management_paused": True, "meural_playback_unrestored": not restored},
+    )
+    return restored
 
 
 def _success(instance_id: str) -> Response | RedirectResponse:
@@ -323,6 +336,7 @@ def meural_select_frame(instance_id: str) -> Response | RedirectResponse | tuple
                 "host": frame.get("host", ""),
                 "meural_management_paused": False,
             },
+            remove=("meural_playback_unrestored",),
         )
     return _success(instance_id)
 
@@ -341,6 +355,7 @@ def meural_manage(instance_id: str) -> Response | RedirectResponse | tuple[Respo
             "devices",
             instance_id,
             {"meural_management_paused": action == "release"},
+            remove=() if action == "release" else ("meural_playback_unrestored",),
         )
     return _success(instance_id)
 
@@ -389,6 +404,16 @@ def meural_pending_logout() -> Response:
     return jsonify(status="ok", account=meural_pending.pending_state())
 
 
+def _add_failed(message: str) -> Response | RedirectResponse | tuple[Response, int]:
+    """Why a Meural was not added: JSON for a script that asked for it, and
+    for the Add device form a notice back on the Devices page. The form is a
+    plain post, so a JSON body would be the whole page the user lands on."""
+    if request.is_json or request.accept_mimetypes.best == "application/json":
+        return jsonify(error=message), 400
+    flash(f"Device not added. {message}", "error")
+    return redirect(url_for("auth.settings_area", area="devices", _anchor="add-device"))
+
+
 def add_pending_device() -> Response | RedirectResponse | tuple[Response, int]:
     from app import device_service, renderer_loader
     from app.panel import panel_overrides_from_form
@@ -402,15 +427,15 @@ def add_pending_device() -> Response | RedirectResponse | tuple[Response, int]:
             entry["selected"] if entry else ""
         )
         if entry is None or not selected or not any(f["id"] == selected for f in entry["frames"]):
-            return jsonify(error="Sign in and choose a Meural frame before adding the device."), 400
+            return _add_failed("Sign in to Netgear and choose a frame first, then add the device.")
         try:
             ensure_frame_available(settings_store(), "", str(selected))
         except ValueError as exc:
-            return jsonify(error=str(exc)), 400
+            return _add_failed(str(exc))
         try:
             tokens = meural_pending.pending_tokens(entry)
         except (ValueError, OSError):
-            return jsonify(error="Could not use the pending Meural account. Sign in again."), 400
+            return _add_failed("Could not use the pending Meural account. Sign in again.")
         result = device_service.create_instance(
             devices=devices(),
             renderers=renderers(),
@@ -422,7 +447,7 @@ def add_pending_device() -> Response | RedirectResponse | tuple[Response, int]:
             orientation=request.form.get("panel_orientation"),
         )
         if not result.ok or result.device is None:
-            return jsonify(error=result.error or "Could not add the Meural device."), 400
+            return _add_failed(result.error or "Could not add the Meural device.")
         previous = settings_store().get_section("devices").get(result.device.id)
         try:
             save_session(
@@ -443,7 +468,7 @@ def add_pending_device() -> Response | RedirectResponse | tuple[Response, int]:
             settings_store().remove_item("devices", result.device.id)
             if previous is not None:
                 settings_store().update_item("devices", result.device.id, previous)
-            return jsonify(error="Could not save the Meural device. Try again."), 400
+            return _add_failed("Could not save the Meural device. Try again.")
         meural_pending.discard_pending()
     rebuild_transport_fn()()
     return redirect(url_for("auth.device_page", instance_id=result.device.id))

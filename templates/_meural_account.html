@@ -52,7 +52,7 @@
     {%- if mode == 'add' and not a.login_url -%}
     Tesserae adds the frame first, then opens Netgear sign-in on its page.
     {%- elif mode == 'add' -%}
-    Sign in to Netgear to choose the frame now. You can also do it later on the frame's page.
+    Sign in to Netgear and choose the frame, then add it. Local preview needs only the frame address.
     {%- else -%}
     Sign in to Netgear so Tesserae can send pages to this frame.
     {%- endif -%}
@@ -67,6 +67,13 @@
   </p>
   <p class="mx-line" {{ show('released') }}>
     Tesserae is paused. {% if chosen_name %}<span class="mx-name" data-mx-frame-name title="{{ chosen_name }}">{{ chosen_name }}</span>{% else %}The frame{% endif %} can be controlled in the Meural app.
+  </p>
+
+  {#- Set when Tesserae stopped delivering and could not put the frame's
+      own playback settings back (an expired sign-in, Netgear unreachable). -#}
+  <p class="mx-line is-warn" data-mx-notice{% if not a.notice %} hidden{% endif %}>
+    <i class="ph ph-warning" aria-hidden="true"></i>
+    <span data-mx-notice-text>{{ a.notice or '' }}</span>
   </p>
 
   {#- Locked in: the chosen frame, confirmed. Change re-opens the picker. -#}
@@ -119,7 +126,7 @@
 
   <details class="mx-about">
     <summary><i class="ph ph-info" aria-hidden="true"></i><span>What Tesserae changes on the frame</span></summary>
-    <p class="mx-help">Tesserae shows one image at a time and creates no Meural galleries. Tesserae does not change gallery rotation or the native sleep schedule. Stop delivery before choosing a gallery or playback settings in the Meural app.</p>
+    <p class="mx-help">Tesserae shows one image at a time and creates no Meural galleries. While it delivers, it turns off the frame's gallery rotation and sets its image duration to 0, so the frame holds the page instead of shuffling it with other artwork. Stop delivery, sign out or remove the frame and Tesserae puts both back as they were. It does not change the native sleep schedule. Stop delivery before choosing a gallery or playback settings in the Meural app.</p>
   </details>
 
   <p class="mx-error" data-mx-error role="alert" hidden></p>

@@ -158,6 +158,39 @@ def release_sleep(device: Device, host: str, *, config: dict[str, Any] | None = 
         path.unlink(missing_ok=True)
 
 
+# Seconds between local uploads of an unchanged page when the device has no
+# saved renewal setting. Local previews expire on the frame (often after 30 s),
+# which then drops back to its own artwork.
+DEFAULT_REFRESH_S = 15
+
+
+def delivery_method(cfg: dict[str, Any]) -> str:
+    """``"local"`` or ``"cloud"`` for a Meural's saved config.
+
+    A frame added before cloud delivery existed has a ``host`` and no
+    ``delivery_method``: it is a LAN frame and must stay one. Without the
+    key, a device is cloud only when a cloud frame has been chosen for it or
+    it has nothing to reach locally."""
+    method = cfg.get("delivery_method")
+    if method in ("local", "cloud"):
+        return str(method)
+    if cfg.get("cloud_device_id") or not str(cfg.get("host") or "").strip():
+        return "cloud"
+    return "local"
+
+
+def refresh_interval(cfg: dict[str, Any]) -> int:
+    """Seconds between local uploads of an unchanged page; 0 sends a page
+    once. An unset value renews every ``DEFAULT_REFRESH_S``."""
+    value = cfg.get("refresh_interval_s")
+    if value in (None, ""):
+        return DEFAULT_REFRESH_S
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return DEFAULT_REFRESH_S
+
+
 class MeuralPublisher:
     """One worker owns uploads, renewals and quiet-hours transitions."""
 
@@ -285,7 +318,7 @@ class MeuralPublisher:
                     logger.info("meural %s: reachable again", device.id)
             except Exception as exc:
                 cfg = (self._settings.get_section("devices") or {}).get(device.id) or {}
-                delay = POLL_INTERVAL_S if cfg.get("delivery_method") == "local" else 60
+                delay = POLL_INTERVAL_S if delivery_method(cfg) == "local" else 60
                 self._retry_at[device.id] = self._clock() + delay
                 # The retry is every few seconds. A frame switched off at
                 # the wall would otherwise fill the log and the History
@@ -314,7 +347,7 @@ class MeuralPublisher:
         cfg = (self._settings.get_section("devices") or {}).get(device.id) or {}
         if cfg.get("meural_management_paused"):
             return
-        if cfg.get("delivery_method", "cloud") != "local":
+        if delivery_method(cfg) != "local":
             self._visit_cloud(device, cfg)
             return
         host = str(cfg.get("host") or "").strip()
@@ -329,7 +362,7 @@ class MeuralPublisher:
         image_key, orientation, jpeg = image
         key = f"{host}:{image_key}"
         sent_key, sent_at = self._sent.get(device.id, ("", 0.0))
-        interval = int(cfg.get("refresh_interval_s") or 0)
+        interval = refresh_interval(cfg)
         if key == sent_key and (interval <= 0 or self._clock() - sent_at < interval):
             return
         client = self._client(host)
@@ -480,10 +513,30 @@ def frame_lock(app: Flask, device_id: str) -> Any:
     return app.config.setdefault("MEURAL_FRAME_LOCKS", {}).setdefault(device_id, threading.RLock())
 
 
+def _save_delivery_methods(app: Flask) -> None:
+    """Write down how each Meural without a saved delivery method is being
+    delivered to, so its settings page shows the method in use and saving
+    that page cannot switch a LAN frame to cloud delivery."""
+    settings = app.config["SETTINGS_STORE"]
+    saved = settings.get_section("devices") or {}
+    for device in list(app.config["DEVICE_REGISTRY"].devices.values()):
+        cfg = saved.get(device.id)
+        if device.kind_of != KIND or not isinstance(cfg, dict):
+            continue
+        if cfg.get("delivery_method") not in ("local", "cloud"):
+            try:
+                settings.update_item(
+                    "devices", device.id, {"delivery_method": delivery_method(cfg)}
+                )
+            except (OSError, ValueError):
+                logger.warning("meural %s: could not save its delivery method", device.id)
+
+
 def register(app: Flask) -> None:
     push = app.config.get("PUSH_MANAGER")
     if push is None:
         return
+    _save_delivery_methods(app)
     old = app.config.get("MEURAL_PUBLISHER")
     if old is not None:
         old.stop()

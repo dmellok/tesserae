@@ -26,6 +26,8 @@ from app import (
     device_service,
     device_timetable,
     fraimic,
+    meural,
+    meural_pending,
     next_update,
     palette_profiles,
     samsung_frame,
@@ -2443,6 +2445,7 @@ def _meural_account_view(device: Device) -> dict[str, Any] | None:
         "state_url": url_for("auth.meural_account", instance_id=device.id),
         "manage_url": url_for("auth.meural_manage", instance_id=device.id),
         "paused": bool(cfg.get("meural_management_paused")),
+        "notice": meural_pending.PLAYBACK_NOTICE if cfg.get("meural_playback_unrestored") else "",
     }
 
 
@@ -2467,7 +2470,7 @@ def _transport_badge(device: Device) -> str:
     if device.transport == "push":
         if device.kind_of == "meural":
             cfg = (settings_store().get_section("devices") or {}).get(device.id) or {}
-            return "LAN" if cfg.get("delivery_method") == "local" else "Cloud"
+            return "LAN" if meural.delivery_method(cfg) == "local" else "Cloud"
         if samsung_frame.is_samsung_frame_device(device) or fraimic.is_fraimic_device(device):
             return "LAN"
         return "TCP" if visionect_routes.is_visionect_device(device) else "HA"

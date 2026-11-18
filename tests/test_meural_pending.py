@@ -23,11 +23,18 @@ def pending_signin(client):
     return response
 
 
-def add(client, device_id="new_frame", frame="101"):
+def add(client, device_id="new_frame", frame="101", headers=None):
     return client.post(
         "/settings/devices/add",
         data={"kind": "meural", "id": device_id, "name": "Example frame", "cloud_device_id": frame},
+        headers=headers,
     )
+
+
+def refused(response):
+    """The Add device form is a plain post: a refusal goes back to the
+    Devices page with the reason, never to a page of JSON."""
+    return response.status_code == 302 and response.location == "/settings/devices#add-device"
 
 
 def test_pending_signin_adds_device_account_and_frame_together(app, provider):
@@ -57,7 +64,7 @@ def test_pending_signin_adds_device_account_and_frame_together(app, provider):
     assert state["saved"]
     assert state["chosen_frame"]["id"] == "101"
     assert "private-refresh" not in json.dumps(state)
-    assert add(client, "second_frame").status_code == 400
+    assert refused(add(client, "second_frame"))
     assert app.config["DEVICE_REGISTRY"].get("second_frame") is None
 
 
@@ -71,7 +78,7 @@ def test_abandoning_pending_account_leaves_no_device_or_settings(app, provider, 
     else:
         for entry in app.config["MEURAL_PENDING_ADDS"].values():
             entry["expires_at"] = time.monotonic() - 1
-    assert add(client).status_code == 400
+    assert refused(add(client))
     assert app.config["DEVICE_REGISTRY"].get("new_frame") is None
     assert "new_frame" not in app.config["SETTINGS_STORE"].get_section("devices")
     assert not app.config["MEURAL_PENDING_ADDS"]
@@ -81,14 +88,14 @@ def test_pending_account_is_bound_to_the_browser_session(app, provider):
     first, second = app.test_client(), app.test_client()
     pending_signin(first)
     assert second.get("/settings/meural/account").json["account"]["state"] == "signed_out"
-    assert add(second).status_code == 400
+    assert refused(add(second))
     assert add(first).status_code == 302
 
 
 def test_invalid_add_keeps_pending_account_without_creating_orphan(app, provider):
     client = app.test_client()
     pending_signin(client)
-    assert add(client, "../invalid").status_code == 400
+    assert refused(add(client, "../invalid"))
     assert app.config["DEVICE_REGISTRY"].get("../invalid") is None
     assert client.get("/settings/meural/account").json["account"]["state"] == "signed_in"
     assert add(client).status_code == 302
@@ -97,10 +104,10 @@ def test_invalid_add_keeps_pending_account_without_creating_orphan(app, provider
 def test_pending_frame_rejects_outside_inventory_and_duplicate(app, provider):
     client = app.test_client()
     pending_signin(client)
-    assert add(client, frame="999").status_code == 400
+    assert refused(add(client, frame="999"))
     assert app.config["DEVICE_REGISTRY"].get("new_frame") is None
     app.config["SETTINGS_STORE"].update_item("devices", "test_frame", {"cloud_device_id": "101"})
-    response = add(client)
+    response = add(client, headers={"Accept": "application/json"})
     assert response.status_code == 400
     assert "another Tesserae display" in response.json["error"]
     assert app.config["DEVICE_REGISTRY"].get("new_frame") is None
@@ -122,7 +129,7 @@ def test_cloud_add_cannot_bypass_pending_signin_with_whitespace_in_kind(app):
     response = app.test_client().post(
         "/settings/devices/add", data={"kind": " meural ", "id": "unlinked_frame"}
     )
-    assert response.status_code == 400
+    assert refused(response)
     assert app.config["DEVICE_REGISTRY"].get("unlinked_frame") is None
 
 
@@ -170,3 +177,18 @@ def test_adding_pending_account_does_not_wait_for_poller_or_call_cloud(app, prov
     finally:
         release.set()
         thread.join(3)
+
+
+def test_adding_before_signing_in_returns_to_the_devices_page_with_the_reason(app):
+    """The Add device form posts as a form. Without a pending sign-in it used
+    to land on a page holding only a JSON error."""
+    client = app.test_client()
+    response = add(client, frame="")
+    assert refused(response)
+    assert app.config["DEVICE_REGISTRY"].get("new_frame") is None
+    page = client.get("/settings/devices")
+    assert "Device not added. Sign in to Netgear and choose a frame first" in page.text
+    # A script that asks for JSON still gets it.
+    scripted = add(client, frame="", headers={"Accept": "application/json"})
+    assert scripted.status_code == 400
+    assert "Sign in to Netgear" in scripted.json["error"]

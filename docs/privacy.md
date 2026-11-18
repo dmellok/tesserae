@@ -38,6 +38,9 @@ Your password and verification code go from your browser to Netgear; Tesserae
 stores encrypted access and refresh tokens. Signing out or deleting the device
 removes those tokens and attempts to remove Tesserae uploads from your library.
 Uploads may remain if Netgear cannot be reached.
+While it delivers, Tesserae also changes two playback settings on the frame through
+your account (gallery rotation off, image duration 0) and puts them back when
+delivery stops.
 
 Local Meural previews send dashboard images only to the frame on your LAN.
 If its address changes while Tesserae has put it to sleep, wake it in the Meural app.
