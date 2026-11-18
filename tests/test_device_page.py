@@ -838,3 +838,33 @@ def test_the_next_thumbnail_is_left_out_when_the_next_step_is_the_same_dashboard
         line = index_routes._now_line_for("door")
     assert line is not None and line["next_thumb"] == "/next.webp"
     assert line["next_when"] == "~1:15 PM" and "until" in line["meta"]
+
+
+@pytest.mark.parametrize("kind", ["meural", "samsung_frame"])
+def test_frame_log_renders_shared_controls(app, kind):
+    from app import device_service
+    from app.frame_log import _note
+
+    client = app.test_client()
+    _sign_in(client)
+    result = device_service.create_instance(
+        devices=app.config["DEVICE_REGISTRY"],
+        renderers=app.config["RENDERER_REGISTRY"],
+        data_root=app.config["DATA_ROOT"],
+        instance_id="meural_log",
+        kind_id=kind,
+        name="Frame",
+    )
+    assert result.ok
+    empty = client.get("/settings/devices/meural_log").get_data(as_text=True)
+    assert 'id="frame-log"' in empty
+    for i in range(65):
+        _note(app, "meural_log", "note", f"Management paused {i}")
+    response = client.get("/settings/devices/meural_log")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert 'id="frame-log"' in html
+    assert 'data-copy-target="#device-meural_log-frame-log-all"' in html
+    assert "Show all 60 lines" in html
+    assert "Management paused 64" in html
+    assert "Management paused 4\n" not in html

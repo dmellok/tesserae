@@ -708,3 +708,56 @@ def test_local_preview_renews_every_15_seconds_unless_told_otherwise(setup):
     assert len(setup.frame.uploads) == 2
     kind = setup.app.config["DEVICE_REGISTRY"].get("meural")
     assert kind.config_schema["refresh_interval_s"]["default"] == 15
+
+
+@pytest.mark.parametrize(
+    "message", ["App key is empty", "private-refresh private@example.com Authorization"]
+)
+def test_frame_log_records_renewal_failure_and_skip_without_credentials(
+    setup, monkeypatch, message
+):
+    import urllib.error
+
+    from app.frame_log import exchanges
+    from app.meural_auth import AuthResult
+    from app.meural_cloud import save_session
+
+    save_session(
+        setup.settings,
+        "test_frame",
+        AuthResult("private-access", "private-refresh", 0, "trust"),
+        email="private@example.com",
+        account_id="17",
+        devices=[{"id": "101"}],
+    )
+    setup.settings.update_item("devices", "test_frame", {"delivery_method": "cloud", "host": ""})
+
+    def fail(request, timeout):
+        raise urllib.error.HTTPError(
+            request.full_url,
+            400,
+            "bad request",
+            {},
+            io.BytesIO(json.dumps({"message": message, "token": "private-refresh"}).encode()),
+        )
+
+    monkeypatch.setattr("app.meural_auth.open_request", fail)
+    publisher = setup.publisher()
+    publisher.poll_once()
+    setup.clock[0] += 61
+    publisher.poll_once()
+    lines = exchanges(setup.app, "test_frame")
+    assert any(way == "out" and text == "Netgear renew" for _, way, text in lines)
+    assert any(way == "in" and "400" in text for _, way, text in lines)
+    if message == "App key is empty":
+        assert any("App key is empty" in text for _, _, text in lines)
+    assert any(way == "note" and text == "Session expired, sign in again" for _, way, text in lines)
+    assert all(
+        secret not in str(lines)
+        for secret in (
+            "private-access",
+            "private-refresh",
+            "private@example.com",
+            "Authorization",
+        )
+    )

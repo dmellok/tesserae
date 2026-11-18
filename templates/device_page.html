@@ -907,26 +907,25 @@
         </div>
         {% endif %}
 
-        {% if section.debug_info or sign or section.status.parsed %}
+        {% set frame_log = sign.log if sign else section.get('frame_log') %}
+        {% if section.debug_info or frame_log is not none or section.status.parsed %}
         <div class="dx-grp" id="diagnostics" data-devsub>
           <div class="dx-grp-head"><h3 class="dx-grp-title">Diagnostics</h3></div>
-          {% if sign %}
-          {#- A Visionect frame's report is shown above; what helps instead is
-              what went each way between Tesserae and the frame. -#}
+          {% if frame_log is not none %}
           <div id="frame-log" class="dx-frame-log">
             <div class="dx-code-head">
-              <span><span class="dx-f-label">Frame log</span> <span class="dx-help">→ Tesserae to the frame, ← the frame to Tesserae</span></span>
-              {% if sign.log %}<button type="button" class="dx-btn is-sm" data-copy-target="#{{ section.id }}-frame-log-all"><i class="ph ph-copy" aria-hidden="true"></i><span>Copy</span></button>{% endif %}
+              <span><span class="dx-f-label">Frame log</span> <span class="dx-help">{{ '→ Tesserae to the frame, ← the frame to Tesserae' if sign else '→ Tesserae request, ← frame or cloud reply' }}</span></span>
+              {% if frame_log %}<button type="button" class="dx-btn is-sm" data-copy-target="#{{ section.id }}-frame-log-all"><i class="ph ph-copy" aria-hidden="true"></i><span>Copy</span></button>{% endif %}
             </div>
-            {% if sign.log %}
-            {% if sign.log|length > 8 %}
-            <pre class="dx-code dx-log-view" data-log-tail data-flog-short>{{ sign.log[-8:] | join('\n') }}</pre>
-            <pre class="dx-code is-tall dx-log-view" id="{{ section.id }}-frame-log-all" data-flog-all hidden>{{ sign.log | join('\n') }}</pre>
-            <button type="button" class="dx-link-btn dx-flog-more" data-flog-more aria-expanded="false" data-more-label="Show all {{ sign.log|length }} lines" data-less-label="Show the last 8 lines"><i class="ph ph-caret-down" aria-hidden="true"></i><span>Show all {{ sign.log|length }} lines</span></button>
+            {% if frame_log %}
+            {% if frame_log|length > 8 %}
+            <pre class="dx-code dx-log-view" data-log-tail data-flog-short>{{ frame_log[-8:] | join('\n') }}</pre>
+            <pre class="dx-code is-tall dx-log-view" id="{{ section.id }}-frame-log-all" data-flog-all hidden>{{ frame_log | join('\n') }}</pre>
+            <button type="button" class="dx-link-btn dx-flog-more" data-flog-more aria-expanded="false" data-more-label="Show all {{ frame_log|length }} lines" data-less-label="Show the last 8 lines"><i class="ph ph-caret-down" aria-hidden="true"></i><span>Show all {{ frame_log|length }} lines</span></button>
             {% else %}
-            <pre class="dx-code dx-log-view" id="{{ section.id }}-frame-log-all" data-log-tail>{{ sign.log | join('\n') }}</pre>
+            <pre class="dx-code dx-log-view" id="{{ section.id }}-frame-log-all" data-log-tail>{{ frame_log | join('\n') }}</pre>
             {% endif %}
-            <p class="dx-help">The last {{ sign.log | length }} exchanges since Tesserae started.</p>
+            <p class="dx-help">The last {{ frame_log | length }} exchanges since Tesserae started.</p>
             {% else %}
             <p class="dx-help">Nothing yet: the frame hasn't connected since Tesserae started.</p>
             {% endif %}

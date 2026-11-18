@@ -9,12 +9,14 @@ import threading
 import time
 import uuid
 from collections.abc import Callable, Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from flask import Flask
 
 from app.device_loader import Device
+from app.frame_log import _note
 from app.meural import valid_host
 from app.meural_auth import (
     AuthenticationBlocked,
@@ -167,10 +169,17 @@ def save_tokens(settings: SettingsStore, device_id: str, result: AuthResult) -> 
 
 
 class MeuralCloudClient:
-    def __init__(self, settings: SettingsStore, device_id: str) -> None:
+    def __init__(
+        self,
+        settings: SettingsStore,
+        device_id: str,
+        *,
+        note: Callable[[str, str], None] = lambda way, text: None,
+    ) -> None:
         self._settings = settings
         self._device_id = device_id
         self.lock = threading.RLock()
+        self.note = note
 
     def config(self) -> dict[str, Any]:
         return (self._settings.get_section("devices") or {}).get(self._device_id) or {}
@@ -195,8 +204,10 @@ class MeuralCloudClient:
         with self.lock:
             cfg = self.config()
             if cfg.get("meural_auth_failed"):
+                self.note("note", "Session expired, sign in again")
                 raise InvalidAuth("Session expired, sign in again")
             if time.time() < float(cfg.get("meural_auth_retry_at") or 0):
+                self.note("note", "Backoff: waiting to retry")
                 error = AuthenticationBlocked if cfg.get("meural_auth_blocked") else CannotConnect
                 raise error(
                     "Meural requests are paused after a connection failure. Try again later."
@@ -207,15 +218,24 @@ class MeuralCloudClient:
             if token and token != rejected and expires > time.time() + 60:
                 return token
             if not refresh:
+                self.note("note", "Session expired, sign in again")
                 raise InvalidAuth("Sign in to Meural in this display's settings")
+            self.note("out", "Netgear renew")
             try:
                 result = NetgearAuthenticator(cfg.get("meural_trust_id")).refresh(refresh)
-            except InvalidAuth:
+            except InvalidAuth as exc:
+                self.note("in", f"Netgear renew: {exc.diagnostic or 'session expired'}")
                 self._settings.update_item("devices", self._device_id, {"meural_auth_failed": True})
                 raise
             except (CannotConnect, AuthenticationBlocked) as exc:
+                self.note("in", f"Netgear renew: {exc.diagnostic or type(exc).__name__}")
                 self._backoff(blocked=isinstance(exc, AuthenticationBlocked))
                 raise
+            self.note(
+                "in",
+                "Netgear renew OK; expires "
+                + datetime.fromtimestamp(result.expires_at, UTC).strftime("%b %d %H:%M:%S UTC"),
+            )
             save_tokens(self._settings, self._device_id, result)
             self.reset_auth()
             logger.info("meural %s: cloud session renewed", self._device_id)
@@ -234,9 +254,17 @@ class MeuralCloudClient:
                     "meural_auth_blocked": blocked,
                 },
             )
+            self.note("note", f"Backoff: retry in {delay}s")
 
     def request(self, method: str, path: str, **kwargs: Any) -> Any:
         token = self._token()
+        action = f"{method} {path.split('?')[0]}"
+        if method == "POST" and path == "items":
+            action = "upload"
+        elif method == "DELETE" and path.startswith("items/"):
+            action = "delete"
+        elif method == "POST" and "/items/" in path:
+            action = "show"
         for attempt in range(2):
             headers = {
                 "Authorization": f"Token {token}",
@@ -246,7 +274,9 @@ class MeuralCloudClient:
                 **kwargs.get("headers", {}),
             }
             try:
+                self.note("out", f"Cloud {action}")
                 result = request_json(method, API + path, **{**kwargs, "headers": headers})
+                self.note("in", f"Cloud {action} OK")
                 if self.config().get("meural_auth_failures"):
                     self._settings.update_item(
                         "devices",
@@ -259,9 +289,11 @@ class MeuralCloudClient:
                     )
                 return result
             except (CannotConnect, AuthenticationBlocked) as exc:
+                self.note("in", f"Cloud request failed ({type(exc).__name__})")
                 self._backoff(blocked=isinstance(exc, AuthenticationBlocked))
                 raise
             except HttpError as exc:
+                self.note("in", f"Cloud {action}: {exc.diagnostic}")
                 if exc.status in (403, 429) or exc.status >= 500:
                     self._backoff(blocked=exc.status == 403)
                     raise CannotConnect(
@@ -372,7 +404,11 @@ class MeuralCloudClient:
 def get_cloud_client(app: Flask, device_id: str) -> MeuralCloudClient:
     clients: dict[str, MeuralCloudClient] = app.config.setdefault("MEURAL_CLOUD_CLIENTS", {})
     if device_id not in clients:
-        clients[device_id] = MeuralCloudClient(app.config["SETTINGS_STORE"], device_id)
+        clients[device_id] = MeuralCloudClient(
+            app.config["SETTINGS_STORE"],
+            device_id,
+            note=lambda way, text: _note(app, device_id, way, text),
+        )
     return clients[device_id]
 
 
@@ -386,8 +422,10 @@ class CloudDelivery:
         cancelled: Callable[[], bool] = lambda: False,
         min_interval_s: int = 300,
         clock: Callable[[], float] = time.time,
+        note: Callable[[str, str], None] = lambda way, text: None,
     ) -> None:
         self.path, self.client, self.cancelled = path, client, cancelled
+        self.note = note
         self.min_interval_s = min_interval_s
         self.clock = clock
 
@@ -461,9 +499,11 @@ class CloudDelivery:
             state.update(paused=True, image_duration_paused=True)
             self._save(state)
         if state.get("last_key") == key:
+            self.note("note", "Image unchanged")
             return False
         started_at = state.get("delivery_started_at")
         if started_at is not None and self.clock() < float(started_at) + self.min_interval_s:
+            self.note("note", "Delivery interval not reached")
             return False
         state["delivery_started_at"] = self.clock()
         self._save(state)

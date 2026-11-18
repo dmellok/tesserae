@@ -1541,6 +1541,17 @@ def _build_device_section(store: Any, device: Device) -> dict[str, Any] | None:
             if section["status"]["health"] == "unknown"
             else section["status"]["relative"]
         )
+    if device.kind_of in ("meural", "samsung_frame"):
+        from app.frame_log import exchanges
+        from app.tz_resolve import app_timezone
+
+        tz = app_timezone()
+        arrows = {"out": "→", "in": "←"}
+        section["frame_log"] = [
+            f"{datetime.fromtimestamp(at, tz=tz):%b %d %H:%M:%S}  {arrows.get(way, '·')}  {text}"
+            for at, way, text in exchanges(current_app, device.id)
+        ]
+
     section["kind_name"] = kind.name if kind is not None else str(device.kind_of)
     section["page_url"] = url_for("auth.device_page", instance_id=device.id)
     section["calibration_url"] = (
