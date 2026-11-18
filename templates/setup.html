@@ -33,6 +33,18 @@
     <div style="position:absolute; left:-9999px; height:0; overflow:hidden;" aria-hidden="true">
       <input type="text" name="username" value="tesserae" autocomplete="username" tabindex="-1" readonly>
     </div>
+    {% if needs_token %}
+    {# Shown only to a browser outside the local network: proof that the
+       person setting the first password can read this server's log. #}
+    <div class="field">
+      <label for="setup_token">Setup token{{ info_pop('Printed in the server log while no password is set, or set by TESSERAE_SETUP_TOKEN.') }}</label>
+      <input type="text" id="setup_token" name="setup_token" value="{{ setup_token_value }}" required autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
+      <p class="field-help">
+        You are connecting from outside the local network, so Tesserae needs to know you run this server.
+        Find the token in the server log, for example with <code>docker logs tesserae</code>, on the line that says <em>setup token</em>.
+      </p>
+    </div>
+    {% endif %}
     <div class="field">
       <label for="password">Password{{ info_pop('At least 8 characters.') }}</label>
       <input type="password" id="password" name="password" required minlength="8" autocomplete="new-password">

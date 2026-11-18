@@ -6,7 +6,9 @@ built-in signed-cookie sessions keyed off ``app.config['SECRET_KEY']``.
 
 First run: the gate sees no password and redirects every request (except
 ``/setup``, ``/static``, and the loopback ``/compose`` bypass) to
-``/setup`` so the user can pick one.
+``/setup`` so the user can pick one. A client outside the local network
+must also present the setup token from the server log (see
+``setup_requires_token``).
 
 Loopback bypass: ``/compose/<page_id>`` and ``/renders/<…>`` are reachable
 from ``127.0.0.1`` even without a session, the in-process Playwright
@@ -23,6 +25,7 @@ import ipaddress
 import logging
 import os
 import secrets
+import threading
 from dataclasses import dataclass
 from typing import Any, Final
 
@@ -248,6 +251,88 @@ def forget_password(settings: SettingsStore) -> None:
     settings.update_section("auth", section)
 
 
+# First-run setup token. ``/setup`` is open to anyone who can reach the
+# port while no password is set, so on an internet-reachable host the first
+# stranger to arrive could pick the admin password. A browser on the local
+# network (loopback, the private ranges, the operator's trusted networks)
+# still sets the password with no extra step; anyone else must also present
+# this token, which only someone who can read the server log or the
+# container environment knows.
+SETUP_TOKEN_KEY: Final[str] = "setup_token_secret"
+SETUP_TOKEN_ENV: Final[str] = "TESSERAE_SETUP_TOKEN"
+_SETUP_TOKEN_LOCK = threading.Lock()
+
+
+def _ensure_setup_token(settings: SettingsStore) -> tuple[str, bool, bool]:
+    """Return ``(token, from_env, created)``. The environment variable wins;
+    otherwise the token is generated once and kept in the auth section so it
+    survives a restart. ``clear_password`` wipes it with the rest of the
+    section, so a password reset gets a fresh one."""
+    configured = os.environ.get(SETUP_TOKEN_ENV, "").strip()
+    if configured:
+        return configured, True, False
+    with _SETUP_TOKEN_LOCK:
+        existing = settings.get_section("auth").get(SETUP_TOKEN_KEY)
+        if isinstance(existing, str) and existing:
+            return existing, False, False
+        fresh = secrets.token_urlsafe(16)
+        settings.patch_section("auth", {SETUP_TOKEN_KEY: fresh})
+        return fresh, False, True
+
+
+def _log_setup_token(token: str, from_env: bool) -> None:
+    if from_env:
+        logger.warning(
+            "No admin password is set. Browsers on the local network can open /setup "
+            "directly; from any other address, setup asks for the token in %s.",
+            SETUP_TOKEN_ENV,
+        )
+        return
+    logger.warning(
+        "No admin password is set. Browsers on the local network can open /setup "
+        "directly; from any other address, setup asks for this setup token: %s",
+        token,
+    )
+
+
+def setup_token(settings: SettingsStore) -> str:
+    """The first-run setup token, generated (and written to the log) the
+    first time it is needed."""
+    token, from_env, created = _ensure_setup_token(settings)
+    if created:
+        _log_setup_token(token, from_env)
+    return token
+
+
+def announce_setup_token(settings: SettingsStore) -> None:
+    """Write the setup token to the log at startup while no password is
+    set, so it sits near the top of ``docker logs``."""
+    if password_is_set(settings):
+        return
+    token, from_env, _created = _ensure_setup_token(settings)
+    _log_setup_token(token, from_env)
+
+
+def verify_setup_token(settings: SettingsStore, candidate: str) -> bool:
+    """Constant-time check of a submitted setup token."""
+    expected = setup_token(settings)
+    return hmac.compare_digest(candidate.strip().encode("utf-8"), expected.encode("utf-8"))
+
+
+def discard_setup_token(settings: SettingsStore) -> None:
+    """Drop the stored token once a password exists. A later reset
+    generates a new one."""
+    section = dict(settings.get_section("auth"))
+    if section.pop(SETUP_TOKEN_KEY, None) is not None:
+        settings.update_section("auth", section)
+
+
+def setup_requires_token() -> bool:
+    """Whether this request must present the setup token to set the first
+    password: true for any client the gate does not treat as local."""
+    return not (_is_loopback() or _is_private_client())
+
+
 def password_required(settings: SettingsStore) -> bool:
     """True iff the gate should enforce a session. The Settings UI exposes
     a switch that writes ``auth.disabled: true`` here; default is enforce."""
@@ -365,7 +450,7 @@ def shell_locked() -> bool:
         return False
     if is_authed():
         return False
-    if current_app.config.get("HA_INGRESS_MODE") and request.headers.get("X-Ingress-Path"):
+    if is_ha_ingress_request():
         return False
     store = current_app.config.get("SETTINGS_STORE")
     if isinstance(store, SettingsStore) and not password_required(store):
@@ -436,6 +521,46 @@ def peer_may_forward(addr: str | None, extra_cidrs: str = "") -> bool:
         part.strip() for part in extra_cidrs.replace(",", "\n").splitlines() if part.strip()
     )
     return any(ip in net for net in _parsed_networks(entries))
+
+
+# Where Home Assistant's Supervisor proxies ingress from. Every ingress
+# request reaches an app from this one address, and Home Assistant's app
+# documentation tells ingress apps to accept only it.
+_HA_INGRESS_PROXY: Final = ipaddress.ip_network("172.30.32.2/32")
+
+
+def peer_is_ha_ingress(addr: str | None, extra_cidrs: str = "") -> bool:
+    """Whether ``addr``, the address that opened the connection, may speak
+    for Home Assistant ingress: the Supervisor's proxy, or a proxy the
+    operator listed in ``TESSERAE_TRUSTED_PROXIES`` (for a Supervisor on an
+    unusual network).
+
+    Deliberately narrower than :func:`peer_may_forward`. The app also
+    publishes its port on the host so displays can reach it, which puts the
+    whole LAN in the private ranges that function trusts. ``X-Ingress-Path``
+    signs the caller in as the admin, so a private address is not enough."""
+    ip = _canonical_ip(addr)
+    if ip is None:
+        return False
+    if ip in _HA_INGRESS_PROXY:
+        return True
+    entries = tuple(
+        part.strip() for part in extra_cidrs.replace(",", "\n").splitlines() if part.strip()
+    )
+    return any(ip in net for net in _parsed_networks(entries))
+
+
+def is_ha_ingress_request() -> bool:
+    """A request Home Assistant has already signed in: ingress mode is on,
+    the request carries ``X-Ingress-Path``, and it came straight from the
+    ingress proxy. The header alone proves nothing, anyone can send it.
+    Judged on the socket peer, not the address ProxyFix derived from
+    ``X-Forwarded-For``, which the sender controls."""
+    if not current_app.config.get("HA_INGRESS_MODE"):
+        return False
+    if not request.headers.get("X-Ingress-Path"):
+        return False
+    return peer_is_ha_ingress(_direct_peer(), current_app.config.get("TRUSTED_PROXIES", ""))
 
 
 def _is_private_client() -> bool:
@@ -549,13 +674,12 @@ def install_gate(app: Flask, settings: SettingsStore) -> None:
         if _path_is_open(path):
             return None
         # Home Assistant Ingress: HA Supervisor reverse-proxies this
-        # request and the ``X-Ingress-Path`` header is its proof that
-        # the user is already authenticated upstream. Trust it and
-        # bypass our own password gate entirely. We require BOTH the
-        # env-var opt-in AND the header so a stray header from a
-        # misconfigured reverse proxy on a non-ingress install can't
-        # bypass auth.
-        if current_app.config.get("HA_INGRESS_MODE") and request.headers.get("X-Ingress-Path"):
+        # request after signing the user in, and marks it with
+        # ``X-Ingress-Path``. Bypass our own password gate for it, but only
+        # when the request came from the ingress proxy itself: the app's
+        # port is also published on the host, and a header is something any
+        # client on the network can send (GHSA-v8q4-3m6w-r576).
+        if is_ha_ingress_request():
             return None
         # A valid, unexpired render signature (minted by /frame) grants
         # access to that one artifact from any origin, independent of the

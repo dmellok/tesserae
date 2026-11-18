@@ -379,3 +379,165 @@ def test_public_client_cannot_pass_for_lan_with_a_forwarding_header(app: Flask) 
         _spoofed(app.test_client(), "/settings/system", "192.168.1.2", "203.0.113.9").status_code
         == 403
     )
+
+
+# -- first-run setup token ---------------------------------------------------
+#
+# /setup is open while no password is set. A browser on the local network
+# sets the password with no extra step; a client anywhere else must also
+# present the setup token from the server log.
+
+_PUBLIC = {"REMOTE_ADDR": "203.0.113.9"}
+_LAN = {"REMOTE_ADDR": "192.168.1.50"}
+_GOOD = {"password": "longenough", "password_confirm": "longenough"}
+
+
+def test_setup_from_a_public_address_asks_for_the_token(app: Flask) -> None:
+    resp = app.test_client().get("/setup", environ_base=_PUBLIC)
+    assert resp.status_code == 200
+    assert b'name="setup_token"' in resp.data
+
+
+def test_setup_from_the_lan_does_not_ask_for_the_token(app: Flask) -> None:
+    client = app.test_client()
+    assert b'name="setup_token"' not in client.get("/setup", environ_base=_LAN).data
+    assert b'name="setup_token"' not in client.get("/setup").data
+    resp = client.post("/setup", data=_GOOD, environ_base=_LAN)
+    assert resp.status_code == 302
+    assert auth.password_is_set(_settings_store(app))
+
+
+def test_setup_from_a_public_address_without_the_token_is_refused(app: Flask) -> None:
+    resp = app.test_client().post("/setup", data=_GOOD, environ_base=_PUBLIC)
+    assert resp.status_code == 200
+    assert b"setup token is not correct" in resp.data
+    assert not auth.password_is_set(_settings_store(app))
+
+
+def test_setup_from_a_public_address_with_a_wrong_token_is_refused(app: Flask) -> None:
+    # The app fixture runs ungated (testing=True), so install the gate to
+    # check that no session came out of the failed attempt.
+    auth.install_gate(app, _settings_store(app))
+    client = app.test_client()
+    resp = client.post("/setup", data={**_GOOD, "setup_token": "nope"}, environ_base=_PUBLIC)
+    assert resp.status_code == 200
+    assert not auth.password_is_set(_settings_store(app))
+    # No session was granted either: the admin pages still bounce to setup.
+    assert client.get("/", environ_base=_PUBLIC).headers["Location"].endswith("/setup")
+
+
+def test_setup_from_a_public_address_with_the_token_succeeds(app: Flask) -> None:
+    store = _settings_store(app)
+    token = auth.setup_token(store)
+    resp = app.test_client().post(
+        "/setup", data={**_GOOD, "setup_token": f" {token} "}, environ_base=_PUBLIC
+    )
+    assert resp.status_code == 302
+    assert auth.verify_password(store, "longenough")
+    # Spent: the stored token goes once a password exists.
+    assert auth.SETUP_TOKEN_KEY not in store.get_section("auth")
+
+
+def test_a_forged_forwarding_header_does_not_skip_the_token(app: Flask) -> None:
+    """A public client can't pass for local by claiming a private address."""
+    resp = app.test_client().post(
+        "/setup",
+        data=_GOOD,
+        environ_base=_PUBLIC,
+        headers={"X-Forwarded-For": "127.0.0.1"},
+    )
+    assert resp.status_code == 200
+    assert not auth.password_is_set(_settings_store(app))
+
+
+def test_trusted_network_client_does_not_need_the_token(app: Flask) -> None:
+    """A home network on a routable IPv6 prefix, declared as trusted, is local."""
+    app.config["TRUSTED_NETWORKS"] = "2001:db8:abcd::/48"
+    resp = app.test_client().post(
+        "/setup", data=_GOOD, environ_base={"REMOTE_ADDR": "2001:db8:abcd::7"}
+    )
+    assert resp.status_code == 302
+    assert auth.password_is_set(_settings_store(app))
+
+
+def test_setup_token_from_the_environment_wins(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(auth.SETUP_TOKEN_ENV, "operator-chosen-token")
+    client = app.test_client()
+    store = _settings_store(app)
+    generated = store.get_section("auth").get(auth.SETUP_TOKEN_KEY)
+    assert generated is None
+    resp = client.post(
+        "/setup", data={**_GOOD, "setup_token": "operator-chosen-token"}, environ_base=_PUBLIC
+    )
+    assert resp.status_code == 302
+    assert auth.password_is_set(store)
+
+
+def test_setup_token_is_stable_logged_once_and_rotated_by_a_reset(
+    app: Flask, caplog: pytest.LogCaptureFixture
+) -> None:
+    store = _settings_store(app)
+    with caplog.at_level("WARNING", logger="app.auth"):
+        first = auth.setup_token(store)
+        assert auth.setup_token(store) == first
+    logged = [r for r in caplog.records if first in r.getMessage()]
+    assert len(logged) == 1
+    auth.clear_password(store)
+    assert auth.setup_token(store) != first
+
+
+def test_announce_setup_token_is_silent_once_a_password_exists(
+    app: Flask, caplog: pytest.LogCaptureFixture
+) -> None:
+    store = _settings_store(app)
+    auth.set_password(store, "longenough")
+    with caplog.at_level("WARNING", logger="app.auth"):
+        auth.announce_setup_token(store)
+    assert not caplog.records
+    assert auth.SETUP_TOKEN_KEY not in store.get_section("auth")
+
+
+def test_setup_stays_closed_once_a_password_exists(app: Flask) -> None:
+    """The token never reopens setup on a configured install."""
+    store = _settings_store(app)
+    token = auth.setup_token(store)
+    auth.set_password(store, "originalpass")
+    resp = app.test_client().post(
+        "/setup", data={**_GOOD, "setup_token": token}, environ_base=_PUBLIC
+    )
+    assert resp.status_code == 302
+    assert auth.verify_password(store, "originalpass")
+
+
+def test_production_server_announces_the_token_and_keeps_forwarding_headers(
+    app: Flask, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """``tesserae`` on a fresh install logs the setup token before serving,
+    and starts waitress without its forwarding-header stripping. Stripped
+    headers make every visitor behind a reverse proxy look local to the
+    gate, which would let them skip the token."""
+    import logging
+
+    import waitress
+
+    from app import log_buffer, main
+
+    served: dict[str, object] = {}
+    # _serve writes these two itself; registering them here restores them.
+    monkeypatch.setenv("TESSERAE_BIND_PORT", "8765")
+    monkeypatch.setenv("TESSERAE_BIND_HOST", "127.0.0.1")
+    monkeypatch.setattr(main, "create_app", lambda **_kw: app)
+    monkeypatch.setattr(waitress, "serve", lambda _app, **kw: served.update(kw))
+    root = logging.getLogger()
+    handlers_before = list(root.handlers)
+    try:
+        with caplog.at_level("WARNING", logger="app.auth"):
+            main._serve(["--host", "127.0.0.1", "--port", "8765"])
+    finally:
+        for handler in list(root.handlers):
+            if handler not in handlers_before and isinstance(handler, log_buffer.LogBuffer):
+                root.removeHandler(handler)
+
+    assert served["clear_untrusted_proxy_headers"] is False
+    token = _settings_store(app).get_section("auth")[auth.SETUP_TOKEN_KEY]
+    assert any(token in r.getMessage() for r in caplog.records)

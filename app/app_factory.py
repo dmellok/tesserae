@@ -331,9 +331,10 @@ def create_app(
     #   when only one of the two knobs is configured.
     #
     # * The auth-gate bypass requires the ``TESSERAE_HA_INGRESS=1`` env
-    #   var AS WELL AS the header on the live request. The env var is
-    #   the security knob, a stray header from a misconfigured reverse
-    #   proxy on a non-ingress install can't bypass auth without it.
+    #   var, the header on the live request, AND that the request came
+    #   from the Supervisor's ingress proxy (app.auth.is_ha_ingress_request).
+    #   The header by itself is not proof of anything: the app's port is
+    #   published on the host too, so any LAN client can send it.
     app.config["HA_INGRESS_MODE"] = os.environ.get("TESSERAE_HA_INGRESS", "").strip() in {
         "1",
         "true",
@@ -458,11 +459,30 @@ def create_app(
             self._inner = inner
 
         def __call__(self, environ: dict[str, Any], start_response: Any) -> Any:
-            from app.auth import peer_may_forward
+            from app.auth import peer_is_ha_ingress, peer_may_forward
 
-            if not peer_may_forward(
-                environ.get("REMOTE_ADDR"), app.config.get("TRUSTED_PROXIES", "")
+            peer = environ.get("REMOTE_ADDR")
+            proxies = app.config.get("TRUSTED_PROXIES", "")
+            # In ingress mode ``X-Ingress-Path`` signs the caller in, so it
+            # is kept only from the ingress proxy. Dropping it here, before
+            # anything reads it, also keeps a LAN client from steering the
+            # URL prefix or the port capture with it.
+            if (
+                app.config.get("HA_INGRESS_MODE")
+                and "HTTP_X_INGRESS_PATH" in environ
+                and not peer_is_ha_ingress(peer, proxies)
             ):
+                if not getattr(self, "_warned_ingress", False):
+                    self._warned_ingress = True
+                    logger.warning(
+                        "Ignoring X-Ingress-Path from %s: in Home Assistant ingress mode "
+                        "it is accepted only from the Supervisor's ingress proxy "
+                        "(172.30.32.2). If your Supervisor proxies from another address, "
+                        "add it to TESSERAE_TRUSTED_PROXIES.",
+                        peer,
+                    )
+                environ.pop("HTTP_X_INGRESS_PATH", None)
+            if not peer_may_forward(peer, proxies):
                 for header in (
                     "HTTP_X_FORWARDED_FOR",
                     "HTTP_X_FORWARDED_HOST",

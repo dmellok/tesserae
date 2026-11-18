@@ -175,6 +175,7 @@ Environment variables can override the script's defaults:
 ## First run
 
 1. Open `http://127.0.0.1:8765/`. On first startup, `/setup` asks you to set an admin password.
+   From a browser outside the local network, `/setup` also asks for the setup token printed in the server log (or set with `TESSERAE_SETUP_TOKEN`).
 2. Sign in at `/login`. The setup wizard covers welcome, help out, timezone, transport, device and dashboard.
    You can reach the same screens through Settings if you skip it.
 3. In **Settings → Server**, set:
