@@ -6,6 +6,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.514.0], 2026-11-18
+
 ### Security
 
 - Home Assistant App: the admin no longer opens to anyone on the network who sends an `X-Ingress-Path` header. The app trusted that header as proof that Home Assistant had signed the visitor in, and it also publishes port 8765 on the host for displays, so any device on the LAN could add the header and skip the password. The header now counts only when the request comes from the Supervisor's ingress proxy (`172.30.32.2`), or from a proxy listed in `TESSERAE_TRUSTED_PROXIES`. Opening Tesserae from the Home Assistant sidebar works as before. Thanks to hillmar for the report. (GHSA-v8q4-3m6w-r576)
