@@ -30,6 +30,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- Priority lineups follow Home Assistant state changes through a shared event subscription, within about a second. Events for entities no lineup watches cost nothing on disk, and a subscription that cannot connect leaves the regular state polling in charge.
 - Pause the Meural slideshow timer during cloud delivery and restore it on release. If the restore cannot reach Netgear, the device page says to turn gallery rotation back on in the Meural app.
 
 - Fix lineup binding races and warnings, and load picker previews on demand with an inline fallback.
