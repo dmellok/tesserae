@@ -450,7 +450,7 @@ def shell_locked() -> bool:
         return False
     if is_authed():
         return False
-    if current_app.config.get("HA_INGRESS_MODE") and request.headers.get("X-Ingress-Path"):
+    if is_ha_ingress_request():
         return False
     store = current_app.config.get("SETTINGS_STORE")
     if isinstance(store, SettingsStore) and not password_required(store):
@@ -521,6 +521,46 @@ def peer_may_forward(addr: str | None, extra_cidrs: str = "") -> bool:
         part.strip() for part in extra_cidrs.replace(",", "\n").splitlines() if part.strip()
     )
     return any(ip in net for net in _parsed_networks(entries))
+
+
+# Where Home Assistant's Supervisor proxies ingress from. Every ingress
+# request reaches an app from this one address, and Home Assistant's app
+# documentation tells ingress apps to accept only it.
+_HA_INGRESS_PROXY: Final = ipaddress.ip_network("172.30.32.2/32")
+
+
+def peer_is_ha_ingress(addr: str | None, extra_cidrs: str = "") -> bool:
+    """Whether ``addr``, the address that opened the connection, may speak
+    for Home Assistant ingress: the Supervisor's proxy, or a proxy the
+    operator listed in ``TESSERAE_TRUSTED_PROXIES`` (for a Supervisor on an
+    unusual network).
+
+    Deliberately narrower than :func:`peer_may_forward`. The app also
+    publishes its port on the host so displays can reach it, which puts the
+    whole LAN in the private ranges that function trusts. ``X-Ingress-Path``
+    signs the caller in as the admin, so a private address is not enough."""
+    ip = _canonical_ip(addr)
+    if ip is None:
+        return False
+    if ip in _HA_INGRESS_PROXY:
+        return True
+    entries = tuple(
+        part.strip() for part in extra_cidrs.replace(",", "\n").splitlines() if part.strip()
+    )
+    return any(ip in net for net in _parsed_networks(entries))
+
+
+def is_ha_ingress_request() -> bool:
+    """A request Home Assistant has already signed in: ingress mode is on,
+    the request carries ``X-Ingress-Path``, and it came straight from the
+    ingress proxy. The header alone proves nothing, anyone can send it.
+    Judged on the socket peer, not the address ProxyFix derived from
+    ``X-Forwarded-For``, which the sender controls."""
+    if not current_app.config.get("HA_INGRESS_MODE"):
+        return False
+    if not request.headers.get("X-Ingress-Path"):
+        return False
+    return peer_is_ha_ingress(_direct_peer(), current_app.config.get("TRUSTED_PROXIES", ""))
 
 
 def _is_private_client() -> bool:
@@ -634,13 +674,12 @@ def install_gate(app: Flask, settings: SettingsStore) -> None:
         if _path_is_open(path):
             return None
         # Home Assistant Ingress: HA Supervisor reverse-proxies this
-        # request and the ``X-Ingress-Path`` header is its proof that
-        # the user is already authenticated upstream. Trust it and
-        # bypass our own password gate entirely. We require BOTH the
-        # env-var opt-in AND the header so a stray header from a
-        # misconfigured reverse proxy on a non-ingress install can't
-        # bypass auth.
-        if current_app.config.get("HA_INGRESS_MODE") and request.headers.get("X-Ingress-Path"):
+        # request after signing the user in, and marks it with
+        # ``X-Ingress-Path``. Bypass our own password gate for it, but only
+        # when the request came from the ingress proxy itself: the app's
+        # port is also published on the host, and a header is something any
+        # client on the network can send (GHSA-v8q4-3m6w-r576).
+        if is_ha_ingress_request():
             return None
         # A valid, unexpired render signature (minted by /frame) grants
         # access to that one artifact from any origin, independent of the

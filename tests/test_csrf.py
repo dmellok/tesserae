@@ -215,9 +215,11 @@ def test_ingress_forwarded_origin_is_accepted_but_another_port_is_rejected(
         source_header: "https://homeassistant.local:8123",
     }
     path = "/api/hassio_ingress/test-prefix/_csrf_probe/one"
-    assert client.post(path, headers=headers).status_code == 204
+    # Ingress requests reach the app from the Supervisor's proxy.
+    supervisor = {"REMOTE_ADDR": "172.30.32.2"}
+    assert client.post(path, headers=headers, environ_overrides=supervisor).status_code == 204
     headers[source_header] = "https://homeassistant.local:9999"
-    assert client.post(path, headers=headers).status_code == 403
+    assert client.post(path, headers=headers, environ_overrides=supervisor).status_code == 403
 
 
 def test_public_url_override_is_the_effective_origin(app) -> None:
@@ -302,6 +304,89 @@ def test_untrusted_ingress_header_does_not_bypass_auth(gated_app) -> None:
     )
     assert response.status_code == 302
     assert "/login" in response.location
+
+
+# GHSA-v8q4-3m6w-r576: the Home Assistant app publishes its port on the host as
+# well as serving ingress, so the ingress header has to come from the ingress
+# proxy to count. A LAN address is "private" and used to be enough.
+_SUPERVISOR = "172.30.32.2"
+_INGRESS = {"X-Ingress-Path": "/api/hassio_ingress/abc"}
+
+
+def _ingress_app(gated_app):
+    gated_app.config["HA_INGRESS_MODE"] = True
+    auth.set_password(gated_app.config["SETTINGS_STORE"], "test-password")
+    return gated_app
+
+
+@pytest.mark.parametrize(
+    "peer",
+    ["192.168.1.50", "10.0.0.7", "172.30.32.1", "172.30.33.2", "127.0.0.1", "::1", "fd00::5"],
+)
+def test_ingress_header_from_the_lan_does_not_sign_anyone_in(gated_app, peer) -> None:
+    app = _ingress_app(gated_app)
+    response = app.test_client().get(
+        "/settings/system", headers=_INGRESS, environ_overrides={"REMOTE_ADDR": peer}
+    )
+    assert response.status_code == 302 and "/login" in response.location
+
+
+def test_ingress_header_from_the_supervisor_proxy_signs_in(gated_app) -> None:
+    app = _ingress_app(gated_app)
+    response = app.test_client().get(
+        "/api/hassio_ingress/abc/settings/system",
+        headers=_INGRESS,
+        environ_overrides={"REMOTE_ADDR": _SUPERVISOR},
+    )
+    assert response.status_code == 200
+    # An IPv4-mapped form of the same address is the same peer.
+    mapped = app.test_client().get(
+        "/settings/system",
+        headers=_INGRESS,
+        environ_overrides={"REMOTE_ADDR": f"::ffff:{_SUPERVISOR}"},
+    )
+    assert mapped.status_code == 200
+
+
+@pytest.mark.parametrize("forged", ["X-Forwarded-For", "X-Real-IP", "Forwarded"])
+def test_a_forwarded_address_cannot_pass_for_the_ingress_proxy(gated_app, forged) -> None:
+    app = _ingress_app(gated_app)
+    value = f"for={_SUPERVISOR}" if forged == "Forwarded" else _SUPERVISOR
+    response = app.test_client().get(
+        "/settings/system",
+        headers={**_INGRESS, forged: value},
+        environ_overrides={"REMOTE_ADDR": "192.168.1.50"},
+    )
+    assert response.status_code == 302 and "/login" in response.location
+
+
+def test_ingress_header_from_the_lan_cannot_write(gated_app) -> None:
+    """A script sends no Origin, so the cross-origin check passes it; the
+    sign-in gate is what has to stop the write."""
+    app = _ingress_app(gated_app)
+    response = app.test_client().post(
+        "/_csrf_probe/one", headers=_INGRESS, environ_overrides={"REMOTE_ADDR": "192.168.1.50"}
+    )
+    assert response.status_code in (302, 401, 403)
+    assert app.config["CSRF_TEST_WRITES"] == []
+
+
+def test_ingress_header_from_the_lan_does_not_set_the_url_prefix(gated_app) -> None:
+    app = _ingress_app(gated_app)
+    client = app.test_client()
+    forged = {"X-Ingress-Path": "/evil-prefix"}
+    lan = client.get("/login", headers=forged, environ_overrides={"REMOTE_ADDR": "192.168.1.50"})
+    assert "/evil-prefix" not in lan.get_data(as_text=True)
+    proxied = client.get("/login", headers=_INGRESS, environ_overrides={"REMOTE_ADDR": _SUPERVISOR})
+    assert "/api/hassio_ingress/abc" in proxied.get_data(as_text=True) or proxied.status_code == 302
+
+
+def test_without_ingress_mode_the_supervisor_address_gets_nothing(gated_app) -> None:
+    auth.set_password(gated_app.config["SETTINGS_STORE"], "test-password")
+    response = gated_app.test_client().get(
+        "/settings/system", headers=_INGRESS, environ_overrides={"REMOTE_ADDR": _SUPERVISOR}
+    )
+    assert response.status_code == 302 and "/login" in response.location
 
 
 @pytest.mark.parametrize("path", ["/pages/new", "/pages/canvas/"])
