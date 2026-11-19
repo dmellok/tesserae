@@ -50,8 +50,11 @@ def _stamp_step_items(png: bytes, page: Any) -> bytes:
     """Keep item identity with its screenshot, including saved item previews."""
     try:
         items = page.evaluate("""() => {
+          // A draw key is a fresh nonce per draw: stamping it would give the
+          // same pixels a new digest every time. Fall through to what each
+          // cell shows instead, which follows the content.
           const chosen = new URL(location.href).searchParams.get("item");
-          if (chosen) return {"*": [chosen]};
+          if (chosen && !chosen.startsWith("draw:")) return {"*": [chosen]};
           const out = {};
           for (const el of document.querySelectorAll("[data-cell-id][data-data]")) {
             const data = JSON.parse(el.dataset.data || "{}");
