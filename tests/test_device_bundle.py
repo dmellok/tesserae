@@ -336,3 +336,51 @@ def test_export_with_tokens_needs_the_admin_session(app: Flask) -> None:
     assert token.encode() not in stranger.get_data()
 
     assert token.encode() in owner.get("/bundles/export?device=kitchen&identity=1").get_data()
+
+
+def test_a_single_display_exports_from_its_own_menu(app: Flask) -> None:
+    """Like the per-row Export on dashboards: the display's More menu
+    downloads just that display, without its token."""
+    _add(app)
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/settings/devices/kitchen").get_data(as_text=True)
+    assert 'href="/bundles/export?device=kitchen" download' in body
+    assert "Export this display" in body
+
+
+def test_the_export_form_offers_select_and_clear_all(app: Flask) -> None:
+    _add(app)
+    client = app.test_client()
+    _sign_in(client)
+    one = client.get("/settings/devices").get_data(as_text=True)
+    assert 'data-export-pick="none"' not in one  # nothing to pick between
+
+    _add(app, "hallway", name="Hallway")
+    both = client.get("/settings/devices").get_data(as_text=True)
+    assert 'data-export-pick="all"' in both and 'data-export-pick="none"' in both
+
+
+def test_backup_copies_in_the_devices_folder_are_not_loaded(app: Flask) -> None:
+    """A copy such as ``kitchen.bak.json`` used to load as a second display
+    holding the first one's token (#541). Device ids never contain a dot."""
+    from app.device_loader import DeviceRegistry, discover
+
+    device = _add(app)
+    root = Path(app.config["DEVICE_DATA_ROOT"])
+    copy = device.path.read_text()
+    (root / "kitchen.bak.json").write_text(copy)
+    (root / ".kitchen.json").write_text(copy)
+
+    fresh = discover(
+        REPO_ROOT / "devices",
+        schema_path=REPO_ROOT / "schema" / "device.schema.json",
+        data_root=root,
+        hardware_dir=REPO_ROOT / "hardware",
+        hardware_schema_path=REPO_ROOT / "schema" / "hardware.schema.json",
+    )
+    assert isinstance(fresh, DeviceRegistry)
+    assert set(fresh.devices) >= {"kitchen"}
+    assert not {"kitchen.bak", ".kitchen"} & set(fresh.devices)
+    skipped = {e.device_id for e in fresh.errors if "backup copy" in e.message}
+    assert skipped == {"kitchen.bak", ".kitchen"}

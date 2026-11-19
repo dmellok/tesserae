@@ -194,8 +194,14 @@
     <summary><i class="ph ph-arrows-left-right" aria-hidden="true"></i> Move displays to another server</summary>
     <form method="get" action="{{ url_for('bundles.export') }}" class="form">
       <p class="field-help">Export writes each ticked display's panel, orientation, quiet hours, buttons and other settings to a file. <a href="{{ url_for('bundles.import_form') }}">Import</a> it on another Tesserae to add the display there, or to update one with the same id.</p>
-      <fieldset>
+      <fieldset data-export-picks>
         <legend>Displays</legend>
+        {% if _devices|length > 1 %}
+        <p class="dx-export-picks">
+          <button type="button" class="dx-btn-ghost-sm" data-export-pick="all">Select all</button>
+          <button type="button" class="dx-btn-ghost-sm" data-export-pick="none">Clear all</button>
+        </p>
+        {% endif %}
         {% for section in _devices %}
         <label><input type="checkbox" name="device" value="{{ section.device_id }}" checked> {{ section.device_name }} <span class="field-help">({{ section.device_id }})</span></label><br>
         {% endfor %}
