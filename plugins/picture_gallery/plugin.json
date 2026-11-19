@@ -29,6 +29,14 @@
       "default": "any",
       "choices": [
         {
+          "value": "auto",
+          "label": "Auto"
+        },
+        {
+          "value": "frame",
+          "label": "Match the frame"
+        },
+        {
           "value": "any",
           "label": "Any"
         },
@@ -45,7 +53,7 @@
           "label": "Square"
         }
       ],
-      "help": "Only pictures of this shape."
+      "help": "Auto shows pictures the shape of this cell on each frame when the dashboard is on both portrait and landscape frames, and any picture otherwise. Match the frame always does this, so a portrait cell on a landscape frame shows portrait pictures. The others show only pictures of that shape."
     },
     {
       "name": "mode",
