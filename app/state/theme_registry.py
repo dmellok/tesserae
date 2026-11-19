@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-ThemeFamily = Literal["light", "dark", "movement", "vivid", "gradient", "user", "community"]
+ThemeFamily = Literal["light", "dark", "movement", "ink", "vivid", "gradient", "user", "community"]
 
 
 @dataclass(frozen=True)
@@ -98,6 +98,19 @@ BUNDLED_THEMES: tuple[Theme, ...] = (
     Theme(id="bauhaus", name="Bauhaus", family="movement", tagline="palette only"),
     Theme(id="destijl", name="De Stijl", family="movement", tagline="palette only"),
     Theme(id="brutalist", name="Brutalist", family="movement", tagline="palette only"),
+    # Flat ink themes for colour e-ink: every token is exactly one of the
+    # panel's own inks, so nothing but anti-aliased edges reaches the
+    # dither. The first four keep to black / white / yellow / red and suit
+    # 4-colour panels as well as Spectra 6; the last four add blue or
+    # green and need Spectra 6. The tagline names the panel and the canvas.
+    Theme(id="ink-poster", name="Poster", family="ink", tagline="4-colour · white"),
+    Theme(id="ink-taxi", name="Taxi", family="ink", tagline="4-colour · yellow"),
+    Theme(id="ink-signal", name="Signal", family="ink", tagline="4-colour · red"),
+    Theme(id="ink-noir", name="Noir", family="ink", tagline="4-colour · black"),
+    Theme(id="ink-primary", name="Primary", family="ink", tagline="Spectra 6 · white"),
+    Theme(id="ink-delft", name="Delft", family="ink", tagline="Spectra 6 · blue"),
+    Theme(id="ink-canary", name="Canary", family="ink", tagline="Spectra 6 · yellow"),
+    Theme(id="ink-gallery", name="Gallery", family="ink", tagline="Spectra 6 · black mat"),
     # NOTE: the Vivid family (tangerine, lime, cobalt, magenta, emerald,
     # crimson, cyan, aubergine, mustard, teal-pop, hot-pink, lavender-
     # pop, olive-pop, burgundy, forest) and the Gradient family (sunset,
@@ -116,6 +129,7 @@ FAMILY_LABELS: dict[ThemeFamily, str] = {
     "light": "Light",
     "dark": "Dark",
     "movement": "Movement",
+    "ink": "Flat ink",
     "vivid": "Vivid",
     "gradient": "Gradient",
     "user": "Your themes",
@@ -130,6 +144,7 @@ FAMILY_ORDER: tuple[ThemeFamily, ...] = (
     "light",
     "dark",
     "movement",
+    "ink",
     "vivid",
     "gradient",
     "community",
@@ -175,6 +190,7 @@ _PICKER_GROUP_LABELS: dict[ThemeFamily, str] = {
     "light": "Light themes",
     "dark": "Dark themes",
     "movement": "Movement themes",
+    "ink": "Flat ink themes",
     "vivid": "Vivid themes",
     "gradient": "Gradient themes",
     "community": "From the catalogue",

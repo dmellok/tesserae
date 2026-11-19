@@ -306,7 +306,7 @@ works against the `trmnl_png` renderer.
 | Panel | Resolution | Client | Status |
 |---|---|---|---|
 | [TRMNL OG](https://shop.trmnl.com/products/trmnl) | 800×480 | TRMNL firmware | TBD via BYOS |
-| [TRMNL X](https://shop.trmnl.com/products/trmnl-x) | 1872×1404 (10.3") | TRMNL firmware | TBD |
+| [TRMNL X](https://shop.trmnl.com/products/trmnl-x) | 1872×1404 (10.3"), 16-level grey | TRMNL firmware | ✅ via BYOS |
 | Amazon Kindle Paperwhite 2 (jailbroken) | 758×1024 | [KOReader trmnl-display plugin](https://github.com/koreader/koreader) (1-bit; see the KOReader section above for the Tesserae plugin) | ✅ |
 
 ### Custom panels

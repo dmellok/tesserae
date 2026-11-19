@@ -28,6 +28,138 @@ def _compute(push: float | None, reach: nu.Reach, hold: nu.Hold | None = None) -
     return nu.compute_next_update(push, reach, now=NOW, hold=hold)
 
 
+@pytest.mark.parametrize("kind", ["meural", "samsung_frame"])
+def test_always_on_kind_is_reachable_without_settings_or_telemetry(app: Flask, kind: str) -> None:
+    device = app.config["DEVICE_REGISTRY"].get(kind)
+    with app.app_context():
+        reach = nu.reach_for_device(device, now=NOW)
+    assert reach.mode == nu.MODE_CONNECTED
+    assert not reach.live
+
+
+@pytest.mark.parametrize("kind", ["meural", "samsung_frame", "esp32_client"])
+@pytest.mark.parametrize("due", [False, True])
+def test_lineups_header_counts_page_refresh_inside_two_hour_step(
+    app: Flask, monkeypatch: pytest.MonkeyPatch, kind: str, due: bool
+) -> None:
+    from datetime import timedelta
+
+    import app.deck_routes as routes
+    from app.state.deck_model import Deck, DeckPage
+
+    now = datetime(2026, 11, 17, 12, 11, 10, 500000, tzinfo=UTC)
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz: tzinfo | None = None) -> datetime:
+            return now.astimezone(tz)
+
+    monkeypatch.setattr(routes, "datetime", Clock)
+    app.config["SETTINGS_STORE"].patch_section("app", {"timezone": "UTC"})
+    c = app.test_client()
+    _sign_in(c)
+    code = app.config["PAIRING_STORE"].issue(note="test").code
+    assert (
+        c.post(
+            "/api/v1/device/register",
+            headers={"X-Pairing-Code": code},
+            json={"device_id": "panel", "kind": kind},
+        ).status_code
+        == 201
+    )
+    app.config["PAGE_STORE"].save(
+        Page(id="kitchen", name="Kitchen", device_ids=["panel"], refresh_minutes=15)
+    )
+    app.config["DECK_STORE"].upsert(
+        Deck(
+            id="loop",
+            name="Loop",
+            device_ids=["panel"],
+            pages=[DeckPage(page_id="kitchen"), DeckPage(page_id="hall")],
+            advance="timer",
+            advance_interval_minutes=120,
+            advance_anchor="11:00",
+            advance_end_at="23:00",
+            advance_smart_sync=False,
+        )
+    )
+    app.config["DECK_NAV_STORE"].set("panel", "loop", "kitchen")
+    sched = app.config["SCHEDULER"]
+    monkeypatch.setattr(sched, "_tz_provider", lambda: UTC)
+    start = now.replace(hour=11, minute=0, second=0, microsecond=0).timestamp()
+    sched._rotation_last_step["loop"] = 0
+    sched._rotation_last_pushed_at["loop"] = start
+    sched._rotation_last_window_start["loop"] = start
+    sched._page_last_refresh["kitchen"] = (now - timedelta(minutes=20) if due else now).timestamp()
+    monkeypatch.setattr(
+        app.config["PUSH_MANAGER"],
+        "latest_render_for",
+        lambda _id: {
+            "page_id": "kitchen",
+            "timestamp": start,
+            "digest": "same-picture",
+        },
+    )
+    monkeypatch.setattr(
+        app.config["PUSH_MANAGER"],
+        "last_served_render_for",
+        lambda _id: {
+            "page_id": "kitchen",
+            "served_at": start,
+            "digest": "same-picture",
+        },
+    )
+    if kind == "esp32_client":
+        app.config["DEVICE_TELEMETRY"].record_heartbeat(
+            "panel",
+            received_at=now.timestamp(),
+            parsed={"sleep_until": now.timestamp() + 600},
+            configured_sleep_s=900,
+        )
+
+    panel = c.get("/decks/view.json?display=panel").get_json()["displays"][0]
+    update = panel["next_update"]
+    ticks = [t for s in panel["day"]["segments"] for t in s["ticks"] if t["next"]]
+    # The always-on bar follows the header's refresh, including a due repaint.
+    # Sleepers keep their existing next-lineup-step marker.
+    assert len(ticks) == 1
+    assert ticks[0]["minute"] == (
+        (12 * 60 + 11 if due else 12 * 60 + 15) if kind != "esp32_client" else 13 * 60
+    )
+    if kind != "esp32_client":
+        assert ticks[0]["in_sec"] == (0 if due else 229)
+    if kind == "esp32_client" and due:
+        # Existing sleeper behavior skips a repaint already due on the same page.
+        assert update["dashboard_id"] == "hall"
+        assert update["push_at_label"] == "13:00"
+    else:
+        assert update["dashboard_id"] == "kitchen"
+        assert update["push_at_label"] == ("12:11" if due else "12:15")
+        if kind != "esp32_client":
+            assert update["at_epoch"] == (
+                now.timestamp()
+                if due
+                else now.replace(minute=15, second=0, microsecond=0).timestamp()
+            )
+            assert panel["next_line"]["before"] == "Kitchen refreshes every 15 min · Hall at"
+            assert panel["next_line"]["at"] == "13:00"
+            assert panel["refreshes_today"] == 27  # six steps + seven refreshes per Kitchen visit
+            if not due:
+                body = c.get("/decks").get_data(as_text=True)
+                status = re.search(r'<p class="lu-show .*?</p>', body).group(0)
+                timing = re.search(r'<p class="lu-nextl".*?</p>', body).group(0)
+                assert '<a href="/pages/kitchen">Kitchen</a>' in status
+                assert '<a href="/decks/loop/edit">Loop</a>' in status
+                assert '<a href="/pages/kitchen">Kitchen</a>' in timing
+                assert '<a href="/pages/hall">Hall</a>' in timing
+                assert "Kitchen refreshes every 15 min" in body
+                assert (
+                    "27 scheduled updates today: lineup steps and dashboard refresh attempts"
+                    in body
+                )
+                assert "<span>Checked in</span>" not in body
+
+
 # -- the computation ------------------------------------------------------
 
 
