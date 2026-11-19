@@ -56,15 +56,6 @@ def _vm_display(display_id: str) -> dict[str, Any]:
     return next(d for d in sample_view_model().to_dict()["displays"] if d["id"] == display_id)
 
 
-def _next_line(d: dict[str, Any]) -> str:
-    nl = d["next_line"]
-    return (
-        str(nl["before"])
-        + (f" <b>{nl['at']}</b>" if nl["at"] else "")
-        + (f" {nl['after']}" if nl["after"] else "")
-    )
-
-
 def _vm_lineup(lineup_id: str) -> dict[str, Any]:
     vm = sample_view_model().to_dict()
     for d in vm["displays"]:
@@ -163,8 +154,9 @@ def test_display_header(page: str) -> None:
         str(fd["refreshes_today"]),
     ):
         assert f"<span>{tag}</span>" in hdr
-    assert '<p class="lu-show sync"' in hdr and "<b>Family</b>" in hdr
-    assert _next_line(fd) in hdr and fd["next_line"]["before"] == "AI News next at"
+    assert '<p class="lu-show sync"' in hdr
+    assert '<a href="/pages/family">Family</a>' in hdr
+    assert '<a href="/pages/ainews">AI News</a> next at <b>18:30</b>' in hdr
     # The now thumbnail sits in a fixed slot in the display's own shape.
     assert re.search(
         r'<figure class="lu-now-thumb" title="On screen: Family"><span class="thumb-frame lu-thumb p" style="--ar:1440/2560',
@@ -334,8 +326,9 @@ def test_next_tick_reports_how_long_it_is_away() -> None:
 def test_queued_step_on_a_sleeping_display(page: str) -> None:
     kitchen = _section(page, "kitchen")
     hdr = kitchen[: kitchen.index("</header>")]
-    assert '<p class="lu-show queued"' in hdr and "<b>Bus times</b>" in hdr
-    assert _next_line(_vm_display("kitchen")) in hdr and "when it wakes" in hdr
+    assert '<p class="lu-show queued"' in hdr
+    assert '<a href="/pages/bus">Bus times</a>' in hdr
+    assert '<a href="/pages/weather">Weather</a> next, lands <b>~18:18</b> when it wakes' in hdr
     assert "<span>Wakes at 18:18</span>" in hdr
     row = _row(page, "kitchen")
     steps = re.findall(r'<li class="lu-step([^"]*)" data-step="(\d)">.*?</li>', row, re.S)

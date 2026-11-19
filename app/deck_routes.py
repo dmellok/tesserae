@@ -1900,7 +1900,15 @@ def _build_lineups_view(
             src = _origin_of(display.id, display.on_screen.dashboard_id)
             origin = src[0] if src is not None else None
             if origin:
-                display.show_suffix = f"from {origin}"
+                if (
+                    src is not None
+                    and src.lineup_id in deck_by_id
+                    and origin == deck_by_id[src.lineup_id].name
+                ):
+                    display.show_lineup_name = deck_by_id[src.lineup_id].name
+                    display.show_lineup_url = url_for("decks.editor", deck_id=src.lineup_id)
+                else:
+                    display.show_suffix = f"from {origin}"
                 live_runtime = current.get(live_lineup.id, {}) if live_lineup else {}
                 resume = live_runtime.get("next_transition_epoch")
                 if behind_schedule and isinstance(resume, (int, float)):

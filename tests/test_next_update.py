@@ -146,6 +146,12 @@ def test_lineups_header_counts_page_refresh_inside_two_hour_step(
             assert panel["refreshes_today"] == 27  # six steps + seven refreshes per Kitchen visit
             if not due:
                 body = c.get("/decks").get_data(as_text=True)
+                status = re.search(r'<p class="lu-show .*?</p>', body).group(0)
+                timing = re.search(r'<p class="lu-nextl".*?</p>', body).group(0)
+                assert '<a href="/pages/kitchen">Kitchen</a>' in status
+                assert '<a href="/decks/loop/edit">Loop</a>' in status
+                assert '<a href="/pages/kitchen">Kitchen</a>' in timing
+                assert '<a href="/pages/hall">Hall</a>' in timing
                 assert "Kitchen refreshes every 15 min" in body
                 assert (
                     "27 scheduled updates today: lineup steps and dashboard refresh attempts"
