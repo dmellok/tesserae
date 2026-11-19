@@ -17,6 +17,7 @@ from flask import Flask
 from PIL import Image
 
 from app import device_service, samsung_frame
+from app.frame_log import exchanges
 from app.main import REPO_ROOT, create_app
 from app.samsung_frame import SamsungFramePublisher
 from app.samsung_frame_art import FrameArtError, FramePairingError
@@ -214,6 +215,7 @@ def test_unchanged_frame_is_not_resent_even_after_restart(app: Flask) -> None:
     uploads = len(tv.uploads)
     _publisher(app, tv).on_push()
     assert len(tv.uploads) == uploads
+    assert ("note", "Unchanged") in [(way, text) for _, way, text in exchanges(app, "office_frame")]
 
 
 def test_keeps_newest_uploads_and_deletes_only_its_own(app: Flask) -> None:
@@ -256,6 +258,9 @@ def test_a_tv_in_use_gets_its_frame_once_art_mode_is_back(app: Flask) -> None:
     assert tv.uploads == []
     assert _screen(app)["screen_why"] == "in use, new frame waiting"
     assert not pub._backing_off("office_frame")
+    assert ("note", "TV in use; frame waits") in [
+        (way, text) for _, way, text in exchanges(app, "office_frame")
+    ]
     pub.poll_once()  # still watching: nothing sent
     assert tv.uploads == []
     tv.art_mode = True  # back to Art Mode
@@ -279,6 +284,7 @@ def test_no_address_skips(app: Flask) -> None:
     tv = FakeTV()
     _publisher(app, tv).on_push()
     assert tv.calls == []
+    assert ("note", "No host") in [(way, text) for _, way, text in exchanges(app, "office_frame")]
 
 
 def test_failure_backs_off_then_poll_resends_when_tv_is_back(app: Flask) -> None:
@@ -291,6 +297,10 @@ def test_failure_backs_off_then_poll_resends_when_tv_is_back(app: Flask) -> None
     assert tv.uploads == []
 
     del tv.fail["connect"]
+    pub.on_push()  # still backing off
+    assert ("note", "Backoff: waiting to retry") in [
+        (way, text) for _, way, text in exchanges(app, "office_frame")
+    ]
     pub.poll_once()  # still backing off
     assert tv.uploads == []
 
@@ -306,11 +316,15 @@ def test_pairing_refusal_is_reported_and_retried_later(
     _make_frame(app)
     _plant_render(app, "office_frame", "aaa111")
     tv = FakeTV()
-    tv.fail["connect"] = FramePairingError("the TV did not allow Tesserae")
+    tv.fail["connect"] = FramePairingError("the TV did not allow Tesserae: token=secret-pairing")
     pub = _publisher(app, tv)
     pub.on_push()
     assert "did not allow" in caplog.text
     assert pub.pending_digest(_device(app)) == "aaa111"
+    lines = [(way, text) for _, way, text in exchanges(app, "office_frame")]
+    assert ("out", "connect/pair") in lines
+    assert ("in", "connect/pair failed (FramePairingError)") in lines
+    assert "secret-pairing" not in str(lines)
 
 
 def test_failed_select_keeps_frame_pending(app: Flask) -> None:
@@ -645,6 +659,13 @@ def test_a_push_to_a_switched_off_tv_switches_it_on_in_art_mode(app: Flask) -> N
     assert ("set_art_mode", True) in tv.calls
     assert ("select", "MY_F0001", True) in tv.calls
     assert _screen(app)["screen"] == "art"
+    lines = [(way, text) for _, way, text in exchanges(app, "office_frame")]
+    assert ("out", "HA switch switch.tv_plug on") in lines
+    assert ("in", "HA switch OK") in lines
+    assert ("out", "Art Mode on") in lines
+    assert ("out", "select") in lines
+    assert any(way == "out" and text.startswith("upload ") for way, text in lines)
+    assert "tok-1" not in str(lines)
 
 
 def test_quiet_hours_switch_off_a_tv_showing_art_and_hold_frames(app: Flask) -> None:
@@ -654,6 +675,9 @@ def test_quiet_hours_switch_off_a_tv_showing_art_and_hold_frames(app: Flask) -> 
     pub = _powered(app, tv, power, [True])
     pub.poll_once()
     assert power.calls == [("switch.tv_plug", False)]
+    assert ("out", "HA switch switch.tv_plug off") in [
+        (way, text) for _, way, text in exchanges(app, "office_frame")
+    ]
     assert _screen(app)["screen"] == "off" and _screen(app)["screen_why"] == "quiet hours"
     _plant_render(app, "office_frame", "aaa111")
     pub.on_push()
@@ -950,6 +974,13 @@ def test_tvs_own_power_sleeps_and_wakes_for_quiet_hours(app: Flask) -> None:
     pub.poll_once()  # morning: Wake-on-LAN
     assert own.wols == 1 and own.state == "on"
     assert _screen(app)["screen"] == "art"
+    lines = [(way, text) for _, way, text in exchanges(app, "office_frame")]
+    assert ("out", "standby (power key)") in lines
+    assert ("in", "standby (power key) OK") in lines
+    assert ("out", "Wake-on-LAN") in lines
+    assert ("in", "TV REST status: unreachable") in lines
+    assert ("note", "Quiet hours") in lines
+    assert "tok-1" not in str(lines)
 
 
 def test_tvs_own_power_wakes_for_a_push(app: Flask) -> None:

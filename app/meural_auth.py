@@ -43,6 +43,8 @@ USER_MIGRATION_KEYWORDS = ("user_not_found", "usernotfoundexception")
 class MeuralAuthError(Exception):
     """An authentication failure safe to display to the operator."""
 
+    diagnostic = ""
+
 
 class CannotConnect(MeuralAuthError):
     pass
@@ -68,6 +70,10 @@ class HttpError(Exception):
     def __init__(self, status: int, body: Any) -> None:
         super().__init__(f"Meural request failed (HTTP {status})")
         self.status = status
+        self.diagnostic = f"HTTP {status}"
+        # Only retain known literal messages. Arbitrary provider text can echo secrets.
+        if isinstance(body, dict) and body.get("message") == "App key is empty":
+            self.diagnostic += ' "App key is empty"'
         # Providers sometimes echo request credentials. Keep only classification,
         # never their raw reply on an exception that a caller might log.
         text = json.dumps(body).lower()
@@ -152,15 +158,19 @@ class NetgearAuthenticator:
     @staticmethod
     def _raise_auth_error(error: HttpError) -> None:
         text = json.dumps(error.body).lower()
+        failure: MeuralAuthError
         if any(word in text for word in WAF_ERROR_KEYWORDS) or (
             error.status == 403 and any(word in text for word in WAF_BLOCK_PAGE_KEYWORDS)
         ):
-            raise AuthenticationBlocked(
+            failure = AuthenticationBlocked(
                 "Netgear blocked the request. Try signing in from a phone on mobile data."
-            ) from None
-        if error.status == 429 or error.status >= 500:
-            raise CannotConnect("Netgear Accounts is temporarily unavailable") from None
-        raise InvalidAuth("The Meural session has expired. Sign in again.") from None
+            )
+        elif error.status == 429 or error.status >= 500:
+            failure = CannotConnect("Netgear Accounts is temporarily unavailable")
+        else:
+            failure = InvalidAuth("The Meural session has expired. Sign in again.")
+        failure.diagnostic = error.diagnostic
+        raise failure from None
 
     @staticmethod
     def _unwrap(response: Any) -> dict[str, Any]:

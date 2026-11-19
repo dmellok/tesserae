@@ -40,13 +40,14 @@ import time
 import urllib.request
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 from flask import Flask
 from PIL import Image, ImageOps
 
 from app import background_loops
 from app.device_loader import Device, DeviceRegistry
+from app.frame_log import _note
 from app.samsung_frame_art import (
     FrameArtClient,
     FrameArtError,
@@ -76,6 +77,7 @@ WOL_REPEAT_S = 15
 POWER_MODES = ("tv", "switch", "none")
 
 ClientFactory = Callable[..., FrameArtClient]
+T = TypeVar("T")
 
 
 class TvInUse(Exception):
@@ -274,6 +276,29 @@ class SamsungFramePublisher:
         cfg = section.get(device_id) if isinstance(section, dict) else None
         return cfg if isinstance(cfg, dict) else {}
 
+    def _exchange(self, device: Device, text: str, call: Callable[[], T]) -> T:
+        _note(self._app, device.id, "out", text)
+        try:
+            result = call()
+        except Exception as exc:
+            # Replies and exception messages can contain pairing tokens or upload keys.
+            _note(self._app, device.id, "in", f"{text} failed ({type(exc).__name__})")
+            raise
+        _note(self._app, device.id, "in", f"{text} OK")
+        return result
+
+    def _turn(self, device: Device, entity: str, on: bool) -> bool:
+        _note(self._app, device.id, "out", f"HA switch {entity} {'on' if on else 'off'}")
+        ok = self._power.turn(entity, on)
+        _note(self._app, device.id, "in", "HA switch OK" if ok else "HA switch failed")
+        return ok
+
+    def _rest_status(self, device: Device, host: str) -> dict[str, Any] | None:
+        info = self._rest_info(host)
+        status = "unreachable" if info is None else "standby" if self._standby(info) else "on"
+        _note(self._app, device.id, "in", f"TV REST status: {status}")
+        return info
+
     # -- state ------------------------------------------------------------
 
     @staticmethod
@@ -398,7 +423,7 @@ class SamsungFramePublisher:
 
     def _put_to_sleep(self, device: Device, cfg: dict[str, Any], mode: str, host: str) -> bool:
         if mode == "switch":
-            return self._power.turn(self._switch(cfg), False)
+            return self._turn(device, self._switch(cfg), False)
         # Not paired yet: the remote channel would ask for Allow on screen,
         # and with no known MAC Wake-on-LAN couldn't bring it back.
         if not self._token(cfg):
@@ -411,7 +436,11 @@ class SamsungFramePublisher:
             )
             return False
         try:
-            self._power_key(host, token=self._token(cfg), name=CLIENT_NAME)
+            self._exchange(
+                device,
+                "standby (power key)",
+                lambda: self._power_key(host, token=self._token(cfg), name=CLIENT_NAME),
+            )
             return True
         except (FrameArtError, OSError) as exc:
             logger.info("samsung_frame %s: couldn't put the TV in standby: %s", device.id, exc)
@@ -422,7 +451,7 @@ class SamsungFramePublisher:
         BOOT_TIMEOUT_S, for it to answer as on."""
         switch = self._switch(cfg)
         if mode == "switch" and self._power.state(switch) != "on":
-            if not self._power.turn(switch, True):
+            if not self._turn(device, switch, True):
                 return False
             logger.info("samsung_frame %s: switched %s on", device.id, switch)
         mac = str(self.load_state(device).get("mac") or "")
@@ -438,35 +467,40 @@ class SamsungFramePublisher:
         # A plug gets ~30 s to boot the TV before Wake-on-LAN helps it along.
         next_wol = start if mode == "tv" else start + 30
         while time.monotonic() - start < BOOT_TIMEOUT_S:
-            info = self._rest_info(host)
+            info = self._rest_status(device, host)
             if info is not None and not self._standby(info):
                 return True
             if mac and time.monotonic() >= next_wol:
                 with contextlib.suppress(OSError, ValueError):
-                    self._wol(mac, host)
+                    self._exchange(device, "Wake-on-LAN", lambda: self._wol(mac, host))
                 next_wol = time.monotonic() + WOL_REPEAT_S
             self._sleep(BOOT_POLL_S)
         return False
 
-    def _tv_is_off(self, cfg: dict[str, Any], mode: str, host: str) -> bool:
+    def _tv_is_off(self, device: Device, cfg: dict[str, Any], mode: str, host: str) -> bool:
         """Whether the TV is off, as opposed to one missed answer: the switch
         is off, the TV says standby, or it misses two answers in a row."""
         if mode == "switch" and self._power.state(self._switch(cfg)) == "off":
             return True
-        info = self._rest_info(host)
+        info = self._rest_status(device, host)
         if info is not None:
             return self._standby(info)
         self._sleep(BOOT_POLL_S)
-        info = self._rest_info(host)
+        info = self._rest_status(device, host)
         return info is None or self._standby(info)
 
     def _maybe_send(self, device: Device) -> None:
         digest = self.pending_digest(device)
-        if digest is None or self._backing_off(device.id):
+        if digest is None:
+            _note(self._app, device.id, "note", "Unchanged")
+            return
+        if self._backing_off(device.id):
+            _note(self._app, device.id, "note", "Backoff: waiting to retry")
             return
         cfg = self._cfg(device.id)
         host = str(cfg.get("host") or "").strip()
         if not host:
+            _note(self._app, device.id, "note", "No host")
             self._warn_once(device.id, "no TV address set (Settings -> Devices); skipping")
             return
         src = self._renders_dir / f"{digest}.png"
@@ -475,11 +509,12 @@ class SamsungFramePublisher:
             return
         mode = self._mode(cfg)
         if mode != "none" and self._quiet_fn(device):
+            _note(self._app, device.id, "note", "Quiet hours")
             return  # held: the TV is asleep for quiet hours; sent when they end
         woke = False
         # Only a TV that is really off is woken; a missed answer from a TV
         # that is on is not, so Art Mode is never forced over a programme.
-        if mode != "none" and self._tv_is_off(cfg, mode, host):
+        if mode != "none" and self._tv_is_off(device, cfg, mode, host):
             if not self._wake_and_wait(device, cfg, mode, host):
                 self._failed(device.id)
                 self._warn_once(device.id, "tried to wake the TV but it didn't answer")
@@ -490,6 +525,7 @@ class SamsungFramePublisher:
         try:
             show = self._send(device, cfg, host, digest, jpeg, state, woke=woke)
         except TvInUse:
+            _note(self._app, device.id, "note", "TV in use; frame waits")
             logger.info("samsung_frame %s: the TV is in use; frame %s waits", device.id, digest)
             self._record(device, {"screen": "on", "screen_why": "in use, new frame waiting"})
             return
@@ -538,7 +574,7 @@ class SamsungFramePublisher:
             attempts = 3 if woke else 1
             for attempt in range(attempts):
                 try:
-                    client.connect()
+                    self._exchange(device, "connect/pair", client.connect)
                     self._keep_token(device.id, client, token)
                     break
                 except FramePairingError:
@@ -549,37 +585,44 @@ class SamsungFramePublisher:
                     self._sleep(BOOT_POLL_S * 2)
             if woke:
                 try:
-                    if not client.art_mode_on():
-                        client.set_art_mode(True)
+                    if not self._exchange(device, "Art Mode status", client.art_mode_on):
+                        self._exchange(device, "Art Mode on", lambda: client.set_art_mode(True))
                 except FrameArtError as exc:
                     logger.info("samsung_frame %s: couldn't turn Art Mode on: %s", device.id, exc)
             else:
                 # Someone watching TV (or using an app) isn't disturbed: the
                 # frame waits until Art Mode is back or the TV is switched off.
                 with contextlib.suppress(FrameArtError):
-                    if not client.art_mode_on():
+                    if not self._exchange(device, "Art Mode status", client.art_mode_on):
                         raise TvInUse
             if cfg.get("take_over_slideshow", "off") != "keep":
                 try:
-                    client.slideshow_off()
+                    self._exchange(device, "slideshow off", client.slideshow_off)
                 except FrameArtError as exc:
                     logger.info("samsung_frame %s: %s", device.id, exc)
             # Ids already on the TV, so an upload confirmation without an id
             # (2022+ Frames) can't be mistaken for another app's photo.
-            existing = {str(item.get("content_id")) for item in client.list_content()}
-            content_id = client.upload_jpeg(
-                jpeg, matte=matte_id(cfg), portrait_matte=matte_id(cfg), existing=existing
+            existing = {
+                str(item.get("content_id"))
+                for item in self._exchange(device, "list artwork", client.list_content)
+            }
+            content_id = self._exchange(
+                device,
+                f"upload {len(jpeg)} bytes",
+                lambda: client.upload_jpeg(
+                    jpeg, matte=matte_id(cfg), portrait_matte=matte_id(cfg), existing=existing
+                ),
             )
             state["uploads"].append(
                 {"content_id": content_id, "digest": digest, "at": int(time.time())}
             )
             try:
-                show = client.art_mode_on()
+                show = self._exchange(device, "Art Mode status", client.art_mode_on)
             except FrameArtError:
                 show = False
             # show=False keeps a programme the owner is watching on screen;
             # Art Mode picks the new artwork up when it is next on.
-            client.select(content_id, show=show)
+            self._exchange(device, "select", lambda: client.select(content_id, show=show))
             state["last_digest"] = digest
             keep = self._keep(cfg)
             old = [u["content_id"] for u in state["uploads"][:-keep]]
@@ -587,7 +630,7 @@ class SamsungFramePublisher:
             doomed = list(dict.fromkeys(state["pending_delete"] + old))
             if doomed:
                 try:
-                    client.delete(doomed)
+                    self._exchange(device, f"delete {len(doomed)}", lambda: client.delete(doomed))
                     state["pending_delete"] = []
                 except FrameArtError as exc:
                     state["pending_delete"] = doomed
@@ -646,11 +689,12 @@ class SamsungFramePublisher:
         cfg = self._cfg(device.id)
         host = str(cfg.get("host") or "").strip()
         if not host:
+            _note(self._app, device.id, "note", "No host")
             return False
         mode = self._mode(cfg)
         switch = self._switch(cfg)
         switch_state = self._power.state(switch) if mode == "switch" else None
-        info = self._rest_info(host)
+        info = self._rest_status(device, host)
         standby = self._standby(info)
         awake = info is not None and not standby
         self._missed[device.id] = 0 if info is not None else self._missed.get(device.id, 0) + 1
@@ -665,6 +709,7 @@ class SamsungFramePublisher:
         screen = self._screen(device, cfg, host) if awake else None
         off = switch_state == "off" or standby or self._missed[device.id] >= 2
         if mode != "none" and self._quiet_fn(device):
+            _note(self._app, device.id, "note", "Quiet hours")
             # Asleep for quiet hours: at once in Art Mode. A TV in use (or
             # whose Art app doesn't answer, so maybe showing a programme) is
             # left on, unless it is still in use after the device's "Still in
@@ -691,6 +736,7 @@ class SamsungFramePublisher:
                 )
                 off = True
             if in_use and not off:
+                _note(self._app, device.id, "note", "TV in use; frame waits")
                 self._record(device, {"screen": "on", "screen_why": "in use in quiet hours"})
                 return False
             if off:
@@ -702,7 +748,7 @@ class SamsungFramePublisher:
             logger.info("samsung_frame %s: quiet hours over, waking the TV", device.id)
             if self._wake_and_wait(device, cfg, mode, host):
                 self.update_state(device, {"needs_art_mode": True})
-                info, awake, off = self._rest_info(host), True, False
+                info, awake, off = self._rest_status(device, host), True, False
                 switch_state = "on" if mode == "switch" else None
                 screen = self._screen(device, cfg, host)
             else:
@@ -756,9 +802,9 @@ class SamsungFramePublisher:
             return None
         client = self._client_factory(host, token=token, name=CLIENT_NAME)
         try:
-            client.connect(pairing_timeout=10)
+            self._exchange(device, "connect/pair", lambda: client.connect(pairing_timeout=10))
             self._keep_token(device.id, client, token)
-            return "art" if client.art_mode_on() else "on"
+            return "art" if self._exchange(device, "Art Mode status", client.art_mode_on) else "on"
         except (FrameArtError, OSError):
             return None
         finally:
@@ -768,9 +814,9 @@ class SamsungFramePublisher:
         token = self._token(cfg)
         client = self._client_factory(host, token=token, name=CLIENT_NAME)
         try:
-            client.connect(pairing_timeout=10)
+            self._exchange(device, "connect/pair", lambda: client.connect(pairing_timeout=10))
             self._keep_token(device.id, client, token)
-            client.set_art_mode(True)
+            self._exchange(device, "Art Mode on", lambda: client.set_art_mode(True))
             return True
         except (FrameArtError, OSError) as exc:
             logger.info("samsung_frame %s: couldn't turn Art Mode on: %s", device.id, exc)
@@ -816,8 +862,8 @@ class SamsungFramePublisher:
         if host and ids:
             client = self._client_factory(host, token=self._token(cfg), name=CLIENT_NAME)
             try:
-                client.connect(pairing_timeout=10)
-                client.delete(ids)
+                self._exchange(device, "connect/pair", lambda: client.connect(pairing_timeout=10))
+                self._exchange(device, f"delete {len(ids)}", lambda: client.delete(ids))
             except (FrameArtError, OSError) as exc:
                 logger.info(
                     "samsung_frame %s: couldn't remove its frames from the TV: %s", device.id, exc
