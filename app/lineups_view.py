@@ -152,6 +152,7 @@ class DashboardInfo:
     #: displays it is bound to, and "Name (WxH)" for each, for the off-display flag
     bound_ids: tuple[str, ...] = ()
     bound_labels: tuple[str, ...] = ()
+    refresh_minutes: int = 0  # the scheduler's Page.refresh_minutes cadence
 
 
 @dataclass(frozen=True)
@@ -290,6 +291,7 @@ class UpcomingInput:
     at: float
     lineup_id: str | None = None
     dashboard_id: str | None = None
+    cause: str | None = None
 
 
 @dataclass(frozen=True)
@@ -354,6 +356,11 @@ class DisplayInput:
     #: dashboard id -> the dashboard as this display shows it, for a dashboard whose
     #: shape here is not the one it has on the other displays it is bound to
     shots: Mapping[str, DisplayShot] = field(default_factory=dict)
+
+    @property
+    def always_on(self) -> bool:
+        # reach_for_device uses device_service.is_always_on for this mode.
+        return self.reach.mode == MODE_CONNECTED and not self.reach.live
 
 
 # ---------------------------------------------------------------------------
@@ -512,6 +519,12 @@ class NextUpdateView(_Dict):
 
 
 @dataclass
+class NextLinePart(_Dict):
+    text: str
+    dashboard_id: str | None = None
+
+
+@dataclass
 class NextLineView(_Dict):
     """The quiet line under "Showing X": ``before`` + bold ``at`` + ``after``."""
 
@@ -519,6 +532,7 @@ class NextLineView(_Dict):
     at: str
     after: str
     title: str
+    before_parts: list[NextLinePart] = field(default_factory=list)
 
 
 @dataclass
@@ -845,8 +859,11 @@ class DisplayView(_Dict):
     # display that has not fetched the latest frame, nothing sent yet).
     on_screen_known: bool = True
     show_suffix: str = ""
+    show_lineup_name: str = ""
+    show_lineup_url: str = ""
     status_title: str = ""
     settings_url: str = ""
+    refreshes_title: str = ""
     gamut: str = "color"
     grey_levels: int = 0
     dither: str | None = None
@@ -1813,7 +1830,17 @@ def _link_view(d: DisplayInput, clk: _Clock) -> LinkView:
     r = d.reach
     gap = round(r.gap_s / 60) if r.gap_s else None
     nxt = _checkin_at_or_after(r, clk.epoch) if r.mode == MODE_SLEEPS else None
-    if r.mode == MODE_CONNECTED:
+    if d.always_on:
+        age = max(0, int((clk.epoch - d.last_seen) // 60)) if d.last_seen is not None else None
+        label = (
+            "Checked in just now"
+            if age == 0
+            else f"Checked in {rel_long(age)} ago"
+            if age is not None
+            else ""
+        )
+        title = f"Last contact at {clk.clock(d.last_seen)}" if d.last_seen is not None else ""
+    elif r.mode == MODE_CONNECTED:
         label = "Online"
         title = (
             "Holds an open connection; changes land right away"
@@ -2301,7 +2328,11 @@ def build_display(
         for ev in d.upcoming:
             item = (ev.at, ev.dashboard_id, ev.lineup_id)
             if upcoming is None and (
-                ev.at > clk.epoch or (ev.dashboard_id is not None and ev.dashboard_id != on_id)
+                ev.at > clk.epoch
+                or (ev.dashboard_id is not None and ev.dashboard_id != on_id)
+                # A due repaint is still the next update attempt for an
+                # always-on display, even when its picture does not change.
+                or (ev.cause == "dashboard_refresh" and d.always_on)
             ):
                 upcoming = item
             if following is None and ev.at > clk.epoch:
@@ -2446,7 +2477,11 @@ def build_display(
         next_line = NextLineView("No update scheduled", "", "", next_title)
     elif queued is not None:
         next_line = NextLineView(
-            f"{queued.name} next, lands", queued.lands, "when it wakes", next_title
+            f"{queued.name} next, lands",
+            queued.lands,
+            "when it wakes",
+            next_title,
+            [NextLinePart(queued.name, queued.dashboard_id), NextLinePart(" next, lands")],
         )
     elif not in_sync and sched_dash is not None and pub is None and not d.published_known:
         next_line = NextLineView(
@@ -2454,11 +2489,54 @@ def build_display(
             next_update.at_label,
             "",
             next_title,
+            [
+                NextLinePart(_next_name(dashboards, sched_dash), sched_dash),
+                NextLinePart(" next, lands"),
+            ],
         )
     else:
         next_line = NextLineView(
-            f"{next_update.name} next at", next_update.at_label, "", next_title
+            f"{next_update.name} next at",
+            next_update.at_label,
+            "",
+            next_title,
+            [
+                NextLinePart(next_update.name, next_update.dashboard_id or None),
+                NextLinePart(" next at"),
+            ],
         )
+    shown = dashboards.get(on_id or "")
+    if d.always_on and shown is not None and shown.refresh_minutes > 0:
+        cadence = f"{shown.name} refreshes every {rel_long(shown.refresh_minutes)}"
+        parts = [
+            NextLinePart(shown.name, shown.id),
+            NextLinePart(f" refreshes every {rel_long(shown.refresh_minutes)}"),
+        ]
+        advance = next((ev for ev in d.upcoming or () if ev.at > clk.epoch and ev.lineup_id), None)
+        if advance is not None:
+            target = (
+                _next_name(dashboards, advance.dashboard_id)
+                if advance.dashboard_id
+                else "Next dashboard"
+            )
+            next_line = NextLineView(
+                f"{cadence} · {target} at",
+                clk.clock(advance.at),
+                "",
+                next_title,
+                [
+                    *parts,
+                    NextLinePart(" · "),
+                    NextLinePart(target, advance.dashboard_id),
+                    NextLinePart(" at"),
+                ],
+            )
+        else:
+            next_line = NextLineView(cadence, "", "", next_title, parts)
+    for part in next_line.before_parts:
+        dashboard = dashboards.get(part.dashboard_id or "")
+        if dashboard is not None and dashboard.missing:
+            part.dashboard_id = None
 
     if connected:
         push_lands = "lands now"
@@ -2509,13 +2587,22 @@ def build_display(
         )
     views.sort(key=_lineup_sort_key)
 
-    refreshes = sum(v.refreshes_today for v in views)
+    refreshes = (
+        _always_on_refreshes_today(d, model, clk, dashboards)
+        if d.always_on
+        else sum(v.refreshes_today for v in views)
+    )
     w, h = d.width, d.height
     _, orient = _aspect(w, h)
     next_tick = next_adv % WEEK_MIN if next_adv is not None else None
     dashboard_ids = {step.dashboard_id for lineup in d.lineups for step in lineup.steps}
     screens = {pid: _screen(dashboards.get(pid), pid, d) for pid in dashboard_ids}
     next_epoch = adv_lands.epoch if adv_lands is not None else None
+    if d.always_on:
+        # The header has already resolved refreshes versus lineup advances.
+        # Use that same instant for both the bar marker and its countdown.
+        next_epoch = next_update.at_epoch if next_update is not None else None
+        next_tick = clk.week_minute(next_epoch) if next_epoch is not None else None
     week = [
         _day_bar(
             d,
@@ -2548,6 +2635,13 @@ def build_display(
         link=_link_view(d, clk),
         pause=_pause_view(d.pause),
         refreshes_today=refreshes,
+        refreshes_title=(
+            f"{refreshes} scheduled updates today: lineup steps and dashboard refresh attempts, "
+            "including refreshes outside lineup windows. Steps and refreshes at the same time "
+            "count once. Pictures may stay the same."
+            if d.always_on
+            else f"{refreshes} refreshes projected today"
+        ),
         on_screen=on_screen,
         scheduled=scheduled_view,
         in_sync=in_sync,
@@ -2577,6 +2671,66 @@ class _Standing:
     label: str
     reason: str = ""
     title: str = ""
+
+
+def _always_on_refreshes_today(
+    d: DisplayInput, model: _Model, clk: _Clock, dashboards: Mapping[str, DashboardInfo]
+) -> int:
+    """Scheduled sends plus page refresh attempts, coalesced on slot boundaries."""
+    from app.device_upcoming import _next_refresh_slot_start
+
+    start = clk.now_abs // DAY_MIN * DAY_MIN
+    end = start + DAY_MIN
+    start_epoch, end_epoch = clk.epoch_of(start), clk.epoch_of(end)
+    quiet = _quiet_window(d.pause) if d.pause is not None else None
+    fires: dict[float, tuple[tuple[int, int, int, str], str]] = {}
+    for block in model.blocks:
+        if not block.lineup.ready:
+            continue
+        for point in block.pts:
+            for offset in (-WEEK_MIN, 0):
+                minute = point.t + offset
+                at = clk.epoch_of(minute)
+                hold = pause_hold_at(quiet, at, clk.tz) if quiet is not None else None
+                if hold is not None:
+                    if block.push or hold.until is None:
+                        continue
+                    at = hold.until
+                    if not _within(block, clk.week_minute(at)):
+                        continue
+                if at >= end_epoch:
+                    continue
+                key = (minute, block.lineup.priority, _rank(block.lineup), block.lineup.id)
+                if at not in fires or key > fires[at][0]:
+                    fires[at] = (key, block.lineup.steps[point.i].dashboard_id)
+
+    def available(at: float) -> bool:
+        if quiet is not None and is_in_window(quiet, datetime.fromtimestamp(at, UTC), clk.tz):
+            return False
+        return not (
+            d.hold is not None and at >= clk.epoch and (d.hold.until is None or at < d.hold.until)
+        )
+
+    prior = [at for at in fires if at < start_epoch]
+    page = fires[max(prior)][1] if prior else (d.on_screen.dashboard_id if d.on_screen else None)
+    today = sorted(at for at in fires if at >= start_epoch and available(at))
+    timeline = {start_epoch: page, **{at: fires[at][1] for at in today}, end_epoch: None}
+    count = len(today)
+    points = sorted(timeline)
+    for begins, ends in itertools.pairwise(points):
+        dashboard = dashboards.get(timeline[begins] or "")
+        if dashboard is None or dashboard.refresh_minutes <= 0:
+            continue
+        # Midnight is itself a refresh slot when a page carries over; a
+        # lineup send at a boundary already paints that slot.
+        after = begins - 1 if begins == start_epoch and begins not in today else begins
+        slot = _next_refresh_slot_start(
+            datetime.fromtimestamp(after, UTC), dashboard.refresh_minutes, clk.tz
+        )
+        while slot.timestamp() < ends:
+            count += int(available(slot.timestamp()))
+            slot = _next_refresh_slot_start(slot, dashboard.refresh_minutes, clk.tz)
+    return count
 
 
 def _ordinal(n: int) -> str:
@@ -2720,6 +2874,33 @@ def _standings(
                     "Queued",
                     f"next {nl.label or clock(nxt)}",
                     f"Its next step goes to {d.name} at {clock(nxt)}. {nl.text}",
+                )
+    if d.always_on:
+        stalled = (
+            d.pending
+            and d.published is not None
+            and d.published.at is not None
+            and clk.epoch - d.published.at > 120
+        )
+        for lineup_id, status in list(out.items()):
+            if status.status == "queued":
+                out[lineup_id] = _Standing("waiting", "Scheduled", status.reason, status.title)
+        if stalled and d.published is not None:
+            target = next(
+                (
+                    lu
+                    for lu in d.lineups
+                    if lu.enabled
+                    and any(st.dashboard_id == d.published.dashboard_id for st in lu.steps)
+                ),
+                None,
+            )
+            if target is not None:
+                out[target.id] = _Standing(
+                    "queued",
+                    "Delivery pending",
+                    "awaiting delivery",
+                    "The latest frame has not been confirmed delivered for more than 2 min.",
                 )
     return out
 
@@ -2876,7 +3057,7 @@ def _lineup_view(
     off_why = _off_why(status, manual=lineup.kind == "manual", runs_today=today % 7 in lineup.days)
     if status == "waiting":
         off_why = OffWhyView(
-            "Conditions not met",
+            "Scheduled" if standing and standing.label == "Scheduled" else "Conditions not met",
             f"{standing.title if standing else ''} {_GREY_NOTE}".strip(),
         )
 

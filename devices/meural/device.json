@@ -4,6 +4,7 @@
   "icon": "device-tablet",
   "version": "0.1.0",
   "description": "Sign in to Netgear to display one image at a time. This unofficial cloud API can stop working. Use the Meural app to manage galleries, playback and native sleep schedules. An optional LAN address enables Tesserae quiet-hours control.",
+  "always_on": true,
   "renderers": ["pi_png"],
   "transport": "push",
   "panel": {
