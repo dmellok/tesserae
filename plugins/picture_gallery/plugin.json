@@ -26,7 +26,7 @@
       "name": "orientation",
       "type": "select",
       "label": "Orientation",
-      "default": "auto",
+      "default": "any",
       "choices": [
         {
           "value": "auto",

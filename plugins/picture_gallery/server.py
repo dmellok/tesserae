@@ -404,7 +404,7 @@ def _frame_shape(options: dict[str, Any], ctx: dict[str, Any]) -> str | None:
     ``frame`` always and for ``auto`` only when the dashboard is on both
     portrait and landscape frames (``ctx["frame_shapes"]``). None means no
     filter."""
-    orientation = (options.get("orientation") or "auto").lower()
+    orientation = (options.get("orientation") or "any").lower()
     if orientation == "auto":
         shapes = set(ctx.get("frame_shapes") or ())
         if not {"landscape", "portrait"} <= shapes:
@@ -430,10 +430,8 @@ def _shown_images(
     """``(the pictures this render picks from, the shape they were narrowed
     to or "any")``. Portrait / Landscape / Square keep that shape (none left
     is the caller's error); Auto and Match the frame keep the frame's shape
-    and square pictures, or every picture when none have it. Unset reads as
-    the manifest's default, Auto: a render gets it filled in, a Lineups
-    listing reads the saved options as they are."""
-    orientation = (options.get("orientation") or "auto").lower()
+    and square pictures, or every picture when none have it."""
+    orientation = (options.get("orientation") or "any").lower()
     if orientation in ("portrait", "landscape", "square"):
         return _filter_by_orientation(images, folder_segment, orientation, data_dir), orientation
     shape = _frame_shape(options, ctx) if orientation in ("auto", "frame") else None

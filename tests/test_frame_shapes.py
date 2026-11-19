@@ -104,7 +104,9 @@ def test_a_gallery_lists_only_the_pictures_a_frame_is_shown(
     for name, size in (("wide.jpg", (90, 60)), ("tall.jpg", (60, 90)), ("sq.jpg", (70, 70))):
         Image.new("RGB", size).save(folder / name)
     monkeypatch.setattr(step_items, "_GALLERY_CACHE", {})
-    cell = Cell(id="c1", plugin="picture_gallery", x=0, y=0, w=400, h=300, options={})
+    cell = Cell(
+        id="c1", plugin="picture_gallery", x=0, y=0, w=400, h=300, options={"orientation": "auto"}
+    )
     mixed = {"frame_shapes": ["landscape", "portrait"]}
     with app.test_request_context("/"):
         wide = step_items._gallery_items(cell, {**mixed, "cell_w": 800, "cell_h": 480})
