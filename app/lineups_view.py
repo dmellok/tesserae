@@ -1126,7 +1126,7 @@ def _always_on(lineup: LineupInput, block: _Block) -> bool:
 
 def window_minutes(lineup: LineupInput) -> tuple[int, int] | None:
     """``(start, end)`` in day minutes, for showing the window: ``end`` may
-    exceed 1440 for an interval window that wraps past midnight and equals
+    exceed 1440 for a window that wraps past midnight and equals
     ``start`` for a single push. ``None`` for a lineup with no time window
     (by hand). What actually runs is :func:`day_spans`."""
     if lineup.kind == "manual":
@@ -1137,11 +1137,9 @@ def window_minutes(lineup: LineupInput) -> tuple[int, int] | None:
     if lineup.kind == "cycle":
         s = parse_hhmm(lineup.start) or 0
         e = parse_hhmm(lineup.end)
-        # The engine treats before-anchor as dormant: an end at or before
-        # the start stops at midnight (``_cycle_fires_on``).
-        if e is None or e <= s:
+        if e is None:
             e = DAY_MIN
-        return (s, e)
+        return (s, e + DAY_MIN if e < s else e)
     s0 = parse_hhmm(lineup.start)
     e0 = parse_hhmm(lineup.end)
     if s0 is None and e0 is None:
@@ -1154,10 +1152,10 @@ def window_minutes(lineup: LineupInput) -> tuple[int, int] | None:
 def day_spans(lineup: LineupInput) -> list[tuple[int, int]]:
     """The ``[start, end)`` spans, in minutes of one calendar day, a lineup
     runs on each of its days. Mirrors the scheduler's gates: every weekday is
-    judged on its own clock, so a Monday-only ``22:00``-``06:00`` interval
+    judged on its own clock for intervals, so a Monday-only ``22:00``-``06:00`` interval
     window runs Monday 00:00-06:00 and Monday 22:00-24:00 and nothing on
     Tuesday (``device_upcoming._window_contains``); an interval window's end
-    minute is inclusive; a cycle stops at its end (or midnight)."""
+    minute is inclusive; a cycle belongs to its start day and stops at its end (or midnight)."""
     if lineup.kind == "manual":
         return []
     if lineup.kind == "daily":
@@ -1346,7 +1344,7 @@ def _next_fire(model: _Model, after: int) -> tuple[int, _Block, _Point] | None:
     kind, then id)."""
     found: list[tuple[int, _Block, _Point]] = []
     for b in model.blocks:
-        for off in (0, WEEK_MIN):
+        for off in (-WEEK_MIN, 0, WEEK_MIN):
             p = next((p for p in b.pts if p.t + off > after), None)
             if p is not None:
                 found.append((p.t + off, b, p))
@@ -1468,6 +1466,15 @@ def in_pause(pause: PauseInput | None, week_minute: int) -> bool:
     return is_in_window(_quiet_window(pause), moment, None)
 
 
+def _pause_run_parts(pause: PauseInput, day: int, end: int) -> list[tuple[int, int]]:
+    """Quiet spans on the calendar days touched by a run, relative to its start day."""
+    return [
+        (offset * DAY_MIN + s, offset * DAY_MIN + e)
+        for offset in range(max(1, (end + DAY_MIN - 1) // DAY_MIN))
+        for s, e in _pause_display_parts(pause, (day + offset) % 7)
+    ]
+
+
 def window_overlaps_pause(pause: PauseInput | None, lineup: LineupInput) -> bool:
     """Whether any of the lineup's runs (or its push) really falls in pause
     hours: an overlap of at least a full minute against the display spans
@@ -1476,8 +1483,11 @@ def window_overlaps_pause(pause: PauseInput | None, lineup: LineupInput) -> bool
     if pause is None:
         return False
     for b in _blocks_for(lineup):
-        day, base = (b.s // DAY_MIN) % 7, (b.s // DAY_MIN) * DAY_MIN
-        parts = [(base + ps, base + pe) for ps, pe in _pause_display_parts(pause, day)]
+        base = (b.s // DAY_MIN) * DAY_MIN
+        parts = [
+            (base + ps, base + pe)
+            for ps, pe in _pause_run_parts(pause, base // DAY_MIN, b.e - base)
+        ]
         if b.push:
             if any(ps <= b.s < pe for ps, pe in parts):
                 return True
@@ -1516,7 +1526,7 @@ def pause_note(pause: PauseInput | None, lineup: LineupInput, where: str) -> str
     partial: str | None = None
     whole = False
     for day in sorted(set(lineup.days)):
-        parts = _pause_display_parts(pause, day)
+        parts = _pause_run_parts(pause, day, last)
         hits = [
             (max(ps, ws), min(pe, we))
             for ws, we in spans
@@ -1566,13 +1576,13 @@ def window_label(lineup: LineupInput) -> str:
     s, e = win
     if lineup.kind == "daily":
         return f"at {clock(s)}"
-    return clock_range(s, e)
+    return clock_range(s, e) + (" next day" if lineup.kind == "cycle" and e > DAY_MIN else "")
 
 
 def _overlap(a: _Block, b: _Block) -> bool:
     ae = a.e if a.e > a.s else a.s + 1
     be = b.e if b.e > b.s else b.s + 1
-    return a.s < be and ae > b.s
+    return any(a.s < be + off and ae > b.s + off for off in (-WEEK_MIN, 0, WEEK_MIN))
 
 
 def find_clashes(candidate: LineupInput, others: Sequence[LineupInput]) -> list[Clash]:
@@ -2912,7 +2922,7 @@ def _next_point(model: _Model, lineup: LineupInput, now_abs: int) -> int | None:
         p.t + off
         for b in model.blocks
         if b.lineup is lineup
-        for off in (0, WEEK_MIN)
+        for off in (-WEEK_MIN, 0, WEEK_MIN)
         for p in b.pts
         if p.t + off > now_abs
     ]
@@ -3038,7 +3048,7 @@ def _lineup_view(
     live = lb is not None
     holding = model.live_hold is not None and model.live_hold.lineup is lineup
     later = any(now_abs < b.s < (today + 1) * DAY_MIN for b in mine)
-    refreshes = sum(len(b.pts) for b in mine if b.s // DAY_MIN == today)
+    refreshes = sum(1 for b in mine for p in b.pts if (p.t // DAY_MIN) % 7 == today)
     badge, mode_label = _BADGE[lineup.kind]
     days_sorted = sorted(set(lineup.days))
 
@@ -3072,7 +3082,7 @@ def _lineup_view(
         window = WindowView(
             start=hhmm(s),
             end=None if point else end_hhmm(e),
-            label=f"at {clock(s)}" if point else clock_range(s, e),
+            label=window_label(lineup),
             start_min=s,
             end_min=e,
             is_point=point,

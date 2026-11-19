@@ -15,7 +15,7 @@ import json
 import re
 import time
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
 
@@ -943,8 +943,8 @@ def test_edit_window_rejects_overlap(client: Any, app: Flask) -> None:
 
 def test_edit_window_rejects_bad_input(client: Any) -> None:
     assert client.post("/decks/morning/window", json={"start": "9am"}).status_code == 400
-    resp = client.post("/decks/morning/window", json={"start": "10:00", "end": "09:00"})
-    assert resp.status_code == 400 and "after start" in resp.get_json()["error"]
+    resp = client.post("/decks/morning/window", json={"start": "10:00", "end": "10:00"})
+    assert resp.status_code == 400 and "must differ" in resp.get_json()["error"]
     assert client.post("/decks/nope/window", json={"start": "10:00"}).status_code == 404
 
 
@@ -4018,8 +4018,7 @@ def test_a_daily_push_with_no_end_still_ignores_one_left_null(client: Any, app: 
 @pytest.mark.parametrize(
     ("body", "text"),
     [
-        ({"start": "22:00", "end": "22:00"}, "after start"),
-        ({"start": "22:00", "end": "21:00"}, "after start"),
+        ({"start": "22:00", "end": "22:00"}, "must differ"),
         ({"start": "22:00", "end": "late"}, "End must be a time"),
         ({"start": "24:00", "end": "24:00"}, "before 24:00"),
     ],
@@ -4329,3 +4328,97 @@ def test_reordering_a_rotation_lets_the_scheduler_resend_its_slot(client: Any, a
     assert resp.status_code == 200, resp.get_json()
     assert "morning" not in sched._rotation_last_step
     assert sched._rotation_last_step["night"] == 0
+
+
+@pytest.mark.parametrize("start_day,following_day", [(3, 4), (6, 0)])
+def test_overnight_cycle_timeline_spills_into_following_day(
+    start_day: int, following_day: int
+) -> None:
+    lineup = LineupInput(
+        "night",
+        "Night",
+        "cycle",
+        (StepInput("art", 30), StepInput("comics", 60)),
+        days=(start_day,),
+        start="08:30",
+        end="03:59",
+    )
+    d, dashboards, _ = _one_display(lineup, pause=None)
+    now = SAMPLE_NOW + timedelta(days=(following_day - SAMPLE_NOW.weekday()) % 7)
+    now = now.replace(hour=0, minute=30)
+    view = build_view([d], dashboards, now=now).displays[0]
+    assert view.scheduled is not None and view.scheduled.lineup_id == "night"
+    assert view.scheduled.step_index == 1
+    assert [(s.start_min, s.end_min) for s in view.day.segments if s.kind == "window"] == [(0, 239)]
+    assert [
+        (s.start_min, s.end_min) for s in view.week[start_day].segments if s.kind == "window"
+    ] == [(510, 1440)]
+    assert view.next_update is not None and view.next_update.push_at_label == "01:00"
+    assert view.lineups[0].refreshes_today == 5
+    assert view.lineups[0].window is not None
+    assert view.lineups[0].window.wraps
+    assert view.lineups[0].window.end_min == 1679
+    morning = LineupInput(
+        "m",
+        "Morning",
+        "cycle",
+        (StepInput("art", 30),),
+        days=(following_day,),
+        start="03:00",
+        end="05:00",
+    )
+    assert find_clash(lineup, [morning]) is not None
+    assert find_clash(morning, [lineup]) is not None
+    assert find_clash(lineup, [replace(morning, start="03:59")]) is None
+
+
+def test_overnight_cycle_checks_quiet_hours_on_the_spill_day() -> None:
+    night = LineupInput(
+        "n", "Night", "cycle", (StepInput("art", 30),), days=(3,), start="08:30", end="03:59"
+    )
+    pause = PauseInput(60, 120, days=(4,))
+    assert window_overlaps_pause(pause, night)
+    from app.lineups_view import pause_note
+
+    assert pause_note(pause, night, "quiet hours") == "Pauses 01:00–02:00 for quiet hours."
+
+
+@pytest.mark.parametrize("start_day,next_day", [(3, 4), (6, 0)])
+def test_inline_overnight_window_refuses_next_mornings_conflict(
+    client: Any, app: Flask, start_day: int, next_day: int
+) -> None:
+    from app.state.deck_model import Deck, DeckPage
+
+    store = app.config["DECK_STORE"]
+    for deck in store.all():
+        store.delete(deck.id)
+    store.upsert(
+        Deck(
+            id="overnight",
+            name="Overnight",
+            device_ids=["panel"],
+            advance="timer",
+            advance_trigger="cycle",
+            advance_anchor="08:30",
+            advance_end_at="18:00",
+            advance_days_of_week=[start_day],
+            pages=[DeckPage(page_id="news"), DeckPage(page_id="art")],
+        )
+    )
+    response = client.post("/decks/overnight/window", json={"end": "03:59"})
+    assert response.status_code == 200
+    store.upsert(
+        Deck(
+            id="early",
+            name="Early",
+            device_ids=["panel"],
+            advance="timer",
+            advance_trigger="daily",
+            advance_fires_at="04:15",
+            advance_days_of_week=[next_day],
+            pages=[DeckPage(page_id="sky")],
+        )
+    )
+    response = client.post("/decks/overnight/window", json={"end": "04:30"})
+    assert response.status_code == 409 and "Early" in response.json["error"]
+    assert store.get("overnight").advance_end_at == "03:59"

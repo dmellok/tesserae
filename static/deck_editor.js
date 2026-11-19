@@ -178,7 +178,8 @@
   const loopMinutes = () => st.steps.reduce((t, s) => t + dwellOf(s), 0);
   const window_ = () => {
     const s = T(st.when.start);
-    const e = st.when.mode === "between" ? (st.when.end === "24:00" ? DAY_MIN : T(st.when.end)) : s;
+    let e = st.when.mode === "between" ? (st.when.end === "24:00" ? DAY_MIN : T(st.when.end)) : s;
+    if (e < s) e += DAY_MIN;
     return { s, e };
   };
   const pause = () => {
@@ -202,6 +203,13 @@
           [a, DAY_MIN],
         ];
   }
+  const pauseRunParts = (day, end) =>
+    [0, ...(end > DAY_MIN ? [1] : [])].flatMap((off) =>
+      pauseParts((day + (kind() === "interval" ? 0 : off)) % 7).map(([a, b]) => [
+        a + off * DAY_MIN,
+        b + off * DAY_MIN,
+      ])
+    );
   // The days it runs (every day for a new lineup with none picked yet).
   const runDays = () => {
     const on = [0, 1, 2, 3, 4, 5, 6].filter((i) => st.when.days[i]);
@@ -220,7 +228,14 @@
   // The whole of s..e (minutes, e up to 1440) is quiet on every day it runs.
   function allInPause(s, e) {
     if (!pause() || !Number.isFinite(s) || !Number.isFinite(e) || e <= s) return false;
-    return runDays().every((d) => pauseParts(d).some(([a, b]) => s >= a && e <= b));
+    return runDays().every(
+      (d) =>
+        pauseRunParts(d, e).reduce(
+          (n, [a, b]) => n + Math.max(0, Math.min(e, b) - Math.max(s, a)),
+          0
+        ) >=
+        e - s
+    );
   }
   // "Sat, Sun" when only some of the run days are named.
   const someDays = (days) =>
@@ -245,7 +260,7 @@
     const where = pauseWhere();
     let whole = false;
     for (const d of runDays()) {
-      const hits = pauseParts(d)
+      const hits = pauseRunParts(d, e)
         .map(([a, b]) => [Math.max(a, s), Math.min(b, e)])
         .filter(([a, b]) => a < b);
       if (!hits.length) continue;
@@ -267,14 +282,11 @@
     for (let i = 0; i < 96 && inPause(t % DAY_MIN); i++) t += 15;
     return t % DAY_MIN;
   }
-  // A window's end that comes before its start: refused, except on a saved
-  // one-dashboard interval, which may run past midnight.
-  function endBeforeStart() {
+  // Equal endpoints do not describe a window.
+  function endMatchesStart() {
     if (st.when.mode !== "between") return false;
     const w = window_();
-    if (!Number.isFinite(w.s) || !Number.isFinite(w.e)) return false;
-    if (w.e === w.s) return true;
-    return w.e < w.s && !(S.when.kind === "interval" && st.steps.length === 1);
+    return Number.isFinite(w.s) && Number.isFinite(w.e) && w.e === w.s;
   }
   const takesInput = () => !!capsOf(st.display).inputs;
   const sleeps = () => !!capsOf(st.display).sleeps;
@@ -315,26 +327,30 @@
     const s = T(x.when.start);
     const e = mode === "between" ? (x.when.end === "24:00" ? DAY_MIN : T(x.when.end)) : s;
     if (!Number.isFinite(s) || !Number.isFinite(e)) return [];
-    const spans = (a, b, point) =>
-      point
-        ? [[a, a + 1]]
-        : b > a
-          ? [[a, b]]
-          : [
-              [a, DAY_MIN],
-              [0, b],
-            ];
-    const mine = spans(s, e, mode === "at");
+    const end = e < s ? e + DAY_MIN : e;
+    const mine = {
+      id: S.deckId,
+      kind: mode === "at" ? "daily" : x.steps.length > 1 ? "cycle" : "interval",
+    };
     return (v.lineups || [])
       .filter((l) => l.id !== S.deckId && l.enabled && l.window)
       .map((l) => {
-        const days = [0, 1, 2, 3, 4, 5, 6].filter((i) => x.when.days[i] && l.days[i]);
-        const theirs = spans(l.window.start_min, l.window.end_min, l.window.is_point);
-        const hit = days.length && mine.some(([a, b]) => theirs.some(([c, d]) => a < d && c < b));
-        return hit ? { l, days } : null;
+        const days = [0, 1, 2, 3, 4, 5, 6].filter(
+          (i) =>
+            x.when.days[i] &&
+            R.clash(
+              { lineups: [l] },
+              mine,
+              s,
+              end,
+              DAYS.map((_, d) => d === i)
+            )
+        );
+        return days.length ? { l, days } : null;
       })
       .filter(Boolean);
   }
+
   // Overlaps it already had are kept, and Priority decides between them;
   // a save that makes a new one is refused (app.deck_routes), so the edit
   // says so instead. {known: [{l, days}], fresh: [{l, days}]}
@@ -678,7 +694,7 @@
   );
   const barReadOnly = () => {
     const bar = $("dxe-daybar");
-    return phoneMQ.matches || !bar || bar.clientWidth <= 602;
+    return phoneMQ.matches || !bar || bar.clientWidth <= 602 || window_().e > DAY_MIN;
   };
   const WEEK_KEY = "tesserae.lineupEditor.week";
   const DAY_ABBR = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -876,7 +892,10 @@
     const days = daysText(st.when.days);
     if (st.when.mode === "at") return `Sends at ${clockOf(st.when.start)}${on}, ${days}.`;
     const w = window_();
-    const range = Number.isFinite(w.s) && Number.isFinite(w.e) ? R.clockRange(w.s, w.e) : "…";
+    const range =
+      Number.isFinite(w.s) && Number.isFinite(w.e)
+        ? R.clockRange(w.s, w.e) + (w.e > DAY_MIN ? " next day" : "")
+        : "…";
     return `Runs ${range}${on}, ${days}.`;
   }
 
@@ -909,7 +928,7 @@
     const fields =
       `<input type="time" step="900" class="dxe-in dxe-time-in" data-fk="start" data-time="start" value="${esc(st.when.start)}" aria-label="Start">` +
       (m === "between"
-        ? `<span class="dxe-to">to</span><input type="time" step="900" class="dxe-in dxe-time-in${endBeforeStart() ? " is-bad" : ""}" data-fk="end" data-time="end" value="${esc(endVal)}" aria-label="End"${endBeforeStart() ? ' aria-invalid="true" aria-describedby="dxe-end-err"' : ""}>` +
+        ? `<span class="dxe-to">to</span><input type="time" step="900" class="dxe-in dxe-time-in${endMatchesStart() ? " is-bad" : ""}" data-fk="end" data-time="end" value="${esc(endVal)}" aria-label="End"${endMatchesStart() ? ' aria-invalid="true" aria-describedby="dxe-end-err"' : ""}>` +
           `<button type="button" class="lu-win-end is-rm" data-end="rm" title="Remove end time" aria-label="Remove end time">${ico("x")}</button>`
         : `<button type="button" class="lu-win-end" data-end="add" title="Add end time" aria-label="Add end time">${ico("plus")}<span>End time</span></button>`);
     return `<div class="dxe-time">${seg}<span class="dxe-time-fields">${fields}</span></div>`;
@@ -919,9 +938,9 @@
     const out = [];
     if (st.when.mode === "manual") return "";
     const w = window_();
-    if (endBeforeStart())
+    if (endMatchesStart())
       out.push(
-        `<p class="dxe-warn is-err" id="dxe-end-err">${ico("info")}<span>End must be after start.</span></p>`
+        `<p class="dxe-warn is-err" id="dxe-end-err">${ico("info")}<span>Start and end must differ.</span></p>`
       );
     if (st.when.mode === "at" && st.steps.length > 1)
       out.push(
@@ -947,7 +966,7 @@
       out.push(
         `<p class="dxe-warn">${ico("moon")}<span>Skipped: ${esc(clockOf(st.when.start))} is in ${esc(pauseWhere())}${on ? ` on ${esc(on)}` : ""}.</span><button type="button" class="dxe-link" data-start="${esc(R.hhmm(after))}" data-fk="start-fix">Start at ${esc(R.clock(after))}</button></p>`
       );
-    } else if (p && st.when.mode === "between" && !endBeforeStart()) {
+    } else if (p && st.when.mode === "between" && !endMatchesStart()) {
       const note = windowPauseNote(w.s, w.e);
       if (note)
         out.push(
@@ -2200,12 +2219,12 @@
     if (st.when.mode === "manual") return "By hand";
     if (st.when.mode === "at") return `At ${clockOf(st.when.start)}, ${daysText(st.when.days)}`;
     const w = window_();
-    return `${R.clockRange(w.s, w.e)}, ${daysText(st.when.days)}`;
+    return `${R.clockRange(w.s, w.e)}${w.e > DAY_MIN ? " next day" : ""}, ${daysText(st.when.days)}`;
   }
-  // Step 2 is done when it has a day, a start, and an end after the start.
+  // Step 2 is done when it has a day, a start, and an end different from the start.
   const whenReady = () =>
     st.when.mode === "manual" ||
-    (st.when.days.some(Boolean) && Number.isFinite(T(st.when.start)) && !endBeforeStart());
+    (st.when.days.some(Boolean) && Number.isFinite(T(st.when.start)) && !endMatchesStart());
   const newReady = () => !!st.display && whenReady() && st.steps.length > 0;
   // The save bar's line: the step that is open, what is missing, or what Create
   // will make.
@@ -2975,8 +2994,8 @@
       ))
     )
       return;
-    if (endBeforeStart()) {
-      ui.msg = "End must be after start.";
+    if (endMatchesStart()) {
+      ui.msg = "Start and end must differ.";
       ui.msgKind = "err";
       drawFooter();
       return;
@@ -3199,7 +3218,7 @@
     if (d.goto) {
       const n = Number(d.goto);
       if (n === 3 && !whenReady()) {
-        ui.msg = endBeforeStart() ? "End must be after start." : "Pick a day and a time.";
+        ui.msg = endMatchesStart() ? "Start and end must differ." : "Pick a day and a time.";
         ui.msgKind = "err";
         drawFooter();
         return;
