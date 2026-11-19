@@ -54,6 +54,7 @@ from ._shared import (
     devices,
     discovery_cache,
     format_discovered,
+    keep_button_map_draft,
     orientation_label,
     push_manager,
     rebuild_transport_fn,
@@ -1787,6 +1788,7 @@ def devices_update_combined(instance_id: str) -> Response:
                         parsed_map = {k: v for k, v in candidate.items()}
         if bm_error is not None:
             flash(f"{device.name} button map: {bm_error}", "error")
+            keep_button_map_draft(device.id, raw)
         else:
             existing = ((store.get_section("devices") or {}).get(instance_id) or {}).get(
                 "button_map"
