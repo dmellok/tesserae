@@ -72,6 +72,7 @@ from ._shared import (
     render_sync_sig,
     renderers,
     settings_store,
+    take_button_map_draft,
 )
 from .field_defs import APP_FIELD_GROUPS, APP_FIELDS, BROKER_FIELDS, PANEL_FIELDS
 
@@ -1450,7 +1451,13 @@ def _build_device_section(store: Any, device: Device) -> dict[str, Any] | None:
         # show up in the help text automatically.
         # A device whose kind declares ``"buttons": false`` gets none of it.
         "button_map_capable": buttons,
-        "button_map_json": (_button_map_stored_json(store, device.id) if buttons else ""),
+        # A map that failed to save comes back as typed, so the error can
+        # be fixed in place instead of retyped (#588).
+        "button_map_json": (
+            (take_button_map_draft(device.id) or _button_map_stored_json(store, device.id))
+            if buttons
+            else ""
+        ),
         "button_map_effective": (_button_map_effective_json(store, device.id) if buttons else ""),
         "button_actions_available": (registered_actions() if buttons else ()),
         # ``page:<id>`` takes the page id, not its name (#379), so list

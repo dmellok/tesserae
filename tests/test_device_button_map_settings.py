@@ -98,3 +98,42 @@ def test_page_action_takes_a_dashboard_name_or_id(app: Flask) -> None:
 
     store.save(Page(id="aaaaaaaaaaaa", name="morning briefing"))
     assert save("page:Morning Briefing").get("button_map") == {"a": "page:3f9a1c2b7d4e"}
+
+
+def _textarea(body: str) -> str:
+    match = re.search(r"<textarea[^>]*name=\"button_map_json\"[^>]*>(.*?)</textarea>", body, re.S)
+    assert match is not None
+    return match.group(1)
+
+
+@pytest.mark.parametrize(
+    "typed",
+    [
+        '{"left": "rotate_prev" "right": "rotate_next"}',  # missing comma
+        '{"left": "no_such_action"}',  # parses, fails validation
+    ],
+)
+def test_a_rejected_button_map_comes_back_as_typed(app: Flask, typed: str) -> None:
+    """#588: a save that fails validation keeps what was typed in the
+    textarea, so a long map can be fixed instead of retyped. The stored
+    map is untouched, and a later visit shows it again."""
+    client = app.test_client()
+    _sign_in(client)
+    _add_device(client)
+    client.post(
+        "/settings/devices/kitchen/save",
+        data={"button_map_json": '{"left": "webhook:http://example.test/kept"}'},
+    )
+
+    resp = client.post("/settings/devices/kitchen/save", data={"button_map_json": typed})
+    assert resp.status_code == 302
+    stored = app.config["SETTINGS_STORE"].get_section("devices").get("kitchen", {})
+    assert stored.get("button_map") == {"left": "webhook:http://example.test/kept"}
+
+    body = client.get(resp.headers["Location"]).get_data(as_text=True)
+    assert "button map:" in body  # the error is still reported
+    shown = _textarea(body)
+    assert shown.replace("&#34;", '"').replace("&quot;", '"') == typed
+
+    again = client.get("/settings/devices/kitchen").get_data(as_text=True)
+    assert "example.test/kept" in _textarea(again)

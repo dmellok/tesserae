@@ -591,3 +591,29 @@ def format_discovered(items: list[DiscoveredDevice]) -> list[dict[str, Any]]:
             }
         )
     return out
+
+
+# A button map that failed validation, kept for the page load after the
+# save's redirect so the textarea shows what was typed instead of the
+# stored map (#588). Server-side because the session is a signed cookie
+# and a large map would push it past the browser's 4 KB limit. One entry
+# per device, read once, gone after ten minutes.
+_BUTTON_MAP_DRAFT_TTL_S = 600.0
+
+
+def _button_map_drafts() -> dict[str, tuple[float, str]]:
+    drafts: dict[str, tuple[float, str]] = current_app.extensions.setdefault(
+        "button_map_drafts", {}
+    )
+    return drafts
+
+
+def keep_button_map_draft(device_id: str, raw: str) -> None:
+    _button_map_drafts()[device_id] = (time.monotonic(), raw)
+
+
+def take_button_map_draft(device_id: str) -> str | None:
+    entry = _button_map_drafts().pop(device_id, None)
+    if entry is None or time.monotonic() - entry[0] > _BUTTON_MAP_DRAFT_TTL_S:
+        return None
+    return entry[1]
