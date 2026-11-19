@@ -1815,3 +1815,35 @@ def test_render_failure_under_the_gate_is_still_a_failure(
     with patch("app.push.capture_composed", side_effect=RuntimeError("browser gone")):
         result = manager.push("home", source="scheduler", respect_quiet_hours=True)
     assert result.status == "failed"
+
+
+def test_previous_render_lookup_does_not_wait_for_a_running_push(
+    tmp_path: Path, composition_png: bytes
+) -> None:
+    """The Lineups page and REST /frame read the grace slot while a deck warm
+    holds the render lock for seconds; the read must not queue behind it."""
+    import threading
+    import time
+
+    manager, _, _ = _wired(tmp_path, composition_png, [])
+    manager._previous_renders["dev"] = {
+        "digest": "old",
+        "composition_digest": "comp",
+        "superseded_at": time.time(),
+    }
+    got: list[object] = []
+
+    def read() -> None:
+        got.append(manager.previous_render_for("dev"))
+        got.append(manager.composition_for_digest("dev", "old"))
+
+    manager._lock.acquire()
+    try:
+        reader = threading.Thread(target=read)
+        reader.start()
+        reader.join(timeout=1.0)
+        assert not reader.is_alive(), "render lookups waited on the render lock"
+    finally:
+        manager._lock.release()
+    assert got[0] is not None and got[0]["digest"] == "old"  # type: ignore[index]
+    assert got[1] == "comp"
