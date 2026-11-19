@@ -184,6 +184,7 @@ def display_caps(device: Any) -> dict[str, Any]:
     checks_in = isinstance(schema, dict) and "sleep_interval_s" in schema
     sleeps = mode == MODE_SLEEPS or (mode == MODE_UNKNOWN and checks_in)
     out: dict[str, Any] = {
+        "meural_swipe": getattr(device, "kind_of", None) == "meural",
         "buttons": buttons,
         "touch": touch,
         "inputs": buttons or touch,

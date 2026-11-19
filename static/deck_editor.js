@@ -2059,6 +2059,8 @@
         )
       );
     if (!rows.length) {
+      if (caps.meural_swipe)
+        return `<p class="dxe-one dxe-opts-none">${ico("info")}<span>A swipe on the frame shows the next item, or the next dashboard.</span></p>`;
       const why = caps.inputs || caps.sleeps ? "not for this lineup" : "always on, no buttons";
       return `<p class="dxe-one dxe-opts-none">${ico("info")}<span>Nothing to set for ${esc(dev.name)}: ${esc(why)}.</span></p>`;
     }
