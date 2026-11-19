@@ -277,6 +277,16 @@ def _selected_device_panels(
     return out
 
 
+def frame_shapes(page: Page, devices: DeviceRegistry | None) -> list[str]:
+    """``landscape`` / ``portrait`` / ``square`` for each kind of frame the
+    page is bound to, sorted; empty when it is on none."""
+    shapes = set()
+    for _device, panel in _selected_device_panels(page, devices):
+        w, h = int(panel.w), int(panel.h)
+        shapes.add("landscape" if w > h else "portrait" if h > w else "square")
+    return sorted(shapes)
+
+
 def resolve_panel_for_page(
     page: Page,
     devices: DeviceRegistry | None,

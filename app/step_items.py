@@ -176,7 +176,7 @@ def _item_ctx(page: Any, placement: Any, plugin_id: str, device_id: str | None) 
     the widget's data dir, the cell's size on the target display, the
     placement's id and the display's panel. ``device_id`` None means the
     dashboard's first bound display."""
-    from app.panel import device_panel, fit_cells_to_panel, resolve_panel_for_page
+    from app.panel import device_panel, fit_cells_to_panel, frame_shapes, resolve_panel_for_page
 
     reg = current_app.config.get("PLUGIN_REGISTRY")
     plugin = reg.get(plugin_id) if reg is not None else None
@@ -209,7 +209,7 @@ def _item_ctx(page: Any, placement: Any, plugin_id: str, device_id: str | None) 
         # A canvas element (or anything unfittable) reports its own size.
         cell_w = int(getattr(placement, "w", 0) or 0)
         cell_h = int(getattr(placement, "h", 0) or 0)
-    return {
+    ctx = {
         "data_dir": str(getattr(plugin, "data_dir", "") or ""),
         "cell_w": cell_w,
         "cell_h": cell_h,
@@ -218,6 +218,15 @@ def _item_ctx(page: Any, placement: Any, plugin_id: str, device_id: str | None) 
         "panel_w": panel_w,
         "panel_h": panel_h,
     }
+    # As in a render: a photo widget lists only the shape this frame gets
+    # when the dashboard is on both portrait and landscape frames.
+    try:
+        shapes = frame_shapes(page, devices)
+    except Exception:
+        shapes = []
+    if shapes:
+        ctx["frame_shapes"] = shapes
+    return ctx
 
 
 def _with_script_root(path: str) -> str:
@@ -261,12 +270,6 @@ def _declared_infos(listed: list[dict[str, Any]], limit: int | None = None) -> l
     ]
 
 
-def _gallery_files(module: Any, folder: str) -> tuple[int, tuple[str, ...]] | None:
-    """``(count, the first MAX_STEP_ITEMS names)`` of a gallery folder."""
-    listed = _gallery_all(module, folder)
-    return None if listed is None else (listed[0], listed[1][:MAX_STEP_ITEMS])
-
-
 def _gallery_all(module: Any, folder: str) -> tuple[int, tuple[str, ...]] | None:
     """``(count, every name)`` of a gallery folder, cached until it changes."""
     stamp: float = float(int(time.time() // 60))
@@ -294,13 +297,33 @@ def _gallery_all(module: Any, folder: str) -> tuple[int, tuple[str, ...]] | None
     return entry[1], entry[2]
 
 
+def _gallery_shown(
+    module: Any, folder: str, names: tuple[str, ...], options: dict[str, Any], ctx: Any
+) -> tuple[str, ...]:
+    """The folder's pictures this frame is shown, by the cell's orientation, as
+    the gallery's ``fetch`` picks them (``shown_files``); all of them when the
+    gallery has no such hook."""
+    shown = getattr(module, "shown_files", None)
+    if not callable(shown):
+        return names
+    try:
+        return tuple(shown(folder, list(names), options, dict(ctx or {})))
+    except Exception:
+        current_app.logger.warning("picture_gallery: shown_files failed", exc_info=True)
+        return names
+
+
 def _gallery_items(cell: Any, ctx: dict[str, Any] | None = None) -> StepItems | None:
     folder = str(cell.options.get("folder") or "")
     module = _plugin_module("picture_gallery")
-    listed = _gallery_files(module, folder) if module is not None else None
-    if listed is None or listed[0] <= 1:
+    listed = _gallery_all(module, folder) if module is not None else None
+    if listed is None:
         return None
-    count, names = listed
+    names = _gallery_shown(module, folder, listed[1], dict(cell.options or {}), ctx)
+    count = len(names)
+    names = names[:MAX_STEP_ITEMS]
+    if count <= 1:
+        return None
     items = _gallery_item_infos(module, folder, list(enumerate(names)))
     return StepItems(str(cell.id), "file", count, tuple(items))
 
@@ -667,6 +690,7 @@ def list_items(
         module = _plugin_module(plugin_id)
         listed = _gallery_all(module, folder) if module is not None else None
         names = listed[1] if listed is not None else ()
+        names = _gallery_shown(module, folder, names, options, ctx) if names else names
         named = [(i, n) for i, n in enumerate(names) if not q or q in n.casefold()]
         items = _gallery_item_infos(module, folder, named[offset : offset + limit])
         mode = "pick" if len(names) > 1 else "none"

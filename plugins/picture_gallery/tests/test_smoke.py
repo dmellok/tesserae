@@ -434,3 +434,56 @@ def test_manifest_lets_lineups_draw_another_image() -> None:
 
     manifest = json.loads((Path(__file__).resolve().parents[1] / "plugin.json").read_text())
     assert manifest["lineups"] == {"draw": True}
+
+
+def _shape_fetch(server, plugin, orientation: str, **ctx) -> str:
+    out = server.fetch(
+        {"folder": "", "orientation": orientation},
+        {},
+        ctx={"data_dir": str(plugin.data_dir), **ctx},
+    )
+    return out["filename"]
+
+
+def _seed_shapes(plugin) -> None:
+    _seed_image(plugin.data_dir, "wide.jpg", size=(90, 60))
+    _seed_image(plugin.data_dir, "tall.jpg", size=(60, 90))
+
+
+MIXED = {"frame_shapes": ["landscape", "portrait"]}
+
+
+def test_auto_matches_each_frame_when_the_page_is_on_both_shapes(app: Flask) -> None:
+    server = _load_server()
+    plugin = app.config["PLUGIN_REGISTRY"].get("picture_gallery")
+    _seed_shapes(plugin)
+    for _ in range(6):
+        assert _shape_fetch(server, plugin, "auto", cell_w=800, cell_h=480, **MIXED) == "wide.jpg"
+        assert _shape_fetch(server, plugin, "auto", cell_w=480, cell_h=800, **MIXED) == "tall.jpg"
+
+
+def test_auto_shows_any_picture_on_frames_of_one_shape(app: Flask) -> None:
+    server = _load_server()
+    plugin = app.config["PLUGIN_REGISTRY"].get("picture_gallery")
+    _seed_shapes(plugin)
+    seen = {
+        _shape_fetch(server, plugin, "auto", cell_w=800, cell_h=480, frame_shapes=["landscape"])
+        for _ in range(40)
+    }
+    assert seen == {"wide.jpg", "tall.jpg"}
+
+
+def test_match_the_frame_always_filters_and_keeps_squares(app: Flask) -> None:
+    server = _load_server()
+    plugin = app.config["PLUGIN_REGISTRY"].get("picture_gallery")
+    _seed_shapes(plugin)
+    _seed_image(plugin.data_dir, "square.jpg", size=(70, 70))
+    seen = {_shape_fetch(server, plugin, "frame", cell_w=480, cell_h=800) for _ in range(40)}
+    assert seen == {"tall.jpg", "square.jpg"}
+
+
+def test_a_folder_without_the_frames_shape_shows_any_picture(app: Flask) -> None:
+    server = _load_server()
+    plugin = app.config["PLUGIN_REGISTRY"].get("picture_gallery")
+    _seed_image(plugin.data_dir, "wide.jpg", size=(90, 60))
+    assert _shape_fetch(server, plugin, "frame", cell_w=480, cell_h=800) == "wide.jpg"

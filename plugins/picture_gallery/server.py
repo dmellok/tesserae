@@ -365,9 +365,10 @@ def _orientation_of(source: Path) -> tuple[int, int, str] | None:
 def _filter_by_orientation(
     images: list[Path],
     folder_segment: str,
-    desired: str,
+    desired: str | frozenset[str],
     data_dir: Path,
 ) -> list[Path]:
+    wanted = frozenset([desired]) if isinstance(desired, str) else desired
     cache = _load_orient_cache(data_dir)
     dirty = False
     kept: list[Path] = []
@@ -386,7 +387,7 @@ def _filter_by_orientation(
             entry = {"mtime": mtime, "w": w, "h": h, "orientation": orient}
             cache[key] = entry
             dirty = True
-        if entry["orientation"] == desired:
+        if entry["orientation"] in wanted:
             kept.append(p)
     if dirty:
         _save_orient_cache(data_dir, cache)
@@ -396,6 +397,67 @@ def _filter_by_orientation(
 # Mirrors ``DEVICE_ID_RE`` in app/device_service.py: registry ids are lower
 # case, start with a letter, and carry only letters, digits, ``_`` and ``-``.
 _DEVICE_TOKEN_RE = re.compile(r"^[a-z][a-z0-9_-]{1,31}$")
+
+
+def _frame_shape(options: dict[str, Any], ctx: dict[str, Any]) -> str | None:
+    """The shape ``auto`` / ``frame`` keep pictures of: the cell's, for
+    ``frame`` always and for ``auto`` only when the dashboard is on both
+    portrait and landscape frames (``ctx["frame_shapes"]``). None means no
+    filter."""
+    orientation = (options.get("orientation") or "any").lower()
+    if orientation == "auto":
+        shapes = set(ctx.get("frame_shapes") or ())
+        if not {"landscape", "portrait"} <= shapes:
+            return None
+    elif orientation != "frame":
+        return None
+    w = int(ctx.get("cell_w") or 0) or int(ctx.get("panel_w") or 0)
+    h = int(ctx.get("cell_h") or 0) or int(ctx.get("panel_h") or 0)
+    if w > h:
+        return "landscape"
+    if h > w:
+        return "portrait"
+    return None
+
+
+def _shown_images(
+    images: list[Path],
+    folder_segment: str,
+    options: dict[str, Any],
+    ctx: dict[str, Any],
+    data_dir: Path,
+) -> tuple[list[Path], str]:
+    """``(the pictures this render picks from, the shape they were narrowed
+    to or "any")``. Portrait / Landscape / Square keep that shape (none left
+    is the caller's error); Auto and Match the frame keep the frame's shape
+    and square pictures, or every picture when none have it."""
+    orientation = (options.get("orientation") or "any").lower()
+    if orientation in ("portrait", "landscape", "square"):
+        return _filter_by_orientation(images, folder_segment, orientation, data_dir), orientation
+    shape = _frame_shape(options, ctx) if orientation in ("auto", "frame") else None
+    if shape:
+        matching = _filter_by_orientation(
+            images, folder_segment, frozenset({shape, "square"}), data_dir
+        )
+        if matching:
+            return matching, shape
+    return images, "any"
+
+
+def shown_files(
+    folder: str, names: list[str], options: dict[str, Any], ctx: dict[str, Any]
+) -> list[str]:
+    """Of ``names`` in ``folder``, the ones a render with these options and
+    ``ctx`` picks from, in order: what the Lineups page lists for a frame."""
+    data_dir = _data_dir()
+    path = _folder_path(folder, data_dir)
+    if path is None:
+        return names
+    images = [path / name for name in names]
+    shown, _shape = _shown_images(
+        images, folder if folder else ROOT_FOLDER_VALUE, options, ctx, data_dir
+    )
+    return [p.name for p in shown]
 
 
 def _cursor_token(device_id: str) -> str:
@@ -454,14 +516,12 @@ def fetch(
                 "folder": folder_segment,
                 "count": len(images),
             }
-    orientation = (options.get("orientation") or "any").lower()
-    if orientation in ("portrait", "landscape", "square"):
-        images = _filter_by_orientation(images, folder_segment, orientation, data_dir)
-        if not images:
-            return {
-                "error": f"No {orientation} images in '{folder_name or ROOT_FOLDER_VALUE}'.",
-                "url": None,
-            }
+    images, orientation = _shown_images(images, folder_segment, options, ctx, data_dir)
+    if not images:
+        return {
+            "error": f"No {orientation} images in '{folder_name or ROOT_FOLDER_VALUE}'.",
+            "url": None,
+        }
 
     mode = options.get("mode", "random")
     if mode == "sequential":
