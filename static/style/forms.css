@@ -1982,26 +1982,84 @@ input[type="range"].slider:focus::-moz-range-thumb {
   border-radius: var(--t-radius-sm);
   background: var(--t-surface);
   overflow: hidden;
+  transition:
+    border-color var(--t-trans-fast),
+    box-shadow var(--t-trans-fast);
+}
+/* The search box is borderless inside the picker, so the picker carries
+   the focus ring a text field would. */
+.multiselect:has(.multiselect-search input:focus) {
+  border-color: var(--t-accent);
+  box-shadow: var(--t-ring);
 }
 .multiselect-search {
   display: flex;
   align-items: center;
   gap: var(--t-space-2);
   padding: var(--t-space-2) var(--t-space-3);
-  border-bottom: 1px solid var(--t-border);
   color: var(--t-muted);
 }
-.multiselect-search input {
+/* Beats ``.field input[type="search"]``, which would draw a second
+   bordered box inside the picker. */
+.multiselect .multiselect-search input[type="search"],
+.multiselect .multiselect-search input[type="search"]:focus {
   flex: 1 1 auto;
   min-width: 0;
   border: 0;
+  border-radius: 0;
   background: transparent;
+  box-shadow: none;
   padding: 2px 0;
   font: inherit;
   color: var(--t-fg);
-}
-.multiselect-search input:focus {
   outline: none;
+}
+/* Escape and closing the list clear the search, so the browser's own
+   clear button (blue, off-palette) has nothing to add. */
+.multiselect .multiselect-search input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+.multiselect .multiselect-search input::placeholder {
+  color: var(--t-muted);
+}
+.multiselect-toggle {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin: -4px calc(var(--t-space-2) * -1) -4px 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--t-radius-sm);
+  background: transparent;
+  box-shadow: none;
+  color: var(--t-muted);
+  transform: none;
+  cursor: pointer;
+}
+.multiselect-toggle:hover,
+.multiselect-toggle:active {
+  background: var(--t-surface-soft);
+  color: var(--t-fg);
+  box-shadow: none;
+  transform: none;
+}
+.multiselect-toggle:focus-visible {
+  outline: 2px solid var(--t-accent);
+  outline-offset: -2px;
+}
+.multiselect-toggle .ph {
+  transition: transform var(--t-trans-fast);
+}
+.multiselect.is-open .multiselect-toggle .ph {
+  transform: rotate(180deg);
+}
+/* Closed, a compact picker lists only its picks. */
+.multiselect[data-ms-compact]:not(.is-open) .multiselect-opt:not(.is-selected),
+.multiselect[data-ms-compact]:not(.is-open) .multiselect-empty {
+  display: none;
 }
 .multiselect-count {
   flex: 0 0 auto;
@@ -2019,6 +2077,8 @@ input[type="range"].slider:focus::-moz-range-thumb {
   align-items: stretch;
   padding: 0;
   font-size: var(--t-size-sm);
+  /* Every row draws the line above it, the first one included, so the
+     search box is set off only when a row shows under it. */
   border-top: 1px solid var(--t-border);
   position: relative;
 }
@@ -2040,8 +2100,9 @@ input[type="range"].slider:focus::-moz-range-thumb {
      "scroll to make visible" against (0, 0) of the page. */
   position: relative;
 }
-.multiselect-opt:first-of-type {
-  border-top: 0;
+.multiselect-choice:has(input:focus-visible) {
+  outline: 2px solid var(--t-accent);
+  outline-offset: -2px;
 }
 /* The class rule above sets ``display: flex``, which beats the UA
    ``[hidden] { display: none }`` rule on specificity, so the
@@ -2095,7 +2156,8 @@ input[type="range"].slider:focus::-moz-range-thumb {
 .multiselect-opt.is-selected + .multiselect-opt.is-selected {
   border-top-color: transparent;
 }
-.multiselect.is-filtering .multiselect-drag {
+.multiselect.is-filtering .multiselect-drag,
+.multiselect:not(.has-order) .multiselect-drag {
   display: none;
 }
 .multiselect-drag:hover,
@@ -2157,6 +2219,9 @@ input[type="range"].slider:focus::-moz-range-thumb {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.multiselect-empty {
+  border-top: 1px solid var(--t-border);
 }
 .multiselect-empty,
 .multiselect-hint {

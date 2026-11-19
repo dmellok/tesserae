@@ -538,6 +538,8 @@
           if (checked) count += 1;
         });
         if (countEl) countEl.textContent = count ? `${count} selected` : "";
+        // One pick has no order to change, so its handle stays out of the way.
+        ms.classList.toggle("has-order", count > 1);
       }
       function applyFilter() {
         const q = (filter ? filter.value : "").trim().toLowerCase();
@@ -550,13 +552,120 @@
         ms.classList.toggle("is-filtering", Boolean(q));
         if (emptyEl) emptyEl.hidden = shown > 0;
       }
+
+      // A long list is compact: closed, it shows only the picks; the search
+      // box, its caret button or ArrowDown opens the whole list, and focus
+      // leaving the picker (or Escape) closes it again.
+      const compact = ms.hasAttribute("data-ms-compact");
+      const toggle = ms.querySelector("[data-ms-toggle]");
+      const visibleInputs = () =>
+        rows()
+          .filter((row) => row.offsetParent !== null)
+          .map(inputFor)
+          .filter(Boolean);
+      function setOpen(open) {
+        if (!compact || ms.classList.contains("is-open") === open) return;
+        ms.classList.toggle("is-open", open);
+        [filter, toggle].forEach((el) => el?.setAttribute("aria-expanded", String(open)));
+        if (!open && filter && filter.value) {
+          filter.value = "";
+          applyFilter();
+        }
+        if (open && list) list.scrollTop = 0;
+      }
+      // Enter in the search box ticks the best match and clears the box for
+      // the next one, as in a tag input.
+      function pickFirstMatch() {
+        const q = filter.value.trim().toLowerCase();
+        const matches = opts.filter((row) => !row.hidden);
+        const row =
+          matches.find((r) => (r.dataset.msText || "") === q && !inputFor(r).checked) ||
+          matches.find((r) => !inputFor(r).checked);
+        if (!row) return;
+        const box = inputFor(row);
+        box.checked = true;
+        box.dispatchEvent(new Event("input", { bubbles: true }));
+        box.dispatchEvent(new Event("change", { bubbles: true }));
+        filter.value = "";
+        applyFilter();
+      }
       if (filter) {
         // Keep filter keystrokes local, don't dirty the form or trigger
         // a preview POST (the filter isn't part of the saved value).
         ["input", "change", "keyup", "keydown"].forEach((evt) =>
           filter.addEventListener(evt, (e) => e.stopPropagation())
         );
-        filter.addEventListener("input", applyFilter);
+        filter.addEventListener("input", () => {
+          setOpen(true);
+          applyFilter();
+        });
+        filter.addEventListener("focus", () => setOpen(true));
+        filter.addEventListener("click", () => setOpen(true));
+        filter.addEventListener("keydown", (ev) => {
+          if (ev.key === "ArrowDown") {
+            ev.preventDefault();
+            setOpen(true);
+            visibleInputs()[0]?.focus();
+          } else if (ev.key === "Enter") {
+            // Never submit the cell form from the search box.
+            ev.preventDefault();
+            if (filter.value.trim()) pickFirstMatch();
+            else setOpen(!ms.classList.contains("is-open"));
+          } else if (ev.key === "Escape" && (filter.value || ms.classList.contains("is-open"))) {
+            ev.preventDefault();
+            if (filter.value) {
+              filter.value = "";
+              applyFilter();
+            } else {
+              setOpen(false);
+            }
+          }
+        });
+      }
+      if (compact) {
+        if (toggle) {
+          // Keep focus in the search box, so a click doesn't close the list
+          // on its way to opening it.
+          toggle.addEventListener("pointerdown", (ev) => ev.preventDefault());
+          toggle.addEventListener("click", () => {
+            const open = !ms.classList.contains("is-open");
+            setOpen(open);
+            if (open) filter?.focus();
+          });
+        }
+        // Ticking a row with the pointer keeps focus where it was (the
+        // search box, say), so Safari, which doesn't focus a clicked
+        // checkbox, doesn't see focus leave and close the list under it.
+        // The drag handle keeps its own pointer handling.
+        list?.addEventListener("pointerdown", (ev) => {
+          if (ms.classList.contains("is-open") && !ev.target.closest("[data-ms-drag]")) {
+            ev.preventDefault();
+          }
+        });
+        // Checked after the event: re-sorting the rows on a tick blurs the
+        // row and puts focus back in the same task where moveBefore is
+        // missing, and that mustn't count as leaving.
+        ms.addEventListener("focusout", () => {
+          setTimeout(() => {
+            if (!ms.contains(document.activeElement)) setOpen(false);
+          }, 0);
+        });
+        ms.addEventListener("keydown", (ev) => {
+          const box = ev.target;
+          if (!box.matches?.('.multiselect-opt input[type="checkbox"]')) return;
+          if (ev.key === "Escape") {
+            ev.preventDefault();
+            filter?.focus();
+            setOpen(false);
+            return;
+          }
+          if (ev.key !== "ArrowDown" && ev.key !== "ArrowUp") return;
+          ev.preventDefault();
+          const boxes = visibleInputs();
+          const next = boxes.indexOf(box) + (ev.key === "ArrowDown" ? 1 : -1);
+          if (next < 0) filter?.focus();
+          else boxes[Math.min(next, boxes.length - 1)]?.focus();
+        });
       }
       if (list) {
         list.addEventListener("dragover", (ev) => {
