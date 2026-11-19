@@ -174,3 +174,56 @@ def test_every_bundled_theme_has_a_parsed_colour_map() -> None:
         colours = bundled_theme_colours(theme.id)
         assert "bg" in colours, f"{theme.id} missing bg in parsed colours"
         assert "accent_1" in colours, f"{theme.id} missing accent_1 in parsed colours"
+
+
+# Flat ink themes: the whole point is that no colour token falls between
+# the panel's inks, so a single off-ink hex (a soft grey, a near-black)
+# silently brings the dither pattern back on a flat background.
+_FOUR_INKS = frozenset({"#000000", "#FFFFFF", "#FFFF00", "#FF0000"})
+_SIX_INKS = _FOUR_INKS | {"#0000FF", "#00FF00"}
+_INK_THEME_INKS: dict[str, frozenset[str]] = {
+    "ink-poster": _FOUR_INKS,
+    "ink-taxi": _FOUR_INKS,
+    "ink-signal": _FOUR_INKS,
+    "ink-noir": _FOUR_INKS,
+    "ink-primary": _SIX_INKS,
+    "ink-delft": _SIX_INKS,
+    "ink-canary": _SIX_INKS,
+    "ink-gallery": _SIX_INKS,
+}
+
+
+def test_ink_theme_ink_lists_cover_the_whole_family() -> None:
+    """A flat ink theme added to the registry without an ink list here
+    would skip the pure-ink check below."""
+    family_ids = {t.id for t in BUNDLED_THEMES if t.family == "ink"}
+    assert family_ids == set(_INK_THEME_INKS)
+
+
+def test_ink_themes_use_only_the_panels_own_inks() -> None:
+    """Every colour token of a flat ink theme is exactly one of its
+    panel's inks: four for the black / white / yellow / red themes, six
+    for the Spectra 6 ones."""
+    from app.state.theme_registry import bundled_theme_colours
+
+    for theme_id, inks in _INK_THEME_INKS.items():
+        colours = bundled_theme_colours(theme_id)
+        colours.pop("font_family", None)
+        assert len(colours) == 21, f"{theme_id}: expected 21 colour tokens, got {len(colours)}"
+        off_ink = {k: v for k, v in colours.items() if v.upper() not in inks}
+        assert not off_ink, f"{theme_id} has tokens that are not a panel ink: {off_ink!r}"
+
+
+def test_ink_theme_accents_differ_from_their_surface_and_soft_fill() -> None:
+    """An accent painted in the same ink as the card it sits on, or as
+    its own soft fill, is invisible."""
+    from app.state.theme_registry import bundled_theme_colours
+
+    for theme_id in _INK_THEME_INKS:
+        c = bundled_theme_colours(theme_id)
+        assert c["text_primary"] != c["surface"], theme_id
+        for n in range(1, 7):
+            accent = c[f"accent_{n}"]
+            assert accent != c["surface"], f"{theme_id} accent-{n} matches the surface"
+            assert accent != c[f"accent_{n}_soft"], f"{theme_id} accent-{n} matches its soft fill"
+            assert accent != c["on_accent"], f"{theme_id} accent-{n} matches on-accent"

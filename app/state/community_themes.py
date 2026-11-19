@@ -42,7 +42,7 @@ _ID_RE = re.compile(r"^[a-z][a-z0-9_-]*$")
 # Valid family values; anything outside this set falls back to
 # ``community`` so the picker still groups it sensibly.
 _KNOWN_FAMILIES: frozenset[ThemeFamily] = frozenset(
-    {"light", "dark", "movement", "vivid", "gradient"}
+    {"light", "dark", "movement", "ink", "vivid", "gradient"}
 )
 
 
