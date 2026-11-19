@@ -859,7 +859,15 @@ def test_rotation_row_marks_intended_step_waiting_until_the_panel_fetches_it(
     # The header names the page the panel holds (#280), not the one the
     # server intends; the row stays live and marks the intended step queued.
     other_name = _other(intended).title()
-    assert re.search(r'<p class="lu-show queued"[^>]*>.*?<b>' + other_name + "</b>", section, re.S)
+    assert re.search(
+        r'<p class="lu-show queued"[^>]*>.*?<a href="/pages/'
+        + _other(intended)
+        + '">'
+        + other_name
+        + "</a>",
+        section,
+        re.S,
+    )
     assert '<li class="lu-row is-live" id="lu-row-loop"' in section
     assert "lu-step is-waiting" in section and "lu-pill p-queued" in section
     assert (
@@ -890,7 +898,13 @@ def test_rotation_row_reads_live_once_the_panel_shows_the_intended_step(
     body = client.get("/decks").get_data(as_text=True)
     section = body[body.index('id="display-panel"') :]
     assert re.search(
-        r'<p class="lu-show sync"[^>]*>.*?<b>' + _intended_page(app).title() + "</b>", section, re.S
+        r'<p class="lu-show sync"[^>]*>.*?<a href="/pages/'
+        + _intended_page(app)
+        + '">'
+        + _intended_page(app).title()
+        + "</a>",
+        section,
+        re.S,
     )
     assert "is-waiting" not in section and "p-queued" not in section
     assert "lu-step is-now" in section
@@ -1008,7 +1022,11 @@ def test_rotation_row_says_the_display_holds_a_manual_push(app: Flask) -> None:
     section = body[body.index('id="display-panel"') :]
     # The header names the page someone pushed. No lineup put it there, so no
     # row is live; the rotation is queued (its next advance takes the panel back).
-    assert re.search(r'<p class="lu-show \w+"[^>]*>.*?<b>' + other.title() + "</b>", section, re.S)
+    assert re.search(
+        r'<p class="lu-show \w+"[^>]*>.*?<a href="/pages/' + other + '">' + other.title() + "</a>",
+        section,
+        re.S,
+    )
     assert '<li class="lu-row is-queued" id="lu-row-loop"' in section
     assert "lu-row is-live" not in section
     assert "from a manual push" in section
@@ -1091,7 +1109,7 @@ def test_playing_rotation_carries_no_paused_pill(app: Flask) -> None:
     section = body[body.index('id="display-panel"') :]
     assert '<li class="lu-row is-live" id="lu-row-loop"' in section
 
-    assert "from Kitchen loop" in section
+    assert 'from <a href="/decks/loop/edit">Kitchen loop</a>' in section
     assert "from an earlier step" not in section
 
 

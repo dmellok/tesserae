@@ -139,6 +139,98 @@ def test_sleeping_display_with_queued_step() -> None:
     assert row.steps[-1].separator == "loop" and row.steps[0].separator == "arrow"
 
 
+@pytest.mark.parametrize(
+    "age, want", [(None, ""), (10, "Checked in just now"), (125, "Checked in 2 min ago")]
+)
+def test_always_on_header_contact_has_a_value(age: int | None, want: str) -> None:
+    from app.next_update import MODE_CONNECTED, Reach
+
+    displays, dashboards = sample_inputs()
+    d = replace(
+        displays[0],
+        reach=Reach(MODE_CONNECTED),
+        heard=True,
+        last_seen=SAMPLE_NOW.timestamp() - age if age is not None else None,
+    )
+    out = build_view([d], dashboards, now=SAMPLE_NOW).displays[0]
+    assert out.link.label == want
+
+
+@pytest.mark.parametrize(
+    "pending, age, queued",
+    [(False, 300, False), (True, 60, False), (True, 120, False), (True, 121, True)],
+)
+@pytest.mark.parametrize("shown", ["art", "family"])
+def test_always_on_bar_only_queues_a_stalled_delivery(
+    pending: bool, age: int, queued: bool, shown: str
+) -> None:
+    from app.next_update import MODE_CONNECTED, Reach
+
+    displays, dashboards = sample_inputs()
+    d = replace(
+        displays[0],
+        reach=Reach(MODE_CONNECTED),
+        pending=pending,
+        on_screen=OnScreenInput(shown, origin_known=True),
+        published=PublishedInput("family", SAMPLE_NOW.timestamp() - age),
+    )
+    out = build_view([d], dashboards, now=SAMPLE_NOW).displays[0]
+    row = _lineup(out, "dinner")
+    block = next(s for s in out.day.segments if s.lineup_id == "dinner" and s.kind == "window")
+    assert (row.status == "queued") is queued
+    assert (block.state == "queued") is queued
+
+
+@pytest.mark.parametrize("sleeping", [False, True])
+def test_always_on_daily_count_coalesces_slots_and_respects_quiet_hours(sleeping: bool) -> None:
+    from app.next_update import MODE_CONNECTED, MODE_SLEEPS, Reach
+
+    displays, _ = sample_inputs()
+    lineup = LineupInput(
+        "day",
+        "Day",
+        "cycle",
+        (StepInput("a", 120), StepInput("b", 120)),
+        start="00:00",
+        end="23:59",
+    )
+    d = replace(
+        displays[0],
+        lineups=(lineup,),
+        reach=Reach(MODE_SLEEPS if sleeping else MODE_CONNECTED),
+        pause=PauseInput(9 * 60, 7 * 60),
+    )
+    dashboards = {pid: DashboardInfo(pid, pid, refresh_minutes=15) for pid in ("a", "b")}
+    out = build_view([d], dashboards, now=SAMPLE_NOW).displays[0]
+    # Awake 07:01–09:00: catch-up, :15/:30/:45, 08:00 step, :15/:30/:45.
+    # The sleeper retains its old count of twelve lineup steps.
+    assert out.refreshes_today == (12 if sleeping else 8)
+
+
+def test_always_on_count_includes_the_dashboard_held_overnight() -> None:
+    from app.next_update import MODE_CONNECTED, Reach
+
+    displays, _ = sample_inputs()
+    lineup = LineupInput(
+        "meural",
+        "Meural",
+        "cycle",
+        (StepInput("photos", 120), StepInput("art", 120), StepInput("travel", 120)),
+        start="07:00",
+        end="23:15",
+    )
+    d = replace(displays[0], lineups=(lineup,), reach=Reach(MODE_CONNECTED), pause=None)
+    dashboards = {
+        "photos": DashboardInfo("photos", "Photos", refresh_minutes=15),
+        "art": DashboardInfo("art", "Art", refresh_minutes=15),
+        "travel": DashboardInfo("travel", "Travel", refresh_minutes=10),
+    }
+    out = build_view([d], dashboards, now=SAMPLE_NOW).displays[0]
+    # Photos and Art each own 6 hours (24 slots each). Travel owns 12 hours,
+    # including 23:00–07:00 overnight (72 slots). Nine steps share refresh slots.
+    assert out.refreshes_today == 120
+
+
 def test_status_tags_ordering_and_day_sets() -> None:
     frame = _display(sample_view_model(), "frame")
     got = [(lu.id, lu.status, lu.status_label) for lu in frame.lineups]

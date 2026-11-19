@@ -552,6 +552,8 @@
   // The new-lineup page, started on this display (the + beside its fold chevron).
   const newLineupUrl = (id) =>
     `${window.TESSERAE_URL_PREFIX || ""}/decks/new?display=${encodeURIComponent(id)}`;
+  const dashboardUrl = (id) =>
+    `${window.TESSERAE_URL_PREFIX || ""}/pages/${encodeURIComponent(id)}`;
 
   function header(vm, d, ui) {
     const op = d.on_screen;
@@ -594,21 +596,32 @@
               zoomH
             )
           : `<span class="thumb-frame lu-thumb ${d.orientation || "l"} empty note-${esc(ph.state)}" style="--ar:${d.width || 16}/${d.height || 10};--arw:${d.width || 16};--arh:${d.height || 10}" role="img" aria-label="${esc(ph.title)}" title="${esc(ph.title)}"><span class="lu-thumb-note">${ico(phIcon[ph.state] || "screen")}<b>${esc(ph.label)}</b>${ph.sub ? `<small>${esc(ph.sub)}</small>` : ""}</span></span>`;
-    let tags = `<span class="lu-im" title="${esc(d.link.title)}">${ico(linkIcon)}<span>${esc(d.link.label)}</span></span>`;
+    let tags = d.link.label
+      ? `<span class="lu-im" title="${esc(d.link.title)}">${ico(linkIcon)}<span>${esc(d.link.label)}</span></span>`
+      : "";
     if (d.size_label)
       tags += `<span class="lu-im" title="${esc(d.spec)}">${ico(d.orientation === "p" ? "portrait" : "landscape")}<span>${esc(d.size_label)}</span></span>`;
     if (d.pause)
       tags += `<span class="lu-im" title="${esc(d.pause.title)}">${ico("moon")}<span>${esc(d.pause.label)}</span></span>`;
-    tags += `<span class="lu-im" title="${d.refreshes_today} refreshes projected today">${ico("refresh")}<span>${d.refreshes_today}</span></span>`;
+    tags += `<span class="lu-im" title="${esc(d.refreshes_title)}">${ico("refresh")}<span>${d.refreshes_today}</span></span>`;
     const show = op
-      ? `<p class="lu-show ${d.in_sync ? "sync" : "queued"}" title="${esc(d.show_title)}"><i class="lu-sdot" aria-hidden="true" title="${esc(d.status_title || d.show_title)}"></i><span class="lu-sr-only">${d.in_sync ? "Synced" : "Waiting to land"}</span><span class="k">Showing</span><b>${esc(op.name)}</b>${d.show_suffix ? `<span class="k">${esc(d.show_suffix)}</span>` : ""}</p>`
+      ? `<p class="lu-show ${d.in_sync ? "sync" : "queued"}" title="${esc(d.show_title)}"><i class="lu-sdot" aria-hidden="true" title="${esc(d.status_title || d.show_title)}"></i><span class="lu-sr-only">${d.in_sync ? "Synced" : "Waiting to land"}</span><span class="k">Showing</span>${op.missing ? `<b>${esc(op.name)}</b>` : `<a href="${esc(dashboardUrl(op.dashboard_id))}">${esc(op.name)}</a>`}${d.show_lineup_url ? `<span class="k">from <a href="${esc(d.show_lineup_url)}">${esc(d.show_lineup_name)}</a></span>` : ""}${d.show_suffix ? `<span class="k">${esc(d.show_suffix)}</span>` : ""}</p>`
       : fr
         ? `<p class="lu-show frame" title="${esc(d.show_title)}"><i class="lu-sdot" aria-hidden="true"></i><span class="k">Showing</span><b>${esc(fr.label)}</b>${fr.since ? `<span class="k">since ${esc(fr.since)}</span>` : ""}</p>`
         : d.nothing_sent
           ? `<p class="lu-show unknown" title="${esc(d.show_title)}"><i class="lu-sdot" aria-hidden="true"></i><b>Nothing sent yet</b></p>`
           : `<p class="lu-show unknown" title="${esc(d.show_title)}"><i class="lu-sdot" aria-hidden="true"></i><span class="k">Showing</span><b>unknown</b>${d.show_note ? `<span class="k">${esc(d.show_note)}</span>` : ""}</p>`;
     const nl = d.next_line;
-    const next = `<p class="lu-nextl" title="${esc(nl.title)}">${esc(nl.before)}${nl.at ? ` <b>${esc(nl.at)}</b>` : ""}${nl.after ? ` ${esc(nl.after)}` : ""}</p>`;
+    const before = nl.before_parts?.length
+      ? nl.before_parts
+          .map((part) =>
+            part.dashboard_id
+              ? `<a href="${esc(dashboardUrl(part.dashboard_id))}">${esc(part.text)}</a>`
+              : esc(part.text)
+          )
+          .join("")
+      : esc(nl.before);
+    const next = `<p class="lu-nextl" title="${esc(nl.title)}">${before}${nl.at ? ` <b>${esc(nl.at)}</b>` : ""}${nl.after ? ` ${esc(nl.after)}` : ""}</p>`;
     const collapsed = ui && ui.collapsed ? ui.collapsed(d) : false;
     const showBar = !(ui && ui.view === "timeline");
     const today = showBar

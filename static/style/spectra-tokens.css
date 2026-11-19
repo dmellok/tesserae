@@ -454,6 +454,204 @@
 }
 
 /* ============================================================================
+   FLAT INK FAMILY, every colour is one of the panel's own inks
+   --------------------------------------------------------------------------
+   For colour e-ink that has a handful of inks and nothing in between:
+   4-colour black / white / yellow / red panels and Spectra 6. Every token
+   below is exactly one ink (#000000, #FFFFFF, #FFFF00, #FF0000, and on the
+   Spectra 6 themes #0000FF and #00FF00), so backgrounds, cards, rules and
+   fills paint as solid ink with no dither pattern. Only anti-aliased glyph
+   and icon edges still pass through the dither.
+
+   Same discipline as Paper: no greys, so secondary and muted text share the
+   primary ink and hierarchy comes from weight and size. Accents are limited
+   to inks that read on the theme's own canvas on a real panel, where red,
+   blue and green all print dark and yellow prints light. That is why some
+   slots repeat, and why yellow is a fill on the light canvases and an
+   accent on the dark ones.
+
+   The first four use only black, white, yellow and red, so they suit both
+   panel types. The last four add blue or green and need Spectra 6.
+   tests/test_theme_registry.py pins every value to those ink lists.
+   ============================================================================ */
+
+/* ---- POSTER, 4 inks: black on white, red accents, yellow highlight --- */
+[data-theme="ink-poster"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #FFFFFF;
+  --surface:        #FFFFFF;
+  --surface-sunken: #FFFFFF;
+  --text-primary:   #000000;
+  --text-secondary: #000000;
+  --text-muted:     #000000;
+  --icon:           var(--text-primary);
+  --edge:           #000000;
+
+  --accent-1:#FF0000; --accent-1-soft:#FFFF00;
+  --accent-2:#000000; --accent-2-soft:#FFFF00;
+  --accent-3:#000000; --accent-3-soft:#FFFF00;
+  --accent-4:#FF0000; --accent-4-soft:#FFFF00;
+  --accent-5:#000000; --accent-5-soft:#FFFF00;
+  --accent-6:#FF0000; --accent-6-soft:#FFFF00;
+  --on-accent:#FFFFFF;
+}
+
+/* ---- TAXI, 4 inks: yellow canvas, black ink, red accents --------------- */
+[data-theme="ink-taxi"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #FFFF00;
+  --surface:        #FFFF00;
+  --surface-sunken: #FFFFFF;
+  --text-primary:   #000000;
+  --text-secondary: #000000;
+  --text-muted:     #000000;
+  --icon:           var(--text-primary);
+  --edge:           #000000;
+
+  --accent-1:#FF0000; --accent-1-soft:#FFFFFF;
+  --accent-2:#000000; --accent-2-soft:#FFFFFF;
+  --accent-3:#000000; --accent-3-soft:#FFFFFF;
+  --accent-4:#FF0000; --accent-4-soft:#FFFFFF;
+  --accent-5:#000000; --accent-5-soft:#FFFFFF;
+  --accent-6:#FF0000; --accent-6-soft:#FFFFFF;
+  --on-accent:#FFFFFF;
+}
+
+/* ---- SIGNAL, 4 inks: red canvas, white ink, yellow accents ------------- */
+[data-theme="ink-signal"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #FF0000;
+  --surface:        #FF0000;
+  --surface-sunken: #000000;
+  --text-primary:   #FFFFFF;
+  --text-secondary: #FFFFFF;
+  --text-muted:     #FFFFFF;
+  --icon:           var(--text-primary);
+  --edge:           #FFFFFF;
+
+  --accent-1:#FFFF00; --accent-1-soft:#000000;
+  --accent-2:#FFFFFF; --accent-2-soft:#000000;
+  --accent-3:#FFFF00; --accent-3-soft:#000000;
+  --accent-4:#FFFFFF; --accent-4-soft:#000000;
+  --accent-5:#FFFF00; --accent-5-soft:#000000;
+  --accent-6:#FFFFFF; --accent-6-soft:#000000;
+  --on-accent:#000000;
+}
+
+/* ---- NOIR, 4 inks: black canvas, white ink, yellow and red accents ------ */
+[data-theme="ink-noir"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #000000;
+  --surface:        #000000;
+  --surface-sunken: #000000;
+  --text-primary:   #FFFFFF;
+  --text-secondary: #FFFFFF;
+  --text-muted:     #FFFFFF;
+  --icon:           var(--text-primary);
+  --edge:           #FFFFFF;
+
+  --accent-1:#FFFF00; --accent-1-soft:#000000;
+  --accent-2:#FF0000; --accent-2-soft:#000000;
+  --accent-3:#FFFFFF; --accent-3-soft:#000000;
+  --accent-4:#FFFF00; --accent-4-soft:#000000;
+  --accent-5:#FFFFFF; --accent-5-soft:#000000;
+  --accent-6:#FF0000; --accent-6-soft:#000000;
+  --on-accent:#000000;
+}
+
+/* ---- PRIMARY, Spectra 6: white canvas, red / green / blue accents ------- */
+[data-theme="ink-primary"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #FFFFFF;
+  --surface:        #FFFFFF;
+  --surface-sunken: #FFFFFF;
+  --text-primary:   #000000;
+  --text-secondary: #000000;
+  --text-muted:     #000000;
+  --icon:           var(--text-primary);
+  --edge:           #000000;
+
+  --accent-1:#FF0000; --accent-1-soft:#FFFF00;
+  --accent-2:#000000; --accent-2-soft:#FFFF00;
+  --accent-3:#00FF00; --accent-3-soft:#FFFF00;
+  --accent-4:#0000FF; --accent-4-soft:#FFFF00;
+  --accent-5:#000000; --accent-5-soft:#FFFF00;
+  --accent-6:#FF0000; --accent-6-soft:#FFFF00;
+  --on-accent:#FFFFFF;
+}
+
+/* ---- DELFT, Spectra 6: blue canvas, white ink, yellow accents ---------- */
+[data-theme="ink-delft"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #0000FF;
+  --surface:        #0000FF;
+  --surface-sunken: #000000;
+  --text-primary:   #FFFFFF;
+  --text-secondary: #FFFFFF;
+  --text-muted:     #FFFFFF;
+  --icon:           var(--text-primary);
+  --edge:           #FFFFFF;
+
+  --accent-1:#FFFF00; --accent-1-soft:#000000;
+  --accent-2:#FFFFFF; --accent-2-soft:#000000;
+  --accent-3:#FFFF00; --accent-3-soft:#000000;
+  --accent-4:#FFFFFF; --accent-4-soft:#000000;
+  --accent-5:#FFFF00; --accent-5-soft:#000000;
+  --accent-6:#FFFFFF; --accent-6-soft:#000000;
+  --on-accent:#000000;
+}
+
+/* ---- CANARY, Spectra 6: yellow canvas, red / green / blue accents ------ */
+[data-theme="ink-canary"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #FFFF00;
+  --surface:        #FFFF00;
+  --surface-sunken: #FFFFFF;
+  --text-primary:   #000000;
+  --text-secondary: #000000;
+  --text-muted:     #000000;
+  --icon:           var(--text-primary);
+  --edge:           #000000;
+
+  --accent-1:#FF0000; --accent-1-soft:#FFFFFF;
+  --accent-2:#000000; --accent-2-soft:#FFFFFF;
+  --accent-3:#00FF00; --accent-3-soft:#FFFFFF;
+  --accent-4:#0000FF; --accent-4-soft:#FFFFFF;
+  --accent-5:#000000; --accent-5-soft:#FFFFFF;
+  --accent-6:#FF0000; --accent-6-soft:#FFFFFF;
+  --on-accent:#FFFFFF;
+}
+
+/* ---- GALLERY, Spectra 6: white cards on a black mat --------------------- */
+[data-theme="ink-gallery"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #000000;
+  --surface:        #FFFFFF;
+  --surface-sunken: #FFFF00;
+  --text-primary:   #000000;
+  --text-secondary: #000000;
+  --text-muted:     #000000;
+  --icon:           var(--text-primary);
+  --edge:           #000000;
+
+  --accent-1:#FF0000; --accent-1-soft:#FFFF00;
+  --accent-2:#000000; --accent-2-soft:#FFFF00;
+  --accent-3:#00FF00; --accent-3-soft:#FFFF00;
+  --accent-4:#0000FF; --accent-4-soft:#FFFF00;
+  --accent-5:#000000; --accent-5-soft:#FFFF00;
+  --accent-6:#FF0000; --accent-6-soft:#FFFF00;
+  --on-accent:#FFFFFF;
+}
+
+/* ============================================================================
    VIVID FAMILY — saturated flat-colour canvases
    --------------------------------------------------------------------------
    Bold flat surfaces (no gradient). Each theme's accents are tuned to

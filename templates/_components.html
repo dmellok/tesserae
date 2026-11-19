@@ -553,7 +553,7 @@ macro here instead.
    165-album picker stays one line tall until you search it. -#}
 {%- set compact = real | length > 8 -%}
 <div class="field">
-  <label for="{{ field_id }}-filter">{{ label }}{{ info_pop(help) }}</label>
+  <label{% if real %} for="{{ field_id }}-filter"{% endif %}>{{ label }}{{ info_pop(help) }}</label>
   <div class="multiselect" data-multiselect{% if compact %} data-ms-compact{% endif %}>
     {% set hint = (options | rejectattr('value') | map(attribute='label') | first) if options else None %}
     {% if real %}
