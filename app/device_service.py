@@ -71,6 +71,16 @@ AWAKE_POLL_MIN_S = 5
 AWAKE_POLL_MAX_S = 300
 
 
+def is_always_on(device: Any, cfg: Any = None, telemetry_entry: Any = None) -> bool:
+    """Whether the kind, device setting or telemetry says it stays awake."""
+    manifest = getattr(device, "manifest", {})
+    return (
+        manifest.get("always_on") is True
+        or (isinstance(cfg, dict) and cfg.get("always_on") is True)
+        or getattr(telemetry_entry, "always_on", False) is True
+    )
+
+
 def awake_poll_interval_s(stored: Any) -> int | None:
     """The poll cadence a device set to stay awake is actually on, or
     ``None`` when it deep-sleeps like everything else.

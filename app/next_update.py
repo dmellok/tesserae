@@ -258,7 +258,7 @@ def reach_for_device(device: Any, *, now: float | None = None) -> Reach:
     from flask import current_app
 
     from app import visionect
-    from app.device_service import awake_poll_interval_s
+    from app.device_service import is_always_on
 
     now = time.time() if now is None else now
     config = current_app.config
@@ -286,7 +286,7 @@ def reach_for_device(device: Any, *, now: float | None = None) -> Reach:
             sign_connected = not (isinstance(asleep, (int, float)) and asleep > now)
     if sign_connected:
         return Reach(MODE_CONNECTED, live=True)
-    if (entry is not None and entry.always_on) or awake_poll_interval_s(stored) is not None:
+    if is_always_on(device, stored, entry):
         return Reach(MODE_CONNECTED)
     predicted = getattr(entry, "predicted_next_wake_at", None)
     if isinstance(predicted, (int, float)):

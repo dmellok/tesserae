@@ -272,10 +272,10 @@
 <figure class="lu-now-thumb" title="{{ ph.title if ph and ph.state == 'delivering' else ('On screen: ' ~ op.name if op else (fr.title if fr else ph.title)) }}">{% if qt %}<span class="lu-now-wrap">{{ top_html }}<span class="lu-qthumb" role="group" aria-label="{{ qt.title }}" title="{{ qt.title }}">{{ thumb(qt.name, qt.thumb_url, qt.aspect, qt.orientation, display=d) }}<span class="lu-qtag">{{ ico('clock') }}<span>{{ qt.label }}</span></span></span></span>{% else %}{{ top_html }}{% endif %}</figure><div class="lu-ds-name-row"><div class="lu-ds-title"><h2>{{ d.name }}</h2>{% if d.settings_url %}<a class="lu-gear" href="{{ d.settings_url }}" title="{{ d.name }} settings" aria-label="{{ d.name }} settings">{{ ico('gear') }}</a>{% endif %}</div>
 <span class="lu-ds-tags">
 {%- set link_icon = {'connected': 'signal', 'sleeps': 'clock'}.get(d.link.mode, 'info') -%}
-<span class="lu-im" title="{{ d.link.title }}">{{ ico(link_icon) }}<span>{{ d.link.label }}</span></span>
+{% if d.link.label %}<span class="lu-im" title="{{ d.link.title }}">{{ ico(link_icon) }}<span>{{ d.link.label }}</span></span>{% endif %}
 {%- if d.size_label %}<span class="lu-im" title="{{ d.spec }}">{{ ico('portrait' if d.orientation == 'p' else 'landscape') }}<span>{{ d.size_label }}</span></span>{% endif -%}
 {%- if d.pause %}<span class="lu-im" title="{{ d.pause.title }}">{{ ico('moon') }}<span>{{ d.pause.label }}</span></span>{% endif -%}
-<span class="lu-im" title="{{ d.refreshes_today }} refreshes projected today">{{ ico('refresh') }}<span>{{ d.refreshes_today }}</span></span>
+<span class="lu-im" title="{{ d.refreshes_title }}">{{ ico('refresh') }}<span>{{ d.refreshes_today }}</span></span>
 </span></div>
 <div class="lu-ds-state">
 {%- if op %}<p class="lu-show {{ 'sync' if d.in_sync else 'queued' }}" title="{{ d.show_title }}"><i class="lu-sdot" aria-hidden="true" title="{{ d.status_title or d.show_title }}"></i><span class="lu-sr-only">{{ 'Synced' if d.in_sync else 'Waiting to land' }}</span><span class="k">Showing</span><b>{{ op.name }}</b>{% if d.show_suffix %}<span class="k">{{ d.show_suffix }}</span>{% endif %}</p>

@@ -17,6 +17,10 @@
     },
     "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+(?:[-+].*)?$" },
     "description": { "type": "string" },
+    "always_on": {
+      "type": "boolean",
+      "description": "This kind stays awake between updates and has no sleep/check-in cycle. Instances inherit it."
+    },
     "renderers": {
       "type": "array",
       "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
