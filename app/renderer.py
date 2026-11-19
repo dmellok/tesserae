@@ -25,20 +25,20 @@ from __future__ import annotations
 
 import concurrent.futures
 import contextlib
-import io
 import json
 import logging
 import os
 import queue
+import struct
 import threading
 import time
+import zlib
 from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Final, Literal, TypeVar, cast
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
-from PIL import Image, PngImagePlugin
 from playwright.sync_api import Browser, Playwright, sync_playwright
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
@@ -76,12 +76,38 @@ def _stamp_step_items(png: bytes, page: Any) -> bytes:
         )
     ):
         return png
-    metadata = PngImagePlugin.PngInfo()
-    metadata.add_text("tesserae_items", json.dumps(items))
-    with Image.open(io.BytesIO(png)) as image:
-        out = io.BytesIO()
-        image.save(out, "PNG", pnginfo=metadata)
-    return out.getvalue()
+    return _with_png_text(png, "tesserae_items", json.dumps(items))
+
+
+_PNG_SIGNATURE: Final[bytes] = b"\x89PNG\r\n\x1a\n"
+
+
+def _with_png_text(png: bytes, keyword: str, text: str) -> bytes:
+    """Splice a tEXt chunk in before the first IDAT without decoding the image.
+
+    Every composer render passes through here, so re-encoding through PIL
+    would cost a full decode and deflate per render on every display. The
+    chunk goes ahead of the image data because PIL (and most readers) only
+    fill ``info`` from chunks before IDAT until the pixels are loaded. The
+    text is ASCII (``json.dumps`` escapes the rest), which tEXt requires."""
+    if not png.startswith(_PNG_SIGNATURE):
+        return png
+    pos = len(_PNG_SIGNATURE)
+    while pos + 8 <= len(png):
+        (length,) = struct.unpack(">I", png[pos : pos + 4])
+        if png[pos + 4 : pos + 8] == b"IDAT":
+            break
+        pos += 12 + length
+    else:
+        return png
+    data = keyword.encode("latin-1") + b"\x00" + text.encode("ascii")
+    chunk = (
+        struct.pack(">I", len(data))
+        + b"tEXt"
+        + data
+        + struct.pack(">I", zlib.crc32(b"tEXt" + data) & 0xFFFFFFFF)
+    )
+    return png[:pos] + chunk + png[pos:]
 
 
 _R = TypeVar("_R")

@@ -28,8 +28,11 @@ def advance(app: Flask, device: Device, latest: dict[str, Any]) -> bool:
         key = f"draw:{uuid.uuid4().hex[:12]}:1"
     elif choices is not None and len(choices.items) > 1:
         digest = str(latest.get("composition_digest") or "")
-        with Image.open(Path(app.config["RENDERS_DIR"]) / f"{digest}.png") as image:
-            shown = json.loads(image.info.get("tesserae_items", "{}"))
+        shown: dict[str, Any] = {}
+        source = Path(app.config["RENDERS_DIR"]) / f"{digest}.png"
+        if digest and source.is_file():
+            with Image.open(source) as image:
+                shown = json.loads(image.info.get("tesserae_items", "{}"))
         candidates = shown.get(choices.cell_id, shown.get("*", []))
         current = next(
             (

@@ -397,3 +397,17 @@ def test_artwork_lookup_is_throttled_while_the_cloud_lags(setup):
     assert calls == ["999"] * 5
     publisher._record_external(setup.device, cloud, "101", "1000")
     assert calls[-1] == "1000"
+
+
+def test_png_text_splice_keeps_pixels_and_reads_back() -> None:
+    from app.renderer import _with_png_text
+
+    src = io.BytesIO()
+    Image.new("RGB", (4, 3), (200, 10, 30)).save(src, "PNG")
+    items = {"cell": ["café.jpg", "#2"]}
+    out = _with_png_text(src.getvalue(), "tesserae_items", json.dumps(items))
+    with Image.open(io.BytesIO(out)) as image:
+        # Read before load(), the way meural_swipe does.
+        assert json.loads(image.info["tesserae_items"]) == items
+        assert image.getpixel((3, 2)) == (200, 10, 30)
+    assert _with_png_text(b"not a png", "tesserae_items", "{}") == b"not a png"
