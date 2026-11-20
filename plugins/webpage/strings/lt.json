@@ -1,4 +1,5 @@
 {
   "webpage": "Tinklalapis",
-  "set_a_url": "Nurodykite URL langelio nustatymuose (turi prasidėti http/https)."
+  "set_a_url": "Nurodykite URL langelio nustatymuose (turi prasidėti http/https).",
+  "paste_html": "Įklijuokite HTML fragmentą langelio nustatymuose."
 }

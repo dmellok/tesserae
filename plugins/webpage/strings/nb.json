@@ -1,4 +1,5 @@
 {
   "webpage": "Nettside",
-  "set_a_url": "Angi en URL i cellevalgene (må starte med http/https)."
+  "set_a_url": "Angi en URL i cellevalgene (må starte med http/https).",
+  "paste_html": "Lim inn en HTML-snutt i cellevalgene."
 }

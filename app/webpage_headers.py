@@ -68,6 +68,8 @@ def headers_by_origin_for_page(page: Page) -> dict[str, dict[str, str]] | None:
         if cell.plugin != WEBPAGE_PLUGIN_ID:
             continue
         options: dict[str, Any] = cell.options or {}
+        if options.get("source") == "html":
+            continue  # a pasted snippet has no URL of its own to send them to
         raw_headers = options.get(HEADERS_OPTION)
         if not raw_headers:
             continue

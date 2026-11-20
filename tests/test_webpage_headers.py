@@ -240,3 +240,21 @@ def test_two_cells_sharing_an_origin_merge_in_page_order() -> None:
         _cell("c2", "webpage", {"url": f"{INTERNAL}/b", "headers": '{"X-Other": "second"}'}),
     )
     assert headers_by_origin_for_page(page) == {INTERNAL: {"X-K": "first", "X-Other": "second"}}
+
+
+def test_a_pasted_snippet_cell_sends_no_headers() -> None:
+    """A cell switched to an HTML snippet keeps its old URL and headers in its
+    options; neither applies any more, so nothing is injected for them."""
+    page = _page(
+        _cell(
+            "c1",
+            "webpage",
+            {
+                "source": "html",
+                "html": "<div></div>",
+                "url": f"{INTERNAL}/status",
+                "headers": '{"Authorization": "Bearer t"}',
+            },
+        )
+    )
+    assert headers_by_origin_for_page(page) is None

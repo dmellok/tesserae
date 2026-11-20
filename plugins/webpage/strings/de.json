@@ -1,4 +1,5 @@
 {
   "webpage": "Webseite",
-  "set_a_url": "URL in den Zellenoptionen setzen (muss mit http/https beginnen)."
+  "set_a_url": "URL in den Zellenoptionen setzen (muss mit http/https beginnen).",
+  "paste_html": "HTML-Schnipsel in den Zellenoptionen einfügen."
 }

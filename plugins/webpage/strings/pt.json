@@ -1,4 +1,5 @@
 {
   "webpage": "Página web",
-  "set_a_url": "Defina um URL nas opções da célula (tem de começar por http/https)."
+  "set_a_url": "Defina um URL nas opções da célula (tem de começar por http/https).",
+  "paste_html": "Cole um excerto HTML nas opções da célula."
 }

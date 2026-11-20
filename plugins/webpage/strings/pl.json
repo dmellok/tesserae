@@ -1,4 +1,5 @@
 {
   "webpage": "Strona WWW",
-  "set_a_url": "Ustaw adres w opcjach kafelka (musi zaczynać się od http/https)."
+  "set_a_url": "Ustaw adres w opcjach kafelka (musi zaczynać się od http/https).",
+  "paste_html": "Wklej fragment HTML w opcjach kafelka."
 }

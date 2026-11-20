@@ -1,4 +1,5 @@
 {
   "webpage": "Webbsida",
-  "set_a_url": "Ange en URL i cellinställningarna (måste börja med http/https)."
+  "set_a_url": "Ange en URL i cellinställningarna (måste börja med http/https).",
+  "paste_html": "Klistra in ett HTML-utdrag i cellinställningarna."
 }
