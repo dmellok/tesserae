@@ -5274,3 +5274,76 @@ def test_pills_are_never_covered_by_a_stack(live: str) -> None:
         assert page.locator(".lu-tile.stacked").count() > 0
         assert page.evaluate(check) == []
         browser.close()
+
+
+@pytest.mark.parametrize("js", [False, True])
+@pytest.mark.parametrize("width", [1440, 390])
+def test_photo_step_labels_match_on_server_and_redraw(
+    live: str, monkeypatch: pytest.MonkeyPatch, js: bool, width: int
+) -> None:
+    from playwright.sync_api import sync_playwright
+
+    original = _sample_vm
+
+    def sample(cycle: str = "h23") -> dict[str, Any]:
+        vm = original(cycle)
+        d = vm["displays"][0]
+        d["name"] = "Meural frame"
+        d["link"].update(
+            mode="connected", live=False, label="Always on", title="Last contact at 18:12"
+        )
+        dinner = next(lu for lu in d["lineups"] if lu["id"] == "dinner")
+        for step in dinner["steps"]:
+            if step["dashboard_id"] == "art":
+                step.update(
+                    refresh_label="every 15 min",
+                    order_icon="list-numbers",
+                    order_title="Sequential order",
+                )
+            elif step["dashboard_id"] == "family":
+                step.update(
+                    refresh_label="every 2 h",
+                    order_icon="sort-descending",
+                    order_title="Newest first",
+                    item_count=12,
+                )
+            elif step["dashboard_id"] == "comics":
+                step.update(order_icon="shuffle", order_title="Random order")
+        return vm
+
+    monkeypatch.setitem(globals(), "_sample_vm", sample)
+    with sync_playwright() as p:
+        browser, page, _ = _open(p, live, js=js, width=width, pics=True, mobile=width < 500)
+        if js:
+            _open_displays_on_phones(page, ["frame"])
+            page.evaluate("TesseraeLineups.render()")
+        art = page.locator('#lu-row-dinner .lu-step[data-step="1"]')
+        family = page.locator('#lu-row-dinner .lu-step[data-step="2"]')
+        comics = page.locator('#lu-row-dinner .lu-step[data-step="5"]')
+        assert art.locator(".lu-step-meta").inner_text() == "every 15 min"
+        assert family.locator(".lu-step-meta").inner_text() == "every 2 h"
+        for tile, icon, title in [
+            (art, "list-numbers", "Sequential order"),
+            (family, "sort-descending", "Newest first"),
+            (comics, "shuffle", "Random order"),
+        ]:
+            assert tile.locator(f".lu-count .ph-{icon}").count() == 1
+            assert title in (tile.locator(".lu-count").get_attribute("title") or "")
+        assert comics.locator(".lu-count").get_attribute("aria-label") == "Random order"
+        assert "Always on" in page.locator('[data-display="frame"] .lu-ds-tags').inner_text()
+        assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+        if js:
+            art.locator("[data-peek]").click()
+            assert page.locator(".lu-peek").is_visible()
+            page.keyboard.press("Escape")
+            assert page._lu_errors == []
+            folder = os.environ.get("LU_LABELS_SHOT_DIR")
+            if folder:
+                page.locator("h1").click()
+                page.mouse.move(0, 0)
+                page.evaluate("document.fonts.ready")
+                page.screenshot(
+                    path=str(Path(folder) / ("phone.png" if width < 500 else "desktop.png")),
+                    full_page=True,
+                )
+        browser.close()
