@@ -5,6 +5,13 @@
 // breakpoint. The composer's headless render screenshots whatever
 // the iframe lands on. A URL that resolves to an image takes a
 // separate <img> path instead, see ``probeImage``.
+//
+// ``source: "html"`` embeds a snippet the owner pasted (a transit operator's
+// departure board: a <div> and a <script src>) instead of a URL. It runs in
+// a srcdoc iframe sandboxed with allow-scripts alone, so the document gets an
+// opaque origin: its scripts run and load what they need, but they are not
+// Tesserae's origin, so they can't reach the admin session, its cookies or
+// storage, or the page around them. Same reach as an embedded URL.
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
@@ -85,15 +92,39 @@ function imageMarkup(url, fitOpt) {
     <div class="shell">${bg}${fg}</div>`;
 }
 
+// The snippet as a whole document: no margin, so it sits flush in the cell
+// as a page would, and links open away from the panel.
+function snippetDocument(html) {
+  return (
+    "<!doctype html><html><head><meta charset=\"utf-8\">" +
+    "<meta name=\"viewport\" content=\"width=device-width\">" +
+    "<base target=\"_blank\">" +
+    "<style>html,body{margin:0}</style></head><body>" +
+    html +
+    "</body></html>"
+  );
+}
+
 export default async function render(shadow, ctx) {
   const t = ctx?.t || ((key, fallback) => fallback ?? key);
   const opts = ctx?.cell?.options || {};
-  const url = String(opts.url || "").trim();
+  const snippet = opts.source === "html" ? String(opts.html || "").trim() : "";
+  const url = opts.source === "html" ? "" : String(opts.url || "").trim();
   const scaleOpt = String(opts.scale || "fit");
   const viewportW = Math.max(200, Math.min(4096, Number(opts.viewport_w) || 1280));
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
 
-  if (!url || !url.startsWith("http")) {
+  if (opts.source === "html" && !snippet) {
+    shadow.innerHTML = `
+      ${css}
+      <div class="w" data-widget="webpage">
+        <div class="w-title"><i class="ph-bold ph-globe" style="color:var(--text-muted)"></i><h3>${t("webpage", "Webpage")}</h3></div>
+        <div class="w-body"><p class="u-muted">${t("paste_html", "Paste an HTML snippet in the cell options.")}</p></div>
+      </div>`;
+    return;
+  }
+
+  if (!snippet && (!url || !url.startsWith("http"))) {
     shadow.innerHTML = `
       ${css}
       <div class="w" data-widget="webpage">
@@ -103,7 +134,7 @@ export default async function render(shadow, ctx) {
     return;
   }
 
-  if (await probeImage(url)) {
+  if (!snippet && (await probeImage(url))) {
     shadow.innerHTML = `
       ${css}
       <div class="w is-bleed" data-widget="webpage">
@@ -133,8 +164,8 @@ export default async function render(shadow, ctx) {
     ${css}
     <div class="w is-bleed" data-widget="webpage">
       <iframe
-        src="${escapeHtml(url)}"
-        sandbox="allow-same-origin allow-scripts"
+        ${snippet ? `srcdoc="${escapeHtml(snippetDocument(snippet))}"` : `src="${escapeHtml(url)}"`}
+        sandbox="${snippet ? "allow-scripts" : "allow-same-origin allow-scripts"}"
         style="border:0;width:${sizedW};height:${sizedH};transform-origin:top left;transform:scale(${scale.toFixed(3)});display:block"
         loading="eager"
         referrerpolicy="no-referrer"></iframe>
