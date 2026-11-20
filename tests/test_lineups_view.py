@@ -4330,7 +4330,7 @@ def test_reordering_a_rotation_lets_the_scheduler_resend_its_slot(client: Any, a
 
 
 @pytest.mark.parametrize(
-    "minutes, label", [(0, ""), (15, "every 15 min"), (120, "every 2 h"), (90, "every 1 h 30 min")]
+    "minutes, label", [(0, ""), (15, "15m"), (120, "2h"), (90, "1h 30m"), (1, "1m")]
 )
 @pytest.mark.parametrize("priority", [False, True])
 def test_rotation_step_refresh_label(minutes: int, label: str, priority: bool) -> None:
@@ -4344,6 +4344,14 @@ def test_rotation_step_refresh_label(minutes: int, label: str, priority: bool) -
     view = build_view([replace(d, lineups=(dinner,))], dashboards, now=SAMPLE_NOW)
     step = view.displays[0].lineups[0].steps[0]
     assert step.refresh_label == ("" if priority else label)
+    expected_title = {
+        0: "",
+        1: "Refreshes every 1 minute",
+        15: "Refreshes every 15 minutes",
+        90: "Refreshes every 90 minutes",
+        120: "Refreshes every 120 minutes",
+    }[minutes]
+    assert step.refresh_title == ("" if priority else expected_title)
     assert step.position == ("1st choice" if priority else "1/6")
 
 
@@ -4451,7 +4459,7 @@ def test_route_passes_gallery_order_and_refresh_to_steps(client: Any, app: Flask
     )
     assert step["order_icon"] == "list-numbers"
     assert step["order_title"] == "Sequential order"
-    assert step["refresh_label"] == "every 15 min"
+    assert step["refresh_label"] == "15m"
 
 
 @pytest.mark.parametrize("kind", ["interval", "daily", "manual"])

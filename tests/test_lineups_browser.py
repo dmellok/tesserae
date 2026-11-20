@@ -5296,19 +5296,26 @@ def test_photo_step_labels_match_on_server_and_redraw(
         for step in dinner["steps"]:
             if step["dashboard_id"] == "art":
                 step.update(
-                    refresh_label="every 15 min",
+                    refresh_label="15m",
+                    refresh_title="Refreshes every 15 minutes",
                     order_icon="list-numbers",
                     order_title="Sequential order",
                 )
             elif step["dashboard_id"] == "family":
                 step.update(
-                    refresh_label="every 2 h",
+                    refresh_label="2h",
+                    refresh_title="Refreshes every 120 minutes",
                     order_icon="sort-descending",
                     order_title="Newest first",
                     item_count=12,
                 )
             elif step["dashboard_id"] == "comics":
-                step.update(order_icon="shuffle", order_title="Random order")
+                step.update(
+                    order_icon="shuffle",
+                    order_title="Random order",
+                    refresh_label="1h 30m",
+                    refresh_title="Refreshes every 90 minutes",
+                )
         return vm
 
     monkeypatch.setitem(globals(), "_sample_vm", sample)
@@ -5320,8 +5327,11 @@ def test_photo_step_labels_match_on_server_and_redraw(
         art = page.locator('#lu-row-dinner .lu-step[data-step="1"]')
         family = page.locator('#lu-row-dinner .lu-step[data-step="2"]')
         comics = page.locator('#lu-row-dinner .lu-step[data-step="5"]')
-        assert art.locator(".lu-step-meta").inner_text() == "every 15 min"
-        assert family.locator(".lu-step-meta").inner_text() == "every 2 h"
+        assert art.locator(".lu-step-meta").inner_text() == "15m"
+        assert art.locator(".lu-step-meta").get_attribute("title") == "Refreshes every 15 minutes"
+        assert art.locator(".lu-step-meta .ph-arrows-clockwise").count() == 1
+        assert family.locator(".lu-step-meta").inner_text() == "2h"
+        assert comics.locator(".lu-step-meta").inner_text() == "1h 30m"
         for tile, icon, title in [
             (art, "list-numbers", "Sequential order"),
             (family, "sort-descending", "Newest first"),
@@ -5339,11 +5349,19 @@ def test_photo_step_labels_match_on_server_and_redraw(
             assert page._lu_errors == []
             folder = os.environ.get("LU_LABELS_SHOT_DIR")
             if folder:
+                if width < 500:
+                    page.set_viewport_size({"width": width, "height": 1200})
                 page.locator("h1").click()
                 page.mouse.move(0, 0)
                 page.evaluate("document.fonts.ready")
+                if width < 500:
+                    page.evaluate("""() => {
+                        const frame = document.querySelector('[data-display="frame"]');
+                        window.scrollTo({top: frame.getBoundingClientRect().top + scrollY - 80, behavior: 'instant'});
+                    }""")
                 page.screenshot(
                     path=str(Path(folder) / ("phone.png" if width < 500 else "desktop.png")),
-                    full_page=True,
+                    full_page=width >= 500,
+                    animations="disabled",
                 )
         browser.close()

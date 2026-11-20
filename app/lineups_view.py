@@ -745,6 +745,7 @@ class StepView(_Dict):
     draw_items: bool = False
     draw_count: int = 0
     refresh_label: str = ""
+    refresh_title: str = ""
     order_icon: str = ""
     order_title: str = ""
     #: lists its items, listed none, but has been sent before: still a collection
@@ -3259,16 +3260,19 @@ def _lineup_view(
         else:
             position = f"{i + 1}/{n}" if n > 1 else "only"
             separator = "arrow" if i < n - 1 else ("loop" if loops else "")
+        refresh_minutes = (
+            dash.refresh_minutes
+            if lineup.kind == "cycle" and not lineup.priority_mode and dash
+            else 0
+        )
         steps.append(
             StepView(
                 index=i,
                 position=position,
-                refresh_label=(
-                    f"every {rel_long(dash.refresh_minutes)}"
-                    if lineup.kind == "cycle"
-                    and not lineup.priority_mode
-                    and dash
-                    and dash.refresh_minutes > 0
+                refresh_label=rel_short(refresh_minutes) if refresh_minutes > 0 else "",
+                refresh_title=(
+                    f"Refreshes every {refresh_minutes} minute{'s' if refresh_minutes != 1 else ''}"
+                    if refresh_minutes > 0
                     else ""
                 ),
                 dashboard_id=st.dashboard_id,
