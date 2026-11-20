@@ -8,6 +8,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Export one display from its own page: **Export this display** in the More menu downloads just that display, without its access token. The export form on Settings › Devices gains **Select all** and **Clear all**. (#541)
 - Themes: eight **Flat ink** themes for colour e-ink, in their own group in the theme pickers. Every colour in them is one of the panel's own inks, so backgrounds, cards and fills paint solid with no dither pattern. Poster, Taxi, Signal and Noir use black, white, yellow and red, for 4-colour panels and Spectra 6. Primary, Delft, Canary and Gallery add blue and green, for Spectra 6. On a display with a measured calibration profile applied, yellow and red areas can still pick up a few stray dots; set the cell's dithering to Flat to clear them.
 - Long multi-select pickers show only their picks under a search box; typing filters, Enter ticks the top match, arrow keys move through results.
 - Gallery's Orientation gains Auto and Match the frame: a dashboard on both portrait and landscape frames shows each frame pictures of its own shape. Widgets get `ctx["frame_shapes"]`.
@@ -18,6 +19,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 ### Fixed
 
 - Device page: a button map that fails to save stays in the editor as you typed it, so you can fix the mistake instead of retyping the map. The error is still shown, and the saved map is unchanged. (#588)
+- A copy of a display's file in `data/devices/`, such as `kitchen.bak.json` or an editor's `.kitchen.json`, no longer loads as a second display holding the same token. Device ids never contain a dot, so such files are skipped with a note in the server log. (#541)
 - Clarify Lineups header hierarchy and link dashboard and lineup names to their editors.
 - Fix always-on lineup update timing, daily refresh counts and delivery status.
 

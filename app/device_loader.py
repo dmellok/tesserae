@@ -536,6 +536,18 @@ def discover(
         for inst_file in sorted(data_root.iterdir()):
             if not inst_file.is_file() or not inst_file.name.endswith(".json"):
                 continue
+            # A device id never holds a dot, so ``kitchen.bak.json`` or an
+            # editor's ``.kitchen.json`` is a copy, not a display. Loading
+            # it made a second display with the same token (#541).
+            if inst_file.name.startswith(".") or "." in inst_file.stem:
+                registry.errors.append(
+                    LoaderError(
+                        inst_file.stem,
+                        inst_file,
+                        "skipped: looks like a backup copy (device ids have no dots)",
+                    )
+                )
+                continue
             load_instance_file(registry, inst_file=inst_file, data_root=data_root)
 
     return registry

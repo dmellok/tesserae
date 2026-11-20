@@ -105,6 +105,7 @@
         <div class="dx-more-pop">
           <a href="{{ section.mirror_url }}" target="_blank" rel="noopener" title="Auto-refreshing browser page (good for iPad / kiosk dashboards)."><i class="ph ph-monitor-play" aria-hidden="true"></i>Open mirror</a>
           <a href="{{ section.preview_url }}" target="_blank" rel="noopener" title="Latest composition PNG, raw image (good for Home Assistant, Grafana, etc)."><i class="ph ph-file-image" aria-hidden="true"></i>Raw PNG preview</a>
+          <a href="{{ url_for('bundles.export', device=section.device_id) }}" download title="Download this display's settings to import on another Tesserae. The access token is left out; Settings › Devices can include it."><i class="ph ph-download-simple" aria-hidden="true"></i>Export this display</a>
         </div>
       </details>
       <a class="dx-btn" href="{{ section.preview_url }}" target="_blank" rel="noopener"

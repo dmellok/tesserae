@@ -227,6 +227,21 @@
     });
   }
 
+  // Export form (#541): every display starts ticked; Select all / Clear
+  // all make picking one or two out of many a single click.
+  function initExportPicks() {
+    document.querySelectorAll("[data-export-picks]").forEach(function (set) {
+      set.querySelectorAll("[data-export-pick]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          const on = btn.dataset.exportPick === "all";
+          set.querySelectorAll('input[type="checkbox"][name="device"]').forEach(function (box) {
+            box.checked = on;
+          });
+        });
+      });
+    });
+  }
+
   // Discovered banner: "Register <id>" (and the id chips) reveal that
   // device's register row; the toolbar's "N discovered" reveals all of
   // them; "Dismiss all" posts every dismiss form then reloads.
@@ -987,6 +1002,7 @@
   ready(function () {
     document.querySelectorAll("[data-devtable]").forEach(initDevicesTable);
     initAddDeviceToggle();
+    initExportPicks();
     initDiscoveredBanner();
     document.querySelectorAll("[data-device-page]").forEach(initDevicePage);
     document.querySelectorAll("[data-subnav]").forEach(initSubnav);
