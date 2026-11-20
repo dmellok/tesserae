@@ -1,4 +1,5 @@
 {
   "webpage": "Webová stránka",
-  "set_a_url": "Nastavte URL v nastavení buňky (musí začínat http/https)."
+  "set_a_url": "Nastavte URL v nastavení buňky (musí začínat http/https).",
+  "paste_html": "Vložte HTML úryvek v nastavení buňky."
 }

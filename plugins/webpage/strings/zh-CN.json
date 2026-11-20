@@ -1,4 +1,5 @@
 {
   "webpage": "网页",
-  "set_a_url": "请在单元格选项中设置 URL（须以 http/https 开头）。"
+  "set_a_url": "请在单元格选项中设置 URL（须以 http/https 开头）。",
+  "paste_html": "请在单元格选项中粘贴 HTML 代码片段。"
 }
