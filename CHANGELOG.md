@@ -6,6 +6,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+- Lineups steps show their dashboard's refresh interval and photo order, and powered displays say Always on.
+
 ### Added
 
 - Webpage widget: **Show** can be **An HTML snippet** instead of a web address. Paste embed code, such as a transit operator's departure board (a `<div>` and a `<script src>`), and it runs in the cell without being hosted on a page of your own first. The snippet runs in a sandboxed frame of its own: its scripts load what they need from the web, but they can't reach Tesserae's pages, your sign-in or settings. An embed that needs cookies or local storage still needs a page of its own. Saved cells keep showing their web address. (discussion #8)

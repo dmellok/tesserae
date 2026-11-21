@@ -152,6 +152,8 @@ class DashboardInfo:
     #: displays it is bound to, and "Name (WxH)" for each, for the off-display flag
     bound_ids: tuple[str, ...] = ()
     bound_labels: tuple[str, ...] = ()
+    order_icon: str = ""
+    order_title: str = ""
     refresh_minutes: int = 0  # the scheduler's Page.refresh_minutes cadence
 
 
@@ -742,6 +744,10 @@ class StepView(_Dict):
     #: "draw next": the arrows render the dashboard again; there is no list to choose from
     draw_items: bool = False
     draw_count: int = 0
+    refresh_label: str = ""
+    refresh_title: str = ""
+    order_icon: str = ""
+    order_title: str = ""
     #: lists its items, listed none, but has been sent before: still a collection
     stacked: bool = False
     item_fit: bool = False
@@ -1832,13 +1838,14 @@ def _link_view(d: DisplayInput, clk: _Clock) -> LinkView:
     nxt = _checkin_at_or_after(r, clk.epoch) if r.mode == MODE_SLEEPS else None
     if d.always_on:
         age = max(0, int((clk.epoch - d.last_seen) // 60)) if d.last_seen is not None else None
-        label = (
-            "Checked in just now"
-            if age == 0
-            else f"Checked in {rel_long(age)} ago"
-            if age is not None
-            else ""
-        )
+        if d.heard:
+            label = "Always on"
+        elif age is None:
+            label = "Offline"
+        elif age == 0:
+            label = "Checked in just now"
+        else:
+            label = f"Checked in {rel_long(age)} ago"
         title = f"Last contact at {clk.clock(d.last_seen)}" if d.last_seen is not None else ""
     elif r.mode == MODE_CONNECTED:
         label = "Online"
@@ -3253,10 +3260,21 @@ def _lineup_view(
         else:
             position = f"{i + 1}/{n}" if n > 1 else "only"
             separator = "arrow" if i < n - 1 else ("loop" if loops else "")
+        refresh_minutes = (
+            dash.refresh_minutes
+            if lineup.kind == "cycle" and not lineup.priority_mode and dash
+            else 0
+        )
         steps.append(
             StepView(
                 index=i,
                 position=position,
+                refresh_label=rel_short(refresh_minutes) if refresh_minutes > 0 else "",
+                refresh_title=(
+                    f"Refreshes every {refresh_minutes} minute{'s' if refresh_minutes != 1 else ''}"
+                    if refresh_minutes > 0
+                    else ""
+                ),
                 dashboard_id=st.dashboard_id,
                 name=scr.name,
                 thumb_url="" if off_display else scr.thumb_url,
@@ -3274,6 +3292,8 @@ def _lineup_view(
                 pick_items=not (off_display or scr.missing) and any(it.key for it in items),
                 draw_items=not (off_display or scr.missing) and bool(dash and dash.draw),
                 draw_count=dash.draw_count if dash and dash.draw else 0,
+                order_icon=dash.order_icon if dash else "",
+                order_title=dash.order_title if dash else "",
                 stacked=bool(dash and dash.empty_list and dash.composition_digest),
                 item_fit=bool(dash and dash.item_fit),
                 current=i == intended,

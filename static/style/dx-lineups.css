@@ -2703,6 +2703,11 @@ main.page.lu-page {
   color: var(--lu-acc-fg);
 }
 
+.lu .lu-count .ph {
+  font-size: 12px;
+  vertical-align: -1px;
+}
+
 .lu .lu-count.is-draw {
   cursor: default;
 }
