@@ -137,3 +137,64 @@ def test_a_rejected_button_map_comes_back_as_typed(app: Flask, typed: str) -> No
 
     again = client.get("/settings/devices/kitchen").get_data(as_text=True)
     assert "example.test/kept" in _textarea(again)
+
+
+# What the device page posts for the sections an operator usually leaves
+# alone. Each of these reports "saved" on every submit whether or not it
+# changed, which is what made a rejected map's message confusing (#588).
+_UNTOUCHED_SECTIONS = {
+    "device_name": "Kitchen",
+    "quiet_hours__present": "1",
+    "battery_offset_mv": "0",
+    "battery_offset_pct": "0",
+    "locale": "",
+}
+_BAD_MAP = '{"left": "rotate_prev" "right": "rotate_next"}'
+
+
+def test_a_rejected_map_alone_claims_no_save(app: Flask) -> None:
+    """#588 follow-up: when the button map is the only thing changed and
+    it fails, the page shows the error and no "saved" message."""
+    client = app.test_client()
+    _sign_in(client)
+    _add_device(client)
+    settled = client.post("/settings/devices/kitchen/save", data=dict(_UNTOUCHED_SECTIONS))
+    client.get(settled.headers["Location"])  # read that save's own message
+
+    resp = client.post(
+        "/settings/devices/kitchen/save",
+        data={**_UNTOUCHED_SECTIONS, "button_map_json": _BAD_MAP},
+    )
+    body = client.get(resp.headers["Location"]).get_data(as_text=True)
+    assert "button map must be valid JSON" in body
+    assert "quiet hours saved" not in body
+    assert "except the button map" not in body
+
+
+def test_a_rejected_map_beside_a_real_change_says_what_was_skipped(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    _add_device(client)
+    settled = client.post("/settings/devices/kitchen/save", data=dict(_UNTOUCHED_SECTIONS))
+    client.get(settled.headers["Location"])  # read that save's own message
+
+    resp = client.post(
+        "/settings/devices/kitchen/save",
+        data={**_UNTOUCHED_SECTIONS, "device_name": "Galley", "button_map_json": _BAD_MAP},
+    )
+    body = client.get(resp.headers["Location"]).get_data(as_text=True)
+    assert "button map must be valid JSON" in body
+    assert "saved, except the button map, which has an error." in body
+    assert "quiet hours saved" not in body
+
+
+def test_a_good_save_still_lists_what_it_saved(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    _add_device(client)
+    resp = client.post(
+        "/settings/devices/kitchen/save",
+        data={**_UNTOUCHED_SECTIONS, "button_map_json": '{"left": "rotate_prev"}'},
+    )
+    body = client.get(resp.headers["Location"]).get_data(as_text=True)
+    assert "button map saved" in body
