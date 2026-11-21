@@ -372,10 +372,119 @@
     }
   }
 
+  /* --------------------------------------------------- keep the view still */
+  // Folding a row, collapsing a display, Fold all and every redraw keep one
+  // header where it was on screen. Safari jumps when the cards are redrawn
+  // (the auto-refresh, a display opening), and any browser jumps when a
+  // collapse near the end leaves the page too short to stay where it was: a
+  // spacer under the cards (.lu-hold) takes up that slack and shrinks back as
+  // the person scrolls up.
+  let pinned = null; // what a toggle asked to keep still through the next redraw
+  const hold = document.createElement("div");
+  hold.className = "lu-hold";
+  hold.setAttribute("aria-hidden", "true");
+  hold.hidden = true;
+  host.after(hold);
+  let holdPx = 0;
+  function setHold(px) {
+    holdPx = Math.max(0, Math.round(px));
+    hold.style.height = `${holdPx}px`;
+    hold.hidden = !holdPx;
+  }
+  const slackBelow = () =>
+    document.documentElement.scrollHeight - window.innerHeight - window.scrollY;
+  // Room for the page to lose ``px`` of height without the browser scrolling it up.
+  function roomFor(px) {
+    const short = px - slackBelow();
+    if (short > 0) setHold(holdPx + short);
+  }
+  window.addEventListener(
+    "scroll",
+    () => {
+      if (!holdPx) return;
+      const slack = slackBelow();
+      if (slack > 0) setHold(holdPx - slack);
+    },
+    { passive: true }
+  );
+  // A selector that finds the same header after a redraw.
+  function anchorSel(el) {
+    if (!host.contains(el)) return null;
+    const row = el.closest(".lu-row");
+    if (row && row.id) return `#${CSS.escape(row.id)} > .lu-row-head`;
+    const ds = el.closest(".lu-ds");
+    if (ds) return `.lu-ds[data-display="${CSS.escape(ds.dataset.display || "")}"] .lu-ds-hdr`;
+    return null;
+  }
+  // The first row or display header in view.
+  function viewAnchor() {
+    for (const el of host.querySelectorAll(".lu-row-head, .lu-ds-hdr")) {
+      if (!el.getClientRects().length) continue;
+      const r = el.getBoundingClientRect();
+      if (r.bottom > 0 && r.top < window.innerHeight) return el;
+    }
+    return null;
+  }
+  // Run ``change`` and scroll back by however far ``el`` (or its redrawn self) moved.
+  function keepStill(el, change) {
+    if (!el || !el.isConnected) return change();
+    const sel = anchorSel(el);
+    const top = el.getBoundingClientRect().top;
+    const out = change();
+    const now = (sel && host.querySelector(sel)) || (el.isConnected ? el : null);
+    if (now && now.getClientRects().length) {
+      const d = now.getBoundingClientRect().top - top;
+      if (Math.abs(d) >= 1) {
+        roomFor(d);
+        window.scrollTo({ top: window.scrollY + d, behavior: "instant" });
+      }
+    }
+    return out;
+  }
+
+  // Opening or closing a body: its height and opacity, about 200ms, ease-out;
+  // nothing under reduced motion. ``done`` runs when it has finished (at once
+  // without motion); a newer slide on the same body cancels this one.
+  function slide(el, open, done) {
+    if (!el) {
+      if (done) done();
+      return;
+    }
+    el.getAnimations().forEach((a) => a.cancel());
+    if (reduceMotion() || typeof el.animate !== "function") {
+      if (done) done();
+      return;
+    }
+    const cs = getComputedStyle(el);
+    const shown = {
+      height: `${el.getBoundingClientRect().height}px`,
+      paddingTop: cs.paddingTop,
+      paddingBottom: cs.paddingBottom,
+      opacity: 1,
+    };
+    const gone = { height: "0px", paddingTop: "0px", paddingBottom: "0px", opacity: 0 };
+    el.style.overflow = "hidden";
+    el.style.boxSizing = "border-box";
+    const a = el.animate(open ? [gone, shown] : [shown, gone], {
+      duration: open ? 200 : 170,
+      easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+    });
+    const tidy = () => {
+      el.style.overflow = "";
+      el.style.boxSizing = "";
+    };
+    a.onfinish = () => {
+      tidy();
+      if (done) done();
+    };
+    a.oncancel = tidy;
+  }
+
   let hasRendered = false;
 
   let lastRO = null;
   function render() {
+    const redraw = hasRendered;
     const scrolls = {};
     if (hasRendered)
       host.querySelectorAll(".lu-row").forEach((r) => {
@@ -423,7 +532,10 @@
     if (!vm.displays.length && !orphans.length) {
       html = host.innerHTML; // the server's empty state
     }
-    replaceCards(html);
+    // Keep what was toggled, or else the first header in view, where it was.
+    const anchor = pinned || (redraw ? viewAnchor() : null);
+    pinned = null;
+    keepStill(anchor, () => replaceCards(html));
     markSteps();
     followColdThumbs();
     lastRO = barReadOnly();
@@ -2082,16 +2194,24 @@
   }
 
   /* ------------------------------------------------------------ clicks */
+  // A row's header stays put while its dashboards slide open or shut.
   function toggleRow(btn) {
     const id = btn.dataset.fold;
     const row = btn.closest(".lu-row");
+    const head = row.querySelector(".lu-row-head");
+    const body = row.querySelector(".lu-row-body");
     const fold = !row.classList.contains("is-folded");
     foldChoice[id] = fold;
     saveFolds();
-    row.classList.toggle("is-folded", fold);
-    row.classList.toggle("just-opened", !fold);
     btn.setAttribute("aria-expanded", String(!fold));
-    if (!fold) {
+    if (fold) {
+      // Shown until it has slid shut; room under the page so nothing scrolls up meanwhile.
+      if (body) roomFor(body.getBoundingClientRect().height);
+      row.classList.add("is-folded", "is-closing");
+      slide(body, false, () => keepStill(head, () => row.classList.remove("is-closing")));
+    } else {
+      keepStill(head, () => row.classList.remove("is-folded", "is-closing"));
+      slide(body, true);
       const sc = row.querySelector(".lu-strip-scroll");
       if (sc) {
         scrollToNow(sc);
@@ -2218,6 +2338,7 @@
       toggleRow(t);
     } else if (t.matches("[data-fold-all]")) {
       const fold = ds.mode === "fold";
+      pinned = t;
       vm.displays.forEach((d) => {
         setCollapsed(d.id, fold);
         d.lineups.forEach((l) => {
@@ -2235,13 +2356,31 @@
       (ds.showDisplay !== undefined && t.matches("[data-show-display]"))
     ) {
       const id = ds.collapse !== undefined ? ds.collapse : ds.showDisplay;
-      setCollapsed(id, !isCollapsed(id));
+      const shut = !isCollapsed(id);
+      setCollapsed(id, shut);
       saveCollapsed();
-      render();
-      const sec = host.querySelector(`.lu-ds[data-display="${CSS.escape(id)}"]`);
-      if (sec && !isCollapsed(id)) sec.classList.add("just-opened");
-      const b = host.querySelector(`[data-collapse="${CSS.escape(id)}"]`);
-      if (b) b.focus({ preventScroll: true });
+      const q = `.lu-ds[data-display="${CSS.escape(id)}"]`;
+      const sec = host.querySelector(q);
+      const bodyOf = (x) => x && x.querySelector(":scope > .lu-ds-card > .lu-ds-body");
+      // The header stays put: closing slides the lineups shut, then redraws;
+      // opening redraws, then slides them open.
+      const done = () => {
+        pinned = sec && sec.querySelector(".lu-ds-hdr");
+        render();
+        if (!shut) slide(bodyOf(host.querySelector(q)), true);
+        const b = host.querySelector(`[data-collapse="${CSS.escape(id)}"]`);
+        if (b) b.focus({ preventScroll: true });
+      };
+      const body = bodyOf(sec);
+      if (shut && body && !body.hidden) {
+        // Shut at once for anyone asking (class, chevrons); the redraw follows the slide.
+        sec.classList.add("is-collapsed");
+        sec
+          .querySelectorAll("[data-collapse], [data-show-display]")
+          .forEach((b) => b.setAttribute("aria-expanded", "false"));
+        roomFor(body.getBoundingClientRect().height);
+        slide(body, false, done);
+      } else done();
     } else if (ds.dpClose !== undefined && t.matches("[data-dp-close]")) {
       const b = root.querySelector('.lu-dp-btn[aria-expanded="true"]');
       closeDayPop();

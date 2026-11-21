@@ -2359,15 +2359,9 @@ main.page.lu-page {
 .lu .lu-row.is-folded .lu-row-body {
   display: none;
 }
-.lu .lu-row.just-opened:not(.is-folded) .lu-row-body,
-.lu .lu-ds.just-opened .lu-sched {
-  animation: lu-reveal 200ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-@keyframes lu-reveal {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
+/* Folded, but still sliding shut (lineups.js slide()). */
+.lu .lu-row.is-folded.is-closing .lu-row-body {
+  display: block;
 }
 @container lu-ds (max-width: 560px) {
   .lu .lu-row-body {
@@ -3408,10 +3402,6 @@ main.page.lu-page {
   .lu .lu-push-mini {
     transition: none;
   }
-  .lu .lu-row.just-opened .lu-row-body,
-  .lu .lu-ds.just-opened .lu-sched {
-    animation: none;
-  }
 }
 
 /* ----- Live row edge (Paper light) ---------------------------------------
@@ -4229,6 +4219,28 @@ main.page.lu-page {
 }
 
 /* ----- Phones ------------------------------------------------------------ */
+/* A phone-width card gives the dashboards the room: taller tiles (two
+   landscape tiles side by side at 360px, three portrait ones and a peek) and
+   slim arrows between them. */
+@container lu-ds (max-width: 560px) {
+  .lu .lu-strip {
+    --tile-h: 140px;
+  }
+  .lu .lu-strip.l {
+    --th: 88px;
+  }
+  .lu .lu-sep {
+    width: 16px;
+    font-size: 14px;
+  }
+  .lu .lu-sep.loop {
+    width: 18px;
+    font-size: 13px;
+  }
+  .lu .lu-sep.else {
+    padding-inline: 5px;
+  }
+}
 /* The Filters button only exists for phones; elsewhere the selects sit inline. */
 .lu .lu-tb-filters {
   display: contents;
