@@ -3912,11 +3912,15 @@ def test_tile_arrows_and_zoom_are_there_on_hover_and_keyboard_focus(live: str) -
         assert push and arrows and pic
         assert arrows["y"] >= push["y"] + push["height"] - 2
         assert arrows["y"] + arrows["height"] <= pic["y"] + pic["height"] + 1
-        # The zoom icon sits in the top right corner of the picture, quiet when idle.
+        # The zoom icon sits in the top right of the picture, just inward of the
+        # gear that has the corner, quiet when idle.
         z = tile.locator(".lu-zoom").bounding_box()
+        g = tile.locator(".lu-tile-gear").bounding_box()
         assert (
             z
-            and abs((z["x"] + z["width"]) - (pic["x"] + pic["width"])) <= 8
+            and g
+            and abs((g["x"] + g["width"]) - (pic["x"] + pic["width"])) <= 8
+            and 0 <= g["x"] - (z["x"] + z["width"]) <= 8
             and z["y"] - pic["y"] <= 8
         )
         page.mouse.move(5, 5)
@@ -5297,12 +5301,14 @@ def test_tile_gear_shows_on_hover_and_focus_beside_the_zoom_icon(live: str, sche
         assert _opacity(gear) == 0
         tile.hover()
         assert _opacity(gear) == 1
-        # Top right, just left of the zoom icon, clear of the x N badge and inside the picture.
+        # Top right, clear of the x N badge and inside the picture.
         g, z = gear.bounding_box(), tile.locator(".lu-zoom").bounding_box()
         pic = tile.locator(".lu-thumb").bounding_box()
         assert g and z and pic
-        assert abs(g["y"] - z["y"]) <= 1 and 0 <= z["x"] - (g["x"] + g["width"]) <= 8
-        assert g["x"] >= pic["x"] and g["y"] - pic["y"] <= 8
+        # The gear has the picture's top right corner; zoom sits just inward of it.
+        assert abs(g["y"] - z["y"]) <= 1 and 0 <= g["x"] - (z["x"] + z["width"]) <= 8
+        assert abs((g["x"] + g["width"]) - (pic["x"] + pic["width"])) <= 8
+        assert z["x"] >= pic["x"] and g["y"] - pic["y"] <= 8
         # Keyboard: Tab reaches it, it shows, and it is a real link.
         page.mouse.move(5, 5)
         assert _opacity(gear) == 0

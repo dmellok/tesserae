@@ -3914,9 +3914,9 @@ main.page.lu-page {
   outline-offset: 1px;
   box-shadow: 0 0 0 4px var(--lu-acc);
 }
-/* The gear to a step's dashboard editor, the same chip just left of the zoom
-   icon (in the corner itself when there is no zoom). Hidden until the tile is
-   hovered or something in it has focus. */
+/* The gear to a step's dashboard editor: the same chip as the zoom icon, in
+   the picture's top right corner, with the zoom icon moved in beside it.
+   Hidden until the tile is hovered or something in it has focus. */
 .lu .lu-tile-gear {
   position: absolute;
   z-index: 3;
@@ -3933,7 +3933,7 @@ main.page.lu-page {
   opacity: 0;
   transition: opacity 150ms ease-out;
 }
-.lu.is-enhanced .lu-zoom + .lu-tile-gear {
+.lu .lu-zoom:has(+ .lu-tile-gear) {
   right: 30px;
 }
 .lu .lu-tile-gear:hover {
@@ -4267,6 +4267,9 @@ main.page.lu-page {
      carries Edit dashboard instead. */
   .lu.is-enhanced .lu-tile-gear {
     display: none;
+  }
+  .lu .lu-zoom:has(+ .lu-tile-gear) {
+    right: 0;
   }
   /* Before the script runs there is no zoom or lightbox: the corner is the gear's. */
   .lu:not(.is-enhanced) .lu-tile-gear {

@@ -913,7 +913,8 @@ def test_tile_gear_sits_in_the_thumbnail_after_the_zoom_icon(app: Flask) -> None
         r'<a class="lu-tile-gear" href="/pages/newspaper"',
         dinner,
     )
-    assert ".lu.is-enhanced .lu-zoom + .lu-tile-gear { right: 30px; }" in CSS
+    # The gear takes the corner; a zoom icon beside it moves inward.
+    assert ".lu .lu-zoom:has(+ .lu-tile-gear) { right: 30px; }" in CSS
 
 
 def test_a_deleted_dashboard_gets_no_gear(app: Flask) -> None:
