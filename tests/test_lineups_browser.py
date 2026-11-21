@@ -4069,10 +4069,13 @@ def test_draw_next_end_to_end_with_a_real_chromium_render(
         tile.hover()
         prev_btn = tile.locator('[data-item="drawdeck:0:-1"]')
         next_btn = tile.locator('[data-item="drawdeck:0:1"]')
-        # Draw mode: arrows exist, a stack badged "random", "previous" waits for something drawn.
+        # Draw mode: arrows exist, a stack badged with the widget's order (its icon,
+        # or the word "random" when it names none), "previous" waits for something drawn.
         assert next_btn.get_attribute("aria-label") == "Draw the next picture"
         assert prev_btn.is_disabled() and tile.locator(".lu-it-pos").inner_text() == ""
-        assert step.locator(".lu-count").inner_text() == "random"
+        badge = step.locator(".lu-count")
+        assert badge.inner_text() in ("", "random")
+        assert badge.get_attribute("aria-label")
         assert "stacked" in tile.get_attribute("class")
 
         def shown() -> str:
