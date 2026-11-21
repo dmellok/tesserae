@@ -945,3 +945,112 @@ def test_editor_tile_keeps_the_shared_preview_while_its_own_picture_renders(
     ]
     assert page["thumb"] and page["thumb"] == plain["thumb"]
     assert (page["w"], page["h"]) == (plain["w"], plain["h"])
+
+
+# -- duplicate -----------------------------------------------------------------
+
+
+def _door_frame(app: Flask) -> Any:
+    from app.state.conditions import ha_condition
+    from app.state.deck_model import Deck, DeckPage
+
+    deck = Deck(
+        id="door_frame",
+        name="Door Frame",
+        enabled=True,
+        device_ids=["frame-1", "frame-2"],
+        pages=[
+            DeckPage(page_id="overview", dwell_minutes=20),
+            DeckPage(
+                page_id="calendar",
+                conditions=[ha_condition("binary_sensor.printing", "==", "on")],
+            ),
+        ],
+        advance="timer",
+        advance_interval_minutes=15,
+        advance_anchor="07:30",
+        advance_window_start="07:00",
+        advance_window_end="21:00",
+        advance_days_of_week=[0, 2, 4],
+        advance_mode="priority",
+    )
+    app.config["DECK_STORE"].upsert(deck)
+    return deck
+
+
+def test_duplicate_copies_the_lineup_and_starts_disabled(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    original = _door_frame(app)
+    resp = client.post("/decks/door_frame/duplicate")
+    copies = [d for d in _decks(app) if d.id != "door_frame"]
+    assert len(copies) == 1
+    copy = copies[0]
+    assert copy.name == "Door Frame copy"
+    assert copy.enabled is False
+    # Everything else is the same lineup: dashboards, conditions, timing, days, displays.
+    keep = {"id", "name", "enabled"}
+    assert copy.model_dump(exclude=keep) == original.model_dump(exclude=keep)
+    assert copy.pages[1].conditions == original.pages[1].conditions
+    # The original is untouched.
+    assert app.config["DECK_STORE"].get("door_frame") == original
+    # Back on the Lineups page with the copy opened and highlighted.
+    assert resp.status_code == 302
+    loc = urlsplit(resp.headers["Location"])
+    assert loc.path == "/decks"
+    assert parse_qs(loc.query) == {"hl": [copy.id]}
+
+
+def test_duplicate_twice_numbers_the_copies(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    _door_frame(app)
+    client.post("/decks/door_frame/duplicate")
+    client.post("/decks/door_frame/duplicate")
+    names = sorted(d.name for d in _decks(app))
+    assert names == ["Door Frame", "Door Frame copy", "Door Frame copy 2"]
+    assert len({d.id for d in _decks(app)}) == 3
+
+
+def test_duplicate_unknown_lineup_changes_nothing(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post("/decks/ghost/duplicate")
+    assert resp.status_code == 302
+    assert _decks(app) == []
+
+
+def test_duplicate_is_post_only(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    _door_frame(app)
+    assert client.get("/decks/door_frame/duplicate").status_code == 405
+    assert len(_decks(app)) == 1
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {"Sec-Fetch-Site": "cross-site"},
+        {"Origin": "http://evil.example"},
+        {"Referer": "http://evil.example/attack"},
+    ],
+)
+def test_duplicate_refuses_cross_origin_posts(app: Flask, headers: dict[str, str]) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    _door_frame(app)
+    resp = client.post("/decks/door_frame/duplicate", headers=headers)
+    assert resp.status_code == 403
+    assert len(_decks(app)) == 1
+
+
+def test_duplicate_needs_sign_in(app: Flask) -> None:
+    from app import auth
+
+    auth.install_gate(app, app.config["SETTINGS_STORE"])
+    auth.set_password(app.config["SETTINGS_STORE"], "abcdefgh")
+    _door_frame(app)
+    resp = app.test_client().post("/decks/door_frame/duplicate")
+    assert resp.status_code in (302, 401, 403)
+    assert len(_decks(app)) == 1

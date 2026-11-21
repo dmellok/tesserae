@@ -3711,10 +3711,10 @@ def test_lightbox_traps_focus_and_labels_its_buttons(live: str) -> None:
         )
         assert names == ["Close", "Previous item", "Next item", "Push now"]
         seen = []
-        for _ in range(5):
+        for _ in range(6):
             seen.append(_focused(page))
             page.keyboard.press("Tab")
-        assert seen == ["Close", "Previous item", "Next item", "Push now", "Close"]
+        assert seen == ["Close", "Edit Art", "Previous item", "Next item", "Push now", "Close"]
         page.keyboard.press("Shift+Tab")
         assert _focused(page) == "Close"
         page.keyboard.press("Shift+Tab")
@@ -5273,4 +5273,170 @@ def test_pills_are_never_covered_by_a_stack(live: str) -> None:
         assert page.locator(".lu-step .lu-pill").count() > 0
         assert page.locator(".lu-tile.stacked").count() > 0
         assert page.evaluate(check) == []
+        browser.close()
+
+
+# -- edit shortcuts and Duplicate ---------------------------------------------------
+
+
+def _opacity(loc: Any) -> float:
+    loc.evaluate("e => e.getAnimations().forEach((a) => a.finish())")
+    return float(loc.evaluate("e => getComputedStyle(e).opacity"))
+
+
+@pytest.mark.parametrize("scheme", ["light", "dark"])
+def test_tile_gear_shows_on_hover_and_focus_beside_the_zoom_icon(live: str, scheme: str) -> None:
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser, page, _ = _open(p, live, pics=True, scheme=scheme)
+        tile = page.locator(f"{ART} .lu-tile")
+        gear = tile.locator(".lu-tile-gear")
+        assert gear.get_attribute("href") == "/pages/art"
+        assert gear.get_attribute("aria-label") == "Edit Art"
+        assert _opacity(gear) == 0
+        tile.hover()
+        assert _opacity(gear) == 1
+        # Top right, just left of the zoom icon, clear of the x N badge and inside the picture.
+        g, z = gear.bounding_box(), tile.locator(".lu-zoom").bounding_box()
+        pic = tile.locator(".lu-thumb").bounding_box()
+        assert g and z and pic
+        assert abs(g["y"] - z["y"]) <= 1 and 0 <= z["x"] - (g["x"] + g["width"]) <= 8
+        assert g["x"] >= pic["x"] and g["y"] - pic["y"] <= 8
+        # Keyboard: Tab reaches it, it shows, and it is a real link.
+        page.mouse.move(5, 5)
+        assert _opacity(gear) == 0
+        gear.focus()
+        assert _opacity(gear) == 1
+        assert page.evaluate("() => document.activeElement.dataset.gear") == "step:dinner:1"
+        # A click goes to the editor, it never opens the lightbox.
+        with page.expect_navigation():
+            gear.click()
+        assert page.url.endswith("/pages/art")
+        assert page._lu_errors == []
+        browser.close()
+
+
+@pytest.mark.parametrize("scheme", ["light", "dark"])
+def test_lineup_name_gear_shows_on_hover_and_focus(live: str, scheme: str) -> None:
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser, page, _ = _open(p, live, scheme=scheme)
+        head = page.locator("#lu-row-dinner .lu-row-head")
+        gear = head.locator(".lu-row-gear")
+        assert gear.get_attribute("href") == "/decks/dinner/edit"
+        assert gear.get_attribute("aria-label") == "Edit Dinner (Mon–Wed)"
+        assert _opacity(gear) == 0
+        head.hover()
+        assert _opacity(gear) == 1
+        # Right after the name, on its line.
+        n = head.locator(".lu-name").bounding_box()
+        g = gear.bounding_box()
+        assert n and g and 0 <= g["x"] - (n["x"] + n["width"]) <= 8
+        assert abs((g["y"] + g["height"] / 2) - (n["y"] + n["height"] / 2)) <= 4
+        page.mouse.move(5, 5)
+        assert _opacity(gear) == 0
+        head.locator(".lu-name").focus()
+        assert _opacity(gear) == 1
+        assert page.evaluate(_OVERLAPS) == []
+        assert page._lu_errors == []
+        browser.close()
+
+
+def test_more_menu_offers_duplicate_after_edit(live: str) -> None:
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser, page, _ = _open(p, live)
+        page.locator("#lu-row-dinner .lu-more summary").click()
+        menu = page.locator("#lu-row-dinner .lu-more-menu")
+        labels = [
+            t.strip() for t in menu.locator(":scope > a, :scope > form button").all_inner_texts()
+        ]
+        assert labels[:2] == ["Edit", "Duplicate"] and labels[-1] == "Delete"
+        form = menu.locator("form", has_text="Duplicate")
+        assert form.get_attribute("action") == "/decks/dinner/duplicate"
+        assert form.get_attribute("method") == "post"
+        # The client renderer draws the same menu (after an auto-refresh redraw).
+        client = page.evaluate(
+            """() => {
+              const vm = JSON.parse(document.querySelector('[data-lu-vm]').textContent);
+              const d = vm.displays[0];
+              return TesseraeLineupsRender.display(vm, d, { view: 'cards', folded: (l) => l.folded, collapsed: () => false, pendingBar: () => '' });
+            }"""
+        )
+        assert (
+            '<a href="/decks/dinner/edit">Edit</a><form method="post" action="/decks/dinner/duplicate" '
+            'class="lu-inline"><button type="submit">Duplicate</button></form>'
+        ) in client
+        assert 'class="lu-gear lu-row-gear" href="/decks/dinner/edit"' in client
+        assert 'class="lu-tile-gear" href="/pages/art"' in client
+        browser.close()
+
+
+@pytest.mark.parametrize("device", ["iPhone 13", "Pixel 7"])
+def test_touch_keeps_both_edit_shortcuts_reachable_at_44px(live: str, device: str) -> None:
+    """No hover on touch: the name's gear is always there; a phone's tile has
+    no room for a second 44px corner, so its dashboard's Edit link lives in the
+    lightbox a tap on the picture opens."""
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser, page, _ = _open_device(p, live, device, pics=True)
+        row = page.locator("#lu-row-dinner")
+        if "is-folded" in (row.get_attribute("class") or ""):
+            page.locator('[data-fold="dinner"]').tap()
+        gear = row.locator(".lu-row-gear")
+        assert _opacity(gear) >= 0.75
+        b = gear.bounding_box()
+        assert b and b["width"] >= 44 and b["height"] >= 44
+        step = row.locator('.lu-step[data-step="1"]')
+        assert not step.locator(".lu-tile-gear").is_visible()
+        step.locator(".lu-zoom").tap()
+        edit = page.locator(f"{LB} .lu-lb-edit")
+        assert edit.is_visible()
+        assert edit.get_attribute("href") == "/pages/art"
+        assert edit.get_attribute("aria-label") == "Edit Art"
+        e = edit.bounding_box()
+        assert e and e["height"] >= 44 and e["width"] >= 44
+        assert page.evaluate(_SMALL_TARGETS) == []
+        assert page._lu_errors == []
+        browser.close()
+
+
+def test_lightbox_links_to_the_dashboard_editor_left_of_push_now(live: str) -> None:
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser, page, _ = _open(p, live, pics=True)
+        page.locator(f"{ART} [data-zoom]").click()
+        edit = page.locator(f"{LB} .lu-lb-edit")
+        push = page.locator(f"{LB} .lu-lb-push")
+        assert edit.inner_text().strip() == "Edit dashboard"
+        assert edit.get_attribute("href") == "/pages/art"
+        a, b = edit.bounding_box(), push.bounding_box()
+        assert a and b and a["x"] + a["width"] <= b["x"]
+        page.keyboard.press("Escape")
+        # The header's picture is what a display shows, not a step: no Edit link.
+        page.locator('[data-zoom="head:frame"]').click()
+        assert not page.locator(f"{LB} .lu-lb-edit").is_visible()
+        assert page._lu_errors == []
+        browser.close()
+
+
+def test_scope_today_keeps_the_highlighted_row_in_view(live: str) -> None:
+    """After Duplicate the page opens on the copy (?hl=), which starts off: the
+    Today list keeps it, on first paint and after the script takes over."""
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser, page, _ = _open(p, live)
+        page.locator('[data-scope="today"]').click()
+        assert "weekend" not in _rows(page)
+        page.goto(live + PAGE + "?hl=weekend", wait_until="load")
+        page.wait_for_selector(".lu.is-enhanced")
+        assert "weekend" in _rows(page)
+        assert "breakfast" not in _rows(page)
+        assert page.locator("#lu-row-weekend").is_visible()
         browser.close()

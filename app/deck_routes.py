@@ -1334,6 +1334,7 @@ def _lineup_input(
             edit=url_for("decks.editor", deck_id=deck.id),
             toggle=url_for("decks.toggle", deck_id=deck.id),
             delete=url_for("decks.delete", deck_id=deck.id),
+            duplicate=url_for("decks.duplicate", deck_id=deck.id),
             fire=fire,
             push_step=url_for("decks.push_step", deck_id=deck.id),
             step_item=url_for("decks.step_item", deck_id=deck.id),
@@ -4464,6 +4465,30 @@ def toggle(deck_id: str) -> Response:
     _store().upsert(updated)
     _invalidate(updated)
     return redirect(url_for("decks.index") + f"#deck-{deck_id}")
+
+
+@bp.post("/<deck_id>/duplicate")
+def duplicate(deck_id: str) -> Response:
+    """Copy a lineup as "<name> copy": same dashboards, conditions, timing,
+    days and displays, but switched off so it doesn't fight the original
+    for the same display. Back on the page with the copy highlighted."""
+    existing = _store().get(deck_id)
+    if existing is None:
+        flash(f"No deck with id {deck_id!r}.", "error")
+        return redirect(url_for("decks.index"))
+    names = {d.name for d in _store().all()}
+    name = f"{existing.name} copy"
+    i = 2
+    while name in names:
+        name = f"{existing.name} copy {i}"
+        i += 1
+    copy = existing.model_copy(
+        deep=True,
+        update={"id": _unique_id(_slug_from(name)), "name": name, "enabled": False},
+    )
+    _store().upsert(copy)
+    flash(f"Duplicated as {name}. It stays off until you enable it.", "ok")
+    return redirect(url_for("decks.index", hl=copy.id))
 
 
 @bp.post("/<deck_id>/delete")
