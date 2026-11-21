@@ -6,9 +6,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
-- Show each dashboard's refresh interval with an icon and compact time on rotation steps.
-- Show photo selection order on Lineups item badges.
-- Show Always on for powered displays with recent contact.
+- Lineups steps show their dashboard's refresh interval and photo order, and powered displays say Always on.
 
 ### Added
 
