@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
 
@@ -677,7 +677,7 @@ def test_cycle_fires_walk_the_days_dwell_grid() -> None:
     assert fires[0].strftime("%H:%M") == "08:00"
     assert fires[-1].strftime("%H:%M") == "19:45"
 
-    # An end before the anchor stops at midnight, as the engine does.
+    # An overnight rotation also includes the previous run's morning spill.
     late = Rotation(
         id="r",
         name="r",
@@ -685,7 +685,10 @@ def test_cycle_fires_walk_the_days_dwell_grid() -> None:
         anchor="22:00",
         end_at="06:00",
     )
-    assert len(_cycle_fires_on(late, day)) == 4
+    assert len(_cycle_fires_on(late, day)) == 16
+    monday_only = late.model_copy(update={"days_of_week": [day.weekday()]})
+    assert len(_cycle_fires_on(monday_only, day)) == 4
+    assert len(_cycle_fires_on(monday_only, day + timedelta(days=1))) == 12
 
     # Disabled or off-day records project nothing.
     off = Rotation(id="r", name="r", steps=two_by_fifteen, enabled=False)

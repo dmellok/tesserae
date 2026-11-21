@@ -344,7 +344,7 @@ def test_removing_the_end_and_by_hand_round_trip(app: Flask) -> None:
     _when(app, "between", "08:00", "12:00", pages="a,b", taps_flip="1")
     d = _stored(app)
     assert (d.advance, d.advance_trigger, d.advance_anchor) == ("both", "cycle", "08:00")
-    assert _when(app, "between", "12:00", "08:00", pages="a,b")["ok"] is False
+    assert _when(app, "between", "12:00", "08:00", pages="a,b")["ok"] is True
 
 
 def test_both_never_stays_on_a_daily_or_interval_lineup(app: Flask) -> None:
@@ -452,7 +452,12 @@ def test_the_new_lineup_flow_creates_through_the_lineup_path(app: Flask) -> None
     )
     one = store.get(_create(app, when="between", start="06:00", end="09:00", page_ids=["a"])["id"])
     assert (one.advance_trigger, one.advance_window_start) == ("interval", "06:00")
-    assert _create(app, when="between", start="09:00", end="06:00", page_ids=["a"])["ok"] is False
+    assert _create(app, when="between", start="09:00", end="06:00", page_ids=["a"])["ok"] is True
+    overnight = store.get(
+        _create(app, when="between", start="08:30", end="03:59", page_ids=["a", "b"])["id"]
+    )
+    assert (overnight.advance_anchor, overnight.advance_end_at) == ("08:30", "03:59")
+    assert not _create(app, when="between", start="09:00", end="09:00", page_ids=["a", "b"])["ok"]
     assert _create(app, when="at", start="25:00", page_ids=["a"])["ok"] is False
 
 
@@ -628,14 +633,20 @@ def test_an_interval_drops_a_dwell_it_never_reads(app: Flask) -> None:
     assert (d.advance_interval_minutes, d.pages[0].dwell_minutes) == (30, None)
 
 
-def test_an_interval_past_midnight_cannot_take_a_second_dashboard(app: Flask) -> None:
+def test_an_interval_past_midnight_can_take_a_second_dashboard(app: Flask) -> None:
     _deck(
         app, advance="timer", advance_trigger="interval", advance_window_start="22:00",
         advance_window_end="02:00",
     )  # fmt: skip
     got = _save(app, pages="a,b").get_json()
-    assert got["ok"] is False and "midnight" in got["error"]
-    assert _stored(app).page_ids == ["a"]
+    assert got["ok"] is True
+    deck = _stored(app)
+    assert deck.page_ids == ["a", "b"]
+    assert (deck.advance_trigger, deck.advance_anchor, deck.advance_end_at) == (
+        "cycle",
+        "22:00",
+        "02:00",
+    )
 
 
 # -- review fixes: stale and deleted saves -------------------------------------------
@@ -1362,3 +1373,25 @@ def test_a_grid_page_with_leftover_canvas_data_still_lists_its_items(
     assert found is not None and found.count == 3 and found.cell_id == "c1"
     as_canvas = with_canvas.model_copy(update={"layout_kind": "canvas"})
     assert [p.id for _, p in named_placements(as_canvas)] == ["e1"]
+
+
+@pytest.mark.parametrize("trigger", ["daily", "cycle"])
+def test_editor_accepts_overnight_rotation_but_rejects_equal_times(
+    app: Flask, trigger: str
+) -> None:
+    _deck(
+        app,
+        advance="timer",
+        advance_trigger=trigger,
+        advance_fires_at="08:30",
+        pages=[DeckPage(page_id="a"), DeckPage(page_id="b")],
+    )
+    assert _when(app, "between", "08:30", "03:59", pages="a,b")["ok"]
+    deck = _stored(app)
+    assert (deck.advance_trigger, deck.advance_anchor, deck.advance_end_at) == (
+        "cycle",
+        "08:30",
+        "03:59",
+    )
+    assert not _when(app, "between", "08:30", "08:30", pages="a,b")["ok"]
+    assert _stored(app).advance_end_at == "03:59"

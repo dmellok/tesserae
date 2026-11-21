@@ -252,7 +252,6 @@
     const l = ed.lineups.find((x) => x.id === id);
     if (!l || ![s, e].every(Number.isFinite)) return;
     s = Math.max(0, Math.min(DAY_MIN - SNAP, s));
-    e = l.window.is_point ? s : Math.max(s + SNAP, Math.min(DAY_MIN, e));
     const orig = d.lineups.find((x) => x.id === id);
     applyEdit(d, orig, { start_min: s, end_min: e, days: l.days.slice() });
   }
@@ -1670,10 +1669,11 @@
         err.textContent = "Enter a time";
         return;
       }
-      if (ended && e - s < SNAP) {
-        err.textContent = "End must be after start";
+      if (ended && e === s) {
+        err.textContent = "Start and end must differ";
         return;
       }
+      if (ended && e < s) e += DAY_MIN;
       const c = clash(effective(d), l, s, e, l.days);
       if (c) {
         err.textContent = `Overlaps ${c.o.name}`;

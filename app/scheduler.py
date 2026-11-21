@@ -274,34 +274,35 @@ def _compute_step_state(
 
     Without override, this matches the original behaviour:
       * Wall-clock must satisfy day-of-week + anchor + end_at gates.
-      * Position = (now - today_anchor) % cycle.
+      * Position = (now - window_anchor) % cycle.
 
     With override (``forced = (clicked_at, step_index)``), we still
     apply the day-of-week + end_at gates, but the cycle anchor used
     for position math becomes ``clicked_at - prefix(step_index)`` so
     that the requested step starts at the moment of the click. The
     override stays in effect as long as the click landed inside
-    today's anchor window; the next day's anchor moment silently GCs
+    the run's anchor window; the next day's anchor moment silently GCs
     it back to deterministic.
     """
     local_now = _local(now, tz)
-    if local_now.weekday() not in rotation.days_of_week:
-        return None
     anchor_t = _parse_hhmm(rotation.anchor)
-    anchor_today = local_now.replace(
+    window_anchor = local_now.replace(
         hour=anchor_t.hour, minute=anchor_t.minute, second=0, microsecond=0
     )
-    if local_now < anchor_today:
-        return None
     if rotation.end_at is not None:
         end_t = _parse_hhmm(rotation.end_at)
-        end_today = local_now.replace(hour=end_t.hour, minute=end_t.minute, second=0, microsecond=0)
-        if end_today > anchor_today:
-            if local_now >= end_today:
-                return None
-        else:
-            if end_today <= local_now < anchor_today:
-                return None
+        window_end = local_now.replace(
+            hour=end_t.hour, minute=end_t.minute, second=0, microsecond=0
+        )
+        if end_t < anchor_t:
+            if local_now < window_end:
+                window_anchor -= timedelta(days=1)
+            else:
+                window_end += timedelta(days=1)
+        if local_now >= window_end:
+            return None
+    if local_now < window_anchor or window_anchor.weekday() not in rotation.days_of_week:
+        return None
     cycle = rotation.cycle_minutes
     if cycle <= 0:
         return None
@@ -311,18 +312,18 @@ def _compute_step_state(
         forced_at, forced_idx = forced
         if 0 <= forced_idx < len(rotation.steps):
             forced_local = forced_at.astimezone(tz) if tz else forced_at.astimezone()
-            # Override is valid while the click landed in today's window
-            # (>= today's anchor) and isn't in the future.
-            if anchor_today <= forced_local <= local_now:
+            # Override is valid while the click landed in this run's window
+            # (>= the run's anchor) and isn't in the future.
+            if window_anchor <= forced_local <= local_now:
                 prefix = sum(s.dwell_minutes for s in rotation.steps[:forced_idx])
                 effective_anchor = forced_local - timedelta(minutes=prefix)
                 forced_at_local = forced_local
             else:
-                effective_anchor = anchor_today
+                effective_anchor = window_anchor
         else:
-            effective_anchor = anchor_today
+            effective_anchor = window_anchor
     else:
-        effective_anchor = anchor_today
+        effective_anchor = window_anchor
 
     minutes_since_anchor = (local_now - effective_anchor).total_seconds() / 60.0
     position = minutes_since_anchor % cycle

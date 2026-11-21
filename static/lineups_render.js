@@ -1116,9 +1116,12 @@
       const orig = { s: w.start_min, e: w.end_min, days: l.days.slice() };
       w.start_min = p.start_min;
       w.end_min = w.is_point ? p.start_min : p.end_min;
+      w.wraps = w.end_min > DAY_MIN;
       w.start = hhmm(w.start_min);
       w.end = w.is_point ? null : endHhmm(w.end_min);
-      w.label = w.is_point ? `at ${clock(w.start_min)}` : clockRange(w.start_min, w.end_min);
+      w.label = w.is_point
+        ? `at ${clock(w.start_min)}`
+        : clockRange(w.start_min, w.end_min) + (l.kind === "cycle" && w.wraps ? " next day" : "");
       w.overlaps_pause = overlapsPause(d.pause, w.start_min, w.end_min);
       if (w.overlaps_pause && d.pause)
         w.pause_title = `Part of this window falls in Quiet hours (${d.pause.label}); nothing is pushed then`;
@@ -1157,24 +1160,40 @@
     l.window.is_point ? l.window.start_min : l.window.end_min,
   ];
 
-  // Other lineups' windows on the given days (points for single pushes).
+  // Intervals gate each calendar day; cycles belong to the day they start.
+  function windowSpans(l, s, e) {
+    if (l.kind === "interval" && e > DAY_MIN)
+      return [
+        [s, DAY_MIN],
+        [0, e - DAY_MIN + 1],
+      ];
+    return [[s, l.kind === "interval" && e < DAY_MIN ? e + 1 : e]];
+  }
+  // Other windows relative to each candidate start day, including overnight spill.
   function obstacles(ed, l, days) {
     const out = [];
     ed.lineups.forEach((o) => {
-      if (o.id === l.id || !o.window || !o.enabled || o.window.wraps) return;
-      if (!o.days.some((on, i) => on && days[i])) return;
+      if (o.id === l.id || !o.window || !o.enabled) return;
       const [s, e] = winOf(o);
-      out.push({ s, e, o });
+      days.forEach((on, day) => {
+        if (!on) return;
+        o.days.forEach((runs, otherDay) => {
+          if (!runs) return;
+          windowSpans(o, s, e).forEach(([a, b]) => {
+            [-WEEK_MIN, 0, WEEK_MIN].forEach((off) => {
+              const shift = (otherDay - day) * DAY_MIN + off;
+              out.push({ s: a + shift, e: b + shift, o });
+            });
+          });
+        });
+      });
     });
     return out;
   }
   function clash(ed, l, s, e, days) {
+    const mine = windowSpans(l, s, e);
     return obstacles(ed, l, days).find((b) =>
-      b.s === b.e
-        ? b.s >= s && b.s < Math.max(e, s + 1)
-        : s === e
-          ? s >= b.s && s < b.e
-          : s < b.e && e > b.s
+      mine.some(([a, z]) => a < Math.max(b.e, b.s + 1) && Math.max(z, a + 1) > b.s)
     );
   }
   function room(ed, l, os, oe) {
