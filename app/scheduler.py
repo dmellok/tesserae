@@ -1781,6 +1781,24 @@ class Scheduler:
             device_ids: set[str] = set()
             for page in pages:
                 device_ids.update(page.device_ids or [])
+            # A manual push can leave a page on the glass after its lineup
+            # conditions fail. That does not authorize automatic refreshes.
+            ineligible: set[tuple[str, str]] = set()
+            if self._deck_store is not None and self._condition_evaluator is not None:
+                for deck in self._deck_store.all():
+                    if not deck.enabled:
+                        continue
+                    eligible_pages = {
+                        entry.page_id
+                        for entry in deck.pages
+                        if self._condition_evaluator.all_pass(entry.conditions, when=now)
+                    }
+                    ineligible.update(
+                        (entry.page_id, dev)
+                        for entry in deck.pages
+                        if entry.page_id not in eligible_pages
+                        for dev in deck.device_ids
+                    )
             # Authoritative source: the page whose frame was actually last pushed
             # to the device (persisted across restart in latest_renders.json).
             # Covers a device bound to SEVERAL dashboards, where a binding count
@@ -1793,8 +1811,9 @@ class Scheduler:
                     rec = latest_for(device_id)
                     pid = rec.get("page_id") if isinstance(rec, dict) else None
                     if isinstance(pid, str) and pid:
-                        showing.setdefault(pid, set()).add(device_id)
                         claimed.add(device_id)
+                        if (pid, device_id) not in ineligible:
+                            showing.setdefault(pid, set()).add(device_id)
             # Fallback: a device never rendered yet but bound to exactly one page.
             bound_count: dict[str, int] = {}
             for page in pages:
@@ -1802,7 +1821,11 @@ class Scheduler:
                     bound_count[device_id] = bound_count.get(device_id, 0) + 1
             for page in pages:
                 for device_id in page.device_ids or []:
-                    if device_id in claimed or bound_count.get(device_id, 0) != 1:
+                    if (
+                        device_id in claimed
+                        or bound_count.get(device_id, 0) != 1
+                        or (page.id, device_id) in ineligible
+                    ):
                         continue
                     showing.setdefault(page.id, set()).add(device_id)
                     claimed.add(device_id)

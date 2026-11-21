@@ -8,9 +8,13 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from app.plugin_loader import Plugin, PluginRegistry
 from app.scheduled_refresh import scheduled_placements
 from app.scheduler import Scheduler
+from app.scheduler_conditions import ConditionEvaluator
+from app.state.conditions import Condition
 from app.state.deck_model import Deck, DeckPage
 from app.state.deck_nav_store import DeckNavStore
 from app.state.deck_store import DeckStore
@@ -256,6 +260,67 @@ def test_multi_bound_device_refreshes_the_shown_page(tmp_path: Path) -> None:
     sched._maybe_refresh_pages(T0)
     pushed = {p[0] for p in pusher.pushes}
     assert pushed == {"b"}
+
+
+@pytest.mark.parametrize("latest_render", [True, False], ids=["latest-render", "single-binding"])
+@pytest.mark.parametrize(
+    "gate", ["closed", "open", "disabled", "unconditional", "unlisted", "duplicate"]
+)
+def test_refresh_fallback_respects_lineup_step_conditions(
+    tmp_path: Path, latest_render: bool, gate: str
+) -> None:
+    devices = ["door", "office", "kitchen"]
+    ps = _pages(
+        tmp_path,
+        Page(id="sleeping", name="Sleeping", device_ids=devices, refresh_minutes=1),
+        Page(id="other", name="Other", device_ids=devices if latest_render else []),
+    )
+    condition = Condition(
+        source_kind="time_window",
+        operator="in",
+        value={"start_local": "00:00", "end_local": "03:00"},
+    )
+    decks = DeckStore(tmp_path / "decks.json")
+    decks.upsert(
+        Deck(
+            id="door_lineup",
+            name="Door lineup",
+            enabled=gate != "disabled",
+            device_ids=["door"],
+            advance="timer",
+            advance_mode="priority",
+            advance_trigger="daily",
+            advance_fires_at="08:30",
+            pages=[
+                DeckPage(
+                    page_id="unrelated" if gate == "unlisted" else "sleeping",
+                    conditions=[] if gate == "unconditional" else [condition],
+                ),
+                DeckPage(page_id="other"),
+                DeckPage(page_id="sleeping" if gate == "duplicate" else "third"),
+                DeckPage(page_id="fourth"),
+            ],
+        )
+    )
+    pusher = FakePush()
+    # The editor's manual push has left this page on all three displays.
+    if latest_render:
+        pusher.latest = {device: {"page_id": "sleeping"} for device in devices}
+    sched = _sched(
+        tmp_path,
+        ps,
+        pusher,
+        deck_store=decks,
+        deck_nav_store=DeckNavStore(tmp_path / "nav.json"),
+        device_ids_for_page=lambda pid: devices if pid == "sleeping" else [],
+        condition_evaluator=ConditionEvaluator(timezone_provider=lambda: UTC),
+    )
+    now = T0.replace(hour=1 if gate == "open" else 11)
+    sched._page_last_refresh["sleeping"] = (now - timedelta(minutes=1)).timestamp()
+    sched._maybe_refresh_pages(now)
+
+    expected = {"office", "kitchen"} if gate == "closed" else set(devices)
+    assert pusher.pushes == [("sleeping", frozenset(expected), True, "page_refresh")]
 
 
 def test_data_change_refreshes_active_page_and_only_warms_inactive_deck_page(
