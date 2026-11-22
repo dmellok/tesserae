@@ -1112,6 +1112,15 @@ class Scheduler:
             return False
         if page_id is None:
             return True
+        return self._page_conditions_allow(page_id, device_id, now)
+
+    def _page_conditions_allow(self, page_id: str, device_id: str, now: datetime) -> bool:
+        """Whether the enabled automations that name ``page_id`` for
+        ``device_id`` allow it now: a lineup step whose conditions pass, or a
+        schedule that currently resolves to it. A page nothing names for the
+        display is allowed (nothing says otherwise). Pauses and quiet hours
+        are not looked at here; :meth:`automation_page_eligible` adds them.
+        """
         named = False
         for rotation in self._cycle_records():
             if not rotation.enabled or not self._cycle_reaches(rotation, device_id):
@@ -1713,6 +1722,18 @@ class Scheduler:
         determined are simply absent, the refresh pass never guesses."""
         showing: dict[str, set[str]] = {}
         claimed: set[str] = set()
+        held_devices = self._all_held_device_ids(now)
+
+        def ruled_out(page_id: str, device_id: str) -> bool:
+            """A page the display's own automations rule out right now (a
+            lineup step whose conditions fail, with no schedule resolving to
+            it) is not refreshed there, wherever the record of it being on
+            the glass came from. A display on a manual hold keeps its page:
+            someone put it there on purpose. Same rules as a warm-ahead, see
+            :meth:`_page_conditions_allow`."""
+            if device_id in held_devices:
+                return False
+            return not self._page_conditions_allow(page_id, device_id, now)
 
         if self._deck_store is not None and self._deck_nav_store is not None:
             for deck in self._deck_store.all():
@@ -1739,6 +1760,8 @@ class Scheduler:
                                 picked is None or rotation.steps[picked].page_id != page_id
                             ) and device_id not in self._held_device_ids(rotation.id, now):
                                 continue
+                        if ruled_out(page_id, device_id):
+                            continue
                         showing.setdefault(page_id, set()).add(device_id)
 
         if self._device_ids_for_page is not None:
@@ -1796,8 +1819,12 @@ class Scheduler:
                     rec = latest_for(device_id)
                     pid = rec.get("page_id") if isinstance(rec, dict) else None
                     if isinstance(pid, str) and pid:
-                        showing.setdefault(pid, set()).add(device_id)
                         claimed.add(device_id)
+                        # A manual push can leave a page on the glass after
+                        # its lineup conditions fail. That does not authorize
+                        # automatic refreshes of it.
+                        if not ruled_out(pid, device_id):
+                            showing.setdefault(pid, set()).add(device_id)
             # Fallback: a device never rendered yet but bound to exactly one page.
             bound_count: dict[str, int] = {}
             for page in pages:
@@ -1805,7 +1832,11 @@ class Scheduler:
                     bound_count[device_id] = bound_count.get(device_id, 0) + 1
             for page in pages:
                 for device_id in page.device_ids or []:
-                    if device_id in claimed or bound_count.get(device_id, 0) != 1:
+                    if (
+                        device_id in claimed
+                        or bound_count.get(device_id, 0) != 1
+                        or ruled_out(page.id, device_id)
+                    ):
                         continue
                     showing.setdefault(page.id, set()).add(device_id)
                     claimed.add(device_id)
@@ -3168,6 +3199,20 @@ class Scheduler:
             if s.rotation_id == rotation_id
             and s.override_until is not None
             and now < s.override_until
+        }
+
+    def _all_held_device_ids(self, now: datetime) -> set[str]:
+        """Devices inside a manual hold for any rotation."""
+        if self._rotation_state_store is None:
+            return set()
+        try:
+            states = self._rotation_state_store.all()
+        except Exception:
+            return set()
+        return {
+            s.device_id
+            for s in states.values()
+            if s.override_until is not None and now < s.override_until
         }
 
     def _clear_holds(self, rotation_id: str, held: set[str], page_id: str, step_index: int) -> None:
