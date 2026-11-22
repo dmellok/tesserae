@@ -149,10 +149,56 @@ def test_end_at_wrap_around_window() -> None:
         steps=_steps(("a", 60), ("b", 60)),
     )
     assert compute_current_step(r, datetime(2026, 6, 15, 23, 0, tzinfo=UTC), UTC) is not None
-    # 02:00 is "before today's 22:00 anchor", so the same-day path
-    # returns None (we're not in the active window for THIS day's
-    # cycle). Wrap-window semantics still hold for daytime gap:
+    assert compute_current_step(r, datetime(2026, 6, 16, 2, 0, tzinfo=UTC), UTC) is not None
     assert compute_current_step(r, datetime(2026, 6, 15, 12, 0, tzinfo=UTC), UTC) is None
+
+
+def test_end_at_equal_to_anchor_still_runs_until_midnight() -> None:
+    """A saved rotation whose end equals its anchor has always run from the
+    anchor to midnight. Overnight windows must not turn that into never."""
+    r = Rotation(
+        id="r",
+        name="r",
+        anchor="09:00",
+        end_at="09:00",
+        steps=_steps(("a", 60), ("b", 60)),
+    )
+    assert compute_current_step(r, datetime(2026, 6, 15, 8, 59, tzinfo=UTC), UTC) is None
+    for hour, page in ((9, "a"), (10, "b"), (23, "a")):
+        got = compute_current_step(r, datetime(2026, 6, 15, hour, 30, tzinfo=UTC), UTC)
+        assert got is not None and got[1].page_id == page
+    assert compute_current_step(r, datetime(2026, 6, 16, 0, 30, tzinfo=UTC), UTC) is None
+
+
+@pytest.mark.parametrize("end_at", [None, "17:00"])
+def test_a_window_inside_one_day_is_untouched_by_overnight_windows(end_at: str | None) -> None:
+    """No end, or an end after the anchor: dormant before the anchor, running
+    from it, and stopped at the end (or midnight), exactly as before."""
+    r = Rotation(
+        id="r", name="r", anchor="09:00", end_at=end_at, steps=_steps(("a", 60), ("b", 60))
+    )
+    assert compute_current_step(r, datetime(2026, 6, 15, 0, 30, tzinfo=UTC), UTC) is None
+    assert compute_current_step(r, datetime(2026, 6, 15, 8, 59, tzinfo=UTC), UTC) is None
+    got = compute_current_step(r, datetime(2026, 6, 15, 10, 30, tzinfo=UTC), UTC)
+    assert got is not None and got[1].page_id == "b"
+    late = compute_current_step(r, datetime(2026, 6, 15, 17, 0, tzinfo=UTC), UTC)
+    assert (late is None) == (end_at is not None)
+
+
+def test_overnight_window_keeps_running_through_a_clock_change() -> None:
+    """A 22:00 to 06:00 run across the night the clocks go back (Berlin,
+    25 October 2026, 03:00 becomes 02:00): it is running on both passes of
+    the repeated hour and stops at 06:00."""
+    tz = ZoneInfo("Europe/Berlin")
+    r = Rotation(
+        id="r", name="r", anchor="22:00", end_at="06:00", steps=_steps(("a", 60), ("b", 60))
+    )
+    first_pass = datetime(2026, 10, 25, 0, 30, tzinfo=UTC)  # 02:30 CEST
+    second_pass = datetime(2026, 10, 25, 1, 30, tzinfo=UTC)  # 02:30 CET
+    assert compute_current_step(r, first_pass, tz) is not None
+    assert compute_current_step(r, second_pass, tz) is not None
+    assert compute_current_step(r, datetime(2026, 10, 25, 4, 59, tzinfo=UTC), tz) is not None
+    assert compute_current_step(r, datetime(2026, 10, 25, 5, 0, tzinfo=UTC), tz) is None  # 06:00
 
 
 def test_timezone_aware_anchor() -> None:
@@ -938,3 +984,54 @@ def test_store_strips_withdrawn_refresh_minutes_key(tmp_path: Path) -> None:
     (tmp_path / "rot.json").write_text(_json.dumps([{**raw[0], "refresh_minutes": 5}]))
     loaded = RotationStore(tmp_path / "rot.json").all()
     assert [r.id for r in loaded] == ["legacy"]
+
+
+@pytest.mark.parametrize(
+    "day,hour,minute,index",
+    [
+        (18, 23, 0, 1),
+        (19, 0, 30, 1),
+        (19, 3, 58, 1),
+        (19, 3, 59, None),
+        (19, 4, 0, None),
+        (18, 0, 30, None),
+        (20, 0, 30, None),
+    ],
+)
+def test_overnight_rotation_belongs_to_its_start_weekday(
+    day: int, hour: int, minute: int, index: int | None
+) -> None:
+    rotation = Rotation(
+        id="night",
+        name="Night",
+        anchor="08:30",
+        end_at="03:59",
+        days_of_week=[3],
+        steps=_steps(("a", 30), ("b", 60)),
+    )
+    result = compute_current_step(rotation, datetime(2026, 6, day, hour, minute, tzinfo=UTC), UTC)
+    assert (result[0] if result else None) == index
+
+
+def test_manual_step_override_survives_midnight_in_overnight_window(
+    wiring: tuple[Scheduler, MagicMock, RotationStore],
+) -> None:
+    scheduler, _, _ = wiring
+    rotation = Rotation(
+        id="night",
+        name="Night",
+        anchor="08:30",
+        end_at="03:59",
+        days_of_week=[3, 4],
+        steps=_steps(("a", 30), ("b", 60)),
+    )
+    clicked = datetime(2026, 6, 18, 23, 50, tzinfo=UTC)
+    state = scheduler.force_step(rotation, 1, clicked)
+    assert state is not None and state.step_index == 1
+    state = scheduler.compute_step_state(rotation, datetime(2026, 6, 19, 0, 30, tzinfo=UTC))
+    assert state is not None and state.step_index == 1 and state.forced_at == clicked
+    state = scheduler.force_step(rotation, 0, datetime(2026, 6, 19, 0, 40, tzinfo=UTC))
+    assert state is not None and state.step_index == 0
+    assert scheduler.compute_step_state(rotation, datetime(2026, 6, 19, 4, 0, tzinfo=UTC)) is None
+    state = scheduler.compute_step_state(rotation, datetime(2026, 6, 19, 8, 30, tzinfo=UTC))
+    assert state is not None and state.step_index == 0 and state.forced_at is None
