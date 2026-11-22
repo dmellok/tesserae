@@ -1012,6 +1012,23 @@ def test_duplicate_twice_numbers_the_copies(app: Flask) -> None:
     assert len({d.id for d in _decks(app)}) == 3
 
 
+def test_duplicate_of_a_long_name_keeps_its_suffix_within_the_limit(app: Flask) -> None:
+    """The rename field and the editor hold a name to 80 characters: the copy
+    trims the name it was made from, never its own " copy N"."""
+    client = app.test_client()
+    _sign_in(client)
+    original = _door_frame(app)
+    long = ("Door Frame " * 8)[:80]
+    assert len(long) == 80
+    app.config["DECK_STORE"].upsert(original.model_copy(update={"name": long}))
+    client.post("/decks/door_frame/duplicate")
+    client.post("/decks/door_frame/duplicate")
+    names = {d.name for d in _decks(app) if d.id != "door_frame"}
+    assert names == {long[:75] + " copy", long[:73] + " copy 2"}
+    assert all(len(n) == 80 for n in names)
+    assert len({d.id for d in _decks(app)}) == 3
+
+
 def test_duplicate_unknown_lineup_changes_nothing(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)

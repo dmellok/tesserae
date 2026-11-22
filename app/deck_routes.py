@@ -4477,10 +4477,16 @@ def duplicate(deck_id: str) -> Response:
         flash(f"No deck with id {deck_id!r}.", "error")
         return redirect(url_for("decks.index"))
     names = {d.name for d in _store().all()}
-    name = f"{existing.name} copy"
+
+    def named(suffix: str) -> str:
+        # A long name gives up its end, not the suffix: the rename field and
+        # the editor both hold a name to ``_NAME_MAX`` characters.
+        return existing.name[: _NAME_MAX - len(suffix)].rstrip() + suffix
+
+    name = named(" copy")
     i = 2
     while name in names:
-        name = f"{existing.name} copy {i}"
+        name = named(f" copy {i}")
         i += 1
     copy = existing.model_copy(
         deep=True,
