@@ -8,6 +8,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Lineups: a rotation step shows its dashboard's refresh interval beside its position, photo widgets show their order on the item badge, and frames that are always on with no connection of their own (Meural, Samsung The Frame) say Always on.
 - Webpage widget: **Show** can be **An HTML snippet** instead of a web address. Paste embed code, such as a transit operator's departure board (a `<div>` and a `<script src>`), and it runs in the cell without being hosted on a page of your own first. The snippet runs in a sandboxed frame of its own: its scripts load what they need from the web, but they can't reach Tesserae's pages, your sign-in or settings. An embed that needs cookies or local storage still needs a page of its own. Saved cells keep showing their web address. (discussion #8)
 - Export one display from its own page: **Export this display** in the More menu downloads just that display, without its access token. The export form on Settings › Devices gains **Select all** and **Clear all**. (#541)
 - Themes: eight **Flat ink** themes for colour e-ink, in their own group in the theme pickers. Every colour in them is one of the panel's own inks, so backgrounds, cards and fills paint solid with no dither pattern. Poster, Taxi, Signal and Noir use black, white, yellow and red, for 4-colour panels and Spectra 6. Primary, Delft, Canary and Gallery add blue and green, for Spectra 6. On a display with a measured calibration profile applied, yellow and red areas can still pick up a few stray dots; set the cell's dithering to Flat to clear them.
@@ -15,11 +16,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - Gallery's Orientation gains Auto and Match the frame: a dashboard on both portrait and landscape frames shows each frame pictures of its own shape. Widgets get `ctx["frame_shapes"]`.
 - Meural swipes show the next item or dashboard, and thumbnails follow the frame's current artwork.
 - Show Meural and Samsung The Frame exchanges, power commands and skips in the device page Frame log.
+- Lineups: a gear on each dashboard tile and beside each lineup name opens its editor, and the More menu can duplicate a lineup (the copy starts off).
 - Hardware: the Seeed XIAO ePaper EE05 with the 4.26" mono panel (800×480) is in the catalog as `seeed_ee05_426`. It takes the same 48,000-byte mono frame as the reTerminal E1001. The firmware target is `seeed-ee05-426` in tesserae-device-firmware. Not yet tested on real hardware.
 
 ### Fixed
 
 - Lineups: folding a row or display keeps it in place instead of jumping the page (Safari, and near the end of the page), and rows slide open and shut. Phones get bigger dashboard tiles with slimmer arrows.
+- Single-widget dashboards use the dashboard Look controls, while keeping saved cell overrides and Zoom editable.
 - Device page: a button map that fails to save stays in the editor as you typed it, so you can fix the mistake instead of retyping the map. The error is still shown, and the saved map is unchanged. (#588)
 - Device page: a save whose button map fails no longer shows a "saved" message listing sections you didn't touch. If something else on the page changed, the message says it saved everything except the button map; if nothing else changed, only the button map's error shows. (#588)
 - A copy of a display's file in `data/devices/`, such as `kitchen.bak.json` or an editor's `.kitchen.json`, no longer loads as a second display holding the same token. Device ids never contain a dot, so such files are skipped with a note in the server log. (#541)
@@ -57,6 +60,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- Lineups no longer waits for a running push before it loads.
 - Priority lineups follow Home Assistant state changes through a shared event subscription, within about a second. Events for entities no lineup watches cost nothing on disk, and a subscription that cannot connect leaves the regular state polling in charge.
 - Pause the Meural slideshow timer during cloud delivery and restore it on release. If the restore cannot reach Netgear, the device page says to turn gallery rotation back on in the Meural app.
 

@@ -17,7 +17,7 @@ import time
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import pytest
 from flask import Flask
@@ -142,7 +142,11 @@ def test_sleeping_display_with_queued_step() -> None:
 @pytest.mark.parametrize(
     "age, want", [(None, ""), (10, "Checked in just now"), (125, "Checked in 2 min ago")]
 )
-def test_always_on_header_contact_has_a_value(age: int | None, want: str) -> None:
+@pytest.mark.parametrize("powered", [False, True])
+def test_always_on_header_contact_has_a_value(age: int | None, want: str, powered: bool) -> None:
+    """A panel set to stay awake polls, so its check-ins show. A kind that is
+    itself always on (Meural, Samsung The Frame) checks in with nobody: it reads
+    "Always on" while its contact is recent."""
     from app.next_update import MODE_CONNECTED, Reach
 
     displays, dashboards = sample_inputs()
@@ -150,10 +154,11 @@ def test_always_on_header_contact_has_a_value(age: int | None, want: str) -> Non
         displays[0],
         reach=Reach(MODE_CONNECTED),
         heard=True,
+        powered=powered,
         last_seen=SAMPLE_NOW.timestamp() - age if age is not None else None,
     )
     out = build_view([d], dashboards, now=SAMPLE_NOW).displays[0]
-    assert out.link.label == want
+    assert out.link.label == ("Always on" if powered else want)
 
 
 @pytest.mark.parametrize(
@@ -4329,3 +4334,184 @@ def test_reordering_a_rotation_lets_the_scheduler_resend_its_slot(client: Any, a
     assert resp.status_code == 200, resp.get_json()
     assert "morning" not in sched._rotation_last_step
     assert sched._rotation_last_step["night"] == 0
+
+
+@pytest.mark.parametrize(
+    "minutes, label", [(0, ""), (15, "15m"), (120, "2h"), (90, "1h30"), (1, "1m")]
+)
+@pytest.mark.parametrize("priority", [False, True])
+def test_rotation_step_refresh_label(minutes: int, label: str, priority: bool) -> None:
+    displays, dashboards = sample_inputs()
+    d = displays[0]
+    dinner = next(lu for lu in d.lineups if lu.id == "dinner")
+    dinner = replace(dinner, priority_mode=priority)
+    dashboards = dict(dashboards)
+    pid = dinner.steps[0].dashboard_id
+    dashboards[pid] = replace(dashboards[pid], refresh_minutes=minutes)
+    view = build_view([replace(d, lineups=(dinner,))], dashboards, now=SAMPLE_NOW)
+    step = view.displays[0].lineups[0].steps[0]
+    assert step.refresh_label == ("" if priority else label)
+    expected_title = {
+        0: "",
+        1: "Refreshes every 1 min",
+        15: "Refreshes every 15 min",
+        90: "Refreshes every 1 h 30 min",
+        120: "Refreshes every 2 h",
+    }[minutes]
+    assert step.refresh_title == ("" if priority else expected_title)
+    assert step.position == ("1st choice" if priority else "1/6")
+
+
+@pytest.mark.parametrize("powered", [False, True])
+def test_stale_always_on_display_keeps_contact_warning(powered: bool) -> None:
+    from app.next_update import MODE_CONNECTED, Reach
+
+    displays, dashboards = sample_inputs()
+    d = replace(
+        displays[0],
+        reach=Reach(MODE_CONNECTED),
+        heard=False,
+        powered=powered,
+        last_seen=SAMPLE_NOW.timestamp() - 7200,
+    )
+    link = build_view([d], dashboards, now=SAMPLE_NOW).displays[0].link
+    assert link.label == "Checked in 2 h ago"
+    assert "Last contact at" in link.title
+
+
+@pytest.mark.parametrize(
+    "name, default, value, want",
+    [
+        ("mode", "random", None, ("shuffle", "Random order")),
+        ("mode", "random", "sequential", ("list-numbers", "Sequential order")),
+        ("order", "shuffle", None, ("shuffle", "Random order")),
+        ("order", "newest", None, ("sort-descending", "Newest first")),
+        ("sort", "Most Reactions", "Newest", ("sort-descending", "Newest first")),
+        ("sort", "Most Reactions", None, ("sort-descending", "Most reactions first")),
+        ("mode", "memory", None, ("", "")),
+        ("mode", "memory", "albums_tags", ("", "")),
+        ("mode", "random", "unknown", ("", "")),
+    ],
+)
+def test_widget_order_uses_cell_setting_or_manifest_default(
+    app: Flask, name: str, default: str, value: str | None, want: tuple[str, str]
+) -> None:
+    from types import SimpleNamespace
+
+    from app.state.page_store import Cell, Page
+    from app.step_items import step_order
+
+    plugin = SimpleNamespace(
+        manifest={
+            "lineups": {"draw": True},
+            "cell_options": [
+                {
+                    "name": name,
+                    "default": default,
+                    "choices": [{"value": v} for v in {default, value} if v is not None],
+                }
+            ],
+        }
+    )
+    page = Page(
+        id="p",
+        name="Photos",
+        cells=[
+            Cell(
+                id="c",
+                plugin="picture_test",
+                x=0,
+                y=0,
+                w=10,
+                h=10,
+                options={} if value is None else {name: value},
+            )
+        ],
+    )
+    with app.test_request_context():
+        app.config["PLUGIN_REGISTRY"] = {"picture_test": plugin}
+        assert step_order(page) == want
+        assert step_order(page.model_copy(update={"cells": page.cells * 2})) == ("", "")
+        plugin.manifest["cell_options"] = []
+        assert step_order(page) == ("", "")
+
+
+def test_route_passes_gallery_order_and_refresh_to_steps(client: Any, app: Flask) -> None:
+    from app.state.page_store import Cell
+
+    store = app.config["PAGE_STORE"]
+    store.save(
+        store.get("art").model_copy(
+            update={
+                "refresh_minutes": 15,
+                "cells": [
+                    Cell(
+                        id="photos",
+                        plugin="picture_gallery",
+                        x=0,
+                        y=0,
+                        w=10,
+                        h=10,
+                        options={"mode": "sequential"},
+                    )
+                ],
+            }
+        )
+    )
+    data = client.get("/decks/view.json").get_json()
+    step = next(
+        s
+        for d in data["displays"]
+        for lu in d["lineups"]
+        for s in lu["steps"]
+        if lu["id"] == "morning" and s["dashboard_id"] == "art"
+    )
+    assert step["order_icon"] == "list-numbers"
+    assert step["order_title"] == "Sequential order"
+    assert step["refresh_label"] == "15m"
+
+
+@pytest.mark.parametrize("kind", ["interval", "daily", "manual"])
+def test_non_rotation_steps_keep_position_labels(
+    kind: Literal["interval", "daily", "manual"],
+) -> None:
+    displays, dashboards = sample_inputs()
+    d = displays[0]
+    dinner = next(lu for lu in d.lineups if lu.id == "dinner")
+    pid = dinner.steps[0].dashboard_id
+    dashboards = {**dashboards, pid: replace(dashboards[pid], refresh_minutes=15)}
+    view = build_view(
+        [replace(d, lineups=(replace(dinner, kind=kind),))], dashboards, now=SAMPLE_NOW
+    )
+    assert view.displays[0].lineups[0].steps[0].refresh_label == ""
+
+
+@pytest.mark.parametrize("powered", [False, True])
+def test_always_on_never_heard_from_says_nothing(powered: bool) -> None:
+    from app.next_update import MODE_CONNECTED, Reach
+
+    displays, dashboards = sample_inputs()
+    d = replace(
+        displays[0], reach=Reach(MODE_CONNECTED), heard=False, powered=powered, last_seen=None
+    )
+    assert build_view([d], dashboards, now=SAMPLE_NOW).displays[0].link.label == ""
+
+
+def test_route_says_always_on_for_an_always_on_kind_only(
+    client: Any, app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A firmware panel set to stay awake keeps its check-in; only a kind that is
+    itself always on (its manifest says so) reads "Always on"."""
+    import time
+
+    app.config["SETTINGS_STORE"].patch_section("devices", {"panel": {"always_on": True}})
+    monkeypatch.setitem(app.config, "DEVICE_STATUS", {"panel": {"received_at": time.time()}})
+
+    def label() -> str:
+        data = client.get("/decks/view.json").get_json()
+        return str(next(d for d in data["displays"] if d["id"] == "panel")["link"]["label"])
+
+    assert label() == "Checked in just now"
+    device = app.config["DEVICE_REGISTRY"].get("panel")
+    monkeypatch.setitem(device.manifest, "always_on", True)
+    assert label() == "Always on"

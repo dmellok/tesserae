@@ -469,6 +469,44 @@ def step_choices(page: Any, device_id: str | None = None) -> StepItems | None:
     return provider(placement, _item_ctx(page, placement, plugin_id, device_id))
 
 
+_ORDER_LABELS = {
+    "random": ("shuffle", "Random order"),
+    "shuffle": ("shuffle", "Random order"),
+    "sequential": ("list-numbers", "Sequential order"),
+    "in_order": ("list-numbers", "Sequential order"),
+    "newest": ("sort-descending", "Newest first"),
+    "newest_first": ("sort-descending", "Newest first"),
+    "oldest": ("sort-ascending", "Oldest first"),
+    "oldest_first": ("sort-ascending", "Oldest first"),
+    "most reactions": ("sort-descending", "Most reactions first"),
+    "most collected": ("sort-descending", "Most collected first"),
+    "most comments": ("sort-descending", "Most comments first"),
+}
+
+
+def step_order(page: Any) -> tuple[str, str]:
+    """Order icon and title for the one list/draw widget, without fetching items.
+
+    Read only declared options. A source selector such as Immich's memory or
+    albums mode does not describe an order and keeps the existing badge.
+    """
+    placements = _placements(page)
+    if len(placements) != 1:
+        return "", ""
+    plugin_id, _, cell = placements[0]
+    plugin = current_app.config["PLUGIN_REGISTRY"].get(plugin_id)
+    manifest = getattr(plugin, "manifest", None) or {}
+    for option in manifest.get("cell_options", []):
+        name = option.get("name")
+        if name not in ("order", "mode", "sort"):
+            continue
+        value = cell.options.get(name) or option.get("default", "")
+        order = _ORDER_LABELS.get(str(value).lower())
+        if order:
+            return order
+    return "", ""
+
+
 def step_items(page: Any, device_id: str | None = None) -> tuple[int, tuple[ItemInfo, ...]]:
     """``(count, items)`` for the Lineups view: one item unless the dashboard
     walks a list."""

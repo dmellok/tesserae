@@ -78,6 +78,7 @@ from app.step_items import step_draws as _step_draws
 from app.step_items import step_empty as _step_empty
 from app.step_items import step_fit as _step_fit
 from app.step_items import step_items as _step_items
+from app.step_items import step_order as _step_order
 
 bp = Blueprint("decks", __name__, url_prefix="/decks")
 
@@ -1334,6 +1335,7 @@ def _lineup_input(
             edit=url_for("decks.editor", deck_id=deck.id),
             toggle=url_for("decks.toggle", deck_id=deck.id),
             delete=url_for("decks.delete", deck_id=deck.id),
+            duplicate=url_for("decks.duplicate", deck_id=deck.id),
             fire=fire,
             push_step=url_for("decks.push_step", deck_id=deck.id),
             step_item=url_for("decks.step_item", deck_id=deck.id),
@@ -1701,6 +1703,7 @@ def _build_lineups_view(
         w, h = shapes.get(pid, (0, 0))
         bound_ids = tuple(page.device_ids) if page is not None else ()
         draws = _step_draws(page) if page is not None else False
+        order_icon, order_title = _step_order(page) if page is not None else ("", "")
         dashboards[pid] = DashboardInfo(
             id=pid,
             name=page.name if page is not None else pid,
@@ -1717,6 +1720,8 @@ def _build_lineups_view(
             draw_count=_step_draw_count(page) if draws and page is not None else 0,
             item_fit=_step_fit(page) if page is not None else False,
             empty_list=_step_empty(page) if page is not None else False,
+            order_icon=order_icon,
+            order_title=order_title,
             refresh_minutes=int(page.refresh_minutes) if page is not None else 0,
         )
 
@@ -1852,6 +1857,7 @@ def _build_lineups_view(
                 nothing_sent=nothing_sent,
                 last_seen=last_seen,
                 heard=heard,
+                powered=(getattr(d, "manifest", None) or {}).get("always_on") is True,
                 pending=pending,
                 pending_thumb_url=pending_thumb,
                 glass_thumb_url=_glass_thumb(d) if on_pid else "",
@@ -4464,6 +4470,36 @@ def toggle(deck_id: str) -> Response:
     _store().upsert(updated)
     _invalidate(updated)
     return redirect(url_for("decks.index") + f"#deck-{deck_id}")
+
+
+@bp.post("/<deck_id>/duplicate")
+def duplicate(deck_id: str) -> Response:
+    """Copy a lineup as "<name> copy": same dashboards, conditions, timing,
+    days and displays, but switched off so it doesn't fight the original
+    for the same display. Back on the page with the copy highlighted."""
+    existing = _store().get(deck_id)
+    if existing is None:
+        flash(f"No deck with id {deck_id!r}.", "error")
+        return redirect(url_for("decks.index"))
+    names = {d.name for d in _store().all()}
+
+    def named(suffix: str) -> str:
+        # A long name gives up its end, not the suffix: the rename field and
+        # the editor both hold a name to ``_NAME_MAX`` characters.
+        return existing.name[: _NAME_MAX - len(suffix)].rstrip() + suffix
+
+    name = named(" copy")
+    i = 2
+    while name in names:
+        name = named(f" copy {i}")
+        i += 1
+    copy = existing.model_copy(
+        deep=True,
+        update={"id": _unique_id(_slug_from(name)), "name": name, "enabled": False},
+    )
+    _store().upsert(copy)
+    flash(f"Duplicated as {name}. It stays off until you enable it.", "ok")
+    return redirect(url_for("decks.index", hl=copy.id))
 
 
 @bp.post("/<deck_id>/delete")

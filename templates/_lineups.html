@@ -65,6 +65,12 @@
 <button type="button" class="lu-zoom" data-zoom="{{ what }}" aria-haspopup="dialog" aria-label="{{ label }}" title="{{ label }}">{{ ico('zoom') }}</button>
 {%- endmacro %}
 
+{#- The gear beside the zoom icon that opens a step's dashboard in its editor;
+   quiet until the tile is hovered or focused, always there on touch. -#}
+{% macro tile_gear(l, s) -%}
+<a class="lu-tile-gear" href="{{ url_for('pages.edit', page_id=s.dashboard_id) }}" data-gear="step:{{ l.id }}:{{ s.index }}" aria-label="Edit {{ s.name }}" title="Edit {{ s.name }}">{{ ico('gear') }}</a>
+{%- endmacro %}
+
 {% macro im(icon, value, title, cls='') -%}
 <span class="lu-im{% if cls %} {{ cls }}{% endif %}" title="{{ title }}" aria-label="{{ title }}">{{ ico(icon) }}<span>{{ value }}</span></span>
 {%- endmacro %}
@@ -194,6 +200,7 @@
 <details class="lu-more"><summary title="More" aria-label="More actions for {{ l.name }}">{{ ico('dots') }}</summary>
 <div class="lu-more-menu">
 {%- if a.edit_url %}<a href="{{ a.edit_url }}">Edit</a>{% endif -%}
+{%- if a.duplicate_url %}<form method="post" action="{{ a.duplicate_url }}" class="lu-inline"><button type="submit">Duplicate</button></form>{% endif -%}
 {%- if a.export_url %}<a href="{{ a.export_url }}" download>Export</a>{% endif -%}
 {%- if assigned and l.kind == 'manual' and a.play_url %}<form method="post" action="{{ a.play_url }}" class="lu-inline"><input type="hidden" name="dir" value="prev"><button type="submit">Step back</button></form>{% endif -%}
 {%- if assigned and l.kind == 'cycle' and a.fire_url %}<form method="post" action="{{ a.fire_url }}" class="lu-inline"><button type="submit">Push now</button></form>{% endif -%}
@@ -210,14 +217,16 @@
 </span>
 {%- set can_push = d.id and l.actions.push_step_url and not s.missing and not s.off_display -%}
 {%- set can_pick = can_push and (s.pick_items or s.draw_items) and l.actions.step_item_url -%}
-{%- set zoom_html -%}{% if s.thumb_url and not s.missing and not s.off_display %}{{ zoom_btn('step:' ~ l.id ~ ':' ~ s.index, 'Zoom ' ~ s.name) }}{% endif %}{%- endset -%}
+{%- set zoom_html -%}{% if s.thumb_url and not s.missing and not s.off_display %}{{ zoom_btn('step:' ~ l.id ~ ':' ~ s.index, 'Zoom ' ~ s.name) }}{% endif %}{% if not s.missing %}{{ tile_gear(l, s) }}{% endif %}{%- endset -%}
 <span class="lu-tile{% if s.item_count > 1 or s.draw_items or s.stacked %} stacked{% endif %}{% if can_pick %} has-items{% endif %}">{{ thumb(s.name, s.thumb_url, s.aspect, d.orientation if d.orientation else s.orientation, cls='missing' if s.missing else ('offdisplay' if s.off_display else ''), display=d, extra=zoom_html) }}<span class="lu-scrim" aria-hidden="true"></span>
 {%- if can_push %}<form method="post" action="{{ l.actions.push_step_url }}" class="lu-push-form"><input type="hidden" name="index" value="{{ s.index }}"><input type="hidden" name="display_id" value="{{ d.id }}"><input type="hidden" name="page_id" value="{{ s.dashboard_id }}"><input type="hidden" name="composition_digest" value="{{ s.composition_digest or '' }}"><button type="submit" class="lu-push-ov" data-push="{{ l.id }}:{{ s.index }}" title="{{ s.push_title }}" aria-label="{{ s.push_title }}"><i>{{ ico('send') }}</i><span>Push now</span></button></form>{% endif -%}
 {%- if can_pick %}<span class="lu-items" role="group" aria-label="{{ ('Draw another ' ~ s.name ~ ' picture') if s.draw_items else ('Choose which ' ~ s.name ~ ' item to push') }}"><button type="button" class="lu-it" data-item="{{ l.id }}:{{ s.index }}:-1" aria-label="{{ 'Previous picture' if s.draw_items else 'Previous item' }}" title="{{ 'Previous picture' if s.draw_items else 'Previous item' }}"{% if s.draw_items %} disabled{% endif %}>{{ ico('chevl') }}</button><span class="lu-it-pos" aria-hidden="true"></span><button type="button" class="lu-it" data-item="{{ l.id }}:{{ s.index }}:1" aria-label="{{ 'Draw the next picture' if s.draw_items else 'Next item' }}" title="{{ 'Draw the next picture' if s.draw_items else 'Next item' }}">{{ ico('chev') }}</button></span>{% endif -%}
 <span class="lu-pushed-msg" aria-hidden="true"></span>
-{%- if s.draw_items %}<span class="lu-count is-draw" title="{{ ('Draws one of ' ~ s.draw_count ~ ' at random') if s.draw_count > 1 else 'A random one each time it is sent' }}">{{ ('×' ~ s.draw_count) if s.draw_count > 1 else 'random' }}</span>{% elif s.item_count > 1 %}<button type="button" class="lu-count" data-peek="{{ l.id }}:{{ s.index }}" aria-haspopup="dialog" aria-expanded="false" title="{{ s.item_count }} items in this step. Show them">×{{ s.item_count }}</button>{% endif -%}
+{%- set order_icon -%}{% if s.order_icon %}<i class="ph ph-{{ s.order_icon }}" aria-hidden="true"></i>{% endif %}{%- endset -%}
+{%- set draw_title = s.order_title or (('Draws one of ' ~ s.draw_count ~ ' at random') if s.draw_count > 1 else 'A random one each time it is sent') -%}
+{%- if s.draw_items %}<span class="lu-count is-draw" title="{{ draw_title }}" role="img" aria-label="{{ draw_title }}{% if s.order_title and s.draw_count > 1 %}, {{ s.draw_count }} items{% endif %}">{{ order_icon }}{{ ('×' ~ s.draw_count) if s.draw_count > 1 else ('' if s.order_icon else 'random') }}</span>{% elif s.item_count > 1 %}<button type="button" class="lu-count" data-peek="{{ l.id }}:{{ s.index }}" aria-haspopup="dialog" aria-expanded="false" title="{{ (s.order_title ~ '. ') if s.order_title else '' }}{{ s.item_count }} items in this step. Show them">{{ order_icon }}×{{ s.item_count }}</button>{% endif -%}
 </span>
-<figcaption><span class="lu-step-name">{{ s.name }}</span><span class="lu-step-meta">{{ s.position }}{% if s.conditional and not s.cond_label %} <span title="Shows only while its conditions pass">{{ ico('funnel') }}</span>{% endif %}</span>
+<figcaption><span class="lu-step-name">{{ s.name }}</span><span class="lu-step-meta">{{ s.position }}{% if s.refresh_label %}<span class="lu-step-refresh" title="{{ s.refresh_title }}"><i class="ph ph-arrows-clockwise" aria-hidden="true"></i>{{ s.refresh_label }}</span>{% endif %}{% if s.conditional and not s.cond_label %} <span title="Shows only while its conditions pass">{{ ico('funnel') }}</span>{% endif %}</span>
 {%- if s.cond_label %}<span class="lu-cond{% if s.cond_ok == true %} ok{% elif s.cond_ok == false %} no{% endif %}" title="{{ s.cond_title or s.cond_label }}">{{ ico('funnel') }}<span>{{ s.cond_label }}</span></span>
 {%- elif s.fallback %}<span class="lu-cond fb" title="Shows when none of the dashboards before it can">Fallback</span>{% endif %}
 {%- if s.off_display %}<span class="lu-step-off" title="{{ s.off_display_note }}">Not on this display</span>{% if d.id and l.actions.bind_url %}<button type="button" class="lu-bind" data-bind="{{ l.id }}:{{ s.index }}" title="{{ s.off_display_note }}. Bind it to {{ d.name }} too so it can show here.">Bind to {{ d.name }}</button>{% endif %}{% endif -%}
@@ -239,7 +248,7 @@
 <li class="lu-row {{ state_cls }}{% if l.folded and not is_new %} is-folded{% endif %}{% if is_new %} is-new{% endif %}" id="lu-row-{{ uid }}" data-lineup="{{ l.id }}" data-display="{{ d.id }}" data-kind="{{ l.kind }}" data-status="{{ l.status }}">
 <div class="lu-row-head">
 <span class="lu-row-tag"><span class="lu-tag-st {{ tag_cls }}">{% if l.status == 'live' %}<i class="lu-dot pulse"></i>{% endif %}{{ l.status_label }}</span></span>
-<div class="lu-row-title"><span class="lu-row-name"><button type="button" class="lu-name" data-name-edit="{{ l.id }}" title="Rename. Click to edit">{{ l.name }}</button></span><span class="lu-row-meta" title="{{ l.mode_label }}, {{ l.days_text }}">{% if l.window %}{{ day_tiles(l) }}{% endif %}{{ row_chips(l) }}</span>{% for warning in l.warnings %}<span class="lu-row-warning">{{ ico('info') }}{{ warning }}</span>{% endfor %}{% if l.display_removed %}<span class="lu-row-warning">{{ ico('info') }}Display removed</span>{% endif %}</div>
+<div class="lu-row-title"><span class="lu-row-name"><button type="button" class="lu-name" data-name-edit="{{ l.id }}" title="Rename. Click to edit">{{ l.name }}</button>{% if l.actions.edit_url %}<a class="lu-gear lu-row-gear" href="{{ l.actions.edit_url }}" data-gear="lineup:{{ l.id }}" aria-label="Edit {{ l.name }}" title="Edit {{ l.name }}">{{ ico('gear') }}</a>{% endif %}</span><span class="lu-row-meta" title="{{ l.mode_label }}, {{ l.days_text }}">{% if l.window %}{{ day_tiles(l) }}{% endif %}{{ row_chips(l) }}</span>{% for warning in l.warnings %}<span class="lu-row-warning">{{ ico('info') }}{{ warning }}</span>{% endfor %}{% if l.display_removed %}<span class="lu-row-warning">{{ ico('info') }}Display removed</span>{% endif %}</div>
 <div class="lu-row-state">{{ row_state(l) }}</div>
 {{ row_actions(l, d.id) }}
 <button class="lu-fold" type="button" aria-expanded="{{ 'false' if l.folded and not is_new else 'true' }}" aria-controls="lu-body-{{ uid }}" aria-label="{{ l.name }}: show or hide dashboards" data-fold="{{ l.id }}">{{ ico('caret') }}</button>

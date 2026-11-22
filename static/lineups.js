@@ -176,8 +176,14 @@
     (day === vm.now.weekday
       ? ["live", "queued", "waiting", "later_today"].includes(l.status) || !!l.holding
       : !!(l.days && l.days[day]));
+  // The row this page was opened to show (?hl=, say a lineup just duplicated, which
+  // starts off) stays in the Today list for as long as the page is open.
+  const shownId = newId;
   const inScope = (l, d) =>
-    st.scope !== "today" || st.view === "timeline" || runsOn(l, d ? dayOf(d) : vm.now.weekday);
+    st.scope !== "today" ||
+    st.view === "timeline" ||
+    l.id === shownId ||
+    runsOn(l, d ? dayOf(d) : vm.now.weekday);
   function ordered(ls, d) {
     const a = ls.filter((l) => matches(l, d) && inScope(l, d));
     if (st.sort === "name") a.sort((x, y) => x.name.localeCompare(y.name));
@@ -291,6 +297,7 @@
       "data-push",
       "data-peek",
       "data-zoom",
+      "data-gear",
       "data-item",
       "data-win-edit",
       "data-name-edit",
@@ -1417,6 +1424,11 @@
       gamut: d.gamut,
       greyLevels: d.grey_levels,
       nav,
+      // The tile's gear, here too: on touch the lightbox is the way to it.
+      edit: {
+        href: `${window.TESSERAE_URL_PREFIX || ""}/pages/${encodeURIComponent(s.dashboard_id)}`,
+        label: `Edit ${s.name}`,
+      },
       // Push sends the picture shown: not while it is still drawing or failed to.
       push: canPush
         ? {
@@ -1438,6 +1450,7 @@
       ...last,
       nav: null,
       push: null,
+      edit: null,
       loading: false,
       msg: null,
       notice: "This is no longer on the page, so it can no longer be pushed from here.",
