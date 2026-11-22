@@ -920,7 +920,8 @@ def test_day_picker_icon_sits_on_the_track_centre(live: str, width: int, scheme:
                       const btn = sec && sec.querySelector('.lu-today .lu-dp-btn');
                       return !!trk && !!btn && trk.getBoundingClientRect().width > 0
                         && btn.getBoundingClientRect().width > 0
-                        && document.getAnimations().every((a) => a.playState !== 'running');
+                        && document.getAnimations().every((a) => a.playState !== 'running'
+                          || a.effect.getComputedTiming().iterations === Infinity);
                     }""",
                     arg=display,
                 )
