@@ -1193,6 +1193,7 @@
     });
     const hooks = {
       pushOverlay: false,
+      editGear: false,
       zoomBeside: true,
       itemChoice: (_d, _l, vm) => choiceView(vm.dashboard_id),
       stepKey: (vm) => vm.dashboard_id,
