@@ -9,10 +9,68 @@ from types import SimpleNamespace
 
 import jsonschema
 import pytest
-from flask import template_rendered
+from flask import Flask, template_rendered
 
 from app.main import REPO_ROOT, create_app
 from app.state.page_store import Cell, Page
+
+
+@pytest.mark.parametrize("extra", ["none", "empty", "status", "widget"])
+@pytest.mark.parametrize("own", [{}, {"theme": "dark"}, {"style": "mono"}, {"font": "noto_serif"}])
+def test_single_widget_uses_dashboard_look_without_hiding_saved_overrides(
+    app: Flask, extra: str, own: dict[str, str]
+) -> None:
+    cells = [
+        Cell(
+            id="clock",
+            plugin="clock_word",
+            x=0,
+            y=0,
+            w=400,
+            h=480,
+            zoom=1.25,
+            theme=own.get("theme"),
+            style=own.get("style"),
+            font=own.get("font"),
+        )
+    ]
+    if extra != "none":
+        cells.append(
+            Cell(
+                id="other",
+                plugin={"empty": "", "status": "status_bar", "widget": "clock_word"}[extra],
+                x=400,
+                y=0,
+                w=400,
+                h=480,
+            )
+        )
+    app.config["PAGE_STORE"].save(
+        Page(
+            id="single-look",
+            name="Clock",
+            cells=cells,
+            status_bar_enabled=extra == "status",
+            status_bar_cell_id="other" if extra == "status" else None,
+        )
+    )
+    response = app.test_client().get("/pages/single-look")
+    assert response.status_code == 200
+    form = response.text.split('id="ev2-cell-form-clock"', 1)[1].split("</form>", 1)[0]
+    look = re.search(r"<details[^>]*data-ev2-look[^>]*>", form)
+    assert look is not None
+    simplified = extra != "widget" and not own
+    assert ("hidden" in look.group()) == simplified
+    hint = re.search(r"<p[^>]*data-ev2-dashboard-look[^>]*>.*?</p>", form, re.S)
+    assert hint is not None
+    assert ("hidden" in hint.group().split(">", 1)[0]) != simplified
+    assert 'href="#look"' in hint.group()
+    zoom = re.findall(r'<input[^>]*name="zoom"[^>]*>', form)
+    assert len(zoom) == 1
+    assert 'value="1.25"' in zoom[0]
+    # The last details start before Zoom identifies its containing group.
+    starts = re.findall(r'<details[^>]*data-ev2-adv="([^"]+)"', form[: form.index(zoom[0])])
+    assert starts[-1] == ("extras" if simplified else "look")
 
 
 @pytest.fixture
@@ -69,6 +127,22 @@ def test_default_ha_look_options_do_not_warn(app, options):
     assert context["look_overrides"] == []
     assert "hidden" in warning.split(">", 1)[0]
     assert "widget overrides it" not in body
+
+
+def test_independent_widget_keeps_cell_controls_when_dashboard_look_is_hidden(app: Flask) -> None:
+    app.config["PAGE_STORE"].save(
+        Page(
+            id="web-look",
+            name="Web",
+            cells=[Cell(id="web", plugin="webpage", x=0, y=0, w=800, h=480)],
+        )
+    )
+    response = app.test_client().get("/pages/web-look")
+    assert response.status_code == 200
+    look = re.search(r"<details[^>]*data-ev2-look[^>]*>", response.text)
+    hint = re.search(r"<p[^>]*data-ev2-dashboard-look[^>]*>", response.text)
+    assert look is not None and "hidden" not in look.group()
+    assert hint is not None and "hidden" in hint.group()
 
 
 def test_zero_padding_is_an_explicit_resettable_override(app):

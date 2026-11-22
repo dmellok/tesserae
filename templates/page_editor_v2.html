@@ -58,9 +58,12 @@
 {% macro ico(name, cls='') -%}<i class="ph ph-{{ name }} {{ cls }}" aria-hidden="true"></i>{%- endmacro %}
 
 {#- A <select> with optional optgroups (options: dicts with value/label/group). -#}
-{% macro ev2_select(id, name, options, value, blank=None, attrs='') -%}
+{% macro ev2_select(id, name, options, value, blank=None, attrs='', keep_unknown=False) -%}
 <select class="ev2-select" id="{{ id }}" name="{{ name }}" {{ attrs | safe }}>
   {% if blank is not none %}<option value="" {% if not value %}selected{% endif %}>{{ blank }}</option>{% endif %}
+  {% if keep_unknown and value and value not in options | map(attribute='value') | list %}
+  <option value="{{ value }}" selected>{{ value }} (unavailable)</option>
+  {% endif %}
   {% set ns = namespace(group=None) %}
   {% for o in options %}
     {% set g = o.group if o.group is defined else None %}
@@ -163,6 +166,23 @@
 {% endfor %}
 {%- endmacro %}
 
+{% macro cell_zoom(cell) -%}
+{% if cell.plugin == 'ha_dashboard' %}
+<div data-ev2-zoom-field>
+  <input type="hidden" name="zoom" value="{{ cell.zoom }}">
+  <p class="ev2-help">Use Dashboard zoom above to resize Home Assistant cards.</p>
+</div>
+{% else %}
+<div class="ev2-of ev2-of--rng" data-ev2-zoom-field>
+  <label for="ev2-{{ cell.id }}-zoom">Zoom{{ info_pop('Makes text and icons bigger or smaller without changing the cell.') }}</label>
+  <div class="ev2-rng">
+    <input type="range" id="ev2-{{ cell.id }}-zoom" name="zoom" min="0.25" max="2" step="0.05" value="{{ cell.zoom }}" data-ev2-zoom>
+    <span class="ev2-rng-out" data-ev2-zoom-out>{{ '%.2f' | format(cell.zoom) }}×</span>
+  </div>
+</div>
+{% endif %}
+{%- endmacro %}
+
 {#- The widget settings that open in place under a filled row. -#}
 {% macro cell_body(cell, idx, is_bar=False) %}
 {% set plugin = (plugins | selectattr('id', 'equalto', cell.plugin) | list | first) if cell.plugin else None %}
@@ -214,30 +234,26 @@
   </details>
   {% endif %}
 
+  {% set simple_look = false %}
   {% if not is_bar %}
   {% set own = [] %}
   {% if cell.theme %}{% set _ = own.append('theme') %}{% endif %}
   {% if cell.style %}{% set _ = own.append('style') %}{% endif %}
   {% if cell.font %}{% set _ = own.append('font') %}{% endif %}
-  {% set n_look = own | length + (0 if (cell.zoom or 1) == 1 or cell.plugin == 'ha_dashboard' else 1) %}
-  <details class="ev2-adv" data-ev2-look data-ev2-adv="look">
+  {#- Count assigned widgets only, excluding the enabled status bar and empty
+      layout cells. Saved appearance overrides remain editable. If the
+      dashboard Look step is unavailable, keep the cell controls reachable. -#}
+  {% set simple_look = _filled | length == 1 and not own and _look_visible %}
+  {% set n_zoom = 0 if (cell.zoom or 1) == 1 or cell.plugin == 'ha_dashboard' else 1 %}
+  {% set n_look = own | length + (0 if simple_look else n_zoom) %}
+  <p class="ev2-help" data-ev2-dashboard-look {% if not simple_look %}hidden{% endif %}>Use the dashboard's <a class="ev2-link" href="#look">Look below</a>.</p>
+  <details class="ev2-adv" data-ev2-look data-ev2-adv="look" {% if simple_look %}hidden{% endif %}>
     <summary>{{ ico('caret-right', 'ev2-caret') }}<b>Look of this cell</b><span class="{{ 'ovw' if own }}" data-ev2-look-sum data-ev2-adv-sum>{{ (n_look ~ ' changed') if n_look else 'defaults' }}</span></summary>
     <div class="ev2-adv-in"><div class="ev2-opts">
-      <div class="ev2-of ev2-oi--short"><label for="ev2-{{ cell.id }}-theme">Theme</label>{{ ev2_select('ev2-' ~ cell.id ~ '-theme', 'theme', theme_options, cell.theme, 'Use dashboard', 'data-ev2-ov="theme"') }}</div>
-      <div class="ev2-of ev2-oi--short"><label for="ev2-{{ cell.id }}-style">Style</label>{{ ev2_select('ev2-' ~ cell.id ~ '-style', 'style', _cell_styles, cell.style, 'Use dashboard', 'data-ev2-ov="style"') }}</div>
-      <div class="ev2-of ev2-oi--short"><label for="ev2-{{ cell.id }}-font">Font</label>{{ ev2_select('ev2-' ~ cell.id ~ '-font', 'font', _font_options, cell.font, 'Use dashboard', 'data-ev2-ov="font"') }}</div>
-      {% if cell.plugin == 'ha_dashboard' %}
-      <input type="hidden" name="zoom" value="{{ cell.zoom }}">
-      <p class="ev2-help">Use Dashboard zoom above to resize Home Assistant cards.</p>
-      {% else %}
-      <div class="ev2-of ev2-of--rng">
-        <label for="ev2-{{ cell.id }}-zoom">Zoom{{ info_pop('Makes text and icons bigger or smaller without changing the cell.') }}</label>
-        <div class="ev2-rng">
-          <input type="range" id="ev2-{{ cell.id }}-zoom" name="zoom" min="0.25" max="2" step="0.05" value="{{ cell.zoom }}" data-ev2-zoom>
-          <span class="ev2-rng-out" data-ev2-zoom-out>{{ '%.2f' | format(cell.zoom) }}×</span>
-        </div>
-      </div>
-      {% endif %}
+      <div class="ev2-of ev2-oi--short"><label for="ev2-{{ cell.id }}-theme">Theme</label>{{ ev2_select('ev2-' ~ cell.id ~ '-theme', 'theme', theme_options, cell.theme, 'Use dashboard', 'data-ev2-ov="theme"', keep_unknown=True) }}</div>
+      <div class="ev2-of ev2-oi--short"><label for="ev2-{{ cell.id }}-style">Style</label>{{ ev2_select('ev2-' ~ cell.id ~ '-style', 'style', _cell_styles, cell.style, 'Use dashboard', 'data-ev2-ov="style"', keep_unknown=True) }}</div>
+      <div class="ev2-of ev2-oi--short"><label for="ev2-{{ cell.id }}-font">Font</label>{{ ev2_select('ev2-' ~ cell.id ~ '-font', 'font', _font_options, cell.font, 'Use dashboard', 'data-ev2-ov="font"', keep_unknown=True) }}</div>
+      {% if not simple_look %}{{ cell_zoom(cell) }}{% endif %}
     </div></div>
   </details>
   {% else %}
@@ -245,6 +261,7 @@
   {% endif %}
 
   {% set extras = [] %}
+  {% if simple_look and n_zoom %}{% set _ = extras.append('zoom') %}{% endif %}
   {% if cell.update_on_change %}{% set _ = extras.append('refresh on change') %}{% endif %}
   {% if cell.update_schedule %}{% set _ = extras.append('daily refresh') %}{% endif %}
   {% if cell.on_tap or cell.on_swipe or cell.on_slide %}{% set _ = extras.append('touch') %}{% endif %}
@@ -255,6 +272,7 @@
   <details class="ev2-adv" data-ev2-adv="extras">
     <summary>{{ ico('caret-right', 'ev2-caret') }}<b>Refresh, taps and dithering</b><span class="{{ 'ovw' if cell.padding_override is not none }}" data-ev2-adv-sum>{{ (extras | length ~ ' changed') if extras else 'defaults' }}</span></summary>
     <div class="ev2-adv-in"><div class="ev2-opts">
+      {% if simple_look %}{{ cell_zoom(cell) }}{% endif %}
       {#- The refresh switches are one group, like a widget's own. -#}
       {% if plugin.on_change_updates %}<input type="hidden" name="update_on_change_present" value="1">{% endif %}
       {% if plugin.on_schedule_updates %}<input type="hidden" name="update_schedule_present" value="1">{% endif %}

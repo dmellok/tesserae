@@ -122,6 +122,24 @@
       (content.length > 0 &&
         (effects || content.some((li) => !JSON.parse(li.dataset.ev2LookRules || "{}").always)));
     EV2.steps?.setLookVisible(visible);
+    content.forEach((li) => {
+      const cellForm = li.querySelector("[data-ev2-cell-form]");
+      const look = cellForm?.querySelector("[data-ev2-look]");
+      if (!look) return;
+      const own = [...look.querySelectorAll("[data-ev2-ov]")].some((s) => s.value);
+      const simple = visible && content.length === 1 && !own;
+      look.hidden = simple;
+      cellForm.querySelector("[data-ev2-dashboard-look]").hidden = !simple;
+      const zoom = cellForm.querySelector("[data-ev2-zoom-field]");
+      const target = cellForm.querySelector(
+        simple ? '[data-ev2-adv="extras"] .ev2-opts' : "[data-ev2-look] .ev2-opts"
+      );
+      if (zoom && target && zoom.parentElement !== target) {
+        if (simple) target.prepend(zoom);
+        else target.append(zoom);
+        EV2.widgets.refreshSums(cellForm);
+      }
+    });
     const o = overriders();
     refreshSummary();
     if (!box) return;
@@ -232,6 +250,12 @@
       form.querySelector('[name="theme"]')?.focus({ preventScroll: true });
       EV2.announce && EV2.announce("Cell look overrides reset. Widget options kept.");
     }
+  });
+
+  root.addEventListener("click", (ev) => {
+    if (!ev.target.closest("[data-ev2-dashboard-look] a")) return;
+    ev.preventDefault();
+    EV2.steps.open("look", { scroll: true, block: "start", focus: true });
   });
 
   EV2.look = { refreshOverrides, refreshSummary };
