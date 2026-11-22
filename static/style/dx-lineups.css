@@ -2730,6 +2730,11 @@ main.page.lu-page {
   color: var(--lu-acc-fg);
 }
 
+.lu .lu-count .ph {
+  font-size: 12px;
+  vertical-align: -1px;
+}
+
 .lu .lu-count.is-draw {
   cursor: default;
 }
@@ -2890,6 +2895,13 @@ main.page.lu-page {
 }
 .lu .lu-step-meta .lu-ico {
   font-size: 11px;
+}
+/* How often the step's dashboard refreshes, beside its position. */
+.lu .lu-step-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
 }
 .lu .lu-sep {
   align-self: flex-start;

@@ -78,6 +78,7 @@ from app.step_items import step_draws as _step_draws
 from app.step_items import step_empty as _step_empty
 from app.step_items import step_fit as _step_fit
 from app.step_items import step_items as _step_items
+from app.step_items import step_order as _step_order
 
 bp = Blueprint("decks", __name__, url_prefix="/decks")
 
@@ -1709,6 +1710,7 @@ def _build_lineups_view(
         w, h = shapes.get(pid, (0, 0))
         bound_ids = tuple(page.device_ids) if page is not None else ()
         draws = _step_draws(page) if page is not None else False
+        order_icon, order_title = _step_order(page) if page is not None else ("", "")
         dashboards[pid] = DashboardInfo(
             id=pid,
             name=page.name if page is not None else pid,
@@ -1725,6 +1727,8 @@ def _build_lineups_view(
             draw_count=_step_draw_count(page) if draws and page is not None else 0,
             item_fit=_step_fit(page) if page is not None else False,
             empty_list=_step_empty(page) if page is not None else False,
+            order_icon=order_icon,
+            order_title=order_title,
             refresh_minutes=int(page.refresh_minutes) if page is not None else 0,
         )
 
@@ -1860,6 +1864,7 @@ def _build_lineups_view(
                 nothing_sent=nothing_sent,
                 last_seen=last_seen,
                 heard=heard,
+                powered=(getattr(d, "manifest", None) or {}).get("always_on") is True,
                 pending=pending,
                 pending_thumb_url=pending_thumb,
                 glass_thumb_url=_glass_thumb(d) if on_pid else "",

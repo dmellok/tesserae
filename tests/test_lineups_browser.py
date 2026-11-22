@@ -4073,10 +4073,13 @@ def test_draw_next_end_to_end_with_a_real_chromium_render(
         tile.hover()
         prev_btn = tile.locator('[data-item="drawdeck:0:-1"]')
         next_btn = tile.locator('[data-item="drawdeck:0:1"]')
-        # Draw mode: arrows exist, a stack badged "random", "previous" waits for something drawn.
+        # Draw mode: arrows exist, a stack badged with the widget's order (its icon,
+        # or the word "random" when it names none), "previous" waits for something drawn.
         assert next_btn.get_attribute("aria-label") == "Draw the next picture"
         assert prev_btn.is_disabled() and tile.locator(".lu-it-pos").inner_text() == ""
-        assert step.locator(".lu-count").inner_text() == "random"
+        badge = step.locator(".lu-count")
+        assert badge.inner_text() in ("", "random")
+        assert badge.get_attribute("aria-label")
         assert "stacked" in tile.get_attribute("class")
 
         def shown() -> str:
@@ -5277,6 +5280,104 @@ def test_pills_are_never_covered_by_a_stack(live: str) -> None:
         assert page.locator(".lu-step .lu-pill").count() > 0
         assert page.locator(".lu-tile.stacked").count() > 0
         assert page.evaluate(check) == []
+        browser.close()
+
+
+@pytest.mark.parametrize("js", [False, True])
+@pytest.mark.parametrize("width", [1440, 390])
+def test_photo_step_labels_match_on_server_and_redraw(
+    live: str, monkeypatch: pytest.MonkeyPatch, js: bool, width: int
+) -> None:
+    from playwright.sync_api import sync_playwright
+
+    original = _sample_vm
+
+    def sample(cycle: str = "h23") -> dict[str, Any]:
+        vm = original(cycle)
+        d = vm["displays"][0]
+        d["name"] = "Meural frame"
+        d["link"].update(
+            mode="connected", live=False, label="Always on", title="Last contact at 18:12"
+        )
+        dinner = next(lu for lu in d["lineups"] if lu["id"] == "dinner")
+        for step in dinner["steps"]:
+            if step["dashboard_id"] == "art":
+                step.update(
+                    refresh_label="15m",
+                    refresh_title="Refreshes every 15 min",
+                    order_icon="list-numbers",
+                    order_title="Sequential order",
+                )
+            elif step["dashboard_id"] == "family":
+                step.update(
+                    refresh_label="2h",
+                    refresh_title="Refreshes every 2 h",
+                    order_icon="sort-descending",
+                    order_title="Newest first",
+                    item_count=12,
+                )
+            elif step["dashboard_id"] == "comics":
+                step.update(
+                    order_icon="shuffle",
+                    order_title="Random order",
+                    refresh_label="1h30",
+                    refresh_title="Refreshes every 1 h 30 min",
+                )
+        return vm
+
+    monkeypatch.setitem(globals(), "_sample_vm", sample)
+    with sync_playwright() as p:
+        browser, page, _ = _open(p, live, js=js, width=width, pics=True, mobile=width < 500)
+        if js:
+            _open_displays_on_phones(page, ["frame"])
+            page.evaluate("TesseraeLineups.render()")
+        art = page.locator('#lu-row-dinner .lu-step[data-step="1"]')
+        family = page.locator('#lu-row-dinner .lu-step[data-step="2"]')
+        comics = page.locator('#lu-row-dinner .lu-step[data-step="5"]')
+        # The position stays; the dashboard's refresh interval sits beside it.
+        assert art.locator(".lu-step-meta").inner_text().split() == ["2/6", "15m"]
+        refresh = art.locator(".lu-step-meta .lu-step-refresh")
+        assert refresh.inner_text() == "15m"
+        assert refresh.get_attribute("title") == "Refreshes every 15 min"
+        assert refresh.locator(".ph-arrows-clockwise").count() == 1
+        assert family.locator(".lu-step-meta").inner_text().split() == ["3/6", "2h"]
+        assert comics.locator(".lu-step-meta").inner_text().split() == ["6/6", "1h30"]
+        # A step whose dashboard has no refresh of its own shows its position alone.
+        plain = page.locator('#lu-row-dinner .lu-step[data-step="0"] .lu-step-meta')
+        assert plain.inner_text().split() == ["1/6"]
+        assert plain.locator(".lu-step-refresh").count() == 0
+        for tile, icon, title in [
+            (art, "list-numbers", "Sequential order"),
+            (family, "sort-descending", "Newest first"),
+            (comics, "shuffle", "Random order"),
+        ]:
+            assert tile.locator(f".lu-count .ph-{icon}").count() == 1
+            assert title in (tile.locator(".lu-count").get_attribute("title") or "")
+        assert comics.locator(".lu-count").get_attribute("aria-label") == "Random order"
+        assert "Always on" in page.locator('[data-display="frame"] .lu-ds-tags').inner_text()
+        assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+        if js:
+            art.locator("[data-peek]").click()
+            assert page.locator(".lu-peek").is_visible()
+            page.keyboard.press("Escape")
+            assert page._lu_errors == []
+            folder = os.environ.get("LU_LABELS_SHOT_DIR")
+            if folder:
+                if width < 500:
+                    page.set_viewport_size({"width": width, "height": 1200})
+                page.locator("h1").click()
+                page.mouse.move(0, 0)
+                page.evaluate("document.fonts.ready")
+                if width < 500:
+                    page.evaluate("""() => {
+                        const frame = document.querySelector('[data-display="frame"]');
+                        window.scrollTo({top: frame.getBoundingClientRect().top + scrollY - 80, behavior: 'instant'});
+                    }""")
+                page.screenshot(
+                    path=str(Path(folder) / ("phone.png" if width < 500 else "desktop.png")),
+                    full_page=width >= 500,
+                    animations="disabled",
+                )
         browser.close()
 
 
