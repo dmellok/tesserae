@@ -25,6 +25,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- Lineups no longer waits for a running push before it loads.
 - A dashboard's own refresh no longer re-sends it to a display whose lineup rules it out. When a step's conditions fail (and no schedule names the dashboard for that display), its refreshes skip that display until the conditions pass again, whether the lineup or a manual push put it there. A display on a manual hold keeps refreshing.
 - Single-widget dashboards use the dashboard Look controls, while keeping saved cell overrides and Zoom editable.
 - Device page: a button map that fails to save stays in the editor as you typed it, so you can fix the mistake instead of retyping the map. The error is still shown, and the saved map is unchanged. (#588)
@@ -64,7 +65,6 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
-- Lineups no longer waits for a running push before it loads.
 - Priority lineups follow Home Assistant state changes through a shared event subscription, within about a second. Events for entities no lineup watches cost nothing on disk, and a subscription that cannot connect leaves the regular state polling in charge.
 - Pause the Meural slideshow timer during cloud delivery and restore it on release. If the restore cannot reach Netgear, the device page says to turn gallery rotation back on in the Meural app.
 
