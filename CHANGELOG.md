@@ -17,11 +17,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - Gallery's Orientation gains Auto and Match the frame: a dashboard on both portrait and landscape frames shows each frame pictures of its own shape. Widgets get `ctx["frame_shapes"]`.
 - Meural swipes show the next item or dashboard, and thumbnails follow the frame's current artwork.
 - Show Meural and Samsung The Frame exchanges, power commands and skips in the device page Frame log.
+- Lineups: a gear on each dashboard tile and beside each lineup name opens its editor, and the More menu can duplicate a lineup (the copy starts off).
 - Hardware: the Seeed XIAO ePaper EE05 with the 4.26" mono panel (800×480) is in the catalog as `seeed_ee05_426`. It takes the same 48,000-byte mono frame as the reTerminal E1001. The firmware target is `seeed-ee05-426` in tesserae-device-firmware. Not yet tested on real hardware.
 
 ### Fixed
 
+- Single-widget dashboards use the dashboard Look controls, while keeping saved cell overrides and Zoom editable.
 - Device page: a button map that fails to save stays in the editor as you typed it, so you can fix the mistake instead of retyping the map. The error is still shown, and the saved map is unchanged. (#588)
+- Device page: a save whose button map fails no longer shows a "saved" message listing sections you didn't touch. If something else on the page changed, the message says it saved everything except the button map; if nothing else changed, only the button map's error shows. (#588)
 - A copy of a display's file in `data/devices/`, such as `kitchen.bak.json` or an editor's `.kitchen.json`, no longer loads as a second display holding the same token. Device ids never contain a dot, so such files are skipped with a note in the server log. (#541)
 - Clarify Lineups header hierarchy and link dashboard and lineup names to their editors.
 - Fix always-on lineup update timing, daily refresh counts and delivery status.
@@ -57,6 +60,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- Lineups no longer waits for a running push before it loads.
 - Priority lineups follow Home Assistant state changes through a shared event subscription, within about a second. Events for entities no lineup watches cost nothing on disk, and a subscription that cannot connect leaves the regular state polling in charge.
 - Pause the Meural slideshow timer during cloud delivery and restore it on release. If the restore cannot reach Netgear, the device page says to turn gallery rotation back on in the Meural app.
 

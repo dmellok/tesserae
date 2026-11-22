@@ -881,3 +881,82 @@ def test_draw_arrows_say_picture_not_item_and_wait_for_something_drawn(app: Flas
     # Named items keep their wording; a step that is neither gets no arrows.
     assert "Choose which Art item to push" in row and "Previous item" in row
     assert row.count("lu-items") == 2
+
+
+# -- edit shortcuts and Duplicate ---------------------------------------------------
+
+
+def test_each_step_tile_has_a_gear_to_its_dashboard_editor(page: str) -> None:
+    dinner = _row(page, "dinner")
+    gears = re.findall(
+        r'<a class="lu-tile-gear" href="([^"]+)" data-gear="([^"]+)" '
+        r'aria-label="([^"]+)" title="([^"]+)">',
+        dinner,
+    )
+    assert gears[0] == ("/pages/newspaper", "step:dinner:0", "Edit Newspaper", "Edit Newspaper")
+    assert [g[0] for g in gears] == [
+        "/pages/newspaper",
+        "/pages/art",
+        "/pages/family",
+        "/pages/ainews",
+        "/pages/quotes",
+        "/pages/comics",
+    ]
+
+
+def test_tile_gear_sits_in_the_thumbnail_after_the_zoom_icon(app: Flask) -> None:
+    dinner = _row(_render(app, _with_thumbs()), "dinner")
+    # Inside the thumbnail, so it follows the picture's corner like the zoom icon.
+    assert re.search(
+        r'<span class="thumb-frame lu-thumb [^"]*"[^>]*>\s*<img [^>]*>\s*'
+        r'<button type="button" class="lu-zoom" data-zoom="step:dinner:0"[^>]*>.*?</button>'
+        r'<a class="lu-tile-gear" href="/pages/newspaper"',
+        dinner,
+    )
+    # The gear takes the corner; a zoom icon beside it moves inward.
+    assert ".lu .lu-zoom:has(+ .lu-tile-gear) { right: 30px; }" in CSS
+
+
+def test_a_deleted_dashboard_gets_no_gear(app: Flask) -> None:
+    from app.lineups_view import DashboardInfo
+
+    displays, dashboards = sample_inputs()
+    dashboards["art"] = DashboardInfo(id="art", name="art", missing=True)
+    vm = build_view(displays, dashboards, now=SAMPLE_NOW, tz_name="UTC")
+    row = _row(_render(app, vm.to_dict()), "dinner")
+    assert row.count('class="lu-tile-gear"') == 5
+    assert 'href="/pages/art"' not in row
+
+
+def test_lineup_name_has_a_gear_to_its_settings(page: str) -> None:
+    dinner = _row(page, "dinner")
+    m = re.search(r'<span class="lu-row-name">(.*?)</span><span class="lu-row-meta"', dinner, re.S)
+    assert m
+    name = m.group(1)
+    assert name.index('class="lu-name"') < name.index('class="lu-gear lu-row-gear"')
+    assert (
+        '<a class="lu-gear lu-row-gear" href="/decks/dinner/edit" data-gear="lineup:dinner" '
+        'aria-label="Edit Dinner (Mon–Wed)" title="Edit Dinner (Mon–Wed)">'
+    ) in name
+
+
+def test_more_menu_has_duplicate_after_edit_and_delete_last(page: str) -> None:
+    dinner = _row(page, "dinner")
+    menu = re.search(r'<div class="lu-more-menu">(.*?)</div></details>', dinner, re.S)
+    assert menu
+    labels = re.findall(
+        r">(Edit|Duplicate|Export|Step back|Push now|Disable|Enable|Delete)<", menu.group(1)
+    )
+    assert labels[:2] == ["Edit", "Duplicate"]
+    assert labels[-1] == "Delete"
+    assert (
+        '<form method="post" action="/decks/dinner/duplicate" class="lu-inline">'
+        '<button type="submit">Duplicate</button></form>'
+    ) in menu.group(1)
+
+
+def test_edit_shortcut_styles_reveal_on_hover_and_focus() -> None:
+    assert ".lu .lu-row-head:hover .lu-row-gear," in CSS
+    assert ".lu .lu-row-head:focus-within .lu-row-gear" in CSS
+    assert ".lu .lu-tile:hover .lu-tile-gear," in CSS
+    assert ".lu .lu-tile:focus-within .lu-tile-gear" in CSS

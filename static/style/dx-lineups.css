@@ -500,6 +500,30 @@ main.page.lu-page {
   color: var(--t-fg);
   background: color-mix(in oklab, var(--t-fg) 10%, transparent);
 }
+/* The same gear right after a lineup's name, to its editor: shown while the
+   row head is hovered or anything in it has focus. */
+.lu .lu-row-gear {
+  width: 22px;
+  height: 22px;
+  margin: -4px 0 -4px 4px;
+  vertical-align: middle;
+}
+.lu .lu-row-gear .lu-ico {
+  width: 14px;
+  height: 14px;
+}
+.lu .lu-row-head:hover .lu-row-gear,
+.lu .lu-row-head:focus-within .lu-row-gear {
+  opacity: 1;
+}
+/* Renaming: the text field has the line to itself. */
+.lu .lu-name-edit + .lu-row-gear {
+  display: none;
+}
+.lu .lu-row-gear:focus-visible {
+  outline: 2px solid var(--lu-acc);
+  outline-offset: 1px;
+}
 @media (hover: none) {
   .lu .lu-gear {
     opacity: 0.75;
@@ -509,6 +533,9 @@ main.page.lu-page {
   .lu .lu-gear {
     width: 44px;
     height: 44px;
+  }
+  .lu .lu-row-gear {
+    margin: 0;
   }
 }
 .lu .lu-ds-name-row h2 {
@@ -3839,8 +3866,9 @@ main.page.lu-page {
    the remembered choice; lineups.js removes it and filters the rows itself
    (by the day the bar shows, which this rule cannot know). Mirrors the
    default "today" rule: only live and later-today rows stay, so every muted
-   row (finished today, not today, switched off) goes; by-hand rows aside. */
-.lu[data-lu-boot-scope="today"] .lu-row.is-off:not([data-kind="manual"], .is-waiting) {
+   row (finished today, not today, switched off) goes; by-hand rows and the
+   row the page was opened to show (?hl=, .is-new) aside. */
+.lu[data-lu-boot-scope="today"] .lu-row.is-off:not([data-kind="manual"], .is-waiting, .is-new) {
   display: none;
 }
 .lu .lu-scope-empty {
@@ -3887,6 +3915,40 @@ main.page.lu-page {
   opacity: 1;
 }
 .lu .lu-zoom:focus-visible {
+  outline: 2px solid #fffdf8;
+  outline-offset: 1px;
+  box-shadow: 0 0 0 4px var(--lu-acc);
+}
+/* The gear to a step's dashboard editor: the same chip as the zoom icon, in
+   the picture's top right corner, with the zoom icon moved in beside it.
+   Hidden until the tile is hovered or something in it has focus. */
+.lu .lu-tile-gear {
+  position: absolute;
+  z-index: 3;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--lu-r-xs);
+  background: rgba(21, 20, 18, 0.58);
+  color: #fffdf8;
+  font-size: 13px;
+  opacity: 0;
+  transition: opacity 150ms ease-out;
+}
+.lu .lu-zoom:has(+ .lu-tile-gear) {
+  right: 30px;
+}
+.lu .lu-tile-gear:hover {
+  background: rgba(21, 20, 18, 0.82);
+}
+.lu .lu-tile:hover .lu-tile-gear,
+.lu .lu-tile:focus-within .lu-tile-gear {
+  opacity: 1;
+}
+.lu .lu-tile-gear:focus-visible {
   outline: 2px solid #fffdf8;
   outline-offset: 1px;
   box-shadow: 0 0 0 4px var(--lu-acc);
@@ -4101,6 +4163,36 @@ main.page.lu-page {
   align-items: center;
   gap: 8px 12px;
 }
+/* Edit dashboard: a quiet link, first in the footer (links left, buttons right). */
+.lu .lu-lb-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  min-height: 32px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t-fg-soft);
+  text-decoration: none;
+  text-underline-offset: 3px;
+}
+.lu .lu-lb-edit[hidden] {
+  display: none;
+}
+.lu .lu-lb-edit:hover,
+.lu .lu-lb-edit:focus-visible {
+  color: var(--t-fg);
+  text-decoration: underline;
+}
+.lu .lu-lb-edit:focus-visible {
+  outline: 2px solid var(--lu-acc);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.lu .lu-lb-edit .lu-ico {
+  width: 14px;
+  height: 14px;
+}
 .lu .lu-lb-items {
   display: flex;
   align-items: center;
@@ -4174,6 +4266,39 @@ main.page.lu-page {
     padding: 5px;
     border-radius: var(--lu-r-xs);
     background: rgba(21, 20, 18, 0.62);
+  }
+  /* No hover on touch and no room for a second 44px corner on a phone's
+     tile: the gear steps aside, and the lightbox (a tap on the picture)
+     carries Edit dashboard instead. */
+  .lu.is-enhanced .lu-tile-gear {
+    display: none;
+  }
+  .lu .lu-zoom:has(+ .lu-tile-gear) {
+    right: 0;
+  }
+  /* Before the script runs there is no zoom or lightbox: the corner is the gear's. */
+  .lu:not(.is-enhanced) .lu-tile-gear {
+    top: 0;
+    right: 0;
+    width: 44px;
+    height: 44px;
+    background: none;
+    opacity: 0.9;
+  }
+  .lu:not(.is-enhanced) .lu-tile-gear .lu-ico {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    box-sizing: border-box;
+    width: 26px;
+    height: 26px;
+    padding: 5px;
+    border-radius: var(--lu-r-xs);
+    background: rgba(21, 20, 18, 0.62);
+  }
+  .lu .lu-lb-edit {
+    min-height: 44px;
+    padding: 0 4px;
   }
   .lu .lu-items {
     display: none;

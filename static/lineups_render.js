@@ -350,6 +350,8 @@
       : (a.primary === "push" ? a.fire_url : a.play_url) || a.fire_url || a.play_url || "";
     let menu = "";
     if (a.edit_url) menu += `<a href="${esc(a.edit_url)}">Edit</a>`;
+    if (a.duplicate_url)
+      menu += `<form method="post" action="${esc(a.duplicate_url)}" class="lu-inline"><button type="submit">Duplicate</button></form>`;
     if (a.export_url) menu += `<a href="${esc(a.export_url)}" download>Export</a>`;
     if (assigned && l.kind === "manual" && a.play_url)
       menu += `<form method="post" action="${esc(a.play_url)}" class="lu-inline"><input type="hidden" name="dir" value="prev"><button type="submit">Step back</button></form>`;
@@ -371,12 +373,20 @@
     return `<button type="button" class="lu-zoom" data-zoom="${esc(what)}" aria-haspopup="dialog" aria-label="${esc(label)}" title="${esc(label)}">${ico("zoom")}</button>`;
   }
 
+  // The gear beside the zoom icon that opens a step's dashboard in its editor
+  // (macro tile_gear in templates/_lineups.html).
+  function tileGear(l, s) {
+    const label = `Edit ${s.name}`;
+    return `<a class="lu-tile-gear" href="${esc(dashboardUrl(s.dashboard_id))}" data-gear="step:${esc(l.id)}:${s.index}" aria-label="${esc(label)}" title="${esc(label)}">${ico("gear")}</a>`;
+  }
+
   // ``ui.itemChoice(d, l, s)`` is the item the person picked with the arrows on this step
   // (lineups.js), or null: {key, idx, state: "loading" | "ready" | "error" | "busy", thumb_url}.
   // The lineup editor (deck_editor.js) draws its dashboards with this too and adds, all
   // optional: ``ui.stepKey(s)`` (data-step), ``ui.stepClass(s)`` and ``ui.stepAttrs(s)`` on
   // the step, ``ui.tileExtra(s)`` inside the tile, ``ui.captionExtra(s)`` in the caption,
-  // ``ui.pushOverlay === false`` (Push now lives elsewhere; the arrows stay).
+  // ``ui.pushOverlay === false`` (Push now lives elsewhere; the arrows stay),
+  // ``ui.editGear === false`` (no gear to the dashboard's editor on the tile).
   // A tile is a stack with a ×N badge when the dashboard lists more than one item, or a
   // "random" (or ×N) badge when it draws one at random.
   /* A step's conditions in words, the twin of _condition_words / _condition_chip in
@@ -479,6 +489,7 @@
     // full-cover button (the lineup editor) sets ``zoomBeside``: inside the thumbnail the
     // icon shares its stacking layer and ends up under that button.
     const zoomOk = !!s.thumb_url && !s.missing && !s.off_display;
+    const gear = !s.missing && !(ui && ui.editGear === false) ? tileGear(l, s) : "";
     // A conditional step says when it shows, in words (cond_label from the
     // server, or condChip in the editor); the last step of a priority lineup with
     // none is its fallback. "ok" / "no": its conditions pass or fail right now.
@@ -509,7 +520,7 @@
             : "";
     return (
       `<li class="lu-step${cls ? " " + cls : ""}${s.missing ? " is-missing" : ""}${s.off_display ? " is-offdisplay" : ""}${hook("stepClass") ? " " + hook("stepClass") : ""}" data-step="${esc(ui && ui.stepKey ? ui.stepKey(s) : s.index)}"${hook("stepAttrs")}${s.missing ? ' title="This dashboard was deleted; remove it from the lineup"' : s.off_display ? ` title="${esc(s.off_display_note)}"` : ""}><figure><span class="lu-slot">${pill}</span>` +
-      `<span class="lu-tile${stacked ? " stacked" : ""}${canPick ? " has-items" : ""}${choice && choice.state === "loading" ? " is-loading" : ""}${choice && (choice.state === "error" || choice.state === "busy") ? " is-itemfail" : ""}">${thumb(s.name, picked || s.thumb_url, s.aspect, d.orientation || s.orientation, s.missing ? "missing" : s.off_display ? "offdisplay" : "", null, false, d, zoomOk && !(ui && ui.zoomBeside) ? zoomBtn(`step:${l.id}:${s.index}`, `Zoom ${s.name}`) : "")}<span class="lu-scrim" aria-hidden="true"></span>${push}${items}<span class="lu-pushed-msg" aria-hidden="true"></span>${count}${zoomOk && ui && ui.zoomBeside ? zoomBtn(`step:${l.id}:${s.index}`, `Zoom ${s.name}`) : ""}${hook("tileExtra")}</span>` +
+      `<span class="lu-tile${stacked ? " stacked" : ""}${canPick ? " has-items" : ""}${choice && choice.state === "loading" ? " is-loading" : ""}${choice && (choice.state === "error" || choice.state === "busy") ? " is-itemfail" : ""}">${thumb(s.name, picked || s.thumb_url, s.aspect, d.orientation || s.orientation, s.missing ? "missing" : s.off_display ? "offdisplay" : "", null, false, d, (zoomOk && !(ui && ui.zoomBeside) ? zoomBtn(`step:${l.id}:${s.index}`, `Zoom ${s.name}`) : "") + gear)}<span class="lu-scrim" aria-hidden="true"></span>${push}${items}<span class="lu-pushed-msg" aria-hidden="true"></span>${count}${zoomOk && ui && ui.zoomBeside ? zoomBtn(`step:${l.id}:${s.index}`, `Zoom ${s.name}`) : ""}${hook("tileExtra")}</span>` +
       `<figcaption><span class="lu-step-name">${esc(s.name)}</span><span class="lu-step-meta"${s.refresh_label ? ` title="${esc(s.refresh_title)}"` : ""}>${s.refresh_label ? '<i class="ph ph-arrows-clockwise" aria-hidden="true"></i>' : ""}${esc(s.refresh_label || s.position)}${funnel}</span>${cond}${off}${hook("captionExtra")}</figcaption></figure>${sep}</li>`
     );
   }
@@ -547,7 +558,7 @@
     return (
       `<li class="lu-row ${STATE_CLS[l.status] || "is-off"}${folded ? " is-folded" : ""}${isNew ? " is-new" : ""}" id="lu-row-${esc(uid)}" data-lineup="${esc(l.id)}" data-display="${esc(d.id)}" data-kind="${esc(l.kind)}" data-status="${esc(l.status)}">` +
       `<div class="lu-row-head"><span class="lu-row-tag"><span class="lu-tag-st ${TAG_CLS[l.status] || "off"}">${l.status === "live" ? '<i class="lu-dot pulse"></i>' : ""}${esc(l.status_label)}</span></span>` +
-      `<div class="lu-row-title"><span class="lu-row-name"><button type="button" class="lu-name" data-name-edit="${esc(l.id)}" title="Rename. Click to edit">${esc(l.name)}</button>${edot}</span><span class="lu-row-meta" title="${esc(l.mode_label)}, ${esc(l.days_text)}">${meta}</span>${(l.warnings || []).map((w) => `<span class="lu-row-warning">${ico("info")}${esc(w)}</span>`).join("")}${l.display_removed ? `<span class="lu-row-warning">${ico("info")}Display removed</span>` : ""}${rowErr ? `<span class="lu-row-err" role="alert">${ico("info")}${esc(rowErr)}</span>` : ""}</div>` +
+      `<div class="lu-row-title"><span class="lu-row-name"><button type="button" class="lu-name" data-name-edit="${esc(l.id)}" title="Rename. Click to edit">${esc(l.name)}</button>${l.actions.edit_url ? `<a class="lu-gear lu-row-gear" href="${esc(l.actions.edit_url)}" data-gear="lineup:${esc(l.id)}" aria-label="Edit ${esc(l.name)}" title="Edit ${esc(l.name)}">${ico("gear")}</a>` : ""}${edot}</span><span class="lu-row-meta" title="${esc(l.mode_label)}, ${esc(l.days_text)}">${meta}</span>${(l.warnings || []).map((w) => `<span class="lu-row-warning">${ico("info")}${esc(w)}</span>`).join("")}${l.display_removed ? `<span class="lu-row-warning">${ico("info")}Display removed</span>` : ""}${rowErr ? `<span class="lu-row-err" role="alert">${ico("info")}${esc(rowErr)}</span>` : ""}</div>` +
       `<div class="lu-row-state">${rowState(l)}</div>${rowActions(l, d.id)}` +
       `<button class="lu-fold" type="button" aria-expanded="${folded ? "false" : "true"}" aria-controls="lu-body-${esc(uid)}" aria-label="${esc(l.name)}: show or hide dashboards" data-fold="${esc(l.id)}">${ico("caret")}</button></div>` +
       `<div class="lu-row-body" id="lu-body-${esc(uid)}">${l.off_why ? `<span class="lu-off-why" title="${esc(l.off_why.title)}">${ico("info")}${esc(l.off_why.label)}</span>` : ""}<div class="lu-strip-scroll" tabindex="0" role="region" aria-label="Dashboards in ${esc(l.name)}; scrolls sideways"><ol class="lu-strip${l.status === "live" ? " has-now" : ""} ${d.orientation || "l"}">${l.steps.map((s) => stepHtml(d, l, s, ui)).join("")}</ol></div></div></li>`

@@ -17,6 +17,7 @@
 //                         data-gamut treatment as every Lineups thumbnail)
 //   nav                   {text, label, prev?, next?, hasPrev?, hasNext?}; draws previous / next
 //   push                  {label, title, busy, disabled}; draws the Push button
+//   edit                  {href, label}; draws the Edit dashboard link, left of the rest
 //   msg                   {text, kind: "ok" | "queued" | "err"}
 //   onStep(delta), onPush(), onClose()
 (function () {
@@ -50,6 +51,7 @@
       `<span class="lu-lb-load" data-lb-load hidden role="status"><i class="lu-lb-spin" aria-hidden="true"></i><span>Drawing this one</span></span></div>` +
       `<p class="lu-lb-note" data-lb-note role="status" hidden></p>` +
       `<footer class="lu-lb-foot" data-lb-foot>` +
+      `<a class="lu-lb-edit" data-lb-edit hidden>${ico("gear")}<span>Edit dashboard</span></a>` +
       `<div class="lu-lb-items" role="group" aria-label="Choose an item" data-lb-nav hidden>` +
       `<button type="button" class="lu-ibtn lu-lb-step" data-lb-step="-1" aria-label="Previous item" title="Previous item (Left arrow)">${ico("chevl")}</button>` +
       `<span class="lu-lb-pos" data-lb-pos aria-live="polite"></span>` +
@@ -130,10 +132,17 @@
       push.disabled = !!(m.push.busy || m.push.disabled);
       push.setAttribute("aria-busy", m.push.busy ? "true" : "false");
     }
+    const edit = $("[data-lb-edit]");
+    edit.hidden = !m.edit;
+    if (m.edit) {
+      edit.href = m.edit.href;
+      edit.setAttribute("aria-label", m.edit.label);
+      edit.title = m.edit.label;
+    } else edit.removeAttribute("href");
     const msg = $("[data-lb-msg]");
     msg.textContent = (m.msg && m.msg.text) || "";
     msg.className = `lu-lb-msg${m.msg ? " " + m.msg.kind : ""}`;
-    $("[data-lb-foot]").hidden = !m.nav && !m.push;
+    $("[data-lb-foot]").hidden = !m.nav && !m.push && !m.edit;
   }
 
   function onKey(e) {
