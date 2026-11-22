@@ -911,6 +911,19 @@ def test_day_picker_icon_sits_on_the_track_centre(live: str, width: int, scheme:
         for display in ("frame", "kitchen"):
             sec = page.locator(f'.lu-ds[data-display="{display}"]')
             for _ in range(2):  # open, then folded
+                # A slide or a redraw can still be settling on a slow runner: wait until
+                # the bar and the picker are laid out before measuring them.
+                page.wait_for_function(
+                    """(d) => {
+                      const sec = document.querySelector(`.lu-ds[data-display="${d}"]`);
+                      const trk = sec && sec.querySelector('.lu-today .lu-trk');
+                      const btn = sec && sec.querySelector('.lu-today .lu-dp-btn');
+                      return !!trk && !!btn && trk.getBoundingClientRect().width > 0
+                        && btn.getBoundingClientRect().width > 0
+                        && document.getAnimations().every((a) => a.playState !== 'running');
+                    }""",
+                    arg=display,
+                )
                 got = sec.evaluate(probe)
                 assert abs(got["btn"]["y"] - got["trk"]["y"]) <= 1, (display, got)
                 gap = got["btn"]["l"] - got["trk"]["r"]
