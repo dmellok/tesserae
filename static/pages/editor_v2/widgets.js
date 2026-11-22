@@ -154,7 +154,11 @@
       const form = li.querySelector("[data-ev2-cell-form]");
       form.querySelector("[data-ev2-plugin]").value = "";
       EV2.saveForm(form)
-        .then(() => EV2.reload({ cell: null }))
+        .then(() => refreshRow(id))
+        .then(() => {
+          closeAll();
+          rowFor(id).querySelector("[data-ev2-row]")?.focus();
+        })
         .catch(() => {});
       return;
     }
@@ -308,6 +312,7 @@
           Object.values(touch).some(Boolean),
           pad,
           on("[data-ev2-dither-on]"),
+          Math.abs(Number(d.querySelector("[data-ev2-zoom]")?.value || 1) - 1) > 1e-6,
         ].filter(Boolean).length;
         ovw = pad;
       }

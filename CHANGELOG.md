@@ -20,7 +20,9 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- Single-widget dashboards use the dashboard Look controls, while keeping saved cell overrides and Zoom editable.
 - Device page: a button map that fails to save stays in the editor as you typed it, so you can fix the mistake instead of retyping the map. The error is still shown, and the saved map is unchanged. (#588)
+- Device page: a save whose button map fails no longer shows a "saved" message listing sections you didn't touch. If something else on the page changed, the message says it saved everything except the button map; if nothing else changed, only the button map's error shows. (#588)
 - A copy of a display's file in `data/devices/`, such as `kitchen.bak.json` or an editor's `.kitchen.json`, no longer loads as a second display holding the same token. Device ids never contain a dot, so such files are skipped with a note in the server log. (#541)
 - Clarify Lineups header hierarchy and link dashboard and lineup names to their editors.
 - Fix always-on lineup update timing, daily refresh counts and delivery status.
@@ -56,6 +58,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- Lineups no longer waits for a running push before it loads.
 - Priority lineups follow Home Assistant state changes through a shared event subscription, within about a second. Events for entities no lineup watches cost nothing on disk, and a subscription that cannot connect leaves the regular state polling in charge.
 - Pause the Meural slideshow timer during cloud delivery and restore it on release. If the restore cannot reach Netgear, the device page says to turn gallery rotation back on in the Meural app.
 
