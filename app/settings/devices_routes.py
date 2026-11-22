@@ -1482,6 +1482,12 @@ def devices_update_combined(instance_id: str) -> Response:
     store = settings_store()
     ok_messages: list[str] = []
     any_change = False
+    # Several sections below report "saved" on every submit, whether or
+    # not their values moved. That's fine on its own, but next to a
+    # rejected button map it reads as though the map went in too (#588),
+    # so a failed map compares the stored state instead.
+    before_save = _device_save_snapshot(store, devices_registry, instance_id)
+    bm_rejected = False
 
     # 0. Display name. Input is only present for instances; the field is
     # bounded at 64 chars in the template, but we trim + cap here too so a
@@ -1789,6 +1795,7 @@ def devices_update_combined(instance_id: str) -> Response:
         if bm_error is not None:
             flash(f"{device.name} button map: {bm_error}", "error")
             keep_button_map_draft(device.id, raw)
+            bm_rejected = True
         else:
             existing = ((store.get_section("devices") or {}).get(instance_id) or {}).get(
                 "button_map"
@@ -1927,9 +1934,35 @@ def devices_update_combined(instance_id: str) -> Response:
             publisher = current_app.config.get("RELAY_PUBLISHER")
             if publisher is not None:
                 publisher.on_config_change(instance_id)
-    if ok_messages:
+    if bm_rejected:
+        # The error flashed above says what's wrong with the map. Only
+        # claim a save when something else really changed; a list of
+        # untouched sections marked "saved" is what made #588 confusing.
+        if _device_save_snapshot(store, devices_registry, instance_id) != before_save:
+            flash(f"{device.name}: saved, except the button map, which has an error.", "ok")
+    elif ok_messages:
         flash(f"{device.name}: {', '.join(ok_messages)}.", "ok")
     return redirect_to
+
+
+def _device_save_snapshot(store: Any, devices_registry: Any, instance_id: str) -> str:
+    """What a device save can change, serialised for a before/after
+    comparison: the instance manifest (name, panel, quiet hours, battery
+    offset, locale), its ``settings.devices`` entry (config, button map,
+    delivery, wake alignment) and its renderer clones' picture quality."""
+    dev = devices_registry.get(instance_id)
+    renderer_section = store.get_section("renderers") or {}
+    return json.dumps(
+        {
+            "manifest": dev.manifest if dev is not None else None,
+            "device": (store.get_section("devices") or {}).get(instance_id),
+            "renderers": {
+                k: v for k, v in renderer_section.items() if k.endswith(f"__{instance_id}")
+            },
+        },
+        sort_keys=True,
+        default=str,
+    )
 
 
 # -- delete + calibrate ------------------------------------------------

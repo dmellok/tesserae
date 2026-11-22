@@ -62,7 +62,7 @@ ALLOWED_BLOCKS = [
     "p.ev2-wsub",
     "p.ev2-note",
     "div.ev2-opts:not(.ev2-opts--tail)",
-    "details.ev2-adv",
+    "details.ev2-adv, p[data-ev2-dashboard-look]",
     "div.ev2-cv-foot",
 ]
 

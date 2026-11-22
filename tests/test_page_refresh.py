@@ -323,6 +323,128 @@ def test_refresh_fallback_respects_lineup_step_conditions(
     assert pusher.pushes == [("sleeping", frozenset(expected), True, "page_refresh")]
 
 
+def _night_only_lineup(tmp_path: Path, *, mode: str = "priority") -> DeckStore:
+    """A lineup on ``door`` whose ``sleeping`` step only passes 00:00-03:00."""
+    decks = DeckStore(tmp_path / "decks.json")
+    decks.upsert(
+        Deck(
+            id="door_lineup",
+            name="Door lineup",
+            device_ids=["door"],
+            advance="timer",
+            advance_mode=mode,
+            advance_trigger="daily",
+            advance_fires_at="08:30",
+            pages=[
+                DeckPage(
+                    page_id="sleeping",
+                    conditions=[
+                        Condition(
+                            source_kind="time_window",
+                            operator="in",
+                            value={"start_local": "00:00", "end_local": "03:00"},
+                        )
+                    ],
+                ),
+                DeckPage(page_id="other"),
+            ],
+        )
+    )
+    return decks
+
+
+def _night_only_sched(
+    tmp_path: Path, pusher: FakePush, decks: DeckStore, nav: DeckNavStore, **kw: Any
+) -> Scheduler:
+    devices = ["door", "office"]
+    ps = _pages(
+        tmp_path,
+        Page(id="sleeping", name="Sleeping", device_ids=devices, refresh_minutes=1),
+        Page(id="other", name="Other", device_ids=devices),
+    )
+    pusher.latest = {device: {"page_id": "sleeping"} for device in devices}
+    return _sched(
+        tmp_path,
+        ps,
+        pusher,
+        deck_store=decks,
+        deck_nav_store=nav,
+        device_ids_for_page=lambda pid: devices if pid == "sleeping" else [],
+        condition_evaluator=ConditionEvaluator(timezone_provider=lambda: UTC),
+        **kw,
+    )
+
+
+def _refresh_sleeping(sched: Scheduler, now: datetime) -> None:
+    sched._page_last_refresh["sleeping"] = (now - timedelta(minutes=1)).timestamp()
+    sched._maybe_refresh_pages(now)
+
+
+def test_refresh_skips_a_ruled_out_page_the_lineup_itself_put_there(tmp_path: Path) -> None:
+    """The lineup's own nav record is treated like a manual push: once the
+    step's conditions fail, the page is not refreshed on that display."""
+    pusher = FakePush()
+    nav = DeckNavStore(tmp_path / "nav.json")
+    nav.set("door", "door_lineup", "sleeping")
+    sched = _night_only_sched(tmp_path, pusher, _night_only_lineup(tmp_path, mode="scheduled"), nav)
+
+    _refresh_sleeping(sched, T0.replace(hour=11))
+    assert pusher.pushes == [("sleeping", frozenset({"office"}), True, "page_refresh")]
+
+    pusher.pushes.clear()
+    _refresh_sleeping(sched, T0.replace(hour=1))
+    assert pusher.pushes == [("sleeping", frozenset({"door", "office"}), True, "page_refresh")]
+
+
+def test_refresh_keeps_a_ruled_out_page_on_a_display_held_by_hand(tmp_path: Path) -> None:
+    """A display inside a manual hold keeps refreshing the page someone put
+    there, even while the lineup's conditions rule it out."""
+
+    @dataclass
+    class Held:
+        device_id: str = "door"
+        rotation_id: str = "door_lineup"
+        step_index: int = 0
+        override_until: datetime = T0 + timedelta(days=1)
+
+    class States:
+        def all(self) -> dict[str, Held]:
+            return {"door": Held()}
+
+    pusher = FakePush()
+    sched = _night_only_sched(
+        tmp_path,
+        pusher,
+        _night_only_lineup(tmp_path),
+        DeckNavStore(tmp_path / "nav.json"),
+        rotation_state_store=States(),
+    )
+    _refresh_sleeping(sched, T0.replace(hour=11))
+    assert pusher.pushes == [("sleeping", frozenset({"door", "office"}), True, "page_refresh")]
+
+
+def test_refresh_keeps_a_page_a_schedule_names_for_the_display(tmp_path: Path) -> None:
+    """A schedule that names the page for the display makes it eligible, so
+    a failing lineup step on the same display does not stop its refreshes."""
+    from app.state.schedule_model import Schedule
+
+    pusher = FakePush()
+    sched = _night_only_sched(
+        tmp_path, pusher, _night_only_lineup(tmp_path), DeckNavStore(tmp_path / "nav.json")
+    )
+    sched._store.upsert(
+        Schedule(
+            id="evening",
+            name="evening",
+            page_id="sleeping",
+            type="daily",
+            fires_at=datetime(2026, 6, 16, 18, 0, tzinfo=UTC),
+        )
+    )
+    _refresh_sleeping(sched, T0.replace(hour=11))
+    assert pusher.pushes == [("sleeping", frozenset({"door", "office"}), True, "page_refresh")]
+
+
 def test_data_change_refreshes_active_page_and_only_warms_inactive_deck_page(
     tmp_path: Path,
 ) -> None:
