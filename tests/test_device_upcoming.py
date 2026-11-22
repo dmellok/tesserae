@@ -580,3 +580,31 @@ def test_a_display_quiet_all_day_gets_no_home_return_at_all() -> None:
         )
     )
     assert events == []
+
+
+def test_overnight_cycle_projects_next_morning_on_start_day_mask() -> None:
+    now = datetime(2026, 8, 18, 0, 30, tzinfo=UTC)  # Tuesday, Monday's run
+    rotation = _cycle(anchor="08:30", end_at="03:59", days_of_week=[0])
+    events = project_upcoming(
+        _inputs(
+            now=now,
+            through=now.replace(hour=4),
+            cycles=[
+                CycleRecord(
+                    rotation=rotation,
+                    last_step=0,
+                    last_pushed_at=now.timestamp(),
+                    last_window_start=now.timestamp(),
+                )
+            ],
+        ),
+        limit=10,
+    )
+    assert [e.scheduled_at.strftime("%H:%M") for e in events] == [
+        "01:00",
+        "01:30",
+        "02:00",
+        "02:30",
+        "03:00",
+        "03:30",
+    ]
