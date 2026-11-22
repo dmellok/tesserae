@@ -2386,15 +2386,9 @@ main.page.lu-page {
 .lu .lu-row.is-folded .lu-row-body {
   display: none;
 }
-.lu .lu-row.just-opened:not(.is-folded) .lu-row-body,
-.lu .lu-ds.just-opened .lu-sched {
-  animation: lu-reveal 200ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-@keyframes lu-reveal {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
+/* Folded, but still sliding shut (lineups.js slide()). */
+.lu .lu-row.is-folded.is-closing .lu-row-body {
+  display: block;
 }
 @container lu-ds (max-width: 560px) {
   .lu .lu-row-body {
@@ -3446,10 +3440,6 @@ main.page.lu-page {
   .lu .lu-push-ov,
   .lu .lu-push-mini {
     transition: none;
-  }
-  .lu .lu-row.just-opened .lu-row-body,
-  .lu .lu-ds.just-opened .lu-sched {
-    animation: none;
   }
 }
 

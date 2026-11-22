@@ -382,6 +382,154 @@
     }
   }
 
+  /* --------------------------------------------------- keep the view still */
+  // Folding a row, collapsing a display, Fold all and the auto-refresh keep one
+  // header where it was on screen. Safari jumps when the cards are redrawn
+  // (the auto-refresh, a display opening), and any browser jumps when a
+  // collapse near the end leaves the page too short to stay where it was: a
+  // spacer under the cards (.lu-hold) takes up that slack and shrinks back as
+  // the person scrolls up. Search, the filters and the view switch redraw too,
+  // but they change what is listed: the page keeps its own scroll there.
+  let pinned = null; // the header to keep still through the next redraw
+  const hold = document.createElement("div");
+  hold.className = "lu-hold";
+  hold.setAttribute("aria-hidden", "true");
+  hold.hidden = true;
+  host.after(hold);
+  let holdPx = 0;
+  function setHold(px) {
+    // Safari scrolls the page up if the spacer shrinks in the same layout as the
+    // cards change: lay out what has changed so far first.
+    void document.documentElement.scrollHeight;
+    holdPx = Math.max(0, Math.round(px));
+    hold.style.height = `${holdPx}px`;
+    hold.hidden = !holdPx;
+  }
+  const slackBelow = () =>
+    document.documentElement.scrollHeight - window.innerHeight - window.scrollY;
+  let heldUntil = 0;
+  let heldT = null;
+  // Room for the page to lose ``px`` of height without the browser scrolling it
+  // up. A page at its top cannot jump: no spacer there, where it would only
+  // leave a gap above the footer.
+  function roomToLose(px) {
+    if (window.scrollY <= 0) return;
+    const short = px - slackBelow();
+    if (short > 0) setHold(holdPx + short);
+    // The room is spoken for until the slide has shut: a scroll event that was
+    // already on its way must not hand it back first.
+    heldUntil = performance.now() + 400;
+    clearTimeout(heldT);
+    heldT = setTimeout(trimHold, 420);
+  }
+  // Room to scroll ``px`` further down. Twice: a page shorter than the window
+  // reports the window's height, so the first measure can fall short.
+  function roomToScroll(px) {
+    for (let i = 0; i < 2; i++) {
+      const short = px - slackBelow();
+      if (short > 0) setHold(holdPx + short);
+    }
+  }
+  // Give back whatever of the spacer is no longer holding the page up: all of
+  // it once the page is back at its top.
+  function trimHold() {
+    if (!holdPx || performance.now() < heldUntil) return;
+    if (window.scrollY <= 0) return setHold(0);
+    const slack = slackBelow();
+    if (slack > 0) setHold(holdPx - slack);
+  }
+  window.addEventListener("scroll", trimHold, { passive: true });
+  // A selector that finds the same header after a redraw.
+  function anchorSel(el) {
+    if (!host.contains(el)) return null;
+    const row = el.closest(".lu-row");
+    if (row && row.id) return `#${CSS.escape(row.id)} > .lu-row-head`;
+    const ds = el.closest(".lu-ds");
+    if (ds) return `.lu-ds[data-display="${CSS.escape(ds.dataset.display || "")}"] .lu-ds-hdr`;
+    return null;
+  }
+  // The first row or display header in view.
+  function viewAnchor() {
+    for (const el of host.querySelectorAll(".lu-row-head, .lu-ds-hdr")) {
+      if (!el.getClientRects().length) continue;
+      const r = el.getBoundingClientRect();
+      if (r.bottom > 0 && r.top < window.innerHeight) return el;
+    }
+    return null;
+  }
+  // Run ``change`` and scroll back by however far ``el`` (or its redrawn self) moved.
+  function keepStill(el, change) {
+    if (!el || !el.isConnected) return change();
+    const sel = anchorSel(el);
+    const top = el.getBoundingClientRect().top;
+    // A page that gets too short mid-change is scrolled up by the browser, and
+    // the engines differ on when that shows (Chromium takes it back if the page
+    // grows again within the same task). So it never gets too short: spare
+    // room for losing every card goes under them first, and what was not
+    // needed comes straight back out.
+    const spare = window.scrollY > 0 ? Math.ceil(host.getBoundingClientRect().height) : 0;
+    if (spare) setHold(holdPx + spare);
+    const out = change();
+    const now = (sel && host.querySelector(sel)) || (el.isConnected ? el : null);
+    if (now && now.getClientRects().length) {
+      const d = now.getBoundingClientRect().top - top;
+      if (d >= 1) roomToScroll(d);
+      if (Math.abs(d) >= 1) window.scrollBy({ top: d, behavior: "instant" });
+    }
+    if (spare) setHold(holdPx - Math.min(spare, Math.max(0, slackBelow())));
+    return out;
+  }
+
+  // Opening or closing a body: its height and opacity, about 200ms, ease-out;
+  // nothing under reduced motion. ``done`` runs when it has finished (at once
+  // without motion); a newer slide on the same body cancels this one.
+  function slide(el, open, done) {
+    if (!el) {
+      if (done) done();
+      return;
+    }
+    el.getAnimations().forEach((a) => a.cancel());
+    if (reduceMotion() || typeof el.animate !== "function") {
+      if (done) done();
+      return;
+    }
+    // Shutting ends, and opening starts, with the page shorter by all that this
+    // body adds to it: room for that first, so the browser never scrolls it up.
+    // (Measured with spare room under the cards, or measuring it would itself
+    // make the page too short.)
+    const full = host.getBoundingClientRect().height;
+    const spare = window.scrollY > 0 ? Math.ceil(full) : 0;
+    if (spare) setHold(holdPx + spare);
+    el.style.display = "none";
+    const without = host.getBoundingClientRect().height;
+    el.style.display = "";
+    if (spare) setHold(holdPx - spare);
+    roomToLose(full - without);
+    const cs = getComputedStyle(el);
+    const shown = {
+      height: `${el.getBoundingClientRect().height}px`,
+      paddingTop: cs.paddingTop,
+      paddingBottom: cs.paddingBottom,
+      opacity: 1,
+    };
+    const gone = { height: "0px", paddingTop: "0px", paddingBottom: "0px", opacity: 0 };
+    el.style.overflow = "hidden";
+    el.style.boxSizing = "border-box";
+    const a = el.animate(open ? [gone, shown] : [shown, gone], {
+      duration: open ? 200 : 170,
+      easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+    });
+    const tidy = () => {
+      el.style.overflow = "";
+      el.style.boxSizing = "";
+    };
+    a.onfinish = () => {
+      tidy();
+      if (done) done();
+    };
+    a.oncancel = tidy;
+  }
+
   let hasRendered = false;
 
   let lastRO = null;
@@ -433,7 +581,10 @@
     if (!vm.displays.length && !orphans.length) {
       html = host.innerHTML; // the server's empty state
     }
-    replaceCards(html);
+    // Keep the header a toggle or the auto-refresh pinned where it was.
+    const anchor = pinned;
+    pinned = null;
+    keepStill(anchor, () => replaceCards(html));
     markSteps();
     followColdThumbs();
     lastRO = barReadOnly();
@@ -2103,16 +2254,24 @@
   }
 
   /* ------------------------------------------------------------ clicks */
+  // A row's header stays put while its dashboards slide open or shut.
   function toggleRow(btn) {
     const id = btn.dataset.fold;
     const row = btn.closest(".lu-row");
+    const head = row.querySelector(".lu-row-head");
+    const body = row.querySelector(".lu-row-body");
     const fold = !row.classList.contains("is-folded");
     foldChoice[id] = fold;
     saveFolds();
-    row.classList.toggle("is-folded", fold);
-    row.classList.toggle("just-opened", !fold);
     btn.setAttribute("aria-expanded", String(!fold));
-    if (!fold) {
+    if (fold) {
+      // Shown until it has slid shut; room under the page so nothing scrolls up meanwhile.
+      // A folded header can be a different height: settle that first.
+      keepStill(head, () => row.classList.add("is-folded", "is-closing"));
+      slide(body, false, () => keepStill(head, () => row.classList.remove("is-closing")));
+    } else {
+      keepStill(head, () => row.classList.remove("is-folded", "is-closing"));
+      slide(body, true, trimHold);
       const sc = row.querySelector(".lu-strip-scroll");
       if (sc) {
         scrollToNow(sc);
@@ -2239,6 +2398,7 @@
       toggleRow(t);
     } else if (t.matches("[data-fold-all]")) {
       const fold = ds.mode === "fold";
+      pinned = t;
       vm.displays.forEach((d) => {
         setCollapsed(d.id, fold);
         d.lineups.forEach((l) => {
@@ -2256,13 +2416,36 @@
       (ds.showDisplay !== undefined && t.matches("[data-show-display]"))
     ) {
       const id = ds.collapse !== undefined ? ds.collapse : ds.showDisplay;
-      setCollapsed(id, !isCollapsed(id));
+      const shut = !isCollapsed(id);
+      setCollapsed(id, shut);
       saveCollapsed();
-      render();
-      const sec = host.querySelector(`.lu-ds[data-display="${CSS.escape(id)}"]`);
-      if (sec && !isCollapsed(id)) sec.classList.add("just-opened");
-      const b = host.querySelector(`[data-collapse="${CSS.escape(id)}"]`);
-      if (b) b.focus({ preventScroll: true });
+      const q = `.lu-ds[data-display="${CSS.escape(id)}"]`;
+      const sec = host.querySelector(q);
+      const bodyOf = (x) => x && x.querySelector(":scope > .lu-ds-card > .lu-ds-body");
+      // The header stays put: closing slides the lineups shut, then redraws;
+      // opening redraws, then slides them open.
+      const done = () => {
+        pinned = sec && sec.querySelector(".lu-ds-hdr");
+        render();
+        if (!shut) slide(bodyOf(host.querySelector(q)), true, trimHold);
+        const b = host.querySelector(`[data-collapse="${CSS.escape(id)}"]`);
+        if (b) b.focus({ preventScroll: true });
+      };
+      const body = bodyOf(sec);
+      if (shut && body && !body.hidden) {
+        // Shut at once for anyone asking (class, chevrons); the redraw follows the slide.
+        keepStill(sec.querySelector(".lu-ds-hdr"), () => {
+          sec.classList.add("is-collapsed");
+          sec
+            .querySelectorAll("[data-collapse], [data-show-display]")
+            .forEach((b) => b.setAttribute("aria-expanded", "false"));
+        });
+        // The cards may be redrawn before the slide ends (a second press that
+        // opens it again, Fold all, the auto-refresh): that drew this display as
+        // it now is, and a late redraw here would cut that slide short and take
+        // the focus back.
+        slide(body, false, () => sec.isConnected && done());
+      } else done();
     } else if (ds.dpClose !== undefined && t.matches("[data-dp-close]")) {
       const b = root.querySelector('.lu-dp-btn[aria-expanded="true"]');
       closeDayPop();
@@ -2497,6 +2680,7 @@
         refreshDirty = true;
       } else if (next && Array.isArray(next.displays)) {
         vm = next;
+        pinned = viewAnchor(); // the first header in view stays where it is
         R.setTimeCycle(vm.time_cycle);
         // Drop edits for lineups that no longer exist.
         Object.keys(st.pending).forEach((did) => {

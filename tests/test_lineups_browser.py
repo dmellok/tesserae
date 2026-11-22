@@ -815,6 +815,7 @@ def test_rows_and_displays_fold_and_remember(live: str) -> None:
         page.locator("#lu-row-dinner .lu-row-name").click()
         assert "is-folded" in dinner.get_attribute("class")
         assert page.locator('[data-fold="dinner"]').get_attribute("aria-expanded") == "false"
+        _settle(page)  # it slides shut
         assert not page.locator("#lu-body-dinner").is_visible()
         # Folded, the live row still names what is on screen.
         assert page.locator("#lu-row-dinner .lu-hs-now").inner_text().strip() == "Family"
@@ -828,6 +829,7 @@ def test_rows_and_displays_fold_and_remember(live: str) -> None:
         assert "is-collapsed" in sec.get_attribute("class")
         assert sec.locator(".lu-ds-hdr h2").is_visible()
         assert sec.locator(".lu-today .lu-trk").is_visible()
+        _settle(page)  # it slides shut
         assert not sec.locator(".lu-ds-body").is_visible()
         assert page.locator('[data-collapse="kitchen"]').evaluate(
             "b => b === document.activeElement"
@@ -872,6 +874,7 @@ def test_collapsed_display_keeps_its_day_bar(live: str) -> None:
         assert sec.locator(".lu-today .lu-trk").is_visible()
         assert sec.locator(".lu-today .lu-scale").is_visible()
         assert sec.locator(".lu-dp-btn").is_visible()
+        _settle(page)  # it slides shut
         assert not sec.locator(".lu-ds-body").is_visible()
         assert not sec.locator(".lu-row").first.is_visible()
         # Still there after a reload (the fold is remembered), and after opening.
@@ -908,6 +911,20 @@ def test_day_picker_icon_sits_on_the_track_centre(live: str, width: int, scheme:
         for display in ("frame", "kitchen"):
             sec = page.locator(f'.lu-ds[data-display="{display}"]')
             for _ in range(2):  # open, then folded
+                # A slide or a redraw can still be settling on a slow runner: wait until
+                # the bar and the picker are laid out before measuring them.
+                page.wait_for_function(
+                    """(d) => {
+                      const sec = document.querySelector(`.lu-ds[data-display="${d}"]`);
+                      const trk = sec && sec.querySelector('.lu-today .lu-trk');
+                      const btn = sec && sec.querySelector('.lu-today .lu-dp-btn');
+                      return !!trk && !!btn && trk.getBoundingClientRect().width > 0
+                        && btn.getBoundingClientRect().width > 0
+                        && document.getAnimations().every((a) => a.playState !== 'running'
+                          || a.effect.getComputedTiming().iterations === Infinity);
+                    }""",
+                    arg=display,
+                )
                 got = sec.evaluate(probe)
                 assert abs(got["btn"]["y"] - got["trk"]["y"]) <= 1, (display, got)
                 gap = got["btn"]["l"] - got["trk"]["r"]
@@ -5546,4 +5563,285 @@ def test_scope_today_keeps_the_highlighted_row_in_view(live: str) -> None:
         assert "weekend" in _rows(page)
         assert "breakfast" not in _rows(page)
         assert page.locator("#lu-row-weekend").is_visible()
+        browser.close()
+
+
+# -- toggles keep the row in place and slide ---------------------------------------
+
+_SLIDES = (
+    "document.getAnimations().filter((a) => a.effect && a.effect.target"
+    " && a.effect.target.matches('.lu-row-body, .lu-ds-body'))"
+)
+
+
+def _settle(page: Any) -> None:
+    page.evaluate(f"() => Promise.all({_SLIDES}.map((a) => a.finished.catch(() => null)))")
+
+
+def _top(page: Any, sel: str) -> float:
+    return float(page.evaluate("(s) => document.querySelector(s).getBoundingClientRect().top", sel))
+
+
+def _put(page: Any, sel: str, y: int) -> None:
+    """Scroll so ``sel`` sits ``y`` px from the top, or as close as the page allows."""
+    page.evaluate(
+        "([s, y]) => window.scrollBy({top: document.querySelector(s).getBoundingClientRect().top - y,"
+        " behavior: 'instant'})",
+        [sel, y],
+    )
+
+
+def _press(page: Any, sel: str) -> None:
+    page.locator(sel).evaluate("(e) => e.click()")
+
+
+def _check_toggles_stay_put(page: Any) -> list[str]:
+    """Fold and unfold rows (one at the very end of the page, where a collapse
+    leaves the page too short), collapse and open a display, and an auto-refresh
+    whose redraw scrolls the page away as Safari does: each time the header that
+    was toggled (or the one in view) stays where it was."""
+    moved = []
+    for rid in ("dinner", "breakfast", "kitchen"):
+        head = f"#lu-row-{rid} > .lu-row-head"
+        for _ in range(2):
+            _put(page, head, 300)
+            before = _top(page, head)
+            _press(page, f"{head} .lu-fold")
+            _settle(page)
+            after = _top(page, head)
+            if abs(after - before) > 1:
+                moved.append(f"row {rid}: {before:.0f} -> {after:.0f}")
+    for did in ("frame", "kitchen"):
+        hdr = f'.lu-ds[data-display="{did}"] .lu-ds-hdr'
+        for _ in range(2):
+            _put(page, hdr, 200)
+            before = _top(page, hdr)
+            _press(page, f'[data-collapse="{did}"]')
+            _settle(page)
+            after = _top(page, hdr)
+            if abs(after - before) > 1:
+                moved.append(f"display {did}: {before:.0f} -> {after:.0f}")
+    # An auto-refresh whose redraw throws the page back to the top (WebKit does
+    # this when the cards are replaced): the first header in view is put back.
+    head = "#lu-row-kitchen > .lu-row-head"
+    _put(page, head, 250)
+    before = _top(page, head)
+    page.evaluate(_JUMPY_REDRAW % "await TesseraeLineups.refresh();")
+    after = _top(page, head)
+    if abs(after - before) > 1:
+        moved.append(f"refresh: {before:.0f} -> {after:.0f}")
+    return moved
+
+
+# Runs its body with a redraw that leaves the page scrolled to 83px, as WebKit's does.
+_JUMPY_REDRAW = """async () => {
+  const host = document.querySelector('[data-lu-displays]');
+  const orig = host.replaceChildren.bind(host);
+  host.replaceChildren = (...a) => { orig(...a); window.scrollTo({top: 83, behavior: 'instant'}); };
+  try { %s } finally { delete host.replaceChildren; }
+}"""
+
+
+@pytest.mark.parametrize("device", ["iPhone 13", "Pixel 7", ""])
+def test_toggles_keep_the_row_where_it_was(live: str, device: str) -> None:
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        if device:
+            browser, page, _ = _open_device(p, live, device, pics=True)
+        else:
+            browser, page, _ = _open(p, live, pics=True)
+        assert _check_toggles_stay_put(page) == []
+        # Fold all keeps its own button still.
+        fa = "[data-fold-all]"
+        if page.locator(fa).is_visible():
+            before = _top(page, fa)
+            _press(page, fa)
+            _settle(page)
+            assert abs(_top(page, fa) - before) <= 1
+        assert page._lu_errors == []
+        browser.close()
+
+
+@pytest.mark.parametrize("device", ["iPhone 13", ""])
+def test_toggles_keep_the_row_where_it_was_in_webkit(live: str, device: str) -> None:
+    """Safari is where the page jumped (replacing the cards scrolls it); run the
+    same checks in WebKit, at a phone's size and a desktop's, when Playwright's
+    WebKit is installed."""
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        if not Path(p.webkit.executable_path).exists():
+            pytest.skip("Playwright WebKit not installed")
+        browser = p.webkit.launch()
+        shape = p.devices[device] if device else {"viewport": {"width": 1440, "height": 900}}
+        ctx = browser.new_context(**shape)
+        page = ctx.new_page()
+        errors: list[str] = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        _Api(pics=True).install(page)
+        page.goto(live + PAGE + "?pics=1", wait_until="load")
+        page.wait_for_selector(".lu.is-enhanced")
+        assert _check_toggles_stay_put(page) == []
+        assert errors == []
+        browser.close()
+
+
+def test_rows_and_displays_slide_open_and_shut(live: str) -> None:
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser, page, _ = _open(p, live, pics=True)
+        # Nothing slides on first paint.
+        assert page.evaluate(f"() => {_SLIDES}.length") == 0
+        body = page.locator("#lu-row-breakfast > .lu-row-body")
+        _press(page, '#lu-row-breakfast [data-fold="breakfast"]')
+        info = page.evaluate(
+            f"""() => {_SLIDES}.map((a) => {{
+              const k = a.effect.getKeyframes(), t = a.effect.getTiming();
+              return {{dur: t.duration, easing: t.easing, from: k[0], to: k[k.length - 1]}};
+            }})"""
+        )
+        assert len(info) == 1 and 150 <= info[0]["dur"] <= 220
+        assert float(info[0]["from"]["opacity"]) == 0 and float(info[0]["to"]["opacity"]) == 1
+        assert info[0]["from"]["height"] == "0px" and info[0]["to"]["height"] != "0px"
+        assert "cubic-bezier" in info[0]["easing"]
+        _settle(page)
+        assert body.is_visible() and body.evaluate("(e) => e.style.overflow") == ""
+        # Shutting: still on screen while it slides, gone after.
+        _press(page, '#lu-row-breakfast [data-fold="breakfast"]')
+        assert "is-closing" in (page.locator("#lu-row-breakfast").get_attribute("class") or "")
+        assert body.is_visible()
+        assert page.evaluate(f"() => {_SLIDES}[0].effect.getKeyframes().pop().height") == "0px"
+        _settle(page)
+        assert not body.is_visible()
+        assert page.locator('[data-fold="breakfast"]').get_attribute("aria-expanded") == "false"
+        # A display: shuts with a slide, then opens with one.
+        _press(page, '[data-collapse="kitchen"]')
+        assert page.evaluate(f"() => {_SLIDES}.length") == 1
+        _settle(page)
+        assert not page.locator("#lu-dsb-kitchen").is_visible()
+        _press(page, '[data-collapse="kitchen"]')
+        assert page.evaluate(f"() => {_SLIDES}.length") == 1
+        _settle(page)
+        assert page.locator("#lu-dsb-kitchen").is_visible()
+        assert page._lu_errors == []
+        browser.close()
+
+
+def test_no_slides_under_reduced_motion(live: str) -> None:
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser, page, _ = _open(p, live, pics=True)
+        page.emulate_media(reduced_motion="reduce")
+        _press(page, '#lu-row-breakfast [data-fold="breakfast"]')
+        assert page.evaluate(f"() => {_SLIDES}.length") == 0
+        assert page.locator("#lu-row-breakfast > .lu-row-body").is_visible()
+        _press(page, '#lu-row-breakfast [data-fold="breakfast"]')
+        assert page.evaluate(f"() => {_SLIDES}.length") == 0
+        assert not page.locator("#lu-row-breakfast > .lu-row-body").is_visible()
+        _press(page, '[data-collapse="kitchen"]')
+        assert page.evaluate(f"() => {_SLIDES}.length") == 0
+        assert not page.locator("#lu-dsb-kitchen").is_visible()
+        browser.close()
+
+
+def test_only_toggles_and_the_auto_refresh_hold_the_scroll(live: str) -> None:
+    """Search, the filters and the view switch change what is listed: their
+    redraw leaves the page's scroll alone, as it always did."""
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser, page, _ = _open(p, live, pics=True)
+        _put(page, "#lu-row-kitchen > .lu-row-head", 250)
+        assert page.evaluate("scrollY") > 83
+        # Any other redraw (what search, a filter or the view switch calls).
+        page.evaluate(_JUMPY_REDRAW % "TesseraeLineups.render();")
+        assert page.evaluate("scrollY") == 83
+        # Typing in search redraws without pinning a header either.
+        _put(page, "#lu-row-kitchen > .lu-row-head", 250)
+        before = page.evaluate("scrollY")
+        page.evaluate(
+            _JUMPY_REDRAW
+            % """const q = document.querySelector('[data-lu-q]');
+                 q.value = 'e'; q.dispatchEvent(new Event('input', {bubbles: true}));
+                 await new Promise((r) => setTimeout(r, 400));"""
+        )
+        assert before > 83 and page.evaluate("scrollY") == 83
+        assert page._lu_errors == []
+        browser.close()
+
+
+def test_folding_at_the_top_of_a_short_page_leaves_no_gap(live: str) -> None:
+    """The spacer only ever holds up a page that is scrolled: at its top nothing
+    can jump, so nothing is added between the cards and the footer."""
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser, page, _ = _open(p, live, pics=True)
+        page.set_viewport_size({"width": 1440, "height": 6000})
+        assert page.evaluate("scrollY") == 0
+        assert page.evaluate("document.documentElement.scrollHeight <= innerHeight")
+        hold = page.locator(".lu-hold")
+        for sel in (
+            '#lu-row-kitchen [data-fold="kitchen"]',
+            '[data-collapse="kitchen"]',
+            '[data-collapse="frame"]',
+        ):
+            _press(page, sel)
+            _settle(page)
+            assert hold.is_hidden() and hold.evaluate("(e) => e.offsetHeight") == 0, sel
+        # Scrolled down a page that does scroll, it still does its job: the last
+        # row folds without the page jumping, and the spacer goes once the page
+        # is back at its top.
+        page.set_viewport_size({"width": 1440, "height": 700})
+        for sel in ('[data-collapse="frame"]', '[data-collapse="kitchen"]'):
+            _press(page, sel)
+            _settle(page)
+        head = "#lu-row-kitchen > .lu-row-head"
+        if "is-folded" in (page.locator("#lu-row-kitchen").get_attribute("class") or ""):
+            _press(page, f"{head} .lu-fold")
+            _settle(page)
+        _put(page, head, 300)
+        assert page.evaluate("scrollY") > 0
+        before = _top(page, head)
+        _press(page, f"{head} .lu-fold")
+        _settle(page)
+        assert abs(_top(page, head) - before) <= 1
+        assert hold.evaluate("(e) => e.offsetHeight") > 0
+        page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
+        page.wait_for_function("document.querySelector('.lu-hold').hidden")
+        assert page._lu_errors == []
+        browser.close()
+
+
+def test_a_second_press_while_a_display_slides_shut_is_not_undone(live: str) -> None:
+    """Shut, then open again before the slide has finished: the first press's
+    redraw must not arrive late, cut the opening slide short and take focus."""
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser, page, _ = _open(p, live, pics=True)
+        page.evaluate(
+            """() => {
+              const host = document.querySelector('[data-lu-displays]');
+              const orig = host.replaceChildren.bind(host);
+              window.__redraws = 0;
+              host.replaceChildren = (...a) => { window.__redraws += 1; orig(...a); };
+              document.querySelector('[data-collapse="kitchen"]').click();
+              document.querySelector('[data-collapse="kitchen"]').click();
+              document.querySelector('[data-lu-q]').focus();
+            }"""
+        )
+        assert page.evaluate(f"() => {_SLIDES}.length") == 1  # sliding open
+        page.wait_for_timeout(500)  # well past the 170ms shut slide
+        _settle(page)
+        assert page.evaluate("window.__redraws") == 1
+        assert page.locator("#lu-dsb-kitchen").is_visible()
+        assert "is-collapsed" not in (
+            page.locator('.lu-ds[data-display="kitchen"]').get_attribute("class") or ""
+        )
+        assert page.evaluate("document.activeElement.matches('[data-lu-q]')")
+        assert page._lu_errors == []
         browser.close()
