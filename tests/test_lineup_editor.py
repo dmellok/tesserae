@@ -649,6 +649,46 @@ def test_an_interval_past_midnight_can_take_a_second_dashboard(app: Flask) -> No
     )
 
 
+def test_an_overnight_interval_on_some_days_cannot_take_a_second_dashboard(app: Flask) -> None:
+    """Monday-only 22:00 to 02:00 as an interval is Monday 00:00-02:00 and
+    22:00-24:00. As a rotation it would be Monday 22:00 to Tuesday 02:00, so
+    the change is refused instead of moving the early hours to Tuesday."""
+    _deck(
+        app, advance="timer", advance_trigger="interval", advance_window_start="22:00",
+        advance_window_end="02:00", advance_days_of_week=[0],
+    )  # fmt: skip
+    got = _save(app, pages="a,b").get_json()
+    assert got["ok"] is False and "midnight" in got["error"]
+    deck = _stored(app)
+    assert deck.page_ids == ["a"] and deck.advance_trigger == "interval"
+
+
+def test_an_overnight_rotation_on_some_days_cannot_drop_to_one_dashboard(app: Flask) -> None:
+    _deck(
+        app, advance="timer", advance_trigger="cycle", advance_anchor="22:00",
+        advance_end_at="02:00", advance_days_of_week=[0],
+        pages=[DeckPage(page_id="a"), DeckPage(page_id="b")],
+    )  # fmt: skip
+    got = _save(app, pages="a").get_json()
+    assert got["ok"] is False and "midnight" in got["error"]
+    deck = _stored(app)
+    assert deck.page_ids == ["a", "b"] and deck.advance_trigger == "cycle"
+
+
+def test_an_overnight_rotation_on_every_day_can_drop_to_one_dashboard(app: Flask) -> None:
+    _deck(
+        app, advance="timer", advance_trigger="cycle", advance_anchor="22:00",
+        advance_end_at="02:00", pages=[DeckPage(page_id="a"), DeckPage(page_id="b")],
+    )  # fmt: skip
+    assert _save(app, pages="a").get_json()["ok"] is True
+    deck = _stored(app)
+    assert (deck.advance_trigger, deck.advance_window_start, deck.advance_window_end) == (
+        "interval",
+        "22:00",
+        "02:00",
+    )
+
+
 # -- review fixes: stale and deleted saves -------------------------------------------
 
 

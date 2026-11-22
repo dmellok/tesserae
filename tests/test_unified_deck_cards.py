@@ -686,6 +686,14 @@ def test_cycle_fires_walk_the_days_dwell_grid() -> None:
         end_at="06:00",
     )
     assert len(_cycle_fires_on(late, day)) == 16
+    # An end equal to the anchor is no end: anchor to midnight, as before.
+    same = late.model_copy(update={"end_at": "22:00"})
+    assert [f.strftime("%H:%M") for f in _cycle_fires_on(same, day)] == [
+        "22:00",
+        "22:30",
+        "23:00",
+        "23:30",
+    ]
     monday_only = late.model_copy(update={"days_of_week": [day.weekday()]})
     assert len(_cycle_fires_on(monday_only, day)) == 4
     assert len(_cycle_fires_on(monday_only, day + timedelta(days=1))) == 12

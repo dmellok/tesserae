@@ -1137,7 +1137,9 @@ def window_minutes(lineup: LineupInput) -> tuple[int, int] | None:
     if lineup.kind == "cycle":
         s = parse_hhmm(lineup.start) or 0
         e = parse_hhmm(lineup.end)
-        if e is None:
+        # An end equal to the start is no end: the engine runs such a cycle
+        # from its anchor to midnight (``scheduler._compute_step_state``).
+        if e is None or e == s:
             e = DAY_MIN
         return (s, e + DAY_MIN if e < s else e)
     s0 = parse_hhmm(lineup.start)
@@ -1576,7 +1578,11 @@ def window_label(lineup: LineupInput) -> str:
     s, e = win
     if lineup.kind == "daily":
         return f"at {clock(s)}"
-    return clock_range(s, e) + (" next day" if lineup.kind == "cycle" and e > DAY_MIN else "")
+    if e > DAY_MIN:
+        # A cycle's hours after midnight belong to the day it started on; an
+        # interval's belong to each of its own days.
+        return clock_range(s, e) + (" next day" if lineup.kind == "cycle" else " overnight")
+    return clock_range(s, e)
 
 
 def _overlap(a: _Block, b: _Block) -> bool:

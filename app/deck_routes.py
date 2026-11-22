@@ -738,6 +738,9 @@ def _cycle_fires_on(rotation: Any, day_start: datetime) -> list[datetime]:
             end = run_day.replace(hour=eh, minute=em, second=0, microsecond=0)
             if end < start:
                 end += timedelta(days=1)
+            elif end == start:
+                # No end at all, as the engine reads it: anchor to midnight.
+                end = run_day + timedelta(days=1)
         if end <= day_start:
             continue
         end = min(end, day_end)
@@ -3854,11 +3857,26 @@ def _reshape_window(deck: Deck) -> Deck:
     saved as: several take turns (a cycle, from the window's start to its
     end), one is sent again and again (an interval). An interval only ever
     sends its first dashboard, so one given more dashboards would never show
-    them. Both shapes allow a window that runs past midnight."""
+    them. Both shapes allow a window that runs past midnight, but they read
+    its weekdays differently: an interval judges each day on its own clock
+    (Monday-only 22:00 to 06:00 is Monday 00:00-06:00 and 22:00-24:00), a
+    cycle belongs to the day it starts (Monday 22:00 to Tuesday 06:00). With
+    every day ticked the two are the same hours. With only some, changing
+    shape would move the early-morning hours to another weekday, so that one
+    change is refused (``_EditError``)."""
     if deck.advance == "manual":
         return deck
+    partial_days = set(deck.advance_days_of_week) != set(range(7))
     if deck.advance_trigger == "interval" and len(deck.pages) > 1:
         s, e = deck.advance_window_start, deck.advance_window_end
+        if partial_days and s and e and (parse_hhmm(e) or 0) < (parse_hhmm(s) or 0):
+            raise _EditError(
+                "Several dashboards can't run past midnight on only some days: "
+                "the hours after midnight would move to the next day. "
+                "End it by 24:00 or run it every day.",
+                400,
+                deck.id,
+            )
         changes: dict[str, Any] = {
             "advance_trigger": "cycle",
             "advance_anchor": s or "00:00",
@@ -3871,6 +3889,15 @@ def _reshape_window(deck: Deck) -> Deck:
             changes["legacy_kind"] = None  # see _edited_deck: the scheduler skips those
         return _merged_deck(deck, **changes)
     if deck.advance_trigger == "cycle" and len(deck.pages) == 1:
+        s, e = deck.advance_anchor, deck.advance_end_at
+        if partial_days and s and e and (parse_hhmm(e) or 0) < (parse_hhmm(s) or 0):
+            raise _EditError(
+                "A single dashboard can't keep this overnight window on only some days: "
+                "the hours after midnight would move to the same day's early morning. "
+                "End it by 24:00 or run it every day first.",
+                400,
+                deck.id,
+            )
         # The one dashboard's dwell was the cycle's cadence; an interval reads
         # advance_interval_minutes and ignores a per-dashboard dwell.
         return _merged_deck(

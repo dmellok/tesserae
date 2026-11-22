@@ -378,6 +378,32 @@ def test_window_overlaps_pause_judges_each_day_on_its_own() -> None:
     assert window_overlaps_pause(pause, replace(push, days=(4,)))
 
 
+def test_a_cycle_whose_end_equals_its_start_shows_as_running_to_midnight() -> None:
+    from app.lineups_view import day_spans, window_label, window_minutes
+
+    same = LineupInput(
+        "s", "S", "cycle", (StepInput("a", 30), StepInput("b", 30)), start="09:00", end="09:00"
+    )
+    assert window_minutes(same) == (540, 1440)
+    assert day_spans(same) == [(540, 1440)]
+    assert "next day" not in window_label(same)
+
+
+def test_a_wrapped_window_says_so_in_its_label() -> None:
+    from app.lineups_view import window_label
+
+    steps = (StepInput("a", 30), StepInput("b", 30))
+    assert window_label(LineupInput("c", "C", "cycle", steps, start="22:00", end="06:00")).endswith(
+        " next day"
+    )
+    assert window_label(
+        LineupInput("i", "I", "interval", (StepInput("a"),), start="22:00", end="06:00")
+    ).endswith(" overnight")
+    assert "overnight" not in window_label(
+        LineupInput("d", "D", "interval", (StepInput("a"),), start="06:00", end="22:00")
+    )
+
+
 def test_overnight_interval_runs_only_on_its_own_days() -> None:
     """A Monday-only 22:00-06:00 interval window runs Monday 00:00-06:00 and
     22:00-24:00 (the scheduler's per-day window gate) and nothing Tuesday."""

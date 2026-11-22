@@ -289,8 +289,10 @@ def _compute_step_state(
     window_anchor = local_now.replace(
         hour=anchor_t.hour, minute=anchor_t.minute, second=0, microsecond=0
     )
-    if rotation.end_at is not None:
-        end_t = _parse_hhmm(rotation.end_at)
+    end_t = _parse_hhmm(rotation.end_at) if rotation.end_at is not None else None
+    # An end equal to the anchor is no end at all: such a rotation has always
+    # run from its anchor to midnight, and saved ones must keep doing so.
+    if end_t is not None and end_t != anchor_t:
         window_end = local_now.replace(
             hour=end_t.hour, minute=end_t.minute, second=0, microsecond=0
         )

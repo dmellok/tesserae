@@ -1121,7 +1121,8 @@
       w.end = w.is_point ? null : endHhmm(w.end_min);
       w.label = w.is_point
         ? `at ${clock(w.start_min)}`
-        : clockRange(w.start_min, w.end_min) + (l.kind === "cycle" && w.wraps ? " next day" : "");
+        : clockRange(w.start_min, w.end_min) +
+          (w.wraps ? (l.kind === "cycle" ? " next day" : " overnight") : "");
       w.overlaps_pause = overlapsPause(d.pause, w.start_min, w.end_min);
       if (w.overlaps_pause && d.pause)
         w.pause_title = `Part of this window falls in Quiet hours (${d.pause.label}); nothing is pushed then`;
