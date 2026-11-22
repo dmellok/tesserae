@@ -49,6 +49,111 @@ pytestmark = [
 PAGE_ID = "full"
 
 
+@pytest.mark.parametrize("field", ["theme", "style", "font"])
+def test_single_widget_keeps_an_unavailable_saved_look_editable(
+    server: tuple[str, Flask], pw: Any, field: str
+) -> None:
+    from playwright.sync_api import expect
+
+    base, app = server
+    store = app.config["PAGE_STORE"]
+    original = store.get(PAGE_ID)
+    cell = original.cells[0].model_copy(update={field: "removed-choice"})
+    store.save(
+        original.model_copy(
+            update={"cells": [cell, original.cells[1].model_copy(update={"plugin": ""})]}
+        )
+    )
+    browser, page, errors = _open(pw, base)
+    try:
+        page.locator('[data-cell-id="c1"] [data-ev2-row]').click()
+        form = page.locator('[data-ev2-cell-form][data-cell-id="c1"]')
+        expect(form.locator("[data-ev2-look]")).to_be_visible()
+        form.locator("[data-ev2-look] > summary").click()
+        expect(form.locator(f'[name="{field}"]')).to_have_value("removed-choice")
+        form.locator('[name="zoom"]').fill("1.25")
+        _wait_for(lambda: _cell(app, PAGE_ID, "c1").zoom == 1.25, "zoom saved", page=page)
+        assert getattr(_cell(app, PAGE_ID, "c1"), field) == "removed-choice"
+        assert errors == []
+    finally:
+        browser.close()
+
+
+@pytest.mark.parametrize("width", [1440, 390])
+@pytest.mark.parametrize("keep_override", [False, True])
+def test_single_widget_look_tracks_live_widget_count_and_keeps_zoom(
+    server: tuple[str, Flask], pw: Any, width: int, keep_override: bool
+) -> None:
+    from playwright.sync_api import expect
+
+    base, app = server
+    store = app.config["PAGE_STORE"]
+    original = store.get(PAGE_ID)
+    store.save(
+        original.model_copy(
+            update={
+                "cells": [original.cells[0], original.cells[1].model_copy(update={"plugin": ""})]
+            }
+        )
+    )
+    browser, page, errors = _open(pw, base)
+    page.set_viewport_size({"width": width, "height": 1000})
+    try:
+        page.evaluate("window.editorStillHere = true")
+        page.locator('[data-cell-id="c1"] [data-ev2-row]').click()
+        form = page.locator('[data-ev2-cell-form][data-cell-id="c1"]')
+        expect(form.locator("[data-ev2-look]")).to_be_hidden()
+        form.locator('[data-ev2-adv="extras"] > summary').click()
+        expect(form.locator('[name="zoom"]')).to_be_visible()
+        form.locator('[name="zoom"]').fill("1.25")
+        _wait_for(lambda: _cell(app, PAGE_ID, "c1").zoom == 1.25, "zoom saved", page=page)
+        expect(form.locator('[data-ev2-adv="extras"] [data-ev2-adv-sum]')).to_have_text("1 changed")
+        form.locator("[data-ev2-dashboard-look] a").click()
+        expect(page.locator("#ev2-h-look")).to_be_focused()
+        expect(page.locator("#ev2-b-look")).to_be_visible()
+        page.locator('[data-ev2-toggle="widgets"]').click()
+        page.locator('[data-cell-id="c2"] [data-ev2-row]').click()
+        page.locator("[data-ev2-pk-q]").fill("word")
+        page.locator('[data-ev2-pk] [data-widget="clock_word"]').click()
+        page.locator('[data-cell-id="c1"] [data-ev2-row]').click()
+        expect(form.locator("[data-ev2-look]")).to_be_visible()
+        expect(form.locator("[data-ev2-dashboard-look]")).to_be_hidden()
+        form.locator("[data-ev2-look] > summary").click()
+        expect(form.locator('[data-ev2-look] [name="zoom"]')).to_have_value("1.25")
+        if keep_override:
+            form.locator('[name="theme"]').select_option("dark")
+            _wait_for(lambda: _cell(app, PAGE_ID, "c1").theme == "dark", "theme saved", page=page)
+        page.locator('[data-cell-id="c2"] [data-ev2-row]').click()
+        page.once("dialog", lambda dialog: dialog.accept())
+        page.locator('[data-cell-id="c2"] [data-ev2-empty]').click()
+        expect(page.locator('.ev2-cl[data-cell-id="c2"]')).to_have_attribute("data-widget", "")
+        page.locator('[data-cell-id="c1"] [data-ev2-row]').click()
+        if keep_override:
+            expect(form.locator("[data-ev2-look]")).to_be_visible()
+            expect(form.locator('[name="theme"]')).to_have_value("dark")
+            page.locator('[data-ev2-toggle="look"]').click()
+            page.locator("[data-ev2-resetov]").click()
+            _wait_for(lambda: not _cell(app, PAGE_ID, "c1").theme, "override reset", page=page)
+            page.locator('[data-ev2-toggle="widgets"]').click()
+            page.locator('[data-cell-id="c1"] [data-ev2-row]').click()
+        expect(form.locator("[data-ev2-look]")).to_be_hidden()
+        expect(form.locator("[data-ev2-dashboard-look]")).to_be_visible()
+        form.locator('[data-ev2-adv="extras"]').evaluate("el => { el.open = true; }")
+        expect(form.locator('[name="zoom"]')).to_be_visible()
+        expect(form.locator('[name="zoom"]')).to_have_value("1.25")
+        assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+        page.locator('[data-cell-id="c1"] [data-ev2-replace]').click()
+        page.locator("[data-ev2-pk-q]").fill("webpage")
+        page.locator('[data-ev2-pk] [data-widget="webpage"]').click()
+        expect(page.locator("#ev2-step-look")).to_be_hidden()
+        expect(form.locator("[data-ev2-look]")).to_be_visible()
+        expect(form.locator("[data-ev2-dashboard-look]")).to_be_hidden()
+        assert page.evaluate("window.editorStillHere") is True
+        assert errors == []
+    finally:
+        browser.close()
+
+
 @pytest.mark.parametrize("plugin", ["", "webpage"])
 def test_look_returns_live_when_a_sensitive_widget_is_added(server, pw, plugin):
     from playwright.sync_api import expect
@@ -68,6 +173,13 @@ def test_look_returns_live_when_a_sensitive_widget_is_added(server, pw, plugin):
     browser, page, errors = _open(pw, base)
     try:
         expect(page.locator("#ev2-step-look")).to_be_hidden()
+        if plugin:
+            expect(page.locator('[data-cell-id="c1"] [data-ev2-look]')).to_have_js_property(
+                "hidden", False
+            )
+            expect(
+                page.locator('[data-cell-id="c1"] [data-ev2-dashboard-look]')
+            ).to_have_js_property("hidden", True)
         assert page.locator("#ev2-step-schedules .ev2-sn-n").inner_text() == "4"
         page.evaluate("window.editorStillHere = true")
         if plugin:
