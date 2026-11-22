@@ -811,15 +811,18 @@ class PushManager:
         was about to make) must not be orphaned the instant a re-render
         lands; digest-addressed lookups fall back to this entry so the
         old frame keeps answering until the device's next /frame poll
-        moves it forward."""
-        with self._lock:
-            entry = self._previous_renders.get(device_id)
-            if entry is None:
-                return None
-            superseded = float(entry.get("superseded_at") or 0)
-            if time.time() - superseded > max_age_s:
-                return None
-            return dict(entry)
+        moves it forward.
+
+        Read without ``self._lock``, like ``latest_render_for``: a push holds
+        that lock for its whole render, and the slot is only ever replaced
+        whole, so a lookup never sees a half-written entry."""
+        entry = self._previous_renders.get(device_id)
+        if entry is None:
+            return None
+        superseded = float(entry.get("superseded_at") or 0)
+        if time.time() - superseded > max_age_s:
+            return None
+        return dict(entry)
 
     def _retire_live_locked(self, device_id: str, new_digest: str) -> None:
         """Move the current live entry into the grace slot before a new
@@ -842,17 +845,17 @@ class PushManager:
     def composition_for_digest(self, device_id: str, digest: str) -> str | None:
         """The composition digest a frame digest rendered from: the live
         frame, the grace slot, or one of the device's last ~10 retired
-        frames. None = unknown / too old to resolve."""
+        frames. None = unknown / too old to resolve. Lock-free for the same
+        reason as ``previous_render_for``."""
         if not digest:
             return None
-        with self._lock:
-            live = self._latest_renders.get(device_id)
-            if live and str(live.get("digest") or "") == digest:
-                return str(live.get("composition_digest") or "") or None
-            prev = self._previous_renders.get(device_id)
-            if prev and str(prev.get("digest") or "") == digest:
-                return str(prev.get("composition_digest") or "") or None
-            return self._digest_history.get(device_id, OrderedDict()).get(digest)
+        live = self._latest_renders.get(device_id)
+        if live and str(live.get("digest") or "") == digest:
+            return str(live.get("composition_digest") or "") or None
+        prev = self._previous_renders.get(device_id)
+        if prev and str(prev.get("digest") or "") == digest:
+            return str(prev.get("composition_digest") or "") or None
+        return self._digest_history.get(device_id, OrderedDict()).get(digest)
 
     def latest_render_for(self, device_id: str) -> dict[str, Any] | None:
         """The most recently published render for a device, or ``None``
