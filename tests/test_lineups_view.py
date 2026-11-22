@@ -139,8 +139,14 @@ def test_sleeping_display_with_queued_step() -> None:
     assert row.steps[-1].separator == "loop" and row.steps[0].separator == "arrow"
 
 
-@pytest.mark.parametrize("age, want", [(None, "Always on"), (10, "Always on"), (125, "Always on")])
-def test_always_on_header_contact_has_a_value(age: int | None, want: str) -> None:
+@pytest.mark.parametrize(
+    "age, want", [(None, ""), (10, "Checked in just now"), (125, "Checked in 2 min ago")]
+)
+@pytest.mark.parametrize("powered", [False, True])
+def test_always_on_header_contact_has_a_value(age: int | None, want: str, powered: bool) -> None:
+    """A panel set to stay awake polls, so its check-ins show. A kind that is
+    itself always on (Meural, Samsung The Frame) checks in with nobody: it reads
+    "Always on" while its contact is recent."""
     from app.next_update import MODE_CONNECTED, Reach
 
     displays, dashboards = sample_inputs()
@@ -148,10 +154,11 @@ def test_always_on_header_contact_has_a_value(age: int | None, want: str) -> Non
         displays[0],
         reach=Reach(MODE_CONNECTED),
         heard=True,
+        powered=powered,
         last_seen=SAMPLE_NOW.timestamp() - age if age is not None else None,
     )
     out = build_view([d], dashboards, now=SAMPLE_NOW).displays[0]
-    assert out.link.label == want
+    assert out.link.label == ("Always on" if powered else want)
 
 
 @pytest.mark.parametrize(
@@ -4330,7 +4337,7 @@ def test_reordering_a_rotation_lets_the_scheduler_resend_its_slot(client: Any, a
 
 
 @pytest.mark.parametrize(
-    "minutes, label", [(0, ""), (15, "15m"), (120, "2h"), (90, "1h 30m"), (1, "1m")]
+    "minutes, label", [(0, ""), (15, "15m"), (120, "2h"), (90, "1h30"), (1, "1m")]
 )
 @pytest.mark.parametrize("priority", [False, True])
 def test_rotation_step_refresh_label(minutes: int, label: str, priority: bool) -> None:
@@ -4346,16 +4353,17 @@ def test_rotation_step_refresh_label(minutes: int, label: str, priority: bool) -
     assert step.refresh_label == ("" if priority else label)
     expected_title = {
         0: "",
-        1: "Refreshes every 1 minute",
-        15: "Refreshes every 15 minutes",
-        90: "Refreshes every 90 minutes",
-        120: "Refreshes every 120 minutes",
+        1: "Refreshes every 1 min",
+        15: "Refreshes every 15 min",
+        90: "Refreshes every 1 h 30 min",
+        120: "Refreshes every 2 h",
     }[minutes]
     assert step.refresh_title == ("" if priority else expected_title)
     assert step.position == ("1st choice" if priority else "1/6")
 
 
-def test_stale_always_on_display_keeps_contact_warning() -> None:
+@pytest.mark.parametrize("powered", [False, True])
+def test_stale_always_on_display_keeps_contact_warning(powered: bool) -> None:
     from app.next_update import MODE_CONNECTED, Reach
 
     displays, dashboards = sample_inputs()
@@ -4363,6 +4371,7 @@ def test_stale_always_on_display_keeps_contact_warning() -> None:
         displays[0],
         reach=Reach(MODE_CONNECTED),
         heard=False,
+        powered=powered,
         last_seen=SAMPLE_NOW.timestamp() - 7200,
     )
     link = build_view([d], dashboards, now=SAMPLE_NOW).displays[0].link
@@ -4477,9 +4486,32 @@ def test_non_rotation_steps_keep_position_labels(
     assert view.displays[0].lineups[0].steps[0].refresh_label == ""
 
 
-def test_always_on_without_contact_does_not_claim_online() -> None:
+@pytest.mark.parametrize("powered", [False, True])
+def test_always_on_never_heard_from_says_nothing(powered: bool) -> None:
     from app.next_update import MODE_CONNECTED, Reach
 
     displays, dashboards = sample_inputs()
-    d = replace(displays[0], reach=Reach(MODE_CONNECTED), heard=False, last_seen=None)
-    assert build_view([d], dashboards, now=SAMPLE_NOW).displays[0].link.label == "Offline"
+    d = replace(
+        displays[0], reach=Reach(MODE_CONNECTED), heard=False, powered=powered, last_seen=None
+    )
+    assert build_view([d], dashboards, now=SAMPLE_NOW).displays[0].link.label == ""
+
+
+def test_route_says_always_on_for_an_always_on_kind_only(
+    client: Any, app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A firmware panel set to stay awake keeps its check-in; only a kind that is
+    itself always on (its manifest says so) reads "Always on"."""
+    import time
+
+    app.config["SETTINGS_STORE"].patch_section("devices", {"panel": {"always_on": True}})
+    monkeypatch.setitem(app.config, "DEVICE_STATUS", {"panel": {"received_at": time.time()}})
+
+    def label() -> str:
+        data = client.get("/decks/view.json").get_json()
+        return str(next(d for d in data["displays"] if d["id"] == "panel")["link"]["label"])
+
+    assert label() == "Checked in just now"
+    device = app.config["DEVICE_REGISTRY"].get("panel")
+    monkeypatch.setitem(device.manifest, "always_on", True)
+    assert label() == "Always on"

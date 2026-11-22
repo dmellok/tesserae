@@ -346,6 +346,11 @@ class DisplayInput:
     # its wake interval (so it is not "waiting for check-in").
     last_seen: float | None = None
     heard: bool = False
+    # True when the display's kind is itself always on (Meural, Samsung The
+    # Frame): a powered frame the server reaches out to, with no connection or
+    # heartbeat of its own. A firmware panel set to stay awake is not one; it
+    # polls, and its check-ins are worth showing.
+    powered: bool = False
     # True when a render exists that a pull/REST display has not fetched yet
     # (its latest digest differs from the last one served, or none was served).
     pending: bool = False
@@ -1840,10 +1845,12 @@ def _link_view(d: DisplayInput, clk: _Clock) -> LinkView:
     nxt = _checkin_at_or_after(r, clk.epoch) if r.mode == MODE_SLEEPS else None
     if d.always_on:
         age = max(0, int((clk.epoch - d.last_seen) // 60)) if d.last_seen is not None else None
-        if d.heard:
+        if d.powered and d.heard:
+            # Nothing checks in: "just now" read like a sleeping display. Contact
+            # that has gone old still says when it was.
             label = "Always on"
         elif age is None:
-            label = "Offline"
+            label = ""
         elif age == 0:
             label = "Checked in just now"
         else:
@@ -3271,11 +3278,10 @@ def _lineup_view(
             StepView(
                 index=i,
                 position=position,
-                refresh_label=rel_short(refresh_minutes) if refresh_minutes > 0 else "",
+                # Beside the position, in the chips' own short form ("15m", "1h30").
+                refresh_label=dur_short(refresh_minutes) if refresh_minutes > 0 else "",
                 refresh_title=(
-                    f"Refreshes every {refresh_minutes} minute{'s' if refresh_minutes != 1 else ''}"
-                    if refresh_minutes > 0
-                    else ""
+                    f"Refreshes every {rel_long(refresh_minutes)}" if refresh_minutes > 0 else ""
                 ),
                 dashboard_id=st.dashboard_id,
                 name=scr.name,

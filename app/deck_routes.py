@@ -1857,6 +1857,7 @@ def _build_lineups_view(
                 nothing_sent=nothing_sent,
                 last_seen=last_seen,
                 heard=heard,
+                powered=(getattr(d, "manifest", None) or {}).get("always_on") is True,
                 pending=pending,
                 pending_thumb_url=pending_thumb,
                 glass_thumb_url=_glass_thumb(d) if on_pid else "",

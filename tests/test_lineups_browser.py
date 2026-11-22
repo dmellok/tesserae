@@ -5304,14 +5304,14 @@ def test_photo_step_labels_match_on_server_and_redraw(
             if step["dashboard_id"] == "art":
                 step.update(
                     refresh_label="15m",
-                    refresh_title="Refreshes every 15 minutes",
+                    refresh_title="Refreshes every 15 min",
                     order_icon="list-numbers",
                     order_title="Sequential order",
                 )
             elif step["dashboard_id"] == "family":
                 step.update(
                     refresh_label="2h",
-                    refresh_title="Refreshes every 120 minutes",
+                    refresh_title="Refreshes every 2 h",
                     order_icon="sort-descending",
                     order_title="Newest first",
                     item_count=12,
@@ -5320,8 +5320,8 @@ def test_photo_step_labels_match_on_server_and_redraw(
                 step.update(
                     order_icon="shuffle",
                     order_title="Random order",
-                    refresh_label="1h 30m",
-                    refresh_title="Refreshes every 90 minutes",
+                    refresh_label="1h30",
+                    refresh_title="Refreshes every 1 h 30 min",
                 )
         return vm
 
@@ -5334,11 +5334,18 @@ def test_photo_step_labels_match_on_server_and_redraw(
         art = page.locator('#lu-row-dinner .lu-step[data-step="1"]')
         family = page.locator('#lu-row-dinner .lu-step[data-step="2"]')
         comics = page.locator('#lu-row-dinner .lu-step[data-step="5"]')
-        assert art.locator(".lu-step-meta").inner_text() == "15m"
-        assert art.locator(".lu-step-meta").get_attribute("title") == "Refreshes every 15 minutes"
-        assert art.locator(".lu-step-meta .ph-arrows-clockwise").count() == 1
-        assert family.locator(".lu-step-meta").inner_text() == "2h"
-        assert comics.locator(".lu-step-meta").inner_text() == "1h 30m"
+        # The position stays; the dashboard's refresh interval sits beside it.
+        assert art.locator(".lu-step-meta").inner_text().split() == ["2/6", "15m"]
+        refresh = art.locator(".lu-step-meta .lu-step-refresh")
+        assert refresh.inner_text() == "15m"
+        assert refresh.get_attribute("title") == "Refreshes every 15 min"
+        assert refresh.locator(".ph-arrows-clockwise").count() == 1
+        assert family.locator(".lu-step-meta").inner_text().split() == ["3/6", "2h"]
+        assert comics.locator(".lu-step-meta").inner_text().split() == ["6/6", "1h30"]
+        # A step whose dashboard has no refresh of its own shows its position alone.
+        plain = page.locator('#lu-row-dinner .lu-step[data-step="0"] .lu-step-meta')
+        assert plain.inner_text().split() == ["1/6"]
+        assert plain.locator(".lu-step-refresh").count() == 0
         for tile, icon, title in [
             (art, "list-numbers", "Sequential order"),
             (family, "sort-descending", "Newest first"),

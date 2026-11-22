@@ -6,10 +6,9 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
-- Lineups steps show their dashboard's refresh interval and photo order, and powered displays say Always on.
-
 ### Added
 
+- Lineups: a rotation step shows its dashboard's refresh interval beside its position, photo widgets show their order on the item badge, and frames that are always on with no connection of their own (Meural, Samsung The Frame) say Always on.
 - Webpage widget: **Show** can be **An HTML snippet** instead of a web address. Paste embed code, such as a transit operator's departure board (a `<div>` and a `<script src>`), and it runs in the cell without being hosted on a page of your own first. The snippet runs in a sandboxed frame of its own: its scripts load what they need from the web, but they can't reach Tesserae's pages, your sign-in or settings. An embed that needs cookies or local storage still needs a page of its own. Saved cells keep showing their web address. (discussion #8)
 - Export one display from its own page: **Export this display** in the More menu downloads just that display, without its access token. The export form on Settings › Devices gains **Select all** and **Clear all**. (#541)
 - Themes: eight **Flat ink** themes for colour e-ink, in their own group in the theme pickers. Every colour in them is one of the panel's own inks, so backgrounds, cards and fills paint solid with no dither pattern. Poster, Taxi, Signal and Noir use black, white, yellow and red, for 4-colour panels and Spectra 6. Primary, Delft, Canary and Gallery add blue and green, for Spectra 6. On a display with a measured calibration profile applied, yellow and red areas can still pick up a few stray dots; set the cell's dithering to Flat to clear them.
