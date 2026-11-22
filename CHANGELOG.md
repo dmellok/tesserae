@@ -10,12 +10,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 - Webpage widget: **Show** can be **An HTML snippet** instead of a web address. Paste embed code, such as a transit operator's departure board (a `<div>` and a `<script src>`), and it runs in the cell without being hosted on a page of your own first. The snippet runs in a sandboxed frame of its own: its scripts load what they need from the web, but they can't reach Tesserae's pages, your sign-in or settings. An embed that needs cookies or local storage still needs a page of its own. Saved cells keep showing their web address. (discussion #8)
 - Export one display from its own page: **Export this display** in the More menu downloads just that display, without its access token. The export form on Settings › Devices gains **Select all** and **Clear all**. (#541)
+- Lineups: rotations can run past midnight, using the weekday they start on. A lineup on only some days can't switch between one dashboard and several while its window runs past midnight, because the two read the hours after midnight as different weekdays; end it by 24:00 or run it every day.
 - Themes: eight **Flat ink** themes for colour e-ink, in their own group in the theme pickers. Every colour in them is one of the panel's own inks, so backgrounds, cards and fills paint solid with no dither pattern. Poster, Taxi, Signal and Noir use black, white, yellow and red, for 4-colour panels and Spectra 6. Primary, Delft, Canary and Gallery add blue and green, for Spectra 6. On a display with a measured calibration profile applied, yellow and red areas can still pick up a few stray dots; set the cell's dithering to Flat to clear them.
 - Long multi-select pickers show only their picks under a search box; typing filters, Enter ticks the top match, arrow keys move through results.
 - Gallery's Orientation gains Auto and Match the frame: a dashboard on both portrait and landscape frames shows each frame pictures of its own shape. Widgets get `ctx["frame_shapes"]`.
 - Meural swipes show the next item or dashboard, and thumbnails follow the frame's current artwork.
 - Show Meural and Samsung The Frame exchanges, power commands and skips in the device page Frame log.
 - Hardware: the Seeed XIAO ePaper EE05 with the 4.26" mono panel (800×480) is in the catalog as `seeed_ee05_426`. It takes the same 48,000-byte mono frame as the reTerminal E1001. The firmware target is `seeed-ee05-426` in tesserae-device-firmware. Not yet tested on real hardware.
+
+### Changed
+
+- Lineups: a saved rotation whose end is earlier than its start used to stop at midnight. It now carries on after midnight until its end, as its settings always read. If you have one (for example 22:00 to 06:00) and want the old hours, set its end to 24:00. A rotation whose end equals its start is unchanged: it runs from its start to midnight.
+- Lineups: a window that runs past midnight says so in its label ("next day" for a rotation, "overnight" for a single dashboard), and the time inputs on the Lineups page again refuse a window shorter than 15 minutes.
 
 ### Fixed
 

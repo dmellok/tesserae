@@ -90,8 +90,8 @@ class Rotation(BaseModel):
     # clock passes this, the rotation stops cycling for the day and
     # picks back up at the next day's anchor. ``None`` (the default)
     # means "cycle until midnight." Setting ``end_at < anchor`` means
-    # a wrap-around window (e.g. 22:00 -> 06:00), same semantics the
-    # Schedule model uses for ``time_of_day_*``.
+    # an overnight window (e.g. 22:00 -> 06:00). Its weekday is the
+    # day the run starts, including the portion after midnight.
     end_at: str | None = None
 
     # Day-of-week filter (0=Mon..6=Sun). On a non-matching day the

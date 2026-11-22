@@ -878,17 +878,17 @@ def test_quiet_hours_say_what_really_happens(real: tuple[str, Flask]) -> None:
         page.locator('[data-time="end"]').dispatch_event("change")
         assert "Sends nothing: all of it is in " in page.locator(".dxe-warn").inner_text()
         _settle(page)
-        # A new lineup starts after quiet hours; an end before the start is said
+        # A new lineup starts after quiet hours; an end equal to the start is said
         # at once, and Continue waits for it.
         page.goto(base + "/decks/new?display=hall", wait_until="load")
         assert page.locator('[data-time="start"]').input_value() == "08:15"
         page.locator('[data-when="between"]').click()
-        page.locator('[data-time="end"]').fill("08:00")
+        page.locator('[data-time="end"]').fill("08:15")
         page.locator('[data-time="end"]').dispatch_event("change")
-        assert page.locator("#dxe-end-err").inner_text() == "End must be after start."
+        assert page.locator("#dxe-end-err").inner_text() == "Start and end must differ."
         page.locator("[data-goto='3']").click(force=True)  # aria-disabled: still focusable
         assert page.locator(".dxe-done").count() == 1
-        assert page.locator("#dxe-save-state").inner_text() == "End must be after start."
+        assert page.locator("#dxe-save-state").inner_text() == "Start and end must differ."
         # Started from a display's +: its display can't be changed.
         assert page.locator(".dxe-done [data-goto='1']").count() == 0
         _settle(page)
@@ -2453,5 +2453,32 @@ def test_picker_adds_and_cancels_without_dialog_support(real, native_dialog, wid
         assert "clock" in requests[0].post_data_json["page_ids"]
         _save(page)
         assert app.config["DECK_STORE"].get("morning").page_ids == ["weather", "agenda", "clock"]
+        assert not errors
+        browser.close()
+
+
+@pytest.mark.parametrize("width", [1280, 390])
+def test_editor_saves_an_overnight_window(real: tuple[str, Flask], width: int) -> None:
+    from playwright.sync_api import expect, sync_playwright
+
+    base, app = real
+    app.config["DECK_STORE"].delete("morning")
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/art/edit", width)
+        page.locator('.dxe-time [data-end="add"]').click()
+        page.locator('[data-time="start"]').fill("08:30")
+        page.locator('[data-time="start"]').dispatch_event("change")
+        page.locator('[data-time="end"]').fill("03:59")
+        page.locator('[data-time="end"]').dispatch_event("change")
+        expect(page.locator("#dxe-end-err")).to_have_count(0)
+        expect(page.locator("#dxe-h-when + .dxe-lead")).to_contain_text("next day")
+        expect(page.locator("#dxe-daybar .lu-blk[data-edit]")).to_have_count(0)
+        _save(page)
+        deck = app.config["DECK_STORE"].get("art")
+        assert (deck.advance_trigger, deck.advance_anchor, deck.advance_end_at) == (
+            "cycle",
+            "08:30",
+            "03:59",
+        )
         assert not errors
         browser.close()

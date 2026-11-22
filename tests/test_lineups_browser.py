@@ -4779,7 +4779,7 @@ def test_end_time_editor_refuses_bad_ends_and_shows_the_servers_reason(live: str
         # An end at the start (or before it) is refused where it is typed.
         _win_inputs(page, "night").nth(1).fill("22:00")
         _win_inputs(page, "night").nth(1).press("Enter")
-        assert err.inner_text() == "End must be after start"
+        assert err.inner_text() == "Start and end must differ"
         # A window over another lineup (Dinner, Mon-Wed 17:00-20:00) is refused before saving.
         _win_inputs(page, "night").nth(0).fill("18:00")
         _win_inputs(page, "night").nth(1).fill("21:00")
