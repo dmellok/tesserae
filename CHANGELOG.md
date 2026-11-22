@@ -11,6 +11,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - Lineups: a rotation step shows its dashboard's refresh interval beside its position, photo widgets show their order on the item badge, and frames that are always on with no connection of their own (Meural, Samsung The Frame) say Always on.
 - Webpage widget: **Show** can be **An HTML snippet** instead of a web address. Paste embed code, such as a transit operator's departure board (a `<div>` and a `<script src>`), and it runs in the cell without being hosted on a page of your own first. The snippet runs in a sandboxed frame of its own: its scripts load what they need from the web, but they can't reach Tesserae's pages, your sign-in or settings. An embed that needs cookies or local storage still needs a page of its own. Saved cells keep showing their web address. (discussion #8)
 - Export one display from its own page: **Export this display** in the More menu downloads just that display, without its access token. The export form on Settings › Devices gains **Select all** and **Clear all**. (#541)
+- Lineups: rotations can run past midnight, using the weekday they start on. A lineup on only some days can't switch between one dashboard and several while its window runs past midnight, because the two read the hours after midnight as different weekdays; end it by 24:00 or run it every day.
 - Themes: eight **Flat ink** themes for colour e-ink, in their own group in the theme pickers. Every colour in them is one of the panel's own inks, so backgrounds, cards and fills paint solid with no dither pattern. Poster, Taxi, Signal and Noir use black, white, yellow and red, for 4-colour panels and Spectra 6. Primary, Delft, Canary and Gallery add blue and green, for Spectra 6. On a display with a measured calibration profile applied, yellow and red areas can still pick up a few stray dots; set the cell's dithering to Flat to clear them.
 - Long multi-select pickers show only their picks under a search box; typing filters, Enter ticks the top match, arrow keys move through results.
 - Gallery's Orientation gains Auto and Match the frame: a dashboard on both portrait and landscape frames shows each frame pictures of its own shape. Widgets get `ctx["frame_shapes"]`.
@@ -19,9 +20,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - Lineups: a gear on each dashboard tile and beside each lineup name opens its editor, and the More menu can duplicate a lineup (the copy starts off).
 - Hardware: the Seeed XIAO ePaper EE05 with the 4.26" mono panel (800×480) is in the catalog as `seeed_ee05_426`. It takes the same 48,000-byte mono frame as the reTerminal E1001. The firmware target is `seeed-ee05-426` in tesserae-device-firmware. Not yet tested on real hardware.
 
+### Changed
+
+- Lineups: a saved rotation whose end is earlier than its start used to stop at midnight. It now carries on after midnight until its end, as its settings always read. If you have one (for example 22:00 to 06:00) and want the old hours, set its end to 24:00. A rotation whose end equals its start is unchanged: it runs from its start to midnight.
+- Lineups: a window that runs past midnight says so in its label ("next day" for a rotation, "overnight" for a single dashboard), and the time inputs on the Lineups page again refuse a window shorter than 15 minutes.
+
 ### Fixed
 
 - Lineups: folding a row or display keeps it in place instead of jumping the page (Safari, and near the end of the page), and so does the page's own refresh. Rows and displays slide open and shut.
+- A dashboard's own refresh no longer re-sends it to a display whose lineup rules it out. When a step's conditions fail (and no schedule names the dashboard for that display), its refreshes skip that display until the conditions pass again, whether the lineup or a manual push put it there. A display on a manual hold keeps refreshing.
 - Single-widget dashboards use the dashboard Look controls, while keeping saved cell overrides and Zoom editable.
 - Device page: a button map that fails to save stays in the editor as you typed it, so you can fix the mistake instead of retyping the map. The error is still shown, and the saved map is unchanged. (#588)
 - Device page: a save whose button map fails no longer shows a "saved" message listing sections you didn't touch. If something else on the page changed, the message says it saved everything except the button map; if nothing else changed, only the button map's error shows. (#588)

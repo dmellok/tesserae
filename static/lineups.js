@@ -253,12 +253,15 @@
 
   // The bar's edit rules are shared with the lineup editor (lineups_render.js).
   const { room, clash } = R;
-  function commit(d, id, s, e) {
+  // ``overnight`` is the time inputs' case: an end typed before the start
+  // arrives as an end past midnight. A drag on the bar never wraps.
+  function commit(d, id, s, e, overnight) {
     const ed = effective(d);
     const l = ed.lineups.find((x) => x.id === id);
     if (!l || ![s, e].every(Number.isFinite)) return;
     s = Math.max(0, Math.min(DAY_MIN - SNAP, s));
-    e = l.window.is_point ? s : Math.max(s + SNAP, Math.min(DAY_MIN, e));
+    const latest = overnight ? s + DAY_MIN - 1 : DAY_MIN;
+    e = l.window.is_point ? s : Math.max(s + SNAP, Math.min(latest, e));
     const orig = d.lineups.find((x) => x.id === id);
     applyEdit(d, orig, { start_min: s, end_min: e, days: l.days.slice() });
   }
@@ -1834,8 +1837,13 @@
         err.textContent = "Enter a time";
         return;
       }
+      if (ended && e === s) {
+        err.textContent = "Start and end must differ";
+        return;
+      }
+      if (ended && e < s) e += DAY_MIN;
       if (ended && e - s < SNAP) {
-        err.textContent = "End must be after start";
+        err.textContent = `End must be at least ${SNAP} minutes after start`;
         return;
       }
       const c = clash(effective(d), l, s, e, l.days);
@@ -1853,7 +1861,7 @@
         });
         return;
       }
-      commit(d, l.id, s, e);
+      commit(d, l.id, s, e, true);
     };
     wrap.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.target.closest("[data-win-end]")) {

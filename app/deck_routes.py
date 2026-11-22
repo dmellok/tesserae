@@ -717,35 +717,42 @@ def _nav_meta(deck: Deck) -> str:
 def _cycle_fires_on(rotation: Any, day_start: datetime) -> list[datetime]:
     """Projected step starts for a cycle record on the local day that begins
     at ``day_start``: every dwell window the engine would open between the
-    anchor and ``end_at`` (or midnight), each one a push to the display.
-
-    Mirrors the gates in ``scheduler._compute_step_state``: day-of-week,
-    anchor, ``end_at``; an end earlier than the anchor stops at midnight
-    because the engine treats before-anchor as dormant. Conditions and the
+    anchor and ``end_at`` (or midnight), including yesterday's overnight
+    spill. The weekday mask belongs to the day the run starts. Conditions and the
     minimum hold can skip windows at run time, so this is a ceiling, the
     same way the schedule rail is."""
     from app.schedule_routes import MAX_PROJECTED_FIRES
 
-    if not rotation.enabled or day_start.weekday() not in rotation.days_of_week:
-        return []
-    if rotation.cycle_minutes <= 0:
+    if not rotation.enabled or rotation.cycle_minutes <= 0:
         return []
     hh, mm = (int(part) for part in rotation.anchor.split(":"))
-    start = day_start.replace(hour=hh, minute=mm, second=0, microsecond=0)
-    end = day_start + timedelta(days=1)
-    if rotation.end_at:
-        eh, em = (int(part) for part in rotation.end_at.split(":"))
-        end_today = day_start.replace(hour=eh, minute=em, second=0, microsecond=0)
-        if end_today > start:
-            end = end_today
+    day_end = day_start + timedelta(days=1)
     fires: list[datetime] = []
-    t = start
-    while t < end and len(fires) < MAX_PROJECTED_FIRES:
-        for step in rotation.steps:
-            if t >= end:
-                break
-            fires.append(t)
-            t += timedelta(minutes=step.dwell_minutes)
+    for offset in (-1, 0):
+        run_day = day_start + timedelta(days=offset)
+        if run_day.weekday() not in rotation.days_of_week:
+            continue
+        start = run_day.replace(hour=hh, minute=mm, second=0, microsecond=0)
+        end = run_day + timedelta(days=1)
+        if rotation.end_at:
+            eh, em = (int(part) for part in rotation.end_at.split(":"))
+            end = run_day.replace(hour=eh, minute=em, second=0, microsecond=0)
+            if end < start:
+                end += timedelta(days=1)
+            elif end == start:
+                # No end at all, as the engine reads it: anchor to midnight.
+                end = run_day + timedelta(days=1)
+        if end <= day_start:
+            continue
+        end = min(end, day_end)
+        t = start
+        while t < end and len(fires) < MAX_PROJECTED_FIRES:
+            for step in rotation.steps:
+                if t >= end:
+                    break
+                if t >= day_start:
+                    fires.append(t)
+                t += timedelta(minutes=step.dwell_minutes)
     return fires
 
 
@@ -2188,8 +2195,8 @@ def _edited_deck(
                 changes["advance_fires_at"] = s
             else:
                 end_s = _clean_time(raw_end, "End", deck.id)
-                if (parse_hhmm(end_s) or 0) <= (parse_hhmm(s) or 0):
-                    raise _EditError("End must be after start.", 400, deck.id)
+                if (parse_hhmm(end_s) or 0) == (parse_hhmm(s) or 0):
+                    raise _EditError("Start and end must differ.", 400, deck.id)
                 # A window to midnight is stored as no end (see the interval
                 # and cycle branches).
                 stop = None if end_s == "24:00" else end_s
@@ -2232,8 +2239,8 @@ def _edited_deck(
             e_min = 1440 if cycle_end is None else (parse_hhmm(cycle_end) or 0)
             if s == "24:00":
                 raise _EditError("Start must be before 24:00.", 400, deck.id)
-            if e_min <= s_min:
-                raise _EditError("End must be after start.", 400, deck.id)
+            if e_min == s_min:
+                raise _EditError("Start and end must differ.", 400, deck.id)
             changes["advance_anchor"] = s
             changes["advance_end_at"] = None if cycle_end in (None, "24:00") else cycle_end
         else:  # interval: a window that may wrap past midnight
@@ -3856,15 +3863,25 @@ def _reshape_window(deck: Deck) -> Deck:
     saved as: several take turns (a cycle, from the window's start to its
     end), one is sent again and again (an interval). An interval only ever
     sends its first dashboard, so one given more dashboards would never show
-    them. A cycle can't run past midnight, so an interval window that wraps
-    can't take a second dashboard (``_EditError``)."""
+    them. Both shapes allow a window that runs past midnight, but they read
+    its weekdays differently: an interval judges each day on its own clock
+    (Monday-only 22:00 to 06:00 is Monday 00:00-06:00 and 22:00-24:00), a
+    cycle belongs to the day it starts (Monday 22:00 to Tuesday 06:00). With
+    every day ticked the two are the same hours. With only some, changing
+    shape would move the early-morning hours to another weekday, so that one
+    change is refused (``_EditError``)."""
     if deck.advance == "manual":
         return deck
+    partial_days = set(deck.advance_days_of_week) != set(range(7))
     if deck.advance_trigger == "interval" and len(deck.pages) > 1:
         s, e = deck.advance_window_start, deck.advance_window_end
-        if s and e and (parse_hhmm(e) or 0) <= (parse_hhmm(s) or 0):
+        if partial_days and s and e and (parse_hhmm(e) or 0) < (parse_hhmm(s) or 0):
             raise _EditError(
-                "Several dashboards can't run past midnight; end it by 24:00.", 400, deck.id
+                "Several dashboards can't run past midnight on only some days: "
+                "the hours after midnight would move to the next day. "
+                "End it by 24:00 or run it every day.",
+                400,
+                deck.id,
             )
         changes: dict[str, Any] = {
             "advance_trigger": "cycle",
@@ -3878,6 +3895,15 @@ def _reshape_window(deck: Deck) -> Deck:
             changes["legacy_kind"] = None  # see _edited_deck: the scheduler skips those
         return _merged_deck(deck, **changes)
     if deck.advance_trigger == "cycle" and len(deck.pages) == 1:
+        s, e = deck.advance_anchor, deck.advance_end_at
+        if partial_days and s and e and (parse_hhmm(e) or 0) < (parse_hhmm(s) or 0):
+            raise _EditError(
+                "A single dashboard can't keep this overnight window on only some days: "
+                "the hours after midnight would move to the same day's early morning. "
+                "End it by 24:00 or run it every day first.",
+                400,
+                deck.id,
+            )
         # The one dashboard's dwell was the cycle's cadence; an interval reads
         # advance_interval_minutes and ignores a per-dashboard dwell.
         return _merged_deck(
