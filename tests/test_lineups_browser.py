@@ -5566,7 +5566,7 @@ def test_scope_today_keeps_the_highlighted_row_in_view(live: str) -> None:
         browser.close()
 
 
-# -- phones: bigger tiles; toggles keep the row in place and slide ------------------
+# -- toggles keep the row in place and slide ---------------------------------------
 
 _SLIDES = (
     "document.getAnimations().filter((a) => a.effect && a.effect.target"
@@ -5597,8 +5597,8 @@ def _press(page: Any, sel: str) -> None:
 
 def _check_toggles_stay_put(page: Any) -> list[str]:
     """Fold and unfold rows (one at the very end of the page, where a collapse
-    leaves the page too short), collapse and open a display, Fold all, and a
-    redraw that scrolls the page away as Safari does: each time the header that
+    leaves the page too short), collapse and open a display, and an auto-refresh
+    whose redraw scrolls the page away as Safari does: each time the header that
     was toggled (or the one in view) stays where it was."""
     moved = []
     for rid in ("dinner", "breakfast", "kitchen"):
@@ -5621,24 +5621,25 @@ def _check_toggles_stay_put(page: Any) -> list[str]:
             after = _top(page, hdr)
             if abs(after - before) > 1:
                 moved.append(f"display {did}: {before:.0f} -> {after:.0f}")
-    # A redraw that throws the page back to the top (WebKit does this when the
-    # cards are replaced): the first header in view is put back.
+    # An auto-refresh whose redraw throws the page back to the top (WebKit does
+    # this when the cards are replaced): the first header in view is put back.
     head = "#lu-row-kitchen > .lu-row-head"
     _put(page, head, 250)
     before = _top(page, head)
-    page.evaluate(
-        """() => {
-          const host = document.querySelector('[data-lu-displays]');
-          const orig = host.replaceChildren.bind(host);
-          host.replaceChildren = (...a) => { orig(...a); window.scrollTo({top: 83, behavior: 'instant'}); };
-          TesseraeLineups.render();
-          delete host.replaceChildren;
-        }"""
-    )
+    page.evaluate(_JUMPY_REDRAW % "await TesseraeLineups.refresh();")
     after = _top(page, head)
     if abs(after - before) > 1:
-        moved.append(f"redraw: {before:.0f} -> {after:.0f}")
+        moved.append(f"refresh: {before:.0f} -> {after:.0f}")
     return moved
+
+
+# Runs its body with a redraw that leaves the page scrolled to 83px, as WebKit's does.
+_JUMPY_REDRAW = """async () => {
+  const host = document.querySelector('[data-lu-displays]');
+  const orig = host.replaceChildren.bind(host);
+  host.replaceChildren = (...a) => { orig(...a); window.scrollTo({top: 83, behavior: 'instant'}); };
+  try { %s } finally { delete host.replaceChildren; }
+}"""
 
 
 @pytest.mark.parametrize("device", ["iPhone 13", "Pixel 7", ""])
@@ -5662,16 +5663,19 @@ def test_toggles_keep_the_row_where_it_was(live: str, device: str) -> None:
         browser.close()
 
 
-def test_toggles_keep_the_row_where_it_was_in_webkit(live: str) -> None:
+@pytest.mark.parametrize("device", ["iPhone 13", ""])
+def test_toggles_keep_the_row_where_it_was_in_webkit(live: str, device: str) -> None:
     """Safari is where the page jumped (replacing the cards scrolls it); run the
-    same checks in WebKit when Playwright's WebKit is installed."""
+    same checks in WebKit, at a phone's size and a desktop's, when Playwright's
+    WebKit is installed."""
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:
         if not Path(p.webkit.executable_path).exists():
             pytest.skip("Playwright WebKit not installed")
         browser = p.webkit.launch()
-        ctx = browser.new_context(**p.devices["iPhone 13"])
+        shape = p.devices[device] if device else {"viewport": {"width": 1440, "height": 900}}
+        ctx = browser.new_context(**shape)
         page = ctx.new_page()
         errors: list[str] = []
         page.on("pageerror", lambda e: errors.append(str(e)))
@@ -5743,29 +5747,101 @@ def test_no_slides_under_reduced_motion(live: str) -> None:
         browser.close()
 
 
-@pytest.mark.parametrize("width", [360, 390, 430])
-def test_phone_tiles_are_bigger_and_arrows_slim(live: str, width: int) -> None:
+def test_only_toggles_and_the_auto_refresh_hold_the_scroll(live: str) -> None:
+    """Search, the filters and the view switch change what is listed: their
+    redraw leaves the page's scroll alone, as it always did."""
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:
-        browser, page, _ = _open(p, live, width=width, pics=True, mobile=True)
-        _open_displays_on_phones(page, ["frame", "kitchen"])
-        page.reload(wait_until="load")
-        page.wait_for_selector(".lu.is-enhanced")
-        sizes = page.evaluate(
-            """() => ['dinner', 'kitchen'].map((id) => {
-              const r = document.querySelector('#lu-row-' + id);
-              const t = r.querySelector('.lu-step .lu-thumb').getBoundingClientRect();
-              const s = r.querySelector('.lu-sep').getBoundingClientRect();
-              const sc = r.querySelector('.lu-strip-scroll').getBoundingClientRect();
-              return {w: t.width, h: t.height, sep: s.width, strip: sc.width};
-            })"""
+        browser, page, _ = _open(p, live, pics=True)
+        _put(page, "#lu-row-kitchen > .lu-row-head", 250)
+        assert page.evaluate("scrollY") > 83
+        # Any other redraw (what search, a filter or the view switch calls).
+        page.evaluate(_JUMPY_REDRAW % "TesseraeLineups.render();")
+        assert page.evaluate("scrollY") == 83
+        # Typing in search redraws without pinning a header either.
+        _put(page, "#lu-row-kitchen > .lu-row-head", 250)
+        before = page.evaluate("scrollY")
+        page.evaluate(
+            _JUMPY_REDRAW
+            % """const q = document.querySelector('[data-lu-q]');
+                 q.value = 'e'; q.dispatchEvent(new Event('input', {bubbles: true}));
+                 await new Promise((r) => setTimeout(r, 400));"""
         )
-        portrait, landscape = sizes
-        assert portrait["h"] >= 136 and landscape["h"] >= 86  # was 100 and 62
-        assert portrait["sep"] <= 18 and landscape["sep"] <= 18  # was 34
-        # Three portrait tiles fit across, and the landscape ones more than one.
-        assert 3 * portrait["w"] + 2 * portrait["sep"] <= portrait["strip"]
-        assert landscape["w"] + landscape["sep"] < landscape["strip"]
-        assert page.evaluate("document.documentElement.scrollWidth - innerWidth") <= 0
+        assert before > 83 and page.evaluate("scrollY") == 83
+        assert page._lu_errors == []
+        browser.close()
+
+
+def test_folding_at_the_top_of_a_short_page_leaves_no_gap(live: str) -> None:
+    """The spacer only ever holds up a page that is scrolled: at its top nothing
+    can jump, so nothing is added between the cards and the footer."""
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser, page, _ = _open(p, live, pics=True)
+        page.set_viewport_size({"width": 1440, "height": 6000})
+        assert page.evaluate("scrollY") == 0
+        assert page.evaluate("document.documentElement.scrollHeight <= innerHeight")
+        hold = page.locator(".lu-hold")
+        for sel in (
+            '#lu-row-kitchen [data-fold="kitchen"]',
+            '[data-collapse="kitchen"]',
+            '[data-collapse="frame"]',
+        ):
+            _press(page, sel)
+            _settle(page)
+            assert hold.is_hidden() and hold.evaluate("(e) => e.offsetHeight") == 0, sel
+        # Scrolled down a page that does scroll, it still does its job: the last
+        # row folds without the page jumping, and the spacer goes once the page
+        # is back at its top.
+        page.set_viewport_size({"width": 1440, "height": 700})
+        for sel in ('[data-collapse="frame"]', '[data-collapse="kitchen"]'):
+            _press(page, sel)
+            _settle(page)
+        head = "#lu-row-kitchen > .lu-row-head"
+        if "is-folded" in (page.locator("#lu-row-kitchen").get_attribute("class") or ""):
+            _press(page, f"{head} .lu-fold")
+            _settle(page)
+        _put(page, head, 300)
+        assert page.evaluate("scrollY") > 0
+        before = _top(page, head)
+        _press(page, f"{head} .lu-fold")
+        _settle(page)
+        assert abs(_top(page, head) - before) <= 1
+        assert hold.evaluate("(e) => e.offsetHeight") > 0
+        page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
+        page.wait_for_function("document.querySelector('.lu-hold').hidden")
+        assert page._lu_errors == []
+        browser.close()
+
+
+def test_a_second_press_while_a_display_slides_shut_is_not_undone(live: str) -> None:
+    """Shut, then open again before the slide has finished: the first press's
+    redraw must not arrive late, cut the opening slide short and take focus."""
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser, page, _ = _open(p, live, pics=True)
+        page.evaluate(
+            """() => {
+              const host = document.querySelector('[data-lu-displays]');
+              const orig = host.replaceChildren.bind(host);
+              window.__redraws = 0;
+              host.replaceChildren = (...a) => { window.__redraws += 1; orig(...a); };
+              document.querySelector('[data-collapse="kitchen"]').click();
+              document.querySelector('[data-collapse="kitchen"]').click();
+              document.querySelector('[data-lu-q]').focus();
+            }"""
+        )
+        assert page.evaluate(f"() => {_SLIDES}.length") == 1  # sliding open
+        page.wait_for_timeout(500)  # well past the 170ms shut slide
+        _settle(page)
+        assert page.evaluate("window.__redraws") == 1
+        assert page.locator("#lu-dsb-kitchen").is_visible()
+        assert "is-collapsed" not in (
+            page.locator('.lu-ds[data-display="kitchen"]').get_attribute("class") or ""
+        )
+        assert page.evaluate("document.activeElement.matches('[data-lu-q]')")
+        assert page._lu_errors == []
         browser.close()

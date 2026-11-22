@@ -21,7 +21,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
-- Lineups: folding a row or display keeps it in place instead of jumping the page (Safari, and near the end of the page), and rows slide open and shut. Phones get bigger dashboard tiles with slimmer arrows.
+- Lineups: folding a row or display keeps it in place instead of jumping the page (Safari, and near the end of the page), and so does the page's own refresh. Rows and displays slide open and shut.
 - Single-widget dashboards use the dashboard Look controls, while keeping saved cell overrides and Zoom editable.
 - Device page: a button map that fails to save stays in the editor as you typed it, so you can fix the mistake instead of retyping the map. The error is still shown, and the saved map is unchanged. (#588)
 - Device page: a save whose button map fails no longer shows a "saved" message listing sections you didn't touch. If something else on the page changed, the message says it saved everything except the button map; if nothing else changed, only the button map's error shows. (#588)

@@ -4356,28 +4356,6 @@ main.page.lu-page {
 }
 
 /* ----- Phones ------------------------------------------------------------ */
-/* A phone-width card gives the dashboards the room: taller tiles (two
-   landscape tiles side by side at 360px, three portrait ones and a peek) and
-   slim arrows between them. */
-@container lu-ds (max-width: 560px) {
-  .lu .lu-strip {
-    --tile-h: 140px;
-  }
-  .lu .lu-strip.l {
-    --th: 88px;
-  }
-  .lu .lu-sep {
-    width: 16px;
-    font-size: 14px;
-  }
-  .lu .lu-sep.loop {
-    width: 18px;
-    font-size: 13px;
-  }
-  .lu .lu-sep.else {
-    padding-inline: 5px;
-  }
-}
 /* The Filters button only exists for phones; elsewhere the selects sit inline. */
 .lu .lu-tb-filters {
   display: contents;
