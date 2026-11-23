@@ -1096,6 +1096,41 @@ def test_a_widget_declaring_a_list_and_a_draw_draws_when_it_lists_nothing(
         assert dashboard_summary(listed)["items"]["mode"] == "pick"
 
 
+def test_a_list_cut_short_counts_what_the_widget_says_it_draws_from(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.lineup_editor import dashboard_summary
+    from app.step_items import list_items, step_items
+
+    manifest = {"lineups": {"pin_option": "pinned_asset", "draw": True}}
+    listing = [{"key": f"k{i}", "label": f"Photo {i}"} for i in range(5)]
+    _install(
+        app,
+        monkeypatch,
+        capped={
+            "manifest": manifest,
+            "module": SimpleNamespace(
+                lineup_items=lambda o: listing, lineup_item_count=lambda o: 1700
+            ),
+        },
+        fewer={
+            "manifest": manifest,
+            "module": SimpleNamespace(
+                lineup_items=lambda o: listing, lineup_item_count=lambda o: 3
+            ),
+        },
+    )
+    with app.test_request_context():
+        capped = _widget_page(app, "capped", {}, "p1")
+        assert dashboard_summary(capped)["items"]["count"] == 1700
+        assert step_items(capped)[0] == 1700
+        page = list_items(capped)
+        # The grid still pages over what was listed.
+        assert (page.mode, page.total, page.matched, len(page.items)) == ("pick", 1700, 5, 5)
+        # A count below the list never shrinks it.
+        assert dashboard_summary(_widget_page(app, "fewer", {}, "p2"))["items"]["count"] == 5
+
+
 def test_recent_sent_lists_the_pictures_a_dashboard_sent_newest_first(app: Flask) -> None:
     import hashlib
     import io
