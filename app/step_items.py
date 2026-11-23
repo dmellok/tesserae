@@ -29,7 +29,8 @@ cached file, ``n`` is how many turns past the current one it looks.
 A draw widget may also report how many items it draws from, so the lineup
 editor can say "212 photos" instead of "draw": give its server module
 ``lineup_item_count(options) -> int | None`` (optional; None or an error means
-unknown). A widget may name its items for the editor with ``"lineups": {"noun":
+unknown). A widget that lists its items may give it too: when its list stops
+short of everything it draws from, the larger count is the one shown. A widget may name its items for the editor with ``"lineups": {"noun":
 "papers"}`` (plural; "items" when absent, "photos" for the gallery).
 
 A widget that is not installed, or declares nothing, shows one thing and reports
@@ -377,7 +378,9 @@ def _declared_items(
         if len(listed) == 1:
             return None
         items = tuple(_declared_infos(listed, MAX_STEP_ITEMS))
-        return StepItems(str(cell.id), option, len(listed), items)
+        rest = {k: v for k, v in dict(cell.options).items() if k != option}
+        count = _declared_total(plugin_id, rest, len(listed), ctx)
+        return StepItems(str(cell.id), option, count, items)
 
     return provide
 
@@ -649,6 +652,16 @@ def _draw_count(plugin_id: str, options: dict[str, Any], ctx: dict[str, Any] | N
     return n if isinstance(n, int) and not isinstance(n, bool) and n > 0 else 0
 
 
+def _declared_total(
+    plugin_id: str, options: dict[str, Any], listed: int, ctx: dict[str, Any] | None = None
+) -> int:
+    """How many items a listing widget draws from: what it listed, or its
+    optional ``lineup_item_count`` when that says more. A widget may stop its
+    list short (a big album, say) while it still draws from every item, so
+    the count must not read as the list's own cap."""
+    return max(listed, _draw_count(plugin_id, options, ctx)) if listed else listed
+
+
 def _declared_listing(
     plugin_id: str, option: str, options: dict[str, Any], ctx: dict[str, Any] | None = None
 ) -> list[ItemInfo]:
@@ -708,9 +721,10 @@ def list_items(
     if isinstance(option, str) and option and (every or pinned or declared.get("draw") is not True):
         label = next((it.label for it in every if it.key == pinned), pinned)
         kept = [it for it in every if not q or q in it.label.casefold() or q in it.key.casefold()]
+        rest = {k: v for k, v in options.items() if k != option}
         return ItemPage(
             "pick" if len(every) > 1 else "none",
-            len(every),
+            _declared_total(plugin_id, rest, len(every), ctx),
             len(kept),
             offset,
             tuple(kept[offset : offset + limit]),
