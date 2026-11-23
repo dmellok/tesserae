@@ -42,6 +42,7 @@ from typing import Any
 
 from PIL import Image, ImageEnhance
 
+from app.dither_regions import buffer_flat_mask, paste_flat
 from app.quantizer import (
     INKY_7COLOUR_PALETTE,
     WAVESHARE_E6_PALETTE,
@@ -123,6 +124,16 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
     # aspects disagree, 180° more for ``panel.flip``). Only a reported
     # buffer counts; a preset guess leaves the composition dims alone.
     native_w, native_h = panel.declared_native or (panel.w, panel.h)
+    # A Flat cell is drawn in the nearest ink, with no dither (#601).
+    flat_mask = buffer_flat_mask(
+        settings,
+        comp_w=img.width,
+        comp_h=img.height,
+        buffer_w=native_w,
+        buffer_h=native_h,
+        flip=panel.flip,
+        underscan=panel.underscan,
+    )
     img = orient_onto_buffer(img, buffer_w=native_w, buffer_h=native_h, flip=panel.flip)
 
     if panel.underscan:
@@ -149,6 +160,9 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
         str(_setting(settings, "dither")), Image.Dither.FLOYDSTEINBERG
     )
     indexed = img.convert("RGB").quantize(palette=pal_img, dither=dither_mode)
+    if flat_mask is not None:
+        flat = img.convert("RGB").quantize(palette=pal_img, dither=Image.Dither.NONE)
+        indexed = paste_flat(indexed, flat, flat_mask)
 
     buf = io.BytesIO()
     indexed.save(buf, format="PNG", optimize=True)

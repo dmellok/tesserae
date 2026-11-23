@@ -34,6 +34,7 @@ from typing import Any
 
 from PIL import Image, ImageEnhance
 
+from app.dither_regions import buffer_flat_mask, paste_flat
 from app.png_gray import encode_gray_png, level_indices
 from app.quantizer import (
     GRAY_4_PALETTE,
@@ -82,6 +83,16 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
 
     # Only a buffer the device itself reported counts (see trmnl_png).
     native_w, native_h = panel.declared_native or (panel.w, panel.h)
+    # A Flat cell is drawn in the nearest ink, with no dither (#601).
+    flat_mask = buffer_flat_mask(
+        settings,
+        comp_w=img.width,
+        comp_h=img.height,
+        buffer_w=native_w,
+        buffer_h=native_h,
+        flip=panel.flip,
+        underscan=panel.underscan,
+    )
     img = orient_onto_buffer(img, buffer_w=native_w, buffer_h=native_h, flip=panel.flip)
 
     if panel.underscan:
@@ -93,6 +104,8 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
 
     ramp = _grey_ramp(settings)
     grey_rgb = quantize(img, dither=str(_setting(settings, "dither")), palette=ramp)
+    if flat_mask is not None:
+        grey_rgb = paste_flat(grey_rgb, quantize(img, dither="none", palette=ramp), flat_mask)
     return encode_gray_png(level_indices(grey_rgb, ramp), bit_depth=2)
 
 

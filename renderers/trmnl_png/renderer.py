@@ -37,6 +37,7 @@ from typing import Any
 
 from PIL import Image, ImageEnhance
 
+from app.dither_regions import buffer_flat_mask, paste_flat
 from app.quantizer import fit_to_panel, orient_onto_buffer, quantize, underscan_image
 from app.state.page_store import Panel
 
@@ -90,6 +91,16 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
     # the composition correctly (same gate the CircuitPython renderers
     # use, issue #200 / #275).
     native_w, native_h = panel.declared_native or (panel.w, panel.h)
+    # A Flat cell is drawn in the nearest ink, with no dither (#601).
+    flat_mask = buffer_flat_mask(
+        settings,
+        comp_w=img.width,
+        comp_h=img.height,
+        buffer_w=native_w,
+        buffer_h=native_h,
+        flip=panel.flip,
+        underscan=panel.underscan,
+    )
     img = orient_onto_buffer(img, buffer_w=native_w, buffer_h=native_h, flip=panel.flip)
 
     if panel.underscan:
@@ -108,6 +119,9 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
 
     dither = str(_setting(settings, "dither"))
     dithered_rgb = quantize(img, dither=dither, palette=_MONO_PALETTE)
+    if flat_mask is not None:
+        flat = quantize(img, dither="none", palette=_MONO_PALETTE)
+        dithered_rgb = paste_flat(dithered_rgb, flat, flat_mask)
 
     # Convert to 1-bit mode for the smallest possible PNG. Pillow's
     # ``convert("1")`` re-thresholds since we're already a 2-colour

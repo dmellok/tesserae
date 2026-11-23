@@ -45,6 +45,7 @@ from typing import Any
 
 from PIL import Image, ImageEnhance
 
+from app.dither_regions import buffer_flat_mask, paste_flat
 from app.quantizer import (
     fit_to_panel,
     orient_onto_buffer,
@@ -81,6 +82,16 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
     # TRMNL and CircuitPython PNG renderers, issue #200): a preset guess
     # would reshape frames for a reader already painting correctly.
     native_w, native_h = panel.declared_native or (panel.w, panel.h)
+    # A Flat cell is drawn in the nearest ink, with no dither (#601).
+    flat_mask = buffer_flat_mask(
+        settings,
+        comp_w=img.width,
+        comp_h=img.height,
+        buffer_w=native_w,
+        buffer_h=native_h,
+        flip=panel.flip,
+        underscan=panel.underscan,
+    )
     img = orient_onto_buffer(img, buffer_w=native_w, buffer_h=native_h, flip=panel.flip)
 
     if panel.underscan:
@@ -93,6 +104,8 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
         img = ImageEnhance.Contrast(img.convert("RGB")).enhance(contrast)
 
     out = quantize_kaleido3(img, dither=_setting(settings, "dither"))
+    if flat_mask is not None:
+        out = paste_flat(out, quantize_kaleido3(img, dither="none"), flat_mask)
     buf = io.BytesIO()
     out.save(buf, format="PNG", optimize=True)
     return buf.getvalue()
