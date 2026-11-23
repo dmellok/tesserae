@@ -9,6 +9,12 @@ small allow-list of options:
 * ``mqtt_host`` / ``mqtt_port`` / ``mqtt_username`` / ``mqtt_password``
   → ``broker.*`` in the settings store
 
+When ``mqtt_username`` is blank, the broker credentials come from
+Supervisor's MQTT service instead (``GET http://supervisor/services/mqtt``),
+the way other apps such as zigbee2mqtt get them (#600). Values entered in
+the options still win: Supervisor's answer is used only for a blank
+username, and only when the options name no other host.
+
 Override-every-start: HA Configuration is the canonical source for the
 fields it covers. The matching Tesserae UI fields are hidden under HA
 so the user has one place to manage broker connection details.
@@ -25,6 +31,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -119,6 +127,58 @@ def apply_to_settings(options: dict[str, Any], settings: SettingsStore) -> None:
         logger.info("HA add-on: applied broker config (%d field(s))", len(patch))
 
 
+SUPERVISOR_MQTT_URL = "http://supervisor/services/mqtt"
+
+
+def fetch_supervisor_mqtt() -> dict[str, Any] | None:
+    """Ask Supervisor for the MQTT service, or None when it has none.
+
+    Supervisor answers ``{"result": "ok", "data": {host, port, ssl, username,
+    password, ...}}`` for an app that declares ``services: [mqtt:want]``, and
+    an error when no broker app provides the service."""
+    token = os.environ.get("SUPERVISOR_TOKEN", "").strip()
+    if not token:
+        return None
+    req = urllib.request.Request(SUPERVISOR_MQTT_URL, headers={"Authorization": f"Bearer {token}"})
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, json.JSONDecodeError, OSError) as err:
+        logger.info("HA add-on: no MQTT service from Supervisor (%s)", err)
+        return None
+    data = payload.get("data") if isinstance(payload, dict) else None
+    return data if isinstance(data, dict) and data.get("host") else None
+
+
+def _broker_patch_from_supervisor(
+    options: dict[str, Any], service: dict[str, Any]
+) -> dict[str, Any]:
+    """Broker keys from Supervisor's MQTT service, or {} when the options decide.
+
+    The options win: a username entered there, or a host other than the
+    service's (an anonymous broker elsewhere), keeps the service out. A TLS
+    service is not applied, because the broker settings have no TLS option and
+    a plain connection to a TLS port would only fail."""
+    if str(options.get("mqtt_username") or "").strip():
+        return {}
+    entered_host = str(options.get("mqtt_host") or "").strip()
+    host = str(service.get("host") or "").strip()
+    if entered_host and entered_host != host:
+        return {}
+    if service.get("ssl"):
+        logger.warning(
+            "HA add-on: Supervisor's MQTT service uses TLS, which Tesserae does not support; not applied"
+        )
+        return {}
+    patch: dict[str, Any] = {"host": host}
+    port = service.get("port")
+    if isinstance(port, int) and 1 <= port <= 65535:
+        patch["port"] = port
+    patch["username"] = str(service.get("username") or "").strip()
+    patch["password_secret"] = str(service.get("password") or "")
+    return patch
+
+
 def is_ha_addon() -> bool:
     """True iff the runtime smells like an HA Add-on container.
 
@@ -143,4 +203,12 @@ def apply_ha_options(
         return None
     apply_log_level(options)
     apply_to_settings(options, settings)
+    if is_ha_addon() and not str(options.get("mqtt_username") or "").strip():
+        service = fetch_supervisor_mqtt()
+        patch = _broker_patch_from_supervisor(options, service) if service else {}
+        if patch:
+            settings.patch_section("broker", patch)
+            logger.info(
+                "HA add-on: applied the MQTT service from Supervisor (host %s)", patch["host"]
+            )
     return options
