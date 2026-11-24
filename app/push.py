@@ -3244,10 +3244,10 @@ class PushManager:
             # Reused by _publish_artifact below, so no double resolution.
             render_settings = self._resolve_render_settings(renderer, image_fit=image_fit)
             # Per-cell dither map (issue #86) only reaches the server-side
-            # quantise renderers (the .bin family and the CircuitPython
-            # indexed files). PNG renderers (pi_png, trmnl_*) quantise on the
-            # client, so the key is meaningless to them and is left off to
-            # keep their render signature stable.
+            # quantise renderers (the .bin family, the CircuitPython indexed
+            # files, and the TRMNL PNG and Kaleido renderers, #601). pi_png
+            # quantises on the client, so the key is meaningless to it and is
+            # left off to keep its render signature stable.
             if dither_regions is not None and renderer_takes_regions(
                 renderer.id, renderer.extension
             ):

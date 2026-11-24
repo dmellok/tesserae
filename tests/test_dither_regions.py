@@ -227,4 +227,6 @@ def test_only_server_quantising_renderers_take_regions() -> None:
     assert renderer_takes_regions("circuitpython_png", "png")
     assert renderer_takes_regions("circuitpython_bmp__frame", "bmp")
     assert not renderer_takes_regions("pi_png", "png")
-    assert not renderer_takes_regions("trmnl_png", "png")
+    # The TRMNL PNG and Kaleido renderers quantise on the server (#601).
+    assert renderer_takes_regions("trmnl_png", "png")
+    assert renderer_takes_regions("kaleido_png", "png")

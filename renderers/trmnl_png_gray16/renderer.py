@@ -54,6 +54,7 @@ from typing import Any
 
 from PIL import Image, ImageEnhance
 
+from app.dither_regions import buffer_flat_mask, paste_flat
 from app.quantizer import (
     GRAY_16_PALETTE,
     fit_to_panel,
@@ -138,6 +139,16 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
     # the composition correctly (same gate the CircuitPython renderers
     # use, issue #200 / #275).
     native_w, native_h = panel.declared_native or (panel.w, panel.h)
+    # A Flat cell is drawn in the nearest ink, with no dither (#601).
+    flat_mask = buffer_flat_mask(
+        settings,
+        comp_w=img.width,
+        comp_h=img.height,
+        buffer_w=native_w,
+        buffer_h=native_h,
+        flip=panel.flip,
+        underscan=panel.underscan,
+    )
     img = orient_onto_buffer(img, buffer_w=native_w, buffer_h=native_h, flip=panel.flip)
 
     if panel.underscan:
@@ -153,6 +164,8 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
     dither = str(_setting(settings, "dither"))
     ramp = _grey_ramp(settings)
     grey_rgb = quantize(img, dither=dither, palette=ramp)
+    if flat_mask is not None:
+        grey_rgb = paste_flat(grey_rgb, quantize(img, dither="none", palette=ramp), flat_mask)
 
     if _png_bit_depth(settings) == 4:
         # True 4-bit greyscale PNG (colour type 0): each sample is the level

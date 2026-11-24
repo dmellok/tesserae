@@ -80,9 +80,20 @@ def regions_from_page(page: Page) -> list[dict[str, Any]]:
 
 
 # Renderers outside the ``.bin`` family that also quantise on the server and
-# apply the region mask. Every other non-``.bin`` renderer (pi_png, trmnl_*)
-# leaves quantising to the client, so the regions mean nothing to it.
-_INDEXED_REGION_RENDERERS = frozenset({"circuitpython_png", "circuitpython_bmp"})
+# apply the region mask. The TRMNL PNG renderers and ``kaleido_png`` quantise
+# on the server too (each calls the quantiser itself before it encodes the
+# PNG), so a Flat cell can be honoured there as well (#601).
+_INDEXED_REGION_RENDERERS = frozenset(
+    {
+        "circuitpython_png",
+        "circuitpython_bmp",
+        "trmnl_png",
+        "trmnl_png_color",
+        "trmnl_png_gray16",
+        "trmnl_png_gray4",
+        "kaleido_png",
+    }
+)
 
 
 def renderer_takes_regions(renderer_id: str, extension: str) -> bool:
@@ -180,3 +191,47 @@ def transform_mask(
     if vflip:
         m = m.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
     return m
+
+
+def buffer_flat_mask(
+    settings: dict[str, Any],
+    *,
+    comp_w: int,
+    comp_h: int,
+    buffer_w: int,
+    buffer_h: int,
+    flip: bool,
+    underscan: int,
+) -> Image.Image | None:
+    """The Flat-cell mask on the buffer a PNG renderer paints, or None.
+
+    Follows :func:`app.quantizer.orient_onto_buffer` and ``underscan_image``,
+    the geometry every TRMNL PNG renderer and ``kaleido_png`` applies: a 90°
+    clockwise turn when the composition aspect disagrees with the buffer's,
+    180° more for ``flip``, a stretch to the buffer dims, then the underscan
+    inset. None when no region forces nearest colour, so a frame without a
+    Flat cell is quantised exactly as before."""
+    regions = settings.get("_dither_regions")
+    if not isinstance(regions, list) or not has_nearest_region(regions):
+        return None
+    mask = rasterize_region_mask(regions, comp_w, comp_h)
+    rotate = -90 if (buffer_w > buffer_h) != (comp_w > comp_h) else 0
+    return transform_mask(
+        mask,
+        native_w=buffer_w,
+        native_h=buffer_h,
+        rotate=rotate,
+        flip=flip,
+        underscan=int(underscan or 0),
+    )
+
+
+def paste_flat(dithered: Image.Image, flat: Image.Image, mask: Image.Image | None) -> Image.Image:
+    """``dithered`` with ``flat`` (the same frame quantised with no dither)
+    inside ``mask``. Both images come from one quantiser and palette, so they
+    share a mode and, for a palette image, the palette indices."""
+    if mask is None:
+        return dithered
+    out = dithered.copy()
+    out.paste(flat, (0, 0), mask)
+    return out
