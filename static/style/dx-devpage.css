@@ -1671,15 +1671,29 @@
 .dx-dp .dx-remove-text .dx-help {
   margin-top: 6px;
 }
+/* The form opens in the page, under its button. settings.css still styles
+   .dx-delete-form as the floating popover it used to be (position: absolute,
+   bottom: 40px), which put it far up the page, out of sight (#610); every
+   popover property is reset here. */
 .dx-dp .dx-delete-form {
+  position: static;
+  width: auto;
   flex-basis: 100%;
   max-width: 70ch;
   margin: 4px 0 0;
-  padding-top: 20px;
+  padding: 20px 0 0;
+  border: 0;
   border-top: 1px solid var(--dp-hair);
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+:root[data-theme="dark"] .dx-dp .dx-delete-form {
+  background: none;
+  border-color: var(--dp-hair);
 }
 .dx-dp .dx-delete-form[hidden] {
   display: none;

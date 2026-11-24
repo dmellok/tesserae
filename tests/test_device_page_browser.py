@@ -225,6 +225,22 @@ def test_more_menu_and_delete_work_from_the_keyboard(live: tuple[str, Flask], br
     pg.context.close()
 
 
+def test_delete_confirmation_opens_under_its_button(live: tuple[str, Flask], browser: Any) -> None:
+    # #610: an old popover rule (position: absolute, bottom: 40px) still
+    # matched the form, so it opened far up the page, out of sight.
+    base, _app = live
+    pg = _open(browser, f"{base}/settings/devices/study")
+    pg.click("[data-del-open]")
+    form = pg.locator("[data-del-form]")
+    assert form.evaluate("el => getComputedStyle(el).position") == "static"
+    btn_box = pg.locator("[data-del-open]").bounding_box()
+    form_box = form.bounding_box()
+    sec_box = pg.locator("#remove").bounding_box()
+    assert form_box["y"] >= btn_box["y"] + btn_box["height"] - 1, (form_box, btn_box)
+    assert form_box["y"] + form_box["height"] <= sec_box["y"] + sec_box["height"] + 1
+    pg.context.close()
+
+
 def test_logs_and_frame_log_show_all_on_request(live: tuple[str, Flask], browser: Any) -> None:
     base, _app = live
     pg = _open(browser, f"{base}/settings/devices/kitchen")
