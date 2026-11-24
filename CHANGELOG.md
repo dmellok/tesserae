@@ -28,6 +28,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- Display page: **Delete** in the Remove section opens its confirmation right under the button. It was opening far up the page, out of sight, so the button looked as if it did nothing. (#610)
 - A cell set to **Flat** is drawn in the nearest ink, with no dithering, on TRMNL displays (`trmnl_png`, `trmnl_png_color`, `trmnl_png_gray16`, `trmnl_png_gray4`) and Kaleido displays (`kaleido_png`), in the preview and on the panel. These renderers ignored the setting, so the choice did nothing on those displays. (#601)
 - Dashboard editor: the **Done drawing** button beside the preview is white on black, like **Edit on preview**, instead of black on black, and keeps its colours under the pointer. (#607)
 - Lineups: folding a row or display keeps it in place instead of jumping the page (Safari, and near the end of the page), and so does the page's own refresh. Rows and displays slide open and shut.
