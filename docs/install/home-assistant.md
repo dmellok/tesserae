@@ -29,6 +29,13 @@ publishes the Tesserae App to Home Assistant Supervisor.
 Use the App's **Configuration** tab for the log level and MQTT connection settings.
 The broker settings are host, port, username and password.
 
+With HA's Mosquitto broker App, the username and password are optional. Leave
+the username blank and Tesserae takes the broker's host, port and credentials
+from Supervisor's MQTT service, the way other Apps do. A username you enter is
+used as given, and so is a host other than the Mosquitto App's. A broker that
+Supervisor reports with TLS is not applied, because Tesserae has no TLS broker
+option; enter the connection details yourself in that case.
+
 Change everything else in Tesserae's Settings. Those changes are saved in `/data`.
 
 ### What the App does for you

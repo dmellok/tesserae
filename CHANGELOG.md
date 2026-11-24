@@ -8,6 +8,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Home Assistant App: MQTT credentials are optional with HA's Mosquitto broker App. With the username left blank, Tesserae takes the broker's host, port, username and password from Supervisor's MQTT service, as zigbee2mqtt and other Apps do. Credentials entered in the App options are used as given, a host other than the service's is kept, and a broker Supervisor reports with TLS is not applied. The App's `config.yaml` still has to declare `services: [mqtt:want]` for Supervisor to offer the service. (#600)
 - Lineups: a rotation step shows its dashboard's refresh interval beside its position, photo widgets show their order on the item badge, and frames that are always on with no connection of their own (Meural, Samsung The Frame) say Always on.
 - Webpage widget: **Show** can be **An HTML snippet** instead of a web address. Paste embed code, such as a transit operator's departure board (a `<div>` and a `<script src>`), and it runs in the cell without being hosted on a page of your own first. The snippet runs in a sandboxed frame of its own: its scripts load what they need from the web, but they can't reach Tesserae's pages, your sign-in or settings. An embed that needs cookies or local storage still needs a page of its own. Saved cells keep showing their web address. (discussion #8)
 - Export one display from its own page: **Export this display** in the More menu downloads just that display, without its access token. The export form on Settings › Devices gains **Select all** and **Clear all**. (#541)
@@ -28,6 +29,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 ### Fixed
 
 - A cell set to **Flat** is drawn in the nearest ink, with no dithering, on TRMNL displays (`trmnl_png`, `trmnl_png_color`, `trmnl_png_gray16`, `trmnl_png_gray4`) and Kaleido displays (`kaleido_png`), in the preview and on the panel. These renderers ignored the setting, so the choice did nothing on those displays. (#601)
+- Dashboard editor: the **Done drawing** button beside the preview is white on black, like **Edit on preview**, instead of black on black, and keeps its colours under the pointer. (#607)
 - Lineups: folding a row or display keeps it in place instead of jumping the page (Safari, and near the end of the page), and so does the page's own refresh. Rows and displays slide open and shut.
 - Lineups no longer waits for a running push before it loads.
 - A dashboard's own refresh no longer re-sends it to a display whose lineup rules it out. When a step's conditions fail (and no schedule names the dashboard for that display), its refreshes skip that display until the conditions pass again, whether the lineup or a manual push put it there. A display on a manual hold keeps refreshing.
@@ -35,6 +37,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - Device page: a button map that fails to save stays in the editor as you typed it, so you can fix the mistake instead of retyping the map. The error is still shown, and the saved map is unchanged. (#588)
 - Device page: a save whose button map fails no longer shows a "saved" message listing sections you didn't touch. If something else on the page changed, the message says it saved everything except the button map; if nothing else changed, only the button map's error shows. (#588)
 - A copy of a display's file in `data/devices/`, such as `kitchen.bak.json` or an editor's `.kitchen.json`, no longer loads as a second display holding the same token. Device ids never contain a dot, so such files are skipped with a note in the server log. (#541)
+- Lineups: a widget whose photo list stops short of everything it draws from shows its real count. An Immich album of 1,700 photos read as 1,000, the most the list holds, though the frame was always drawing from the whole album.
 - Clarify Lineups header hierarchy and link dashboard and lineup names to their editors.
 - Fix always-on lineup update timing, daily refresh counts and delivery status.
 
