@@ -27,6 +27,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- Dashboard editor: the **Done drawing** button beside the preview is white on black, like **Edit on preview**, instead of black on black, and keeps its colours under the pointer. (#607)
 - Lineups: folding a row or display keeps it in place instead of jumping the page (Safari, and near the end of the page), and so does the page's own refresh. Rows and displays slide open and shut.
 - Lineups no longer waits for a running push before it loads.
 - A dashboard's own refresh no longer re-sends it to a display whose lineup rules it out. When a step's conditions fail (and no schedule names the dashboard for that display), its refreshes skip that display until the conditions pass again, whether the lineup or a manual push put it there. A display on a manual hold keeps refreshing.

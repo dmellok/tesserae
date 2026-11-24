@@ -623,8 +623,12 @@
   }
 }
 
-/* Done drawing, next to the preview's other controls (shown in edit mode). */
-.ev2pv-done {
+/* Done drawing, next to the preview's other controls (shown in edit mode).
+   Scoped like the editor's primary button: the editor's button reset
+   (:is(.ev2, ...) button, color: inherit) and the shell's button:hover both
+   outrank a bare class, which drew it black on black, and black on white
+   under the pointer (#607). */
+:is(.ev2, .ev2-bar) .ev2pv-done {
   height: var(--ev2-control-sm, 32px);
   margin: 0 0 0 var(--ev2-gap-tight, 8px);
   padding: 0 var(--t-space-3, 12px);
@@ -636,6 +640,12 @@
   font-size: var(--ev2-fs-label, 13px);
   font-weight: 600;
   cursor: pointer;
+}
+:is(.ev2, .ev2-bar) .ev2pv-done:hover {
+  background: var(--t-fg);
+  border-color: var(--t-fg);
+  color: var(--t-surface);
+  opacity: 0.88;
 }
 .ev2pv-done[hidden] {
   display: none;
@@ -651,7 +661,7 @@
   .ev2pv-tab-dims {
     white-space: nowrap;
   }
-  .ev2pv-done {
+  :is(.ev2, .ev2-bar) .ev2pv-done {
     min-height: 44px;
   }
 }

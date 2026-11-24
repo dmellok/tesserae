@@ -1191,3 +1191,28 @@ def test_phone_swap_widgets_with_the_move_buttons(phone_server: tuple[str, Flask
     assert _cell(app, "medit", "c2").plugin == "weather_now"
     assert not errors
     browser.close()
+
+
+def test_done_drawing_reads_on_its_own_background(server: tuple[str, Flask], pw: Any) -> None:
+    # #607: the editor's button reset and the shell's button:hover outranked
+    # the bare class, so Done drawing was black on black, and black on white
+    # under the pointer.
+    base, _app = server
+    browser, page, errors = _open(pw, base)
+    try:
+        page.locator('[data-ev2-toggle="layout"]').click()
+        page.locator("[data-ev2-draw]").click()
+        done = page.locator("[data-ev2pv-done]")
+        done.wait_for(state="visible")
+        js = "el => { const s = getComputedStyle(el); return [s.color, s.backgroundColor]; }"
+        idle = done.evaluate(js)
+        draw = page.locator("[data-ev2-draw]").evaluate(js)
+        assert idle[0] != idle[1], idle
+        # The same pair as the pressed Edit on preview beside it.
+        assert idle == draw, (idle, draw)
+        done.hover()
+        hovered = done.evaluate(js)
+        assert hovered == idle, (hovered, idle)
+        assert not errors, errors
+    finally:
+        browser.close()
