@@ -240,6 +240,21 @@ class MeuralPublisher:
         self._app = app
         self._devices = devices
         self._settings = settings
+        stored = settings.get_section("devices") or {}
+        for device in devices.devices.values():
+            if device.kind_of != KIND:
+                continue
+            cfg = stored.get(device.id) or {}
+            cached = cfg.get("meural_sleep_schedule") or {}
+            scope = f"{cfg.get('meural_account_id')}:{cfg.get('cloud_device_id')}"
+            if (
+                cfg.get("meural_refresh_token_secret")
+                and not cfg.get("meural_auth_failed")
+                and cached.get("scope") == scope
+            ):
+                device.manifest["_native_sleep_schedule"] = cached
+            else:
+                device.manifest.pop("_native_sleep_schedule", None)
         self._renders_dir = Path(renders_dir)
         self._latest = latest_render_fn
         self._client = client_factory
@@ -289,9 +304,13 @@ class MeuralPublisher:
             self._wake.wait(POLL_INTERVAL_S)
 
     def _quiet_sleeps(self, device: Device) -> bool:
+        from app.meural_schedule import governs, in_sleep_window, sync_schedule
         from app.quiet_hours import is_in_window, resolve_quiet_hours
         from app.tz_resolve import app_timezone
 
+        schedule = sync_schedule(self._app, device)
+        if governs(schedule):
+            return in_sleep_window(schedule)
         window = resolve_quiet_hours(self._settings.get_section("app") or {}, device)
         if window is None or not window.sleep_through:
             return False
@@ -618,11 +637,24 @@ class MeuralPublisher:
             return True
         owned = self._owns_sleep(device, host)
         quiet = self._quiet(device)
-        if quiet and not sleeping:
+        from app.meural_schedule import STALE_S, governs
+
+        cfg = (self._settings.get_section("devices") or {}).get(device.id) or {}
+        native = cfg.get("meural_sleep_schedule") or {}
+        native_controls_sleep = (
+            bool(cfg.get("meural_refresh_token_secret"))
+            and not cfg.get("meural_auth_failed")
+            and governs(native)
+            and native.get("scope")
+            == f"{cfg.get('meural_account_id')}:{cfg.get('cloud_device_id')}"
+            and time.time() - float(native.get("checked_at") or 0) < STALE_S
+        )
+        # Leave native sleep/wake transitions to the frame, but keep reading status.
+        if not native_controls_sleep and quiet and not sleeping:
             client.set_sleep(True)
             self._save_sleep(device, host)
             sleeping, owned = True, True
-        elif not quiet and owned:
+        elif not native_controls_sleep and not quiet and owned:
             if sleeping:
                 client.set_sleep(False)
             self._save_sleep(device, None)

@@ -1499,6 +1499,20 @@ def _pause_input(device: Any) -> PauseInput | None:
         return None
     if window is None:
         return None
+    if window.native_schedule is not None:
+        # A frame's own schedule (Meural): its one nightly window when it has
+        # one; a schedule that differs by day has no single window to draw.
+        from app.meural_schedule import DAYS
+
+        native = window.native_schedule
+        start, end = native.get("start"), native.get("end")
+        if not start or not end:
+            return None
+        return PauseInput(
+            start_min=int(start[:2]) * 60 + int(start[3:]),
+            end_min=int(end[:2]) * 60 + int(end[3:]),
+            days=tuple(sorted(DAYS.index(d) for d in native.get("days") or [] if d in DAYS)),
+        )
     return PauseInput(
         start_min=window.start.hour * 60 + window.start.minute,
         end_min=window.end.hour * 60 + window.end.minute,

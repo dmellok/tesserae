@@ -438,11 +438,13 @@
         </div>
         {% endif %}
 
+        {% if section.meural_sleep %}{% include "_meural_sleep.html" %}{% endif %}
+
         {# Quiet hours: the override's switch heads the fields it governs;
            off hides them (and disables them, so they are not posted). #}
         {% if section.quiet_hours_endpoint %}
         <div class="dx-grp" id="quiet-hours" data-devsub data-dep-group data-dep-hide>
-          <div class="dx-grp-head"><h3 class="dx-grp-title">Quiet hours</h3></div>
+          <div class="dx-grp-head"><h3 class="dx-grp-title">{{ "Tesserae quiet hours (fallback)" if section.meural_sleep else "Quiet hours" }}</h3></div>
           <div class="dx-fg">
             {{ toggle_fld(section.id ~ '-qh-enabled', 'quiet_hours_enabled', 'Own hours', checked=qh.get('enabled', False),
                 help="On, this display uses only the hours set here and the server's quiet hours don't apply to it. Off, it follows Settings › Server › Quiet hours.",

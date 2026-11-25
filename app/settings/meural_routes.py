@@ -472,3 +472,41 @@ def add_pending_device() -> Response | RedirectResponse | tuple[Response, int]:
         meural_pending.discard_pending()
     rebuild_transport_fn()()
     return redirect(url_for("auth.device_page", instance_id=result.device.id))
+
+
+@bp.route("/settings/devices/<instance_id>/meural/sleep", methods=["GET", "POST"])
+@bp.post("/settings/devices/<instance_id>/meural/sleep/refresh", endpoint="meural_sleep_refresh")
+def meural_sleep(instance_id: str) -> Response | RedirectResponse | tuple[Response, int]:
+    from app.meural_schedule import edit_schedule, sync_schedule
+
+    device = _device(instance_id)
+    try:
+        with frame_lock(current_app, device.id):
+            if request.method == "POST" and not request.path.endswith("/refresh"):
+                data = _request_data()
+                if request.form.get("return_to_device"):
+                    data = {
+                        "start": request.form.get("start"),
+                        "end": request.form.get("end"),
+                        "enabled": request.form.get("enabled") == "1",
+                        "days": request.form.getlist("days"),
+                    }
+                if not isinstance(data, dict):
+                    return jsonify(error="Send the frame sleep settings as JSON."), 400
+                state = edit_schedule(current_app, device, data)
+            else:
+                state = sync_schedule(current_app, device, force=request.method == "POST")
+        if request.form.get("return_to_device"):
+            return redirect(
+                url_for("auth.device_page", instance_id=instance_id, _anchor="frame-sleep")
+            )
+        return jsonify(status="ok", sleep=state)
+    except (meural_auth.MeuralAuthError, meural_auth.HttpError, OSError, ValueError):
+        if request.form.get("return_to_device"):
+            flash("Could not update the frame sleep schedule. Check it in the Meural app.", "error")
+            return redirect(
+                url_for("auth.device_page", instance_id=instance_id, _anchor="frame-sleep")
+            )
+        return jsonify(
+            error="Could not update the frame sleep schedule. Check it in the Meural app."
+        ), 400
