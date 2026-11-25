@@ -29,6 +29,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- A picture still loading when the render's wait ends counts as failed, so an automated send keeps the previous image instead of a blank frame.
 - Display page: **Delete** in the Remove section opens its confirmation right under the button. It was opening far up the page, out of sight, so the button looked as if it did nothing. (#610)
 - A cell set to **Flat** is drawn in the nearest ink, with no dithering, on TRMNL displays (`trmnl_png`, `trmnl_png_color`, `trmnl_png_gray16`, `trmnl_png_gray4`) and Kaleido displays (`kaleido_png`), in the preview and on the panel. These renderers ignored the setting, so the choice did nothing on those displays. (#601)
 - Dashboard editor: the **Done drawing** button beside the preview is white on black, like **Edit on preview**, instead of black on black, and keeps its colours under the pointer. (#607)
@@ -42,6 +43,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - Lineups: a widget whose photo list stops short of everything it draws from shows its real count. An Immich album of 1,700 photos read as 1,000, the most the list holds, though the frame was always drawing from the whole album.
 - Clarify Lineups header hierarchy and link dashboard and lineup names to their editors.
 - Fix always-on lineup update timing, daily refresh counts and delivery status.
+- Documentation: manual install steps were missing chromium install via playwright
 
 ## [0.514.0], 2026-11-18
 
