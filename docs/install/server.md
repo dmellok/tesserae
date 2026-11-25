@@ -116,6 +116,7 @@ git clone https://github.com/dmellok/tesserae.git
 cd tesserae
 python3 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
+.venv/bin/playwright install chromium
 
 .venv/bin/python -m app.main         # production: waitress, port 8765
 .venv/bin/python -m app.main --dev   # Flask dev server: auto-reload + debugger
