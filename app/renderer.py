@@ -502,6 +502,8 @@ def _image_failures(
         return ()
     if not isinstance(urls, list) or not urls:
         urls = ["?"]
+    slow = images.get("slow_urls")
+    slow = set(slow) if isinstance(slow, list) else set()
     out: list[ImageFailure] = []
     for raw in urls:
         url = str(raw)
@@ -517,7 +519,7 @@ def _image_failures(
                 host=host,
                 status=status if isinstance(status, int) else None,
                 status_text=str(info.get("status_text") or ""),
-                error=info.get("error"),
+                error=info.get("error") or ("still loading after 5 s" if url in slow else None),
             )
         )
     return tuple(out)
@@ -566,17 +568,26 @@ _IMAGE_WAIT_JS: Final[str] = """async () => {
     // frame is captured; a picture that fails to decode is left as it is.
     const decoded = [];
     let undecodable = 0;
+    // Pictures not yet loaded and decoded. Any still here when the wait
+    // gives up count as failed: the frame would show their boxes empty.
+    const waiting = new Set();
     const decode = (img) => {
         if (typeof img.decode !== 'function') return;
-        decoded.push(img.decode().catch(() => { undecodable += 1; }));
+        waiting.add(img);
+        decoded.push(
+            img.decode()
+                .catch(() => { undecodable += 1; })
+                .finally(() => waiting.delete(img))
+        );
     };
     for (const img of allImages(document)) {
         total += 1;
         if (img.complete && img.naturalWidth > 0) { decode(img); continue; }
         if (img.complete && !img.naturalWidth) { record(img); continue; }
+        waiting.add(img);
         pending.push(new Promise((resolve) => {
-            const done = () => { decode(img); resolve(); };
-            const failed = () => { record(img); resolve(); };
+            const done = () => { waiting.delete(img); decode(img); resolve(); };
+            const failed = () => { waiting.delete(img); record(img); resolve(); };
             img.addEventListener('load', done, { once: true });
             img.addEventListener('error', failed, { once: true });
         }));
@@ -588,6 +599,10 @@ _IMAGE_WAIT_JS: Final[str] = """async () => {
         settle.then(() => 'done'),
         new Promise((r) => setTimeout(() => r('timeout'), 5000)),
     ]);
+    const slow = [];
+    if (outcome === 'timeout') {
+        for (const img of waiting) { record(img); slow.push(seen[seen.length - 1]); }
+    }
     return {
         total,
         awaited: pending.length,
@@ -596,6 +611,7 @@ _IMAGE_WAIT_JS: Final[str] = """async () => {
         timed_out: outcome === 'timeout',
         failed: seen.length,
         failed_urls: seen.slice(0, 8),
+        slow_urls: slow.slice(0, 8),
     };
 }"""
 
