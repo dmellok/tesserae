@@ -105,6 +105,48 @@ function snippetDocument(html) {
   );
 }
 
+// How the iframe is sized and scaled in the cell, as CSS lengths relative to
+// the cell (percentages, so the cell's own zoom doesn't matter).
+//
+// "fit" gives the page ``viewportW`` logical pixels across and shrinks it
+// until that width fits the cell. Its height is then whatever is left: the
+// page is cut off at the cell's bottom edge. With a render height the page is
+// shrunk until that height fits as well, and centred when that leaves room at
+// the sides, so a page taller than the cell is shown whole (#609).
+//
+// The iframe must not shrink: the widget wrapper is a column flexbox, and a
+// flex item taller than it is squeezed back to the wrapper's height before
+// the transform scales it, which left the page in the top ``scale`` share of
+// the cell with the rest blank (hence ``flex:none`` on the element).
+//
+// A percentage shows the page at that size; the render width and height don't
+// apply, the page sees the cell's own size divided by the scale.
+export function frameGeometry(scaleOpt, viewportW, viewportH, cellWRaw, cellHRaw) {
+  const cellW = Number(cellWRaw) || 1;
+  const cellH = Number(cellHRaw) || 0;
+  if (scaleOpt !== "fit") {
+    const scale = Math.max(0.1, Math.min(1, Number(scaleOpt) / 100));
+    const pct = `${(100 / scale).toFixed(2)}%`;
+    return { scale, width: pct, height: pct, left: "0" };
+  }
+  const byWidth = Math.min(1, cellW / viewportW);
+  if (!(viewportH > 0) || !(cellH > 0)) {
+    const pct = `${(100 / byWidth).toFixed(2)}%`;
+    return { scale: byWidth, width: pct, height: pct, left: "0" };
+  }
+  const scale = Math.min(byWidth, cellH / viewportH);
+  // Never shorter than the cell: a page that fits by width keeps filling it.
+  const pageH = Math.max(viewportH, cellH / scale);
+  const left = Math.max(0, (cellW - viewportW * scale) / 2);
+  return {
+    scale,
+    width: `${((100 * viewportW) / cellW).toFixed(2)}%`,
+    height: `${((100 * pageH) / cellH).toFixed(2)}%`,
+    // A percentage margin is taken from the cell's width, as ``left`` is.
+    left: `${((100 * left) / cellW).toFixed(2)}%`,
+  };
+}
+
 export default async function render(shadow, ctx) {
   const t = ctx?.t || ((key, fallback) => fallback ?? key);
   const opts = ctx?.cell?.options || {};
@@ -112,6 +154,7 @@ export default async function render(shadow, ctx) {
   const url = opts.source === "html" ? "" : String(opts.url || "").trim();
   const scaleOpt = String(opts.scale || "fit");
   const viewportW = Math.max(200, Math.min(4096, Number(opts.viewport_w) || 1280));
+  const viewportH = Math.max(0, Math.min(8192, Number(opts.viewport_h) || 0));
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
 
   if (opts.source === "html" && !snippet) {
@@ -150,15 +193,7 @@ export default async function render(shadow, ctx) {
     return;
   }
 
-  // Compute a target scale. "fit" sizes the iframe to viewport_w
-  // logical pixels and lets CSS scale it down to fit the cell;
-  // numeric options (25/50/75/100) are pinned.
-  const cellW = Number(ctx?.cell?.w) || 1;
-  const scale = scaleOpt === "fit"
-    ? Math.min(1, cellW / viewportW)
-    : Math.max(0.1, Math.min(1, Number(scaleOpt) / 100));
-  const sizedW = `${(100 / scale).toFixed(2)}%`;
-  const sizedH = `${(100 / scale).toFixed(2)}%`;
+  const frame = frameGeometry(scaleOpt, viewportW, viewportH, ctx?.cell?.w, ctx?.cell?.h);
 
   shadow.innerHTML = `
     ${css}
@@ -166,7 +201,7 @@ export default async function render(shadow, ctx) {
       <iframe
         ${snippet ? `srcdoc="${escapeHtml(snippetDocument(snippet))}"` : `src="${escapeHtml(url)}"`}
         sandbox="${snippet ? "allow-scripts" : "allow-same-origin allow-scripts"}"
-        style="border:0;width:${sizedW};height:${sizedH};transform-origin:top left;transform:scale(${scale.toFixed(3)});display:block"
+        style="border:0;flex:none;width:${frame.width};height:${frame.height};margin-left:${frame.left};transform-origin:top left;transform:scale(${frame.scale.toFixed(4)});display:block"
         loading="eager"
         referrerpolicy="no-referrer"></iframe>
     </div>`;

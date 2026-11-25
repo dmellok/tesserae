@@ -49,11 +49,11 @@
       "type": "select",
       "label": "Scale",
       "default": "fit",
-      "help": "Applies to embedded pages. A direct image URL is framed by Image fit instead.",
+      "help": "Applies to embedded pages. Fit shrinks the page until Render width fits across the cell; whatever is below the cell's bottom edge is not shown, unless Render height is set. The percentages show the page at that size and ignore Render width and Render height. A direct image URL is framed by Image fit instead.",
       "choices": [
         {
           "value": "fit",
-          "label": "Fit to cell (no scroll)"
+          "label": "Fit the page's width to the cell"
         },
         {
           "value": "100",
@@ -113,6 +113,17 @@
       "advanced": true,
       "min": 200,
       "max": 4096
+    },
+    {
+      "name": "viewport_h",
+      "unit": "px",
+      "type": "number",
+      "label": "Render height",
+      "help": "How much of the page to show, in pixels from its top. 0 shows as much as fits under the width. With a height set and Scale on Fit, the page is shrunk until both Render width and this height fit in the cell, so a page taller than the cell is shown whole instead of cut off at the bottom.",
+      "default": 0,
+      "advanced": true,
+      "min": 0,
+      "max": 8192
     },
     {
       "name": "settle_seconds",

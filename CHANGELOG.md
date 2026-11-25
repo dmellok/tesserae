@@ -29,6 +29,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- Webpage widget: a scaled page fills its cell again. The page is drawn larger than the cell and scaled down, but it was squeezed back to the cell's height first, so at a scale of 0.64 it covered only the top 64% of the cell and everything below was lost, whatever the render width or scale. A new **Render height** (under the advanced options) says how much of the page to show: with Scale on Fit the page is shrunk until that height fits too, so a page taller than the cell can be shown whole. The Fit choice is labelled for what it does, fitting the width, and the help says the percentages ignore the render width. (#609)
 - A picture still loading when the render's wait ends counts as failed, so an automated send keeps the previous image instead of a blank frame.
 - Display page: **Delete** in the Remove section opens its confirmation right under the button. It was opening far up the page, out of sight, so the button looked as if it did nothing. (#610)
 - A cell set to **Flat** is drawn in the nearest ink, with no dithering, on TRMNL displays (`trmnl_png`, `trmnl_png_color`, `trmnl_png_gray16`, `trmnl_png_gray4`) and Kaleido displays (`kaleido_png`), in the preview and on the panel. These renderers ignored the setting, so the choice did nothing on those displays. (#601)
