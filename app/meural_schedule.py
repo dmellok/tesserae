@@ -24,6 +24,22 @@ CACHE_S = 1800
 # A schedule older than this is not trusted (the cloud may be unreachable).
 STALE_S = 2 * CACHE_S
 DAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+# Saving a schedule to the frame replaces its whole scheduler event list, and
+# that write has not been run against a real frame yet. Until it has, the
+# device page shows the frame's schedule without the form that changes it.
+EDIT_ON_DEVICE_PAGE = False
+
+
+def governs(state: Any) -> bool:
+    """True when the frame's own schedule decides its quiet hours: it was read,
+    its scheduler is on and it has sleep and wake events. A frame with its
+    scheduler off, or with no sleep events, keeps Tesserae's quiet hours."""
+    return bool(
+        isinstance(state, dict)
+        and state.get("available")
+        and state.get("enabled")
+        and state.get("events")
+    )
 
 
 def _hhmm(value: Any, *, colon: bool = False) -> str:
@@ -57,7 +73,7 @@ def _sleep_events(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def in_sleep_window(state: dict[str, Any], now: datetime | None = None) -> bool:
-    if not state.get("available") or not state.get("enabled"):
+    if not governs(state):
         return False
     local = (now or datetime.now(UTC)).astimezone(ZoneInfo(state["timezone"]))
     transitions = []
@@ -134,7 +150,9 @@ def sync_schedule(app: Flask, device: Device, *, force: bool = False) -> dict[st
             start = start[:2] + ":" + start[2:] if start else None
             end = end[:2] + ":" + end[2:] if end else None
             if not data["schedulerEnabled"] or not events:
-                message = "Frame sleep schedule is off (from the frame)."
+                message = (
+                    "Frame sleep schedule is off (from the frame). Using Tesserae quiet hours."
+                )
             elif simple:
                 message = f"Frame sleeps {start}–{end} (from the frame)."
             else:
@@ -143,7 +161,7 @@ def sync_schedule(app: Flask, device: Device, *, force: bool = False) -> dict[st
                 "scope": scope,
                 "source": "frame",
                 "available": True,
-                "can_edit": True,
+                "can_edit": EDIT_ON_DEVICE_PAGE,
                 "synced_at": time.time(),
                 "checked_at": time.time(),
                 "timezone": timezone,

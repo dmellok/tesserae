@@ -215,3 +215,69 @@ def test_sleep_refresh_form_returns_to_the_device(app, provider, monkeypatch):
     )
     assert response.status_code == 302
     assert response.location == "/settings/devices/test_frame#frame-sleep"
+
+
+def _off_or_empty(app, monkeypatch, *, enabled, events):
+    held_frame(app, app.test_client())
+
+    def request(self, method, path, **kw):
+        if path.endswith("/scheduler"):
+            return {"data": {"events": events}}
+        return {"data": {"schedulerEnabled": enabled, "timezone": "America/Phoenix"}}
+
+    monkeypatch.setattr("app.meural_cloud.MeuralCloudClient.request", request)
+
+
+@pytest.mark.parametrize(
+    ("enabled", "events"),
+    [
+        (False, EVENTS),  # scheduler switched off in the Meural app
+        (True, [{"time": "0900", "days": DAYS, "command": "gallery"}]),  # no sleep events
+    ],
+)
+def test_a_frame_with_no_sleep_schedule_keeps_tesserae_quiet_hours(
+    app, provider, monkeypatch, enabled, events
+):
+    from app.meural_schedule import governs, sync_schedule
+    from app.quiet_hours import device_is_quiet
+
+    _off_or_empty(app, monkeypatch, enabled=enabled, events=events)
+    device = app.config["DEVICE_REGISTRY"].get("test_frame")
+    state = sync_schedule(app, device)
+    assert state["available"] and not governs(state)
+    app_hours = {
+        "quiet_hours_enabled": True,
+        "quiet_hours_start": "12:00",
+        "quiet_hours_end": "13:00",
+    }
+    # Tesserae's own window still applies, and the frame's unused one does not.
+    assert device_is_quiet(app_hours, device, datetime(2026, 11, 17, 12, 30, tzinfo=UTC), UTC)
+    assert not device_is_quiet(app_hours, device, datetime(2026, 11, 17, 6, tzinfo=UTC), UTC)
+    page = app.test_client().get("/settings/devices/test_frame").text
+    assert "Tesserae quiet hours (fallback)" in page
+
+
+def test_lineups_draw_the_frame_schedule_as_the_pause(app, provider, monkeypatch):
+    from app.deck_routes import _pause_input
+    from app.meural_schedule import sync_schedule
+
+    schedule(app, monkeypatch)
+    device = app.config["DEVICE_REGISTRY"].get("test_frame")
+    sync_schedule(app, device)
+    with app.test_request_context():
+        pause = _pause_input(device)
+    assert pause is not None
+    assert (pause.start_min, pause.end_min) == (23 * 60, 7 * 60)
+    assert pause.days == (0, 1, 2, 3, 4, 5, 6)
+
+
+def test_the_device_page_does_not_offer_to_change_the_frame_schedule_yet(
+    app, provider, monkeypatch
+):
+    from app.meural_schedule import sync_schedule
+
+    schedule(app, monkeypatch)
+    sync_schedule(app, app.config["DEVICE_REGISTRY"].get("test_frame"))
+    page = app.test_client().get("/settings/devices/test_frame").text
+    assert "Frame sleeps 23:00–07:00 (from the frame)." in page
+    assert "Change frame sleep schedule" not in page

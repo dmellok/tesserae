@@ -304,12 +304,12 @@ class MeuralPublisher:
             self._wake.wait(POLL_INTERVAL_S)
 
     def _quiet_sleeps(self, device: Device) -> bool:
-        from app.meural_schedule import in_sleep_window, sync_schedule
+        from app.meural_schedule import governs, in_sleep_window, sync_schedule
         from app.quiet_hours import is_in_window, resolve_quiet_hours
         from app.tz_resolve import app_timezone
 
         schedule = sync_schedule(self._app, device)
-        if schedule["available"]:
+        if governs(schedule):
             return in_sleep_window(schedule)
         window = resolve_quiet_hours(self._settings.get_section("app") or {}, device)
         if window is None or not window.sleep_through:
@@ -637,14 +637,14 @@ class MeuralPublisher:
             return True
         owned = self._owns_sleep(device, host)
         quiet = self._quiet(device)
-        from app.meural_schedule import STALE_S
+        from app.meural_schedule import STALE_S, governs
 
         cfg = (self._settings.get_section("devices") or {}).get(device.id) or {}
         native = cfg.get("meural_sleep_schedule") or {}
         native_controls_sleep = (
             bool(cfg.get("meural_refresh_token_secret"))
             and not cfg.get("meural_auth_failed")
-            and native.get("available")
+            and governs(native)
             and native.get("scope")
             == f"{cfg.get('meural_account_id')}:{cfg.get('cloud_device_id')}"
             and time.time() - float(native.get("checked_at") or 0) < STALE_S

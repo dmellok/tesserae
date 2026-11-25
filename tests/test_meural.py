@@ -782,6 +782,11 @@ def test_native_schedule_keeps_status_checks_and_does_not_wake_the_frame(setup):
             "meural_sleep_schedule": {
                 "scope": "17:101",
                 "available": True,
+                "enabled": True,
+                "events": [
+                    {"command": "sleep", "time": "2300", "days": ["Monday"]},
+                    {"command": "wake", "time": "0700", "days": ["Monday"]},
+                ],
                 "checked_at": time.time(),
             },
         },
