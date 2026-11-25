@@ -1559,6 +1559,17 @@ def _build_device_section(store: Any, device: Device) -> dict[str, Any] | None:
             for at, way, text in exchanges(current_app, device.id)
         ]
 
+    if device.kind_of == "meural":
+        from app.meural_schedule import DAYS, schedule_view
+
+        sleep = schedule_view(current_app, device)
+        sleep["refresh_url"] = url_for("auth.meural_sleep_refresh", instance_id=device.id)
+        sleep["edit_url"] = url_for("auth.meural_sleep", instance_id=device.id)
+        sleep["last_synced"] = _clock_hhmm(sleep.get("synced_at")) or "Not synced yet"
+        sleep["day_choices"] = DAYS
+        section["meural_sleep"] = sleep
+        if sleep["available"]:
+            section["quiet_hours_endpoint"] = None
     section["kind_name"] = kind.name if kind is not None else str(device.kind_of)
     section["page_url"] = url_for("auth.device_page", instance_id=device.id)
     section["calibration_url"] = (

@@ -767,3 +767,29 @@ def test_frame_log_records_renewal_failure_and_skip_without_credentials(
             "Authorization",
         )
     )
+
+
+def test_native_schedule_keeps_status_checks_and_does_not_wake_the_frame(setup):
+    import time
+
+    setup.app.config["SETTINGS_STORE"].update_item(
+        "devices",
+        "test_frame",
+        {
+            "cloud_device_id": "101",
+            "meural_account_id": "17",
+            "meural_refresh_token_secret": "example-refresh",
+            "meural_sleep_schedule": {
+                "scope": "17:101",
+                "available": True,
+                "checked_at": time.time(),
+            },
+        },
+    )
+    publisher = setup.publisher()
+    publisher._save_sleep(setup.device, "192.0.2.10")
+    setup.frame.sleeping = True
+    publisher.poll_once()
+    assert setup.frame.sleeping
+    assert setup.frame.power == []
+    assert "test_frame" in publisher._telemetry

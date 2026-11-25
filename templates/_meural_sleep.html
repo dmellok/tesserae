@@ -1,0 +1,29 @@
+<div class="dx-grp" id="frame-sleep" data-devsub>
+  <div class="dx-grp-head">
+    <h3 class="dx-grp-title">Frame sleep</h3>
+    <form method="post" action="{{ section.meural_sleep.refresh_url }}">
+      <input type="hidden" name="return_to_device" value="1">
+      <button type="submit" class="dx-btn is-sm">Refresh</button>
+    </form>
+  </div>
+  <p class="dx-help">{{ section.meural_sleep.message }}</p>
+  <p class="dx-help">Last synced: {{ section.meural_sleep.last_synced }}{% if section.meural_sleep.timezone %}. {{ section.meural_sleep.timezone }}{% endif %}.</p>
+  {% if section.meural_sleep.can_edit %}
+  <details class="dx-adv">
+    <summary>Change frame sleep schedule</summary>
+    <form method="post" action="{{ section.meural_sleep.edit_url }}" class="dx-adv-body">
+      <input type="hidden" name="return_to_device" value="1">
+      <div class="dx-fg">
+        <label class="dx-f"><span class="dx-f-label">Sleep at</span><input class="dx-in" type="time" name="start" value="{{ section.meural_sleep.start or '' }}" required></label>
+        <label class="dx-f"><span class="dx-f-label">Wake at</span><input class="dx-in" type="time" name="end" value="{{ section.meural_sleep.end or '' }}" required></label>
+        <label class="dx-f"><span class="dx-f-label">Frame scheduler</span><select class="dx-in" name="enabled"><option value="1"{% if section.meural_sleep.enabled %} selected{% endif %}>On</option><option value="0"{% if not section.meural_sleep.enabled %} selected{% endif %}>Off</option></select></label>
+      </div>
+      <fieldset class="dx-fg"><legend class="dx-f-label">Days</legend>
+        {% for day in section.meural_sleep.day_choices %}<label class="dx-day"><input type="checkbox" name="days" value="{{ day }}"{% if day in section.meural_sleep.days %} checked{% endif %}><span>{{ day }}</span></label>{% endfor %}
+      </fieldset>
+      <p class="dx-help">This replaces the frame's sleep and wake events. Artwork events stay in place.</p>
+      <div class="dx-actions-right"><button type="submit" class="dx-btn is-primary">Save to frame</button></div>
+    </form>
+  </details>
+  {% endif %}
+</div>
