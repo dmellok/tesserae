@@ -41,6 +41,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - Lineups: a widget whose photo list stops short of everything it draws from shows its real count. An Immich album of 1,700 photos read as 1,000, the most the list holds, though the frame was always drawing from the whole album.
 - Clarify Lineups header hierarchy and link dashboard and lineup names to their editors.
 - Fix always-on lineup update timing, daily refresh counts and delivery status.
+- Documentation: manual install steps were missing chromium install via playwright
 
 ## [0.514.0], 2026-11-18
 
