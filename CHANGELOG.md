@@ -6,6 +6,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+- Documentation: Add HOWTO for an embedded transit-board
+
 ### Added
 
 - Meural: the device page shows the frame's own sleep schedule, set in the Meural app, and quiet hours follow it. A frame with its scheduler off, or with no sleep events, keeps the quiet hours set in Tesserae.
