@@ -160,5 +160,7 @@ nav:
       - OpenAPI spec & SDK generation: dev/openapi.md
   - Build dashboards with AI (MCP): dev/mcp.md
   - MCP servers (install & use): dev/mcp-servers.md
+  - HOWTOs:
+      - Embedded Transit Board: howtos/transit-board-embed.md
   - Privacy: privacy.md
   - Credits: credits.md
