@@ -3459,11 +3459,11 @@ def test_zoom_icon_and_thumbnail_open_the_lightbox_and_close_by_click_and_keyboa
         assert page.locator(LB).count() == 0
         assert not page.locator("[data-lu-displays]").evaluate("e => e.inert")
         assert icon.evaluate("e => e === document.activeElement")
-        # The thumbnail itself opens it too; the scrim closes it.
-        page.locator(f"{NEWS} .lu-thumb img").click(position={"x": 4, "y": 4})
-        assert page.locator(LB).count() == 1
-        page.mouse.click(5, 5)
-        assert page.locator(LB).count() == 0
+        # The thumbnail opens dashboard details. Zoom remains on its own button.
+        page.locator(f"{NEWS} [data-ds-open]").click(position={"x": 4, "y": 4})
+        page.locator('[data-panel="newspaper"]').wait_for()
+        page.keyboard.press("Escape")
+        assert page.locator('[data-panel="newspaper"]').count() == 0
         # From the keyboard: Enter on the focused icon, Space too.
         icon.focus()
         page.keyboard.press("Enter")
@@ -5020,7 +5020,7 @@ def test_dropping_a_step_where_it_was_or_outside_the_strip_changes_nothing(live:
         browser.close()
 
 
-def test_a_plain_click_on_a_step_still_zooms_and_a_drag_does_not(live: str) -> None:
+def test_a_drag_does_not_open_dashboard_details_or_zoom(live: str) -> None:
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:

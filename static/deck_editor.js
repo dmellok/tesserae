@@ -16,6 +16,8 @@
   const root = document.getElementById("deck-editor");
   if (!root || !window.TesseraeLineupsRender) return;
   const R = window.TesseraeLineupsRender;
+  const DS = window.TesseraeDashboardSidebar;
+  const sidebar = DS.mount(root, () => select([...ui.open][0], true));
   const S = JSON.parse(document.getElementById("dxe-data").textContent);
   const form = document.getElementById("deck-form");
   const $ = (id) => document.getElementById(id);
@@ -26,8 +28,7 @@
   const DAY_MIN = 1440;
   const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-  const GRID_PAGE = 18;
-  const STRIP = 8; // items shown up front, then "+N more" opens the whole list
+  const { GRID_PAGE, STRIP } = DS;
   const SHOW_FOR = [5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240];
   const UPDATES = [0, 1, 5, 10, 15, 30, 60, 120, 360, 720, 1440];
   const KEEP_READY = [0, 5, 15, 30, 60, 120, 360];
@@ -59,6 +60,8 @@
       .join(" + ");
   const viewOf = (id) => (id && S.views ? S.views[id] : null) || null;
   const capsOf = (id) => (deviceOf(id) || {}).caps || {};
+  const stepThumb = (id) =>
+    S.lineup?.steps.find((step) => step.dashboard_id === id)?.thumb_url || pageOf(id).thumb;
   const live = (text) => {
     const n = $("dxe-live");
     if (n) n.textContent = "";
@@ -133,7 +136,6 @@
   let st = initial();
   const ui = {
     open: new Set(),
-    editing: new Set(),
     rawOpen: new Set(), // step ids whose conditions' raw JSON is open
     condOpen: new Set(), // step ids whose Conditions editor was opened with "Add a condition"
     grid: {}, // page id -> {q, offset, data, busy, open}
@@ -1101,7 +1103,7 @@
   }
 
   /* --- the strip: the Lineups page's own step tiles (lineups_render.js stepHtml),
-     bigger, in order; a tile opens its details under the strip. */
+     bigger, in order; a tile opens the dashboard sidebar. */
   function displayModel() {
     const v = viewOf(st.display) || {};
     const w = Number(v.width) || 16;
@@ -1145,7 +1147,7 @@
       index: i,
       dashboard_id: s.id,
       name: p.name,
-      thumb_url: p.missing ? "" : p.thumb,
+      thumb_url: p.missing ? "" : stepThumb(s.id),
       aspect: d.aspect,
       item_count: pick ? Number(it.count) || 0 : 1,
       draw_count: it.mode === "draw" ? Number(it.count) || 0 : 0,
@@ -1210,8 +1212,8 @@
         const open = ui.open.has(vm.dashboard_id);
         const duplicate = vm.missing
           ? ""
-          : `<button type="button" class="lu-zoom dxe-duplicate" data-duplicate="${esc(vm.dashboard_id)}" data-fk="dup-${esc(vm.dashboard_id)}" title="Duplicate ${esc(vm.name)}" aria-label="Duplicate ${esc(vm.name)}"${ui.duplicating ? " disabled" : ""}>${ico("copy")}</button>`;
-        return `<button type="button" class="dxe-sel" data-expand="${esc(vm.dashboard_id)}" data-grip data-fk="sel-${esc(vm.dashboard_id)}" aria-expanded="${open}" aria-controls="dxe-detail" aria-label="${esc(vm.name)}, ${vm.index + 1} of ${n}. ${open ? "Hide" : "Show"} its details; Alt+arrows move it"></button>${duplicate}`;
+          : DS.duplicateControl(vm.dashboard_id, vm.name, !!ui.duplicating);
+        return `<button type="button" class="dxe-sel" data-expand="${esc(vm.dashboard_id)}" data-grip data-fk="sel-${esc(vm.dashboard_id)}" aria-expanded="${open}" aria-controls="${DS.ID}" aria-label="${esc(vm.name)}, ${vm.index + 1} of ${n}. ${open ? "Hide" : "Show"} its details; Alt+arrows move it"></button>${duplicate}`;
       },
       captionExtra: (vm) => {
         const tags = stepTags(st.steps[vm.index], vm.index);
@@ -1230,311 +1232,101 @@
     return (
       `<div class="dxe-tiles-scroll"><ol class="lu-strip dxe-tiles ${d.orientation}${now}" id="dxe-steps" aria-label="Dashboards in order">${tiles}${addTile}</ol>` +
       (n > 1 ? `<p class="dxe-soft dxe-hint">Drag or Alt+←→ to reorder.</p>` : "") +
-      `</div>` +
-      detailHtml()
+      `</div>`
     );
   }
 
-  // The open dashboard's details, under the strip: what it is (its widget's icon and
-  // one line), what it shows one of, then its own settings and actions.
-  function detailHtml() {
+  function pinnedKey(s, p) {
+    return s.pin ?? p.items?.pinned ?? "";
+  }
+
+  function drawSidebar() {
     const id = [...ui.open][0];
     const i = st.steps.findIndex((s) => s.id === id);
-    if (i < 0) return "";
+    if (i < 0 || (S.isNew && ui.step !== 3)) return sidebar.render(null);
     const s = st.steps[i];
-    const p = pageOf(id);
+    const page = pageOf(id);
+    const p = { ...page, refresh: s.refresh };
+    const d = displayModel();
+    const vm = stepModel(s, i, d);
     const c = choiceView(id);
     const ready = !c || c.state === "ready";
     const label = c && c.label ? `Push ${c.label}` : "Push now";
     const push = S.isNew
       ? ""
-      : `<button type="button" class="lu-btn-ghost lu-btn-line dxe-act dxe-push" data-push="${esc(id)}" data-fk="push-${esc(id)}"${canPush(id) && !ui.pushing && ready ? "" : " disabled"} title="${!canPush(id) ? "Save first to push it" : ready ? `Push ${esc(p.name)} to the display now` : "Wait for this picture to finish"}">${ico("send")}<span>${esc(label)}</span></button>`;
-    // Draw another sits with Push now: both act on this dashboard at once.
+      : `<button type="button" class="lu-btn-primary dxe-push" data-push="${esc(id)}" data-fk="push-${esc(id)}"${canPush(id) && !ui.pushing && ready ? "" : " disabled"} title="${!canPush(id) ? "Save first to push it" : ready ? `Push ${esc(p.name)} to the display now` : "Wait for this picture to finish"}">${ico("send")}<span>${esc(label)}</span></button>`;
     const it = p.items || {};
-    let drawBtn = "";
-    if (!S.isNew && it.mode === "draw") {
-      const c0 = ui.choice[id];
-      const hist = c0 && c0.mode === "draw" ? c0.hist : [];
-      const ok = canPick(id);
-      const busy = hist.length && hist[hist.length - 1].state === "loading";
-      drawBtn = `<button type="button" class="lu-btn-ghost lu-btn-line dxe-act dxe-draw" data-draw="${esc(id)}" data-fk="draw-${esc(id)}"${ok && !busy ? "" : ` disabled title="${ok ? "Drawing…" : "Save first to draw"}"`}>${ico("refresh")}<span>Draw another</span></button>`;
-    }
-    const sub = p.subtitle && p.subtitle !== p.name ? p.subtitle : "";
-    const body = S.isNew ? newStepBody(s, p) : `${childrenHtml(s, p)}${settingsHtml(s, p, i)}`;
-    return (
-      `<section class="dxe-detail" id="dxe-detail" data-panel="${esc(id)}" aria-label="${esc(p.name)}">` +
-      `<div class="dxe-detail-head"><span class="dxe-plug" aria-hidden="true"><i class="ph ${esc(p.icon || "ph-squares-four")}"></i></span>` +
-      `<span class="dxe-detail-t"><span class="dxe-name-row"><b>${esc(p.name)}</b>${editLink(p)}</span>${sub ? `<span class="dxe-soft">${esc(sub)}</span>` : ""}</span>` +
-      `<span class="dxe-detail-acts">${drawBtn}${push}</span><button type="button" class="lu-ibtn dxe-close" data-expand="${esc(id)}" data-fk="close-${esc(id)}" aria-label="Close ${esc(p.name)} details" title="Close (Esc)">${ico("x")}</button></div>` +
-      body +
-      `</section>`
-    );
-  }
-
-  // A new lineup's dashboard: what it does, an optional condition (closed
-  // until asked for) and Remove.
-  function newStepBody(s, p) {
-    const id = esc(s.id);
-    const open = showConditions(s);
-    const rm = `<button type="button" class="dxe-link quiet" data-remove="${id}" data-fk="rm-${id}" aria-label="Remove ${esc(p.name)}">Remove</button>`;
-    if (!open)
-      return (
-        `<div class="dxe-sum"><span class="dxe-soft dxe-sum-t">Shows whenever the lineup runs.</span>` +
-        `<span class="dxe-sum-r"><button type="button" class="dxe-link" data-add-cond="${id}" data-fk="addcond-${id}" aria-label="Add a condition for ${esc(p.name)}">Add a condition</button>${rm}</span></div>`
-      );
-    return (
-      `<div class="dxe-sum"><span class="dxe-sum-t"><b id="dxe-cond-t-${id}">Only show while…</b> <span class="dxe-soft">optional</span></span>` +
-      `<span class="dxe-sum-r"><button type="button" class="dxe-link quiet" data-clear-cond="${id}" data-fk="clearcond-${id}" aria-label="Clear the condition for ${esc(p.name)}">Clear condition</button>${rm}</span></div>` +
-      `<div class="dxe-cond dxe-cond-new" role="group" aria-labelledby="dxe-cond-t-${id}">` +
-      `<small class="dxe-soft">Skipped while a condition fails. If none pass, the display keeps its last picture.</small>` +
-      `<div class="condition-picker" data-condition-picker data-empty-message="No condition yet."><textarea rows="2" spellcheck="false" data-cond="${id}" data-fk="cond-${id}" placeholder="[]" aria-label="Conditions for ${esc(p.name)}">${esc(s.conditions)}</textarea></div></div>`
-    );
-  }
-
-  /* The gear beside a dashboard's name opens it in the dashboard editor. */
-  function editLink(p) {
-    if (p.missing || !S.urls.editPage) return "";
-    const href = S.urls.editPage.replace("__ID__", encodeURIComponent(p.id));
-    return `<a class="lu-gear dxe-gear" href="${esc(href)}" data-edit-dashboard="${esc(p.id)}" title="Edit dashboard" aria-label="Edit dashboard ${esc(p.name)}">${ico("gear")}</a>`;
-  }
-
-  /* --- children: what a dashboard shows one of */
-  function pinnedKey(s, p) {
-    return s.pin !== undefined ? s.pin : (p.items && p.items.pinned) || "";
-  }
-  function itemTile(p, it, mark, pinMode) {
-    const label = it.label || `#${it.index + 1}`;
-    const pic = it.thumb_url
-      ? `<img src="${esc(it.thumb_url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
-      : `<span class="dxe-it-word">${esc(label)}</span>`;
-    const tag = mark
-      ? `<span class="dxe-tag ${mark === "Chosen" ? "now" : "mute"}">${esc(mark)}</span>`
-      : "";
-    const inner = `<span class="dxe-it-pic">${pic}</span><span class="dxe-it-l">${esc(`#${it.index + 1} ${it.thumb_url ? label : ""}`.trim())}</span>${tag}`;
-    return pinMode
-      ? `<button type="button" class="dxe-it${mark ? " is-marked" : ""}" data-pin-item="${esc(p.id)}" data-key="${esc(it.key)}" data-fk="pin-${esc(p.id)}-${esc(it.key)}" aria-pressed="${mark === "Chosen"}" title="Show ${esc(label)}">${inner}</button>`
-      : `<span class="dxe-it${mark ? " is-marked" : ""}" title="${esc(label)}">${inner}</span>`;
-  }
-
-  function childrenHtml(s, p) {
-    const it = p.items || {};
-    if (p.missing) return `<p class="dxe-one">${esc(p.subtitle)}</p>`;
-    if (it.mode === "pick") {
-      const pinned = pinnedKey(s, p);
-      const pinMode = !!it.pinnable && !!pinned;
-      const head =
-        `<div class="dxe-kids-head"><span class="dxe-mono">${esc(plural(it.count, it.noun || "items"))}</span>` +
-        `<span class="dxe-soft">${pinned ? `Shows the chosen one.` : it.order === "random" ? `A random one each visit.` : `Rotates through them.`}</span>` +
-        (it.pinnable
-          ? `<span class="lu-seg dxe-seg sm" role="group" aria-label="${esc(p.name)}: rotate items or show chosen"><button type="button" data-pin-mode="${esc(p.id)}" data-mode="walk" data-fk="pinmode-${esc(p.id)}-walk" aria-pressed="${!pinned}">Rotate items</button><button type="button" data-pin-mode="${esc(p.id)}" data-mode="pin" data-fk="pinmode-${esc(p.id)}-pin" aria-pressed="${!!pinned}">Show chosen</button></span>`
-          : "") +
-        // A pin is the dashboard's own setting, so it moves every lineup that shows it.
-        (it.pinnable && p.shared
-          ? `<small class="dxe-soft dxe-shared">Applies to this dashboard in every lineup.</small>`
-          : "") +
-        `</div>`;
-      const strip = ui.strip[p.id];
-      let tiles = "";
-      if (!strip || strip.busy)
-        tiles = Array.from(
-          { length: Math.min(STRIP, it.count || STRIP) },
-          () =>
-            `<span class="dxe-it is-ghost" aria-hidden="true"><span class="dxe-it-pic"></span></span>`
-        ).join("");
-      else if (strip.err) tiles = `<span class="dxe-soft">${esc(strip.err)}</span>`;
-      else {
-        const gridOpen = !!(ui.grid[p.id] && ui.grid[p.id].open);
-        tiles = strip.data.items
-          .slice(0, gridOpen ? 0 : STRIP)
-          .map((x) => itemTile(p, x, pinned && x.key === pinned ? "Chosen" : "", pinMode))
-          .join("");
-        const more = it.count - Math.min(STRIP, strip.data.items.length);
-        const g = ui.grid[p.id];
-        if (more > 0)
-          tiles += `<button type="button" class="dxe-more" data-grid="${esc(p.id)}" data-fk="grid-${esc(p.id)}" aria-expanded="${!!(g && g.open)}">${ico("layers")}<span><b>${g && g.open ? "Hide" : `+${more} more`}</b><small>${g && g.open ? "" : "Browse all"}</small></span></button>`;
-      }
-      return `<div class="dxe-kids${it.fit ? " is-fit" : ""}"${shapeVars()} aria-busy="${!strip || !!strip.busy}">${head}<div class="dxe-strip">${tiles}</div>${gridHtml(s, p)}</div>`;
-    }
-    if (it.empty) {
-      // A list widget that listed nothing: what it last sent, to look at only (those may
-      // be filtered out now or the wrong shape), and a line saying why there is no list.
-      const sent = (Array.isArray(p.recent) ? p.recent : []).slice(0, STRIP);
-      const lastLabel = liveFlags(s.id).now ? "On screen" : "Last sent";
-      const tiles = sent
-        .map(
-          (r, k) =>
-            `<span class="dxe-it is-render" title="${k === 0 ? lastLabel : "Sent earlier"}"><span class="dxe-it-pic"><img src="${esc(r.thumb)}" alt="" loading="lazy" referrerpolicy="no-referrer"></span><span class="dxe-it-l">${k === 0 ? lastLabel : "Sent earlier"}</span></span>`
-        )
-        .join("");
-      return (
-        `<div class="dxe-kids dxe-recent is-empty"${shapeVars()}><div class="dxe-kids-head">${sent.length ? `<span class="dxe-mono">Recent photos</span>` : ""}` +
-        `<span class="dxe-soft">No matches to list right now.</span></div>` +
-        (tiles ? `<div class="dxe-strip">${tiles}</div>` : "") +
-        `</div>`
-      );
-    }
-    if (it.mode === "draw") {
-      const c = ui.choice[p.id];
-      const hist = c && c.mode === "draw" ? c.hist : [];
-      const pos = c && c.mode === "draw" ? c.pos : -1;
-      const ok = canPick(s.id);
-      const tile = (k, pic, label, on) =>
-        `<button type="button" class="dxe-it is-render${on ? " is-marked" : ""}" data-draw-pos="${esc(p.id)}" data-pos="${k}" data-fk="dpos-${esc(p.id)}-${k}" aria-pressed="${on}"${ok ? "" : " disabled"} title="${esc(label)}"><span class="dxe-it-pic">${pic}</span><span class="dxe-it-l">${esc(label)}</span></button>`;
-      // Newest first: pictures drawn here and not sent yet, then what this dashboard
-      // actually sent (the push log), the latest marked. Up to STRIP in all.
-      const sent = Array.isArray(p.recent) ? p.recent : [];
-      const lastLabel = liveFlags(s.id).now ? "On screen" : "Last sent";
-      const drawn = hist
-        .map((e, k) =>
-          tile(
-            k,
-            e.thumb
-              ? `<img src="${esc(e.thumb)}" alt="">`
-              : `<span class="dxe-it-word">${e.state === "error" ? "!" : "…"}</span>`,
-            e.state === "error" ? e.note : e.state === "ready" ? `Draw ${e.n}` : "Drawing…",
-            k === pos
-          )
-        )
-        .reverse();
-      const sentTiles = (sent.length ? sent : p.thumb ? [{ thumb: p.thumb }] : []).map((r, k) => {
-        const pic = `<img src="${esc(r.thumb)}" alt="" loading="lazy" referrerpolicy="no-referrer">`;
-        return k === 0
-          ? tile(-1, pic, lastLabel, pos < 0)
-          : `<span class="dxe-it is-render" title="Sent earlier"><span class="dxe-it-pic">${pic}</span><span class="dxe-it-l">Sent earlier</span></span>`;
-      });
-      const strip = [...drawn, ...sentTiles].slice(0, STRIP).join("");
-      return (
-        `<div class="dxe-kids dxe-recent"${shapeVars()}><div class="dxe-kids-head"><span class="dxe-mono">Recent photos</span>` +
-        `<span class="dxe-soft">${c && c.note ? esc(c.note) : "A random photo each time it's sent."}</span></div>` +
-        `<div class="dxe-strip">${strip}</div></div>`
-      );
-    }
-    return "";
-  }
-
-  function gridHtml(s, p) {
-    const g = ui.grid[p.id];
-    if (!g || !g.open) return "";
-    const it = p.items || {};
-    const pinMode = !!it.pinnable && !!pinnedKey(s, p);
-    const pinned = pinnedKey(s, p);
-    const data = g.data;
-    const pages = data ? Math.max(1, Math.ceil(data.matched / GRID_PAGE)) : 1;
-    const cur = Math.floor(g.offset / GRID_PAGE) + 1;
-    let pager = "";
-    if (pages > 1) {
-      const nums = [];
-      for (let n = 1; n <= pages; n++)
-        if (n === 1 || n === pages || Math.abs(n - cur) <= 1) nums.push(n);
-        else if (nums[nums.length - 1] !== "…") nums.push("…");
-      pager =
-        `<nav class="dxe-pager" aria-label="Pages">` +
-        `<button type="button" class="lu-ibtn sm" data-gpage="${cur - 1}" data-fk="gprev-${esc(p.id)}"${cur <= 1 ? " disabled" : ""} aria-label="Previous page">${ico("chevl")}</button>` +
-        nums
-          .map((n) =>
-            n === "…"
-              ? `<span class="dxe-soft">…</span>`
-              : `<button type="button" class="dxe-pg" data-gpage="${n}" data-fk="gpage-${esc(p.id)}-${n}"${n === cur ? ' aria-current="page"' : ""}>${n}</button>`
-          )
-          .join("") +
-        `<button type="button" class="lu-ibtn sm" data-gpage="${cur + 1}" data-fk="gnext-${esc(p.id)}"${cur >= pages ? " disabled" : ""} aria-label="Next page">${ico("chev")}</button></nav>`;
-    }
-    const range = data
-      ? data.matched
-        ? `${g.offset + 1}–${Math.min(data.matched, g.offset + GRID_PAGE)} of ${data.matched}`
-        : `None match`
-      : "";
-    const body = !data
-      ? `<p class="dxe-soft dxe-loading">Loading…</p>`
-      : `<div class="dxe-grid-items${g.busy ? " is-busy" : ""}"${g.busy ? ' aria-busy="true"' : ""}>${data.items.map((x) => itemTile(p, x, pinned && x.key === pinned ? "Chosen" : "", pinMode)).join("")}</div>`;
-    return (
-      `<div class="dxe-grid" data-grid-for="${esc(p.id)}">` +
-      `<div class="dxe-grid-tb"><label class="lu-tb-search dxe-search">${ico("search")}<input type="search" data-fk="q-${esc(p.id)}" data-grid-q="${esc(p.id)}" value="${esc(g.q)}" placeholder="Search ${esc(plural(it.count, it.noun || "items"))}" aria-label="Search ${esc(p.name)}" autocomplete="off" spellcheck="false"></label>` +
-      `<span class="dxe-mono dxe-range" aria-live="polite">${esc(range)}</span></div>` +
-      body +
-      pager +
-      `</div>`
-    );
-  }
-
-  /* --- per-dashboard settings: what differs, in one line, and its actions */
-  function settingsHtml(s, p, i) {
-    const k = kind();
-    const window = k === "cycle";
-    const bits = [];
-    if (window)
-      bits.push(
-        s.dwell && s.dwell !== st.interval
-          ? `shows ${mins(s.dwell)}`
-          : `shows ${mins(st.interval)}, the default`
-      );
-    if (s.refresh) bits.push(`updates every ${mins(s.refresh)} while shown`);
-    if (showKeepReady() && s.override !== null && s.override !== undefined)
-      bits.push(s.override ? `drawn ahead every ${mins(s.override)}` : "not drawn ahead");
-    let nCond = 0;
-    try {
-      nCond = s.conditions.trim() ? JSON.parse(s.conditions).length : 0;
-    } catch {
-      nCond = 1;
-    }
-    if (nCond) bits.push(plural(nCond, "conditions"));
-    const sum = bits.join(" · ");
-    const editing = ui.editing.has(s.id);
-    const home = st.home === s.id || (!st.home && i === 0);
+    const choice = ui.choice[id];
+    const busy = choice?.hist?.at(-1)?.state === "loading";
+    const drawBtn =
+      !S.isNew && it.mode === "draw"
+        ? `<button type="button" class="lu-btn-ghost lu-btn-line dxe-draw" data-draw="${esc(id)}" data-fk="draw-${esc(id)}"${canPick(id) && !busy ? "" : ` disabled title="${busy ? "Drawing…" : "Save first to draw"}"`}>${ico("refresh")}<span>Draw another</span></button>`
+        : "";
+    const canHome = (takesInput() || kind() === "manual") && st.steps.length > 1;
+    const home = canHome && (st.home || st.steps[0]?.id) === id;
     const homeBtn =
-      (takesInput() || k === "manual") && st.steps.length > 1
-        ? `<button type="button" class="dxe-link quiet" data-home="${esc(s.id)}" data-fk="home-${esc(s.id)}"${home ? ' aria-disabled="true"' : ""} aria-label="${home ? `${esc(p.name)} is home` : `Make ${esc(p.name)} home`}">${home ? "★ Home" : "Make home ★"}</button>`
+      canHome && !home
+        ? `<button type="button" class="ds-link" data-home="${esc(id)}" data-fk="home-${esc(id)}" aria-label="Make ${esc(p.name)} home">${ico("star")} Make home</button>`
         : "";
-    let edit = "";
-    if (editing) {
-      const showFor = window
-        ? `<label class="dxe-mini"><span>Shows for</span><select class="dxe-in dxe-select" data-fk="dwell-${esc(s.id)}" data-dwell="${esc(s.id)}">` +
-          `<option value="">Lineup default (${esc(mins(st.interval))})</option>` +
-          (s.dwell && !SHOW_FOR.includes(s.dwell)
-            ? `<option value="${s.dwell}" selected>${esc(mins(s.dwell))}</option>`
-            : "") +
-          SHOW_FOR.map(
-            (v) =>
-              `<option value="${v}"${s.dwell === v ? " selected" : ""}>${esc(mins(v))}</option>`
-          ).join("") +
-          `</select></label>`
+    const remove = `<button type="button" class="ds-link ds-remove" data-remove="${esc(id)}" data-fk="rm-${esc(id)}" aria-label="Remove ${esc(p.name)}">Remove</button>`;
+    const clear =
+      S.isNew && showConditions(s)
+        ? `<button type="button" class="ds-link" data-clear-cond="${esc(id)}" data-fk="clearcond-${esc(id)}">Clear condition</button>`
         : "";
-      // A repeat on a sleeping display is redrawn on each send already:
-      // Updates while shown only shows here once it is set.
-      const upd =
-        kind() === "interval" && wakeOf() && !s.refresh
-          ? ""
-          : `<label class="dxe-mini"><span>Updates while shown</span><select class="dxe-in dxe-select" data-fk="upd-${esc(s.id)}" data-updates="${esc(s.id)}">` +
-            (UPDATES.includes(s.refresh)
-              ? ""
-              : `<option value="${s.refresh}" selected>every ${esc(mins(s.refresh))}</option>`) +
-            UPDATES.map(
-              (v) =>
-                `<option value="${v}"${s.refresh === v ? " selected" : ""}>${v ? `every ${esc(mins(v))}` : "no, only when sent"}</option>`
-            ).join("") +
-            `</select><small class="dxe-soft">Changes this dashboard everywhere.</small></label>`;
-      // Ready for presses, for this dashboard: where the display flips by press.
-      let keep = "";
-      if (showKeepReady()) {
-        const cur = s.override === null || s.override === undefined ? "" : String(s.override);
-        const opts = [
-          ["", `Lineup's (${st.cadence ? `every ${mins(st.cadence)}` : "off"})`],
-          ...KEEP_READY.map((v) => [String(v), v ? `every ${mins(v)}` : "off"]),
-        ];
-        if (cur && !opts.some(([v]) => v === cur)) opts.push([cur, `every ${mins(Number(cur))}`]);
-        keep = `<label class="dxe-mini"><span>${esc(readyLabel())}</span><select class="dxe-in dxe-select" data-fk="ov-${esc(s.id)}" data-override="${esc(s.id)}">${opts.map(([v, l]) => `<option value="${v}"${v === cur ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></label>`;
-      }
-      const cond = showConditions(s)
-        ? `<div class="dxe-mini dxe-cond"><span>Conditions</span><div class="condition-picker" data-condition-picker><textarea rows="2" spellcheck="false" data-cond="${esc(s.id)}" data-fk="cond-${esc(s.id)}" placeholder="[]" aria-label="Conditions for ${esc(p.name)}">${esc(s.conditions)}</textarea></div><small class="dxe-soft">Skipped while they fail.</small></div>`
-        : `<div class="dxe-mini dxe-cond"><span>Conditions</span><button type="button" class="dxe-link" data-add-cond="${esc(s.id)}" data-fk="addcond-${esc(s.id)}" aria-label="Add a condition for ${esc(p.name)}">Add a condition</button><small class="dxe-soft">Skips this dashboard while a condition fails.</small></div>`;
-      edit = `<div class="dxe-edit">${showFor}${upd}${keep}${cond}</div>${updatesWarning(s, "edit")}`;
-    }
-    return (
-      `<div class="dxe-sum"><span class="dxe-soft dxe-sum-t">${esc(sum.charAt(0).toUpperCase() + sum.slice(1))}</span>` +
-      `<span class="dxe-sum-r"><button type="button" class="dxe-link" data-edit="${esc(s.id)}" data-fk="edit-${esc(s.id)}" aria-expanded="${editing}" aria-label="${editing ? "Done with" : "Edit"} ${esc(p.name)}">${editing ? "Done" : "Edit"}</button>` +
-      `${homeBtn}<button type="button" class="dxe-link quiet" data-remove="${esc(s.id)}" data-fk="rm-${esc(s.id)}" aria-label="Remove ${esc(p.name)}">Remove</button></span></div>` +
-      edit
-    );
+    sidebar.render(id, {
+      p,
+      d,
+      l: {
+        id: S.deckId || "new",
+        name: st.name,
+        actions: {
+          push_step_url: canPick(id) ? S.urls.pushStep : "",
+          step_item_url: S.urls.stepItem,
+        },
+      },
+      s: vm,
+      choice: c,
+      home,
+      edit: !p.missing && S.urls.editPage.replace("__ID__", encodeURIComponent(p.id)),
+      duplicate: p.missing ? "" : DS.duplicateControl(id, p.name, !!ui.duplicating, true),
+      previewLabel:
+        c?.mode === "pick"
+          ? `${c.idx + 1} of ${it.count}${c.label ? ` · ${c.label}` : ""}`
+          : c?.mode === "draw"
+            ? `Draw ${c.pos + 1} of ${c.of}`
+            : "",
+      previewNotice:
+        c?.state === "loading" ? "Drawing preview…" : c?.state === "error" ? c.note : choice?.note,
+      photos:
+        !S.isNew &&
+        DS.photos(p, {
+          pinned: pinnedKey(s, p),
+          shape: shapeVars(),
+          strip: ui.strip[id],
+          grid: ui.grid[id],
+          choice,
+          current: c?.idx,
+          canDraw: canPick(id),
+          onScreen: vm.on_screen,
+        }),
+      timing:
+        !S.isNew &&
+        !p.missing &&
+        DS.timing(s, {
+          cycle: kind() === "cycle",
+          interval: st.interval,
+          update: !(kind() === "interval" && wakeOf() && !s.refresh),
+          keepReady: showKeepReady(),
+          cadence: st.cadence,
+          readyLabel: readyLabel(),
+          warning: updatesWarning(s, "edit"),
+        }),
+      conditions: {
+        summary: vm.cond_label || "Shows whenever the lineup runs",
+        body: DS.conditionBody(id, p.name, s.conditions, showConditions(s), vm.cond_ok) + clear,
+      },
+      actions: { links: remove + homeBtn, buttons: drawBtn + push },
+    });
   }
 
   /* --- the add-dashboard picker: a dialog over the page. Pick one, Add puts it in
@@ -2342,12 +2134,16 @@
     const mark = focusMark();
     noteRawOpen();
     const sections = $("dxe-sections");
+    const tileScroll = sections.querySelector(".dxe-tiles-scroll")?.scrollLeft || 0;
     if (S.isNew) sections.innerHTML = newFlowHtml();
     else
       sections.innerHTML =
         `<section class="dxe-sec" aria-labelledby="dxe-h-when">${secHead(1, "When it runs", whenLead(), "dxe-h-when")}${whenCard()}</section>` +
         `<section class="dxe-sec" aria-labelledby="dxe-h-dash">${secHead(2, "Dashboards", stepsLead(), "dxe-h-dash")}${stepsCard()}</section>` +
         `<section class="dxe-sec dxe-sec-pace" aria-labelledby="dxe-h-timing">${secHead(3, "Timing", paceLead(), "dxe-h-timing")}${paceHtml()}</section>`;
+    drawSidebar();
+    const strip = sections.querySelector(".dxe-tiles-scroll");
+    if (strip) strip.scrollLeft = tileScroll;
     drawHeader();
     drawFooter();
     refocus(mark);
@@ -2377,6 +2173,7 @@
     const hero = $("dxe-hero");
     if (sections) sections.inert = ui.saving || !!ui.duplicating;
     if (hero) hero.inert = ui.saving;
+    if (!zoom) sidebar.panel.inert = ui.saving;
     const on = $("dxe-enabled");
     if (on) on.disabled = ui.saving;
     const mv = root.querySelector("[data-move]");
@@ -2499,24 +2296,20 @@
     draw();
     live(`Duplicating ${p.name}.`);
     try {
-      const body = new FormData();
-      body.append("respond", "json");
-      const data = await request(S.urls.duplicatePage.replace("__ID__", encodeURIComponent(id)), {
-        method: "POST",
-        body,
-        headers: { Accept: "application/json" },
-      });
+      const page = await DS.duplicatePage(
+        S.urls.duplicatePage.replace("__ID__", encodeURIComponent(id))
+      );
       ui.duplicating = null;
       change(() => {
-        S.pages[data.page.id] = { ...p, ...data.page, shared: 0, recent: [] };
-        copy.id = data.page.id;
+        S.pages[page.id] = { ...p, ...page, shared: 0, recent: [] };
+        copy.id = page.id;
         st.steps.splice(st.steps.findIndex((s) => s.id === id) + 1, 0, copy);
         if (hasConditions(source)) stepHadConditions.add(copy.id);
         if (ui.consent[id]) ui.consent[copy.id] = ui.consent[id];
         ui.open = new Set([copy.id]);
       });
-      const tile = root.querySelector(`[data-step="${CSS.escape(copy.id)}"] .dxe-sel`);
-      tile?.focus();
+      loadStrip(copy.id);
+      revealTile(copy.id);
       live(`Duplicated ${p.name}.`);
     } catch (err) {
       ui.duplicating = null;
@@ -2544,19 +2337,18 @@
       if (!st.home) st.home = "";
       ui.picker = false;
       ui.open.clear();
-      ui.open.add(id);
+      if (!sidebar.isMobile()) ui.open.add(id);
     });
     if (!S.isNew) loadStrip(id);
     live(`Added ${pageOf(id).name}.`);
-    // After the closing dialog hands the focus back to what opened it.
-    window.setTimeout(() => {
+    // Focus the new tile after the picker closes and returns its own focus.
+    requestAnimationFrame(() => {
       const tile = root.querySelector(`[data-step="${CSS.escape(id)}"]`);
       if (!tile) return root.querySelector("[data-picker]")?.focus();
-      tile.querySelector(".dxe-sel")?.focus({ preventScroll: true });
-      tile.scrollIntoView({ block: "nearest", inline: "nearest" });
+      revealTile(id);
       tile.classList.add("is-flash");
       window.setTimeout(() => tile.classList.remove("is-flash"), 1800);
-    }, 0);
+    });
   }
 
   function removeStep(id) {
@@ -2792,7 +2584,7 @@
     );
     itemChanged();
   }
-  function stepItem(id, delta) {
+  function stepItem(id, delta, index) {
     const p = pageOf(id);
     const it = p.items || {};
     if (!canPick(id)) return;
@@ -2809,7 +2601,8 @@
     const n = Number(it.count) || 0;
     if (n < 2) return;
     const cur = ui.choice[id];
-    const idx = cur && cur.mode === "pick" ? (cur.idx + delta + n) % n : delta > 0 ? 0 : n - 1;
+    const idx =
+      index ?? (cur && cur.mode === "pick" ? (cur.idx + delta + n) % n : delta > 0 ? 0 : n - 1);
     const c = {
       mode: "pick",
       idx,
@@ -2857,7 +2650,7 @@
     const d = displayModel();
     const c = choiceView(id);
     const big = (u) => (u ? u + (u.includes("?") ? "&" : "?") + "lg=1" : "");
-    const url = c && c.state === "ready" ? c.large_url || c.thumb_url : big(p.thumb);
+    const url = c && c.state === "ready" ? c.large_url || c.thumb_url : big(stepThumb(id));
     let nav = null;
     if (canPick(id) && it.mode === "draw")
       nav = {
@@ -2899,8 +2692,12 @@
       onStep: (delta) => stepItem(id, delta),
       onPush: () => pushNow(id),
       onClose: () => {
+        const fromSidebar = zoom.fromSidebar;
         zoom = null;
-        root.querySelector(`[data-step="${CSS.escape(id)}"] [data-zoom]`)?.focus();
+        (fromSidebar
+          ? sidebar.panel.querySelector("[data-zoom]")
+          : root.querySelector(`[data-step="${CSS.escape(id)}"] [data-zoom]`)
+        )?.focus();
       },
     };
   }
@@ -2909,15 +2706,20 @@
     const m = zoomModel();
     if (m) LB.update(m);
   }
-  function openZoom(id) {
+  function openZoom(id, fromSidebar = false) {
     if (!LB) return;
-    zoom = { id, msg: null };
+    zoom = { id, msg: null, fromSidebar };
     const m = zoomModel();
     // The rest of the editor sits still behind it.
     if (m)
       LB.open(root, m, () => {
+        const was = form.inert;
         form.inert = true;
-        return () => (form.inert = false);
+        sidebar.panel.inert = true;
+        return () => {
+          form.inert = was;
+          sidebar.panel.inert = false;
+        };
       });
     else zoom = null;
   }
@@ -3092,17 +2894,26 @@
   /* ------------------------------------------------------------ events */
   // A dashboard's tile opens its details under the strip (one at a time); again, or
   // Esc, closes them.
+  function revealTile(id) {
+    const tile = root.querySelector(`[data-step="${CSS.escape(id)}"]`);
+    if (!tile) return;
+    tile.scrollIntoView({ block: "nearest", inline: "nearest" });
+    if (sidebar.panel.getAttribute("aria-modal") === "true") sidebar.focus();
+    else tile.querySelector(".dxe-sel")?.focus({ preventScroll: true });
+  }
+
   function select(id, toggle) {
     if (!id) return;
     const open = ui.open.has(id);
     if (open && !toggle) return;
     ui.open.clear();
+    if (!open) ui.open.add(id);
+    draw();
+    revealTile(id);
     if (!open) {
-      ui.open.add(id);
+      sidebar.focus();
       loadStrip(id);
     }
-    draw();
-    root.querySelector(`[data-step="${CSS.escape(id)}"] .dxe-sel`)?.focus();
   }
 
   root.addEventListener("click", async (e) => {
@@ -3255,7 +3066,7 @@
     }
     if (d.zoom) {
       const s = st.steps[Number(d.zoom.split(":")[2])];
-      if (s) openZoom(s.id);
+      if (s) openZoom(s.id, !!t.closest(".ds-panel"));
       return;
     }
     if (d.drawPos) {
@@ -3291,13 +3102,6 @@
       );
       return;
     }
-    if (d.edit) {
-      if (ui.editing.has(d.edit)) ui.editing.delete(d.edit);
-      else ui.editing.add(d.edit);
-      draw();
-      root.querySelector(`[data-edit="${CSS.escape(d.edit)}"]`)?.focus();
-      return;
-    }
     if (d.grid) {
       const g = (ui.grid[d.grid] = ui.grid[d.grid] || { q: "", offset: 0, data: null });
       g.open = !g.open;
@@ -3320,29 +3124,33 @@
       loadGrid(host.dataset.gridFor);
       return;
     }
-    if (d.pinMode) {
-      const s = stepOf(d.pinMode);
-      const p = pageOf(d.pinMode);
+    if (d.pinMode || d.pinItem) {
+      const id = d.pinMode || d.pinItem;
+      const s = stepOf(id);
+      const p = pageOf(id);
       if (!s) return;
-      if (d.mode === "walk") change(() => (s.pin = ""));
-      else {
-        const first =
-          (ui.strip[p.id] && ui.strip[p.id].data && ui.strip[p.id].data.items[0]) || null;
-        change(() => (s.pin = pinnedKey(s, p) || (first ? first.key : "")));
-      }
-      live(
-        d.mode === "walk"
-          ? `${p.name}: rotating items.`
-          : `${p.name}: showing the chosen item, pick one.`
-      );
+      const pinned = pinnedKey(s, p);
+      const first = ui.strip[id]?.data?.items[0];
+      const choice = choiceView(id);
+      const pin = d.pinItem
+        ? d.key === pinned
+          ? ""
+          : d.key
+        : d.mode === "walk"
+          ? ""
+          : pinned || choice?.key || first?.key;
+      if (pin === undefined) return;
+      const index = d.pinItem ? Number(d.index) : (choice?.idx ?? first?.index);
+      change(() => {
+        s.pin = pin;
+        if (!pin) delete ui.choice[id];
+      });
+      if (pin && pin !== pinned && pin !== choice?.key && Number.isInteger(index))
+        stepItem(id, 0, index);
+      live(pin ? `Showing ${pin}.` : `${p.name}: rotating items.`);
       return;
     }
-    if (d.pinItem) {
-      const s = stepOf(d.pinItem);
-      if (s) change(() => (s.pin = d.key));
-      live(`Showing ${d.key}.`);
-      return;
-    }
+    if (d.previewItem) return stepItem(d.previewItem, 0, Number(d.index));
     if (d.draw) return drawItem(d.draw, true);
     if (d.push) return pushNow(d.push);
     if (d.pushLineup !== undefined) return pushNow(st.home || st.steps[0].id);
@@ -3465,15 +3273,6 @@
       e.preventDefault();
       move(row.dataset.step, e.key === "ArrowUp" || e.key === "ArrowLeft" ? -1 : 1);
       return;
-    }
-    // Esc closes the open details and goes back to its tile.
-    if (e.key === "Escape" && ui.open.size && !(LB && LB.isOpen())) {
-      const inside = e.target.closest && e.target.closest("#dxe-detail, .dxe-tiles");
-      if (inside && !e.target.matches("input, textarea, select")) {
-        e.preventDefault();
-        select([...ui.open][0], true);
-        return;
-      }
     }
     // The display cards are a radio group: arrows move between them.
     const card = e.target.closest && e.target.closest("[data-pick-display]");

@@ -369,8 +369,8 @@
 
   // The little zoom icon over a thumbnail's top right corner; what is "step:<lineup>:<index>"
   // or "head:<display>" (macro zoom_btn in templates/_lineups.html).
-  function zoomBtn(what, label) {
-    return `<button type="button" class="lu-zoom" data-zoom="${esc(what)}" aria-haspopup="dialog" aria-label="${esc(label)}" title="${esc(label)}">${ico("zoom")}</button>`;
+  function zoomBtn(what, label, preview = false) {
+    return `<button type="button" class="lu-zoom" data-zoom="${esc(what)}"${preview ? ' data-fk="ds-zoom"' : ""} aria-haspopup="dialog" aria-label="${esc(label)}" title="${esc(label)}">${ico("zoom")}</button>`;
   }
 
   // The gear beside the zoom icon that opens a step's dashboard in its editor
@@ -466,7 +466,7 @@
     const prevLabel = draw ? "Previous picture" : `Previous ${noun}`;
     const nextLabel = draw ? s.draw_label || "Draw the next picture" : `Next ${noun}`;
     const items = canPick
-      ? `<span class="lu-items" role="group" aria-label="${draw ? `Draw another ${esc(s.name)} picture` : `Choose which ${esc(s.name)} item to push`}"><button type="button" class="lu-it" data-item="${esc(l.id)}:${s.index}:-1" aria-label="${esc(prevLabel)}" title="${esc(prevLabel)}"${draw && !choice ? " disabled" : ""}>${ico("chevl")}</button><span class="lu-it-pos" aria-hidden="true">${choice && !draw ? `${choice.idx + 1}/${s.items.length}` : ""}</span><button type="button" class="lu-it" data-item="${esc(l.id)}:${s.index}:1" aria-label="${esc(nextLabel)}" title="${esc(nextLabel)}">${ico("chev")}</button></span>`
+      ? `<span class="lu-items" role="group" aria-label="${draw ? `Draw another ${esc(s.name)} picture` : `Choose which ${esc(s.name)} item to push`}"><button type="button" class="lu-it" data-item="${esc(l.id)}:${s.index}:-1"${ui?.preview ? ' data-fk="ds-prev"' : ""} aria-label="${esc(prevLabel)}" title="${esc(prevLabel)}"${draw && !choice ? " disabled" : ""}>${ico("chevl")}</button><span class="lu-it-pos" aria-hidden="true">${choice && !draw ? `${choice.idx + 1}/${choice.count || s.items.length}` : ""}</span><button type="button" class="lu-it" data-item="${esc(l.id)}:${s.index}:1"${ui?.preview ? ' data-fk="ds-next"' : ""} aria-label="${esc(nextLabel)}" title="${esc(nextLabel)}">${ico("chev")}</button></span>`
       : "";
     // A widget that draws a random photo is a collection too: it stacks, and says
     // "random" when it can't say how many it draws from.
@@ -480,15 +480,17 @@
       (drawN > 1 ? `Draws one of ${drawN} at random` : "A random one each time it is sent");
     const count =
       s.item_count > 1 && !draw
-        ? `<button type="button" class="lu-count" data-peek="${esc(l.id)}:${s.index}" aria-haspopup="dialog" aria-expanded="false" title="${s.order_title ? esc(s.order_title) + ". " : ""}${s.item_count} items in this step. Show them">${orderIcon}×${s.item_count}</button>`
+        ? ui?.preview
+          ? `<span class="lu-count" aria-label="${s.item_count} items">${orderIcon}×${s.item_count}</span>`
+          : `<button type="button" class="lu-count" data-peek="${esc(l.id)}:${s.index}" aria-haspopup="dialog" aria-expanded="false" title="${s.order_title ? esc(s.order_title) + ". " : ""}${s.item_count} items in this step. Show them">${orderIcon}×${s.item_count}</button>`
         : draw
           ? `<span class="lu-count is-draw" title="${esc(drawTitle)}" role="img" aria-label="${esc(drawTitle)}${s.order_title && drawN > 1 ? `, ${drawN} items` : ""}">${orderIcon}${drawN > 1 ? `×${drawN}` : s.order_icon ? "" : "random"}</span>`
           : "";
-    const hook = (name) => (ui && ui[name] ? ui[name](s) || "" : "");
+    const hook = (name) => (ui && ui[name] ? ui[name](s, l, d) || "" : "");
     // The zoom icon shows when there is a picture to zoom. A surface whose tiles carry a
     // full-cover button (the lineup editor) sets ``zoomBeside``: inside the thumbnail the
     // icon shares its stacking layer and ends up under that button.
-    const zoomOk = !!s.thumb_url && !s.missing && !s.off_display;
+    const zoomOk = !!(s.thumb_url || picked) && !s.missing && !s.off_display;
     const gear = !s.missing && !(ui && ui.editGear === false) ? tileGear(l, s) : "";
     // A conditional step says when it shows, in words (cond_label from the
     // server, or condChip in the editor); the last step of a priority lineup with
@@ -518,9 +520,11 @@
           : s.separator === "else"
             ? `<span class="lu-sep else" title="If it can't show, the next one">otherwise</span>`
             : "";
+    const tile = `<span class="lu-tile${stacked ? " stacked" : ""}${canPick ? " has-items" : ""}${choice && choice.state === "loading" ? " is-loading" : ""}${choice && (choice.state === "error" || choice.state === "busy") ? " is-itemfail" : ""}">${thumb(s.name, picked || s.thumb_url, s.aspect, d.orientation || s.orientation, s.missing ? "missing" : s.off_display ? "offdisplay" : "", null, false, d, (zoomOk && !(ui && ui.zoomBeside) ? zoomBtn(`step:${l.id}:${s.index}`, `Zoom ${s.name}${ui?.preview ? " preview" : ""}`, ui?.preview) : "") + (ui?.zoomBeside ? "" : gear))}<span class="lu-scrim" aria-hidden="true"></span>${push}${items}<span class="lu-pushed-msg" aria-hidden="true"></span>${count}${zoomOk && ui && ui.zoomBeside ? zoomBtn(`step:${l.id}:${s.index}`, `Zoom ${s.name}${ui?.preview ? " preview" : ""}`, ui?.preview) : ""}${ui?.zoomBeside ? gear : ""}${hook("tileExtra")}</span>`;
+    if (ui?.preview) return tile;
     return (
       `<li class="lu-step${cls ? " " + cls : ""}${s.missing ? " is-missing" : ""}${s.off_display ? " is-offdisplay" : ""}${hook("stepClass") ? " " + hook("stepClass") : ""}" data-step="${esc(ui && ui.stepKey ? ui.stepKey(s) : s.index)}"${hook("stepAttrs")}${s.missing ? ' title="This dashboard was deleted; remove it from the lineup"' : s.off_display ? ` title="${esc(s.off_display_note)}"` : ""}><figure><span class="lu-slot">${pill}</span>` +
-      `<span class="lu-tile${stacked ? " stacked" : ""}${canPick ? " has-items" : ""}${choice && choice.state === "loading" ? " is-loading" : ""}${choice && (choice.state === "error" || choice.state === "busy") ? " is-itemfail" : ""}">${thumb(s.name, picked || s.thumb_url, s.aspect, d.orientation || s.orientation, s.missing ? "missing" : s.off_display ? "offdisplay" : "", null, false, d, (zoomOk && !(ui && ui.zoomBeside) ? zoomBtn(`step:${l.id}:${s.index}`, `Zoom ${s.name}`) : "") + gear)}<span class="lu-scrim" aria-hidden="true"></span>${push}${items}<span class="lu-pushed-msg" aria-hidden="true"></span>${count}${zoomOk && ui && ui.zoomBeside ? zoomBtn(`step:${l.id}:${s.index}`, `Zoom ${s.name}`) : ""}${hook("tileExtra")}</span>` +
+      tile +
       `<figcaption><span class="lu-step-name">${esc(s.name)}</span><span class="lu-step-meta">${esc(s.position)}${s.refresh_label ? `<span class="lu-step-refresh" title="${esc(s.refresh_title)}"><i class="ph ph-arrows-clockwise" aria-hidden="true"></i>${esc(s.refresh_label)}</span>` : ""}${funnel}</span>${cond}${off}${hook("captionExtra")}</figcaption></figure>${sep}</li>`
     );
   }
