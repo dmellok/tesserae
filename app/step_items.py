@@ -339,6 +339,7 @@ def _gallery_item_infos(module: Any, folder: str, named: list[tuple[int, str]]) 
                 ver = str(version(folder, name))
             except Exception:
                 ver = ""
+        preview = ""
         try:
             thumb = url_for(
                 "picture_gallery_admin.serve_thumbnail",
@@ -346,9 +347,17 @@ def _gallery_item_infos(module: Any, folder: str, named: list[tuple[int, str]]) 
                 filename=name,
                 v=ver or None,
             )
+            preview = url_for(
+                "picture_gallery_admin.serve_image",
+                folder=folder or "_root",
+                filename=name,
+                w=1600,
+                h=1600,
+                v=ver or None,
+            )
         except Exception:
             thumb = ""
-        items.append(ItemInfo(i, name, thumb, key=name, version=ver))
+        items.append(ItemInfo(i, name, thumb, key=name, version=ver, preview_url=preview))
     return items
 
 
@@ -647,7 +656,13 @@ class ItemPage:
             "fit": self.fit,
             "empty": self.empty,
             "items": [
-                {"index": it.index, "label": it.label, "key": it.key, "thumb_url": it.thumb_url}
+                {
+                    "index": it.index,
+                    "label": it.label,
+                    "key": it.key,
+                    "thumb_url": it.thumb_url,
+                    **({"preview_url": it.preview_url} if it.preview_url else {}),
+                }
                 for it in self.items
             ],
         }

@@ -8,7 +8,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
-- Open a dashboard sidebar from either Lineups page to preview the next push and edit its settings.
+- Open a dashboard sidebar from either Lineups page to preview photos and edit dashboard settings.
 - Meural: the device page shows the frame's own sleep schedule, set in the Meural app, and quiet hours follow it. A frame with its scheduler off, or with no sleep events, keeps the quiet hours set in Tesserae.
 - Home Assistant App: MQTT credentials are optional with HA's Mosquitto broker App. With the username left blank, Tesserae takes the broker's host, port, username and password from Supervisor's MQTT service, as zigbee2mqtt and other Apps do. Credentials entered in the App options are used as given, a host other than the service's is kept, and a broker Supervisor reports with TLS is not applied. The App's `config.yaml` still has to declare `services: [mqtt:want]` for Supervisor to offer the service. (#600)
 - Lineups: a rotation step shows its dashboard's refresh interval beside its position, photo widgets show their order on the item badge, and frames that are always on with no connection of their own (Meural, Samsung The Frame) say Always on.

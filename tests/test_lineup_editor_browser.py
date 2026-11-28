@@ -1363,7 +1363,7 @@ def test_collection_widgets_stack_and_plain_ones_do_not(
         assert kids.locator(".dxe-mono").text_content() == "Recent photos"
         assert "No matches to list right now." in kids.inner_text()
         assert kids.locator(".dxe-it").count() == 8
-        assert kids.locator("button.dxe-it, [data-pin-item], [data-draw-pos]").count() == 0
+        assert kids.locator("[data-pin-item], [data-draw-pos]").count() == 0
         assert kids.locator(".dxe-it-l").first.inner_text() in ("Last sent", "On screen")
         step("listdraw").locator(".dxe-sel").click()
         dd = page.locator('[data-panel="listdraw"]')
@@ -1979,7 +1979,7 @@ def test_the_item_control_says_rotate_items_and_show_chosen(real: tuple[str, Fla
             "Applies to this dashboard in every lineup."
             in page.locator("#dashboard-sidebar").inner_text()
         )
-        assert page.locator(".dxe-it[aria-pressed=true] .ds-item-check").count() == 1
+        assert page.locator(".ds-pin[aria-pressed=true] .ds-item-check").count() == 1
         # The panel's wording matches the two choices, and its gear opens the dashboard editor.
         text = page.locator("#dashboard-sidebar").inner_text()
         assert "Shows the chosen one." in text or "Rotates through them." in text
@@ -2683,8 +2683,14 @@ def test_lineups_dashboard_sidebar_pins_and_unpins_a_gallery(real: tuple[str, Fl
         panel.get_by_role("button", name="Only chosen").click()
         expect(gallery.locator('[data-pin-item][aria-pressed="true"]')).to_have_count(1)
         assert pages.get("photos").cells[0].options["file"] == "IMG_000.jpg"
-        gallery.get_by_role("button", name="#2 IMG_001.jpg").click()
-        expect(gallery.locator('[data-key="IMG_001.jpg"]')).to_have_attribute(
+        gallery.get_by_role("button", name="#2 IMG_001.jpg", exact=True).click()
+        lightbox = page.locator("[data-lb]")
+        expect(lightbox.get_by_role("heading", name="IMG_001.jpg")).to_be_visible()
+        assert pages.get("photos").cells[0].options["file"] == "IMG_000.jpg"
+        page.keyboard.press("Escape")
+        expect(gallery.get_by_role("button", name="#2 IMG_001.jpg", exact=True)).to_be_focused()
+        gallery.get_by_role("button", name="Pin #2 IMG_001.jpg").click()
+        expect(gallery.locator('[data-pin-item][data-key="IMG_001.jpg"]')).to_have_attribute(
             "aria-pressed", "true"
         )
         assert pages.get("photos").cells[0].options["file"] == "IMG_001.jpg"
@@ -2721,5 +2727,48 @@ def test_lineups_dashboard_sidebar_home_duplicate_and_remove(real: tuple[str, Fl
         expect(panel).to_be_hidden()
         assert decks.get("morning").page_ids == ["weather", "agenda"]
         assert app.config["PAGE_STORE"].get(copied).name == "Agenda copy"
+        assert errors == []
+        browser.close()
+
+
+@pytest.mark.parametrize(("path", "width"), [("/decks/art/edit", 1440), ("/decks", 390)])
+def test_sidebar_photo_thumbnails_open_lightbox(
+    real: tuple[str, Flask], path: str, width: int
+) -> None:
+    from playwright.sync_api import expect, sync_playwright
+
+    base, _ = real
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, path, width, touch=width == 390)
+        if path == "/decks":
+            page.locator('.lu-ds[data-display="tv"] [data-collapse="tv"]').click()
+            row = page.locator('.lu-row[data-lineup="art"]')
+            fold = row.locator("[data-fold]")
+            if fold.get_attribute("aria-expanded") == "false":
+                fold.click()
+            row.locator("[data-ds-open]").first.press("Enter")
+        else:
+            page.locator('[data-expand="photos"]').click()
+
+        panel = page.locator('[data-panel="photos"]')
+        lightbox = page.locator("[data-lb]")
+        for scope, name in (
+            (".dxe-strip", "#2 IMG_001.jpg"),
+            (".dxe-grid-items", "#3 IMG_002.jpg"),
+        ):
+            if scope == ".dxe-grid-items":
+                panel.locator("[data-grid]").click()
+            thumb = panel.locator(scope).get_by_role("button", name=name, exact=True)
+            thumb.click()
+            expect(lightbox.get_by_role("heading", name=name.split(" ", 1)[1])).to_be_visible(
+                timeout=2000
+            )
+            expect(lightbox.locator("img")).to_have_attribute(
+                "src", re.compile(r"/IMG_00[12]\.jpg\?[^#]*w=1600")
+            )
+            page.keyboard.press("Escape")
+            expect(lightbox).to_have_count(0)
+            expect(panel).to_be_visible()
+            expect(thumb).to_be_focused()
         assert errors == []
         browser.close()

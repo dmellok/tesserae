@@ -84,6 +84,7 @@
         thumb.replaceChildren();
         img = document.createElement("img");
         img.decoding = "async";
+        img.referrerPolicy = "no-referrer";
         thumb.appendChild(img);
       }
       if (src !== lastImg) {
@@ -184,15 +185,34 @@
     }
   }
 
+  function lockPage(dialog) {
+    const siblings = [];
+    for (let node = dialog; node !== document.body; node = node.parentElement) {
+      for (const sibling of node.parentElement.children) {
+        if (sibling !== node && !sibling.inert) {
+          siblings.push(sibling);
+          sibling.inert = true;
+        }
+      }
+    }
+    const html = document.documentElement;
+    const overflow = html.style.overflow;
+    html.style.overflow = "hidden";
+    return () => {
+      html.style.overflow = overflow;
+      siblings.forEach((sibling) => (sibling.inert = false));
+    };
+  }
+
   /** Open under ``host`` (the [data-lu] element). ``lock(el)`` isolates the
       rest of the page and returns the function that undoes it. */
-  function open(host, model, lock) {
+  function open(host, model, lock = lockPage) {
     if (el) teardown();
     m = model;
     lastImg = "";
     host.insertAdjacentHTML("beforeend", skeleton());
     el = host.lastElementChild;
-    release = lock ? lock(el) : null;
+    release = lock(el);
     el.addEventListener("click", onClick);
     document.addEventListener("keydown", onKey, true);
     paint();

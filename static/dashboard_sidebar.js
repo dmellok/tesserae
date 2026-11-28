@@ -61,6 +61,37 @@
         });
       }
     }
+    function openThumbnail(button) {
+      const photo = button.querySelector("img");
+      const lightbox = window.TesseraeLineupsLightbox;
+      if (!photo || !lightbox) return;
+      const { dsPhoto: title, fk } = button.dataset;
+      const width = photo.naturalWidth || 16;
+      const height = photo.naturalHeight || 10;
+      const source = new URL(photo.currentSrc || photo.src);
+      if (source.origin === location.origin && source.pathname.includes("/compose/thumbs/v1/"))
+        source.searchParams.set("lg", "1");
+      lightbox.open(root, {
+        title,
+        img: { src: button.dataset.dsLarge || source.href, alt: title },
+        aspect: `${width}/${height}`,
+        orientation: height > width ? "p" : "l",
+        onClose: () => {
+          const opener = panel.querySelector(`[data-fk="${CSS.escape(fk)}"]`);
+          if (opener) opener.focus({ preventScroll: true });
+          else if (key !== null) focus();
+        },
+      });
+    }
+    panel.addEventListener(
+      "click",
+      (event) => {
+        const thumbnail = event.target.closest("[data-ds-photo]");
+        if (thumbnail && !thumbnail.disabled) openThumbnail(thumbnail);
+      },
+      true
+    );
+
     phone.addEventListener("change", syncMode);
     wrap.addEventListener("click", (event) => {
       if (event.target.closest("[data-ds-close]")) {
@@ -275,10 +306,17 @@
       ? `<img src="${esc(it.thumb_url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
       : `<span class="dxe-it-word">${esc(label)}</span>`;
     const mark = !!pinned && pinned === it.key;
-    const inner = `<span class="dxe-it-pic">${pic}</span><span class="ds-item-number">#${it.index + 1}</span>${mark ? `<span class="ds-item-check">${ico("check")}</span>` : ""}`;
+    const inner = `<span class="dxe-it-pic">${pic}</span><span class="ds-item-number">#${it.index + 1}</span>`;
     const cls = `dxe-it${current === it.index || mark ? " is-marked" : ""}`;
     const title = esc(`#${it.index + 1} ${label}`);
-    return `<button type="button" class="${cls}" ${pinMode ? `data-pin-item="${esc(p.id)}" aria-pressed="${mark}"` : `data-preview-item="${esc(p.id)}"`} data-index="${it.index}" data-label="${esc(label)}" data-key="${esc(it.key)}" data-fk="photo-${esc(p.id)}-${esc(it.key)}" title="${title}" aria-label="${title}"${current === it.index ? ' aria-current="true"' : ""}>${inner}</button>`;
+    const attrs = `data-index="${it.index}" data-label="${esc(label)}" data-key="${esc(it.key)}"`;
+    const thumb = `<button type="button" class="${cls}" ${pinMode ? "" : `data-preview-item="${esc(p.id)}"`} ${attrs} data-ds-photo="${esc(label)}" data-ds-large="${esc(it.preview_url || "")}" data-fk="photo-${esc(p.id)}-${esc(it.key)}" aria-haspopup="dialog" title="${title}" aria-label="${title}"${current === it.index ? ' aria-current="true"' : ""}>${inner}</button>`;
+    if (!pinMode) return thumb;
+    return `<div class="ds-pinnable">${thumb}<button type="button" class="ds-pin" data-pin-item="${esc(p.id)}" ${attrs} data-fk="pin-${esc(p.id)}-${esc(it.key)}" aria-pressed="${mark}" aria-label="Pin ${title}" title="Pin ${title}">${mark ? ico("check", "ds-item-check") : '<i class="ph ph-push-pin" aria-hidden="true"></i>'}</button></div>`;
+  }
+
+  function historyThumbnail(id, src, label, index) {
+    return `<button type="button" class="dxe-it is-render" data-ds-photo="${esc(label)}" data-fk="history-${esc(id)}-${index}" aria-haspopup="dialog" title="${esc(label)}"><span class="dxe-it-pic"><img src="${esc(src)}" alt="" loading="lazy" referrerpolicy="no-referrer"></span><span class="dxe-it-l">${esc(label)}</span></button>`;
   }
 
   function childrenHtml(p, state) {
@@ -323,10 +361,7 @@
       const sent = (Array.isArray(p.recent) ? p.recent : []).slice(0, STRIP);
       const lastLabel = onScreen ? "On screen" : "Last sent";
       const tiles = sent
-        .map(
-          (r, k) =>
-            `<span class="dxe-it is-render" title="${k === 0 ? lastLabel : "Sent earlier"}"><span class="dxe-it-pic"><img src="${esc(r.thumb)}" alt="" loading="lazy" referrerpolicy="no-referrer"></span><span class="dxe-it-l">${k === 0 ? lastLabel : "Sent earlier"}</span></span>`
-        )
+        .map((r, k) => historyThumbnail(p.id, r.thumb, k === 0 ? lastLabel : "Sent earlier", k))
         .join("");
       return (
         `<div class="dxe-kids dxe-recent is-empty"${shape || ""}><div class="dxe-kids-head">${sent.length ? `<span class="dxe-mono">Recent photos</span>` : ""}` +
@@ -340,8 +375,8 @@
       const hist = c && c.mode === "draw" ? c.hist : [];
       const pos = c && c.mode === "draw" ? c.pos : -1;
       const ok = canDraw;
-      const tile = (k, pic, label, on) =>
-        `<button type="button" class="dxe-it is-render${on ? " is-marked" : ""}" data-draw-pos="${esc(p.id)}" data-pos="${k}" data-fk="dpos-${esc(p.id)}-${k}" aria-pressed="${on}"${ok ? "" : " disabled"} title="${esc(label)}"><span class="dxe-it-pic">${pic}</span><span class="dxe-it-l">${esc(label)}</span></button>`;
+      const tile = (k, pic, label, on, large = "") =>
+        `<button type="button" class="dxe-it is-render${on ? " is-marked" : ""}" ${ok ? `data-draw-pos="${esc(p.id)}" data-pos="${k}" aria-pressed="${on}"` : ""} data-ds-photo="${esc(label)}" data-ds-large="${esc(large)}" data-fk="dpos-${esc(p.id)}-${k}" aria-haspopup="dialog" title="${esc(label)}"><span class="dxe-it-pic">${pic}</span><span class="dxe-it-l">${esc(label)}</span></button>`;
       // Newest first: pictures drawn here and not sent yet, then what this dashboard
       // actually sent (the push log), the latest marked. Up to STRIP in all.
       const sent = Array.isArray(p.recent) ? p.recent : [];
@@ -354,7 +389,8 @@
               ? `<img src="${esc(e.thumb)}" alt="">`
               : `<span class="dxe-it-word">${e.state === "error" ? "!" : "…"}</span>`,
             e.state === "error" ? e.note : e.state === "ready" ? `Draw ${e.n}` : "Drawing…",
-            k === pos
+            k === pos,
+            e.large || e.large_url
           )
         )
         .reverse();
@@ -362,7 +398,7 @@
         const pic = `<img src="${esc(r.thumb)}" alt="" loading="lazy" referrerpolicy="no-referrer">`;
         return k === 0
           ? tile(-1, pic, lastLabel, pos < 0)
-          : `<span class="dxe-it is-render" title="Sent earlier"><span class="dxe-it-pic">${pic}</span><span class="dxe-it-l">Sent earlier</span></span>`;
+          : historyThumbnail(p.id, r.thumb, "Sent earlier", k);
       });
       const strip = [...drawn, ...sentTiles].slice(0, STRIP).join("");
       return (
