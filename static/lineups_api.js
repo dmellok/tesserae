@@ -40,6 +40,21 @@
   }
 
   window.TesseraeLineupsAPI = {
+    sidebar(deckId, pageId, displayId, index, change) {
+      const q = new URLSearchParams({ display_id: displayId, index });
+      const url = `${PREFIX}/decks/${encodeURIComponent(deckId)}/sidebar/${encodeURIComponent(pageId)}?${q}`;
+      return send(change ? "POST" : "GET", url, change);
+    },
+    dashboardItems(pageId, displayId, offset, limit, q) {
+      const query = new URLSearchParams({
+        page_id: pageId,
+        display_id: displayId,
+        offset,
+        limit,
+        q,
+      });
+      return send("GET", `${PREFIX}/decks/dashboard-items?${query}`);
+    },
     /** GET /decks/view.json?day=<n>: the whole view-model, same shape as the page's. */
     view(day) {
       const url = attr("data-view-url", "/decks/view.json");

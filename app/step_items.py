@@ -339,6 +339,7 @@ def _gallery_item_infos(module: Any, folder: str, named: list[tuple[int, str]]) 
                 ver = str(version(folder, name))
             except Exception:
                 ver = ""
+        preview = ""
         try:
             thumb = url_for(
                 "picture_gallery_admin.serve_thumbnail",
@@ -346,9 +347,17 @@ def _gallery_item_infos(module: Any, folder: str, named: list[tuple[int, str]]) 
                 filename=name,
                 v=ver or None,
             )
+            preview = url_for(
+                "picture_gallery_admin.serve_image",
+                folder=folder or "_root",
+                filename=name,
+                w=1600,
+                h=1600,
+                v=ver or None,
+            )
         except Exception:
             thumb = ""
-        items.append(ItemInfo(i, name, thumb, key=name, version=ver))
+        items.append(ItemInfo(i, name, thumb, key=name, version=ver, preview_url=preview))
     return items
 
 
@@ -647,7 +656,13 @@ class ItemPage:
             "fit": self.fit,
             "empty": self.empty,
             "items": [
-                {"index": it.index, "label": it.label, "key": it.key, "thumb_url": it.thumb_url}
+                {
+                    "index": it.index,
+                    "label": it.label,
+                    "key": it.key,
+                    "thumb_url": it.thumb_url,
+                    **({"preview_url": it.preview_url} if it.preview_url else {}),
+                }
                 for it in self.items
             ],
         }
@@ -745,8 +760,19 @@ def list_items(
         named = [(i, n) for i, n in enumerate(names) if not q or q in n.casefold()]
         items = _gallery_item_infos(module, folder, named[offset : offset + limit])
         mode = "pick" if len(names) > 1 else "none"
+        pinned = str(options.get("file") or "").strip()
         return ItemPage(
-            mode, len(names), len(named), offset, tuple(items), noun, plugin_id, fit=step_fit(page)
+            mode,
+            len(names),
+            len(named),
+            offset,
+            tuple(items),
+            noun,
+            plugin_id,
+            fit=step_fit(page),
+            pinnable=True,
+            pinned=pinned,
+            pinned_label=pinned,
         )
     declared = _declared(plugin_id)
     option = declared.get("pin_option")
@@ -802,14 +828,21 @@ def pin_page(page: Any, key: str | None, device_id: str | None = None) -> dict[s
     if found is None:
         return None
     plugin_id, placement = found
-    option = _declared(plugin_id).get("pin_option")
+    option = "file" if plugin_id == "picture_gallery" else _declared(plugin_id).get("pin_option")
     if not isinstance(option, str) or not option:
         return None
     options = dict(getattr(placement, "options", None) or {})
     ctx = _item_ctx(page, placement, plugin_id, device_id)
     key = (key or "").strip()
-    if key and key not in {it.key for it in _declared_listing(plugin_id, option, options, ctx)}:
-        return None
+    if key:
+        if plugin_id == "picture_gallery":
+            folder = str(options.get("folder") or "")
+            module = _plugin_module(plugin_id)
+            listed = _gallery_all(module, folder) if module is not None else None
+            if listed is None or key not in _gallery_shown(module, folder, listed[1], options, ctx):
+                return None
+        elif key not in {it.key for it in _declared_listing(plugin_id, option, options, ctx)}:
+            return None
     cell_id = str(placement.id)
 
     def pinned(placements: list[dict[str, Any]]) -> list[dict[str, Any]]:

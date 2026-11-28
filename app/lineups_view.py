@@ -122,6 +122,7 @@ class ItemInfo:
     thumb_url: str = ""
     key: str = ""
     version: str = ""
+    preview_url: str = ""
 
 
 @dataclass(frozen=True)

@@ -67,6 +67,55 @@ def _count(n: int, noun: str) -> str:
     return f"{n} {noun[:-1] if n == 1 and noun.endswith('s') else noun}"
 
 
+def dashboard_widgets(page: Any, items: dict[str, Any] | None = None) -> list[dict[str, str]]:
+    """The real placements, named and located for links into either editor."""
+    widgets = named_placements(page)
+    if len(widgets) < 2:
+        return []
+    canvas = page.canvas if page.layout_kind == "canvas" else None
+    width = canvas.w if canvas else max(c.x + c.w for c in page.cells)
+    height = canvas.h if canvas else max(c.y + c.h for c in page.cells)
+
+    def location(start: float, size: float, extent: int, labels: tuple[str, str, str]) -> str:
+        if size >= extent * 0.85:
+            return ""
+        center = (start + size / 2) / extent
+        return labels[0] if center < 0.38 else labels[2] if center > 0.62 else labels[1]
+
+    rows = []
+    for plugin, widget in widgets:
+        horizontal = location(widget.x, widget.w, width, ("left", "center", "right"))
+        vertical = location(widget.y, widget.h, height, ("top", "middle", "bottom"))
+        position = " ".join(v for v in (vertical, horizontal) if v)
+        options = widget.options or {}
+        entities: list[Any] = next(
+            (options[key] for key in _ENTITY_OPTIONS if isinstance(options.get(key), list)),
+            [],
+        )
+        if items and items.get("plugin") == plugin and items.get("count"):
+            description = _count(int(items["count"]), str(items["noun"]))
+        elif entities or options.get("entity_id"):
+            description = _count(len(entities) or 1, "entities" if len(entities) > 1 else "entity")
+        else:
+            description = f"{widget.w} × {widget.h} px"
+        rows.append(
+            {
+                "id": widget.id,
+                "name": _plugin_name(plugin),
+                "icon": _plugin_icon(plugin),
+                "position": (
+                    f"{vertical.capitalize()}, full width"
+                    if vertical and not horizontal
+                    else f"{horizontal.capitalize()}, full height"
+                    if horizontal and not vertical
+                    else position.capitalize() or "Full dashboard"
+                ),
+                "detail": description,
+            }
+        )
+    return rows
+
+
 def dashboard_summary(page: Any, device_id: str | None = None) -> dict[str, Any]:
     """``{kind, icon, facts, subtitle, items, fresh}`` for one dashboard.
 

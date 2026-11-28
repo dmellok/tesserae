@@ -91,20 +91,31 @@ def test_duplicate_dashboard_copies_the_step_and_keeps_tile_controls(real, width
         assert decks.get("morning").page_ids == ["weather", "agenda"]
         expect(page.locator("#dxe-save-state")).to_have_text("Unsaved changes")
         expect(page.locator("#dxe-live")).to_have_text("Duplicated Weather.")
-        expect(page.locator(f'[data-step="{copy_id}"] .dxe-sel')).to_be_focused()
+        if width == 390:
+            expect(page.locator(".ds-close")).to_be_focused()
+        else:
+            expect(page.locator(f'[data-step="{copy_id}"] .dxe-sel')).to_be_focused()
         assert (
             page.get_by_role("link", name="Edit dashboard Weather copy", exact=True)
             .get_attribute("href")
             .endswith(copy_id)
         )
+        if width == 390:
+            page.keyboard.press("Escape")
         page.locator(f'[data-step="{copy_id}"] .dxe-sel').press("Alt+ArrowRight")
+        if width == 390:
+            page.locator(f'[data-step="{copy_id}"] .dxe-sel').click()
+            page.keyboard.press("Escape")
+            page.locator(f'[data-step="{copy_id}"] .dxe-sel').click()
         assert _steps(page) == ["weather", "agenda", copy_id]
-        page.locator(f'[data-step="{copy_id}"] .dxe-sel').click()
-        expect(page.locator(f'[data-panel="{copy_id}"]')).to_have_count(0)
-        page.locator(f'[data-step="{copy_id}"] .dxe-sel').click()
+        if width != 390:
+            page.locator(f'[data-step="{copy_id}"] .dxe-sel').click()
+            expect(page.locator(f'[data-panel="{copy_id}"]')).to_have_count(0)
+            page.locator(f'[data-step="{copy_id}"] .dxe-sel').click()
         expect(page.locator(f'[data-panel="{copy_id}"]')).to_be_visible()
-        page.get_by_role("button", name="Zoom Weather copy", exact=True).click()
+        page.get_by_role("button", name="Zoom Weather copy preview", exact=True).click()
         expect(page.locator(".lu-lb")).to_be_visible()
+        page.keyboard.press("Escape")
         page.keyboard.press("Escape")
         _save(page)
         saved = decks.get("morning")
@@ -196,7 +207,7 @@ def test_duplicate_failure_keeps_edits_and_allows_retry(real, offline):
 def test_add_dashboard_offers_optional_conditions(real, conditional, width):
     """Picking a dashboard adds it at once, selected; a condition is optional
     and lives in its details."""
-    from playwright.sync_api import sync_playwright
+    from playwright.sync_api import expect, sync_playwright
 
     base, app = real
     pages = app.config["PAGE_STORE"]
@@ -221,7 +232,12 @@ def test_add_dashboard_offers_optional_conditions(real, conditional, width):
         assert "clock" in _steps(page)
         assert page.locator("[data-add-confirm]").count() == 0
         assert page.locator("#dxe-picker").count() == 0
-        assert page.locator('[data-panel="clock"]').is_visible()
+        tile = page.locator('[data-expand="clock"]')
+        if width == 390:
+            expect(tile).to_have_attribute("aria-expanded", "false")
+            tile.click()
+        expect(page.locator('[data-panel="clock"]')).to_be_visible()
+        page.keyboard.press("Escape")
         assert page.locator("#dxe-live").inner_text() == "Added Clock."
         # Adding a conditioned dashboard never changes how the lineup picks,
         # and the legacy pick mode is not offered where it isn't already set.
@@ -406,7 +422,7 @@ def test_a_redraw_from_an_item_list_keeps_the_raw_conditions_open(
         held: list[Any] = []
         page.route("**/decks/dashboard-items?**", lambda route: held.append(route))
         page.locator('[data-expand="photos"]').click()
-        page.locator('[data-edit="photos"]').click()
+        page.locator("[data-ds-section=conditions]").click()
         picker = page.locator('[data-panel="photos"] [data-condition-picker]')
         picker.locator("summary").click()
         raw = picker.locator("textarea")
@@ -431,7 +447,7 @@ def test_a_dashboard_without_conditions_can_be_given_one(real: tuple[str, Flask]
     with sync_playwright() as p:
         browser, page, errors = _open(p, base, "/decks/art/edit")
         page.locator('[data-expand="clock"]').click()
-        page.locator('[data-edit="clock"]').click()
+        page.locator("[data-ds-section=conditions]").click()
         page.locator('[data-add-cond="clock"]').click()
         picker = page.locator('[data-panel="clock"] [data-condition-picker]')
         picker.locator("summary").click()
@@ -463,7 +479,6 @@ def test_a_rotation_cut_to_one_dashboard_carries_its_cadence(real: tuple[str, Fl
     with sync_playwright() as p:
         browser, page, errors = _open(p, base, "/decks/morning/edit")
         page.locator('[data-expand="weather"]').click()
-        page.locator('[data-edit="weather"]').click()
         assert page.locator('[data-dwell="weather"]').count() == 1  # a cycle: its own time
         page.locator('[data-expand="agenda"]').click()
         page.locator('[data-remove="agenda"]').click()
@@ -536,11 +551,11 @@ def test_dashboards_reorder_items_add_remove_and_discard(real: tuple[str, Flask]
         assert page.locator("[data-step]:focus-within").get_attribute("data-step") == "photos"
         # Its items: the first eight, then every one in a searchable, paged grid.
         page.locator('[data-expand="photos"]').click()
-        head = page.locator('[data-panel="photos"] .dxe-detail-head')
+        head = page.locator('[data-panel="photos"] .ds-header')
         assert "Gallery · 31 photos" in head.inner_text()
         strip = page.locator('[data-panel="photos"] .dxe-strip .dxe-it')
         page.locator('[data-panel="photos"] .dxe-strip .dxe-it img').first.wait_for()
-        assert strip.count() == 8
+        assert strip.count() == 9
         page.locator('[data-grid="photos"]').click()
         grid = page.locator('[data-grid-for="photos"] .dxe-grid-items .dxe-it')
         grid.first.wait_for()
@@ -554,7 +569,7 @@ def test_dashboards_reorder_items_add_remove_and_discard(real: tuple[str, Flask]
         page.wait_for_function(
             "() => document.querySelector('.dxe-range')?.textContent === '1–1 of 1'"
         )
-        assert "zz_beach.jpg" in page.locator('[data-grid-for="photos"]').inner_text()
+        assert page.locator('[data-grid-for="photos"] [aria-label$="zz_beach.jpg"]').count() == 1
         # Remove one, add one from the picker, then Discard puts it all back.
         page.locator('[data-remove="photos"]').click()
         page.locator("[data-picker]").click()
@@ -671,7 +686,7 @@ def test_new_lineup_adds_a_picked_dashboard_in_one_step(
     """The new lineup's Dashboards step: picking adds at once (no second
     confirm), the condition is optional and closed, and Create lineup is the
     one primary action, saying what is missing until it can run."""
-    from playwright.sync_api import sync_playwright
+    from playwright.sync_api import expect, sync_playwright
 
     base, app = real
     before = {d.id for d in app.config["DECK_STORE"].all()}
@@ -699,20 +714,23 @@ def test_new_lineup_adds_a_picked_dashboard_in_one_step(
         assert _steps(page) == ["photos"]
         assert page.locator("#dxe-picker").count() == 0
         assert page.locator("[data-add-confirm], [data-add-cancel]").count() == 0
-        assert page.locator('[data-step="photos"]').get_attribute("class").count("is-open")
-        assert (
-            page.evaluate("() => document.activeElement.closest('[data-step]')?.dataset.step")
-            == "photos"
-        )
-        assert page.locator("#dxe-live").inner_text() == "Added Photos."
+        tile = page.locator('[data-expand="photos"]')
+        expect(tile).to_be_focused()
+        if width == 390:
+            expect(tile).to_have_attribute("aria-expanded", "false")
+            tile.click()
+        expect(tile).to_have_attribute("aria-expanded", "true")
+        expect(page.locator("#dxe-live")).to_have_text("Added Photos.")
         # The condition is optional and closed: no editor, no raw JSON, until asked.
         panel = page.locator('[data-panel="photos"]')
         assert panel.locator("[data-condition-picker]").count() == 0
         assert page.get_by_text("Edit raw JSON").count() == 0
+        panel.locator("[data-ds-section=conditions]").click()
         panel.locator('[data-add-cond="photos"]').click()
         assert panel.locator("[data-condition-picker]").is_visible()
         panel.locator('[data-clear-cond="photos"]').click()
         assert panel.locator("[data-condition-picker]").count() == 0
+        page.keyboard.press("Escape")
         # Ready: one primary action on the page, the Cancel link before it.
         assert create.is_enabled()
         ready = " ".join(state.inner_text().replace("\u202f", " ").split())
@@ -747,9 +765,14 @@ def test_a_phone_width_page_never_scrolls_sideways(real: tuple[str, Flask], path
     base, _app = real
     with sync_playwright() as p:
         browser, page, errors = _open(p, base, path, width=420)
-        for sel in ("[data-expand]", "[data-picker]"):
-            if page.locator(sel).count():
-                page.locator(sel).first.click()
+        tile = page.locator("[data-expand]").first
+        if tile.count():
+            tile.click()
+            assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+            page.keyboard.press("Escape")
+        picker = page.locator("[data-picker]").first
+        if picker.count():
+            picker.click()
         over = page.evaluate(
             "() => document.documentElement.scrollWidth - document.documentElement.clientWidth"
         )
@@ -831,8 +854,13 @@ def test_keyboard_focus_stays_put_through_a_redraw(real: tuple[str, Flask]) -> N
         page.locator('[data-expand="agenda"]').click()
         page.locator('[data-home="agenda"]').focus()
         page.keyboard.press("Enter")
-        assert _fk(page) == "home-agenda"
-        assert page.locator('[data-home="agenda"]').inner_text() == "★ Home"
+        assert _fk(page) == "ds-close"
+        assert (
+            page.locator('[data-panel="agenda"] .ds-status')
+            .get_by_text("Home", exact=True)
+            .is_visible()
+        )
+        assert page.locator('[data-home="agenda"]').count() == 0
         # 12:00 AM as an end is midnight, not a window that ends before it starts.
         page.locator('[data-time="end"]').fill("00:00")
         page.locator('[data-time="end"]').dispatch_event("change")
@@ -968,7 +996,7 @@ def test_the_audit_hides_what_does_nothing(real: tuple[str, Flask]) -> None:
         for gone in ("Keep ready", "Picks", "Min hold", "Priority", "pre-rendered", "Advanced"):
             assert gone not in text, gone
         page.locator('[data-expand="clock"]').click()
-        page.locator('[data-edit="clock"]').click()
+        page.locator("[data-ds-section=conditions]").click()
         # No conditions: the editor stays shut behind "Add a condition".
         assert page.locator('[data-cond="clock"]').count() == 0
         assert page.locator('[data-add-cond="clock"]').count() == 1
@@ -1081,24 +1109,19 @@ def test_dashboards_are_big_display_shaped_tiles_that_open_their_details(
             if portrait:
                 name = page.locator(f'[data-step="{other}"] .lu-step-name')
                 assert name.evaluate("(e) => e.getBoundingClientRect().height") < 44  # two lines
-            # Clicking a tile opens its details under the strip, without its picture again.
+            # The selected dashboard carries its picture and stack into the sidebar.
             page.locator(f'[data-step="{first}"] .dxe-sel').click()
             panel = page.locator(f'[data-panel="{first}"]')
-            assert page.locator(f'[data-step="{first}"]').get_attribute("class").count("is-open")
-            head = panel.locator(".dxe-detail-head")
+            assert "is-open" in page.locator(f'[data-step="{first}"]').get_attribute("class")
+            head = panel.locator(".ds-header")
             assert "Gallery · 31 photos" in head.inner_text()
-            assert head.locator(".dxe-plug i.ph-images").count() == 1
-            assert panel.locator(".lu-thumb").count() == 0
-            # Measure in one atomic step: the panel can be re-rendered right after the click.
-            page.wait_for_function(
-                """(id) => {
-                  const p = document.querySelector(`[data-panel="${id}"]`);
-                  const t = document.querySelector('.dxe-tiles');
-                  return !!p && p.getBoundingClientRect().top >= t.getBoundingClientRect().bottom;
-                }""",
-                arg=first,
-            )
-            # One open at a time; Esc closes and goes back to the tile.
+            assert head.locator(".ds-widget-icon.ph-images").count() == 1
+            assert panel.locator(".lu-tile.stacked .lu-thumb").count() == 1
+            if width < 701:
+                assert panel.get_attribute("aria-modal") == "true"
+                page.keyboard.press("Escape")
+            else:
+                assert panel.get_attribute("role") == "complementary"
             page.locator(f'[data-step="{other}"] .lu-step-name').click()
             assert page.locator("[data-panel]").count() == 1
             assert page.locator(f'[data-panel="{other}"]').count() == 1
@@ -1230,10 +1253,10 @@ def test_a_drawing_dashboards_arrows_draw_another_and_go_back(
         # Its details list what was drawn; Draw another there, in one action
         # row with Push now (× apart), draws one more.
         tile.locator(".dxe-sel").click()
-        acts = page.locator(".dxe-detail-head .dxe-detail-acts")
+        acts = page.locator(".ds-footer > div:last-child")
         assert acts.locator('[data-draw="album"]').count() == 1
         assert acts.locator('[data-push="album"]').count() == 1
-        assert acts.locator(".dxe-close").count() == 0
+        assert acts.locator(".ds-close").count() == 0
         page.locator('[data-draw="album"]').click()
         page.wait_for_function(f"({src})() === '/_img/d2.png'")
         assert page.locator('[data-panel="album"] .dxe-strip .dxe-it').count() == 3
@@ -1340,7 +1363,7 @@ def test_collection_widgets_stack_and_plain_ones_do_not(
         assert kids.locator(".dxe-mono").text_content() == "Recent photos"
         assert "No matches to list right now." in kids.inner_text()
         assert kids.locator(".dxe-it").count() == 8
-        assert kids.locator("button.dxe-it, [data-pin-item], [data-draw-pos]").count() == 0
+        assert kids.locator("[data-pin-item], [data-draw-pos]").count() == 0
         assert kids.locator(".dxe-it-l").first.inner_text() in ("Last sent", "On screen")
         step("listdraw").locator(".dxe-sel").click()
         dd = page.locator('[data-panel="listdraw"]')
@@ -1951,20 +1974,21 @@ def test_the_item_control_says_rotate_items_and_show_chosen(real: tuple[str, Fla
         browser, page, errors = _open(p, base, "/decks/readers/edit")
         page.locator('[data-expand="news"]').click()
         seg = page.locator("[data-pin-mode]")
-        assert [b.inner_text() for b in seg.all()] == ["Rotate items", "Show chosen"]
+        assert [b.inner_text() for b in seg.all()] == ["Rotate all", "Only chosen"]
         assert (
-            "Applies to this dashboard in every lineup." in page.locator("#dxe-detail").inner_text()
+            "Applies to this dashboard in every lineup."
+            in page.locator("#dashboard-sidebar").inner_text()
         )
-        assert page.locator(".dxe-it .dxe-tag").first.inner_text().lower() == "chosen"
+        assert page.locator(".ds-pin[aria-pressed=true] .ds-item-check").count() == 1
         # The panel's wording matches the two choices, and its gear opens the dashboard editor.
-        text = page.locator("#dxe-detail").inner_text()
+        text = page.locator("#dashboard-sidebar").inner_text()
         assert "Shows the chosen one." in text or "Rotates through them." in text
         assert "One per visit" not in text
-        gear = page.locator("#dxe-detail .dxe-name-row a[data-edit-dashboard]")
+        gear = page.locator("#dashboard-sidebar .ds-name a[data-edit-dashboard]")
         assert gear.get_attribute("href") == "/pages/news"
         assert gear.get_attribute("aria-label") == "Edit dashboard News"
         page.locator('[data-pin-mode="news"][data-mode="walk"]').click()
-        assert "Rotates through them." in page.locator("#dxe-detail").inner_text()
+        assert "Rotates through them." in page.locator("#dashboard-sidebar").inner_text()
         _settle(page)
         assert errors == []
         browser.close()
@@ -2034,8 +2058,8 @@ def test_items_show_the_first_eight_in_the_displays_shape_and_stack_only_when_ma
             tile.locator(".dxe-sel").click()
             page.locator(".dxe-strip .dxe-it img").first.wait_for()
             # First eight up front, then one "+4 more" tile that opens the grid.
-            assert page.locator(".dxe-strip .dxe-it").count() == 8
-            assert page.locator(".dxe-more b").inner_text() == "+4 more"
+            assert page.locator(".dxe-strip .dxe-it").count() == 9
+            assert page.locator(".dxe-more b").inner_text() == "+3"
             img = page.locator(".dxe-strip .dxe-it img").first
             assert img.get_attribute("referrerpolicy") == "no-referrer"
             assert img.get_attribute("loading") == "lazy"
@@ -2240,10 +2264,10 @@ def test_updates_are_said_on_the_dashboard_not_in_timing(real: tuple[str, Flask]
         assert tag.get_attribute("title") == "Updates every 30 min while shown"
         assert page.locator('[data-step="clock"] .dxe-step-tags .lu-ico').count() == 0
         page.locator('[data-step="photos"] .dxe-sel').click()
-        assert "Updates every 30 min while shown" in page.locator(".dxe-sum").inner_text()
+        assert "30 min" in page.locator(".ds-preview-meta").inner_text()
         page.locator('[data-step="clock"] .dxe-sel').click()
-        detail = page.locator("#dxe-detail").inner_text()
-        assert "Redrawn" not in detail and "updates" not in detail.lower()
+        detail = page.locator("#dashboard-sidebar").inner_text()
+        assert "Redrawn" not in detail and "no, only when sent" in detail
         _settle(page)
         assert errors == []
         browser.close()
@@ -2381,7 +2405,11 @@ def test_now_and_next_pills_sit_above_the_stack_and_the_selection_outline(
                     for kind in ("now", "next"):
                         sel = f".dxe-tiles .lu-pill.p-{kind}"
                         page.locator(sel).scroll_into_view_if_needed()
-                        assert page.evaluate(visible, sel) == "ok", (width, theme, pick, kind)
+                        if width > 700 or not pick:
+                            assert page.evaluate(visible, sel) == "ok", (width, theme, pick, kind)
+                    if width <= 700 and pick:
+                        page.locator(f".ds-status .lu-pill.p-{pick}").wait_for()
+                        page.keyboard.press("Escape")
                 _settle(page)
                 assert errors == []
                 browser.close()
@@ -2414,7 +2442,7 @@ def test_unreadable_condition_choice_survives_save_and_reload(real, width):
         page.reload()
         row = page.locator('[data-panel="clock"]')
         page.locator('[data-expand="clock"]').click()
-        page.locator('[data-edit="clock"]').click()
+        page.locator("[data-ds-section=conditions]").click()
         assert row.get_by_label("Not met when it can't be read").is_checked()
         assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
         assert not errors
@@ -2481,4 +2509,266 @@ def test_editor_saves_an_overnight_window(real: tuple[str, Flask], width: int) -
             "03:59",
         )
         assert not errors
+        browser.close()
+
+
+@pytest.mark.parametrize("width", [1440, 390])
+def test_dashboard_sidebar_switch_close_and_save(real: tuple[str, Flask], width: int) -> None:
+    from playwright.sync_api import expect, sync_playwright
+
+    base, app = real
+    decks = app.config["DECK_STORE"]
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/morning/edit", width, touch=width == 390)
+        first = page.locator('[data-expand="weather"]')
+        second = page.locator('[data-expand="agenda"]')
+        first.click()
+        panel = page.locator('[data-panel="weather"]')
+        expect(panel).to_have_attribute("role", "dialog" if width == 390 else "complementary")
+        if width == 390:
+            close = panel.locator(".ds-close")
+            expect(close).to_be_focused()
+            gear = panel.locator(".ds-gear")
+            page.keyboard.press("Shift+Tab")
+            expect(gear).to_be_focused()
+            page.keyboard.press("Shift+Tab")
+            expect(panel.locator("[data-push]")).to_be_focused()
+            page.keyboard.press("Tab")
+            expect(gear).to_be_focused()
+        timing = panel.get_by_role("button", name="Timing", exact=False)
+        expect(timing).to_have_attribute("aria-expanded", "true")
+        timing.click()
+        expect(timing).to_have_attribute("aria-expanded", "false")
+        timing.click()
+        panel.get_by_label("Shows for").select_option("45")
+        assert decks.get("morning").pages[0].dwell_minutes is None
+        if width == 1440:
+            second.click()
+            expect(page.locator('[data-panel="agenda"]')).to_be_visible()
+            second.click()
+            expect(second).to_be_focused()
+            first.click()
+        page.keyboard.press("Escape")
+        expect(first).to_be_focused()
+        expect(first).to_have_attribute("aria-expanded", "false")
+        _save(page)
+        assert decks.get("morning").pages[0].dwell_minutes == 45
+        assert errors == []
+        browser.close()
+
+
+def test_dashboard_sidebar_widget_links_open_the_grid_and_canvas_widgets(
+    real: tuple[str, Flask],
+) -> None:
+    from playwright.sync_api import expect, sync_playwright
+
+    from app.state.panel_store import CanvasLayout, Element
+
+    base, app = real
+    pages = app.config["PAGE_STORE"]
+    pages.save(
+        Page(
+            id="weather",
+            name="Weather",
+            device_ids=["hall"],
+            cells=[
+                Cell(id="weather2", plugin="clock_word", x=0, y=0, w=120, h=100),
+                Cell(id="date2", plugin="clock_word", x=120, y=0, w=120, h=100),
+            ],
+        )
+    )
+    pages.save(
+        Page(
+            id="agenda",
+            name="Agenda",
+            device_ids=["hall"],
+            layout_kind="canvas",
+            canvas=CanvasLayout(
+                els=[
+                    Element(id="caption", kind="text", text="Caption", x=0, y=0, w=200, h=80),
+                    Element(id="clock-a", widget="clock_word", x=0, y=80, w=200, h=100),
+                    Element(id="clock-b", widget="clock_word", x=400, y=280, w=200, h=100),
+                ]
+            ),
+        )
+    )
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks/morning/edit")
+        page.locator('[data-expand="weather"]').click()
+        widgets = page.locator(".ds-widgets")
+        expect(widgets.locator("li")).to_have_count(2)
+        widgets.locator('a[href$="?widget=date2"]').click()
+        expect(
+            page.locator('.ev2-step[data-step="widgets"] [data-cell-id="date2"] [data-ev2-row]')
+        ).to_have_attribute("aria-expanded", "true")
+        page.goto(base + "/decks/morning/edit")
+        page.locator('[data-expand="agenda"]').click()
+        expect(widgets.locator("li")).to_have_count(2)
+        expect(widgets.locator("li").last).to_contain_text("Bottom right · 200 × 100 px")
+        widgets.locator('a[href$="?widget=clock-b"]').click()
+        expect(page.locator('.el.psel[data-id="clock-b"]')).to_be_visible()
+        assert errors == []
+        browser.close()
+
+
+@pytest.mark.parametrize("width", [1440, 390])
+def test_lineups_dashboard_sidebar_saves_timing_and_conditions(
+    real: tuple[str, Flask], width: int
+) -> None:
+    from playwright.sync_api import expect, sync_playwright
+
+    base, app = real
+    decks = app.config["DECK_STORE"]
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks", width, touch=width == 390)
+        if width == 390:
+            page.locator('.lu-ds[data-display="hall"] [data-collapse="hall"]').click()
+        row = page.locator('.lu-row[data-lineup="morning"]')
+        fold = row.locator("[data-fold]")
+        if fold.get_attribute("aria-expanded") == "false":
+            fold.click()
+        first, second = row.locator("[data-ds-open]").first, row.locator("[data-ds-open]").last
+        first.press("Enter")
+        panel = page.locator('[data-panel="weather"]')
+        expect(panel).to_have_attribute("role", "dialog" if width == 390 else "complementary")
+        expect(panel.get_by_role("status").filter(has_text="Saved")).to_be_visible()
+        with page.expect_response(
+            lambda r: "/sidebar/weather" in r.url and r.request.method == "POST"
+        ):
+            panel.get_by_label("Shows for").select_option("45")
+        expect(panel.get_by_role("status").filter(has_text="Saved")).to_be_visible()
+        assert decks.get("morning").pages[0].dwell_minutes == 45
+        conditions = panel.locator("[data-ds-section=conditions]")
+        expect(conditions).to_have_attribute("aria-expanded", "false")
+        conditions.click()
+        panel.get_by_role("button", name="Add a condition for Weather").click()
+        panel.get_by_text("Edit raw JSON").click()
+        raw = panel.get_by_label("Conditions for Weather")
+        rows = [{"source_kind": "sun", "operator": "is_day", "value": {}}]
+        with page.expect_response(
+            lambda r: "/sidebar/weather" in r.url and r.request.method == "POST"
+        ):
+            raw.fill(json.dumps(rows))
+            raw.press("Tab")
+        expect(panel.get_by_role("status").filter(has_text="Saved")).to_be_visible()
+        assert decks.get("morning").pages[0].conditions[0].operator == "is_day"
+        if width == 1440:
+            second.press("Enter")
+            expect(page.locator('[data-panel="agenda"]')).to_be_visible()
+            second.press("Enter")
+            expect(second).to_be_focused()
+            first.press("Enter")
+        page.keyboard.press("Escape")
+        expect(first).to_be_focused()
+        expect(first).to_have_attribute("aria-expanded", "false")
+        assert errors == []
+        browser.close()
+
+
+def test_lineups_dashboard_sidebar_pins_and_unpins_a_gallery(real: tuple[str, Flask]) -> None:
+    from playwright.sync_api import expect, sync_playwright
+
+    base, app = real
+    pages = app.config["PAGE_STORE"]
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks")
+        row = page.locator('.lu-row[data-lineup="art"]')
+        fold = row.locator("[data-fold]")
+        if fold.get_attribute("aria-expanded") == "false":
+            fold.click()
+        row.locator("[data-ds-open]").first.press("Enter")
+        panel = page.locator('[data-panel="photos"]')
+        gallery = panel.locator(".dxe-strip")
+        expect(gallery.locator("img")).to_have_count(9)
+        panel.get_by_role("button", name="Only chosen").click()
+        expect(gallery.locator('[data-pin-item][aria-pressed="true"]')).to_have_count(1)
+        assert pages.get("photos").cells[0].options["file"] == "IMG_000.jpg"
+        gallery.get_by_role("button", name="#2 IMG_001.jpg", exact=True).click()
+        lightbox = page.locator("[data-lb]")
+        expect(lightbox.get_by_role("heading", name="IMG_001.jpg")).to_be_visible()
+        assert pages.get("photos").cells[0].options["file"] == "IMG_000.jpg"
+        page.keyboard.press("Escape")
+        expect(gallery.get_by_role("button", name="#2 IMG_001.jpg", exact=True)).to_be_focused()
+        gallery.get_by_role("button", name="Pin #2 IMG_001.jpg").click()
+        expect(gallery.locator('[data-pin-item][data-key="IMG_001.jpg"]')).to_have_attribute(
+            "aria-pressed", "true"
+        )
+        assert pages.get("photos").cells[0].options["file"] == "IMG_001.jpg"
+        panel.get_by_role("button", name="Rotate all").click()
+        expect(panel.get_by_role("button", name="Rotate all")).to_have_attribute(
+            "aria-pressed", "true"
+        )
+        assert pages.get("photos").cells[0].options["file"] == ""
+        assert errors == []
+        browser.close()
+
+
+def test_lineups_dashboard_sidebar_home_duplicate_and_remove(real: tuple[str, Flask]) -> None:
+    from playwright.sync_api import expect, sync_playwright
+
+    base, app = real
+    decks = app.config["DECK_STORE"]
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, "/decks")
+        row = page.locator('.lu-row[data-lineup="morning"]')
+        fold = row.locator("[data-fold]")
+        if fold.get_attribute("aria-expanded") == "false":
+            fold.click()
+        row.locator("[data-ds-open]").last.press("Enter")
+        panel = page.locator("#dashboard-sidebar")
+        panel.get_by_role("button", name="Make home").click()
+        expect(panel.locator(".ds-status")).to_contain_text("Home")
+        assert decks.get("morning").home_page_id == "agenda"
+        panel.get_by_role("button", name="Duplicate Agenda from preview").click()
+        expect(panel.get_by_role("heading", name="Agenda copy")).to_be_visible()
+        copied = decks.get("morning").page_ids[-1]
+        assert decks.get("morning").page_ids == ["weather", "agenda", copied]
+        panel.get_by_role("button", name="Remove", exact=True).click()
+        expect(panel).to_be_hidden()
+        assert decks.get("morning").page_ids == ["weather", "agenda"]
+        assert app.config["PAGE_STORE"].get(copied).name == "Agenda copy"
+        assert errors == []
+        browser.close()
+
+
+@pytest.mark.parametrize(("path", "width"), [("/decks/art/edit", 1440), ("/decks", 390)])
+def test_sidebar_photo_thumbnails_open_lightbox(
+    real: tuple[str, Flask], path: str, width: int
+) -> None:
+    from playwright.sync_api import expect, sync_playwright
+
+    base, _ = real
+    with sync_playwright() as p:
+        browser, page, errors = _open(p, base, path, width, touch=width == 390)
+        if path == "/decks":
+            page.locator('.lu-ds[data-display="tv"] [data-collapse="tv"]').click()
+            row = page.locator('.lu-row[data-lineup="art"]')
+            fold = row.locator("[data-fold]")
+            if fold.get_attribute("aria-expanded") == "false":
+                fold.click()
+            row.locator("[data-ds-open]").first.press("Enter")
+        else:
+            page.locator('[data-expand="photos"]').click()
+
+        panel = page.locator('[data-panel="photos"]')
+        lightbox = page.locator("[data-lb]")
+        for scope, name in (
+            (".dxe-strip", "#2 IMG_001.jpg"),
+            (".dxe-grid-items", "#3 IMG_002.jpg"),
+        ):
+            if scope == ".dxe-grid-items":
+                panel.locator("[data-grid]").click()
+            thumb = panel.locator(scope).get_by_role("button", name=name, exact=True)
+            thumb.click()
+            expect(lightbox.get_by_role("heading", name=name.split(" ", 1)[1])).to_be_visible(
+                timeout=2000
+            )
+            expect(lightbox.locator("img")).to_have_attribute(
+                "src", re.compile(r"/IMG_00[12]\.jpg\?[^#]*w=1600")
+            )
+            page.keyboard.press("Escape")
+            expect(lightbox).to_have_count(0)
+            expect(panel).to_be_visible()
+            expect(thumb).to_be_focused()
+        assert errors == []
         browser.close()

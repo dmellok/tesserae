@@ -240,8 +240,9 @@ If your widget tracks its own turn, show that turn without advancing it.
 An item can also carry `"thumb": "<image URL>"` to show a preview picture in the lineup
 editor and on the Lineups page. Use an absolute http(s) URL or an app-relative path
 (`url_for` works too); anything else is dropped. Core adds the app's URL prefix to an
-app-relative path, so it loads under Home Assistant ingress. An item without a thumb shows
-its rendered thumbnail or a label card.
+app-relative path, so it loads under Home Assistant ingress. Clicking a photo thumbnail in
+either dashboard sidebar opens a lightbox. An item without a thumb shows its rendered
+thumbnail or a label card.
 
 If `lineup_items(options, *, ctx=None)` or `lineup_item_count(options, *, ctx=None)` takes
 a `ctx` keyword, it also gets a plain dict with:
@@ -254,7 +255,7 @@ a `ctx` keyword, it also gets a plain dict with:
 
 A hook with one argument is called as before.
 
-The lineup editor lists a dashboard's items in its rows. Two optional extras help it:
+Both Lineups pages list a dashboard's items in its sidebar. Two optional fields control the display:
 
 - `"lineups": { "noun": "papers" }` names the items ("6 papers" instead of "6 items").
 - A draw widget can report how many items it draws from with `lineup_item_count(options)`

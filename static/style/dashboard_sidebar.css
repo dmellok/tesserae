@@ -1,0 +1,632 @@
+/* The panel takes its space from the app shell and leaves the strip operable. */
+:root {
+  --ds-width: 440px;
+}
+@media (min-width: 701px) {
+  html.has-dashboard-sidebar main.page {
+    width: calc(100% - var(--ds-width));
+    margin-inline-end: var(--ds-width);
+  }
+}
+.lu .ds-panel {
+  position: fixed;
+  z-index: 1900;
+  inset: 0 0 0 auto;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: var(--ds-width);
+  height: 100dvh;
+  background: var(--t-surface);
+  color: var(--t-fg);
+  box-shadow: var(--t-shadow-md);
+  border-inline-start: 1px solid var(--t-border);
+  transform: translateX(100%);
+  visibility: hidden;
+  transition:
+    transform 180ms ease,
+    visibility 180ms;
+}
+.has-dashboard-sidebar .ds-panel {
+  transform: translateX(0);
+  visibility: visible;
+  transition: transform 180ms ease;
+}
+.ds-scrim {
+  display: none;
+}
+.ds-header,
+.ds-footer {
+  padding: var(--t-space-4) var(--t-space-5);
+}
+.ds-header {
+  border-bottom: 1px solid var(--t-border);
+}
+.ds-heading,
+.ds-name,
+.ds-status,
+.ds-status > span,
+.ds-preview-meta,
+.ds-preview-meta > span {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-2);
+}
+.ds-heading {
+  align-items: flex-start;
+  gap: var(--t-space-3);
+}
+.ds-heading-copy {
+  flex: 1;
+  min-width: 0;
+}
+.ds-heading h2 {
+  margin: 0;
+  font-size: var(--t-size-lg);
+  overflow-wrap: anywhere;
+}
+.ds-widget-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--t-border-strong);
+  border-radius: var(--lu-r);
+  font-size: 20px;
+  color: var(--t-fg-soft);
+}
+.ds-soft,
+.ds-status,
+.ds-preview-meta,
+.ds-widgets small {
+  font-size: var(--t-size-sm);
+  color: var(--t-fg-soft);
+}
+.ds-status {
+  flex-wrap: wrap;
+  gap: var(--t-space-2) var(--t-space-3);
+  margin-top: var(--t-space-3);
+}
+.ds-status .lu-pill {
+  position: static;
+}
+.ds-saved {
+  margin-inline-start: auto;
+}
+.ds-verdict,
+.ds-preview-note {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-2);
+}
+.ds-verdict.pass {
+  color: var(--t-accent-ink);
+}
+.ds-verdict.fail,
+.lu .ds-panel .ds-remove {
+  color: color-mix(in oklab, var(--t-danger) 76%, var(--t-fg));
+}
+.ds-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.ds-preview {
+  display: grid;
+  justify-items: center;
+  gap: var(--t-space-3);
+  padding: var(--t-space-5);
+}
+.lu .ds-preview .lu-tile {
+  width: min(calc(100% - 12px), calc(230px * var(--ds-arw) / var(--ds-arh)));
+  cursor: auto;
+}
+.lu .ds-preview .lu-thumb {
+  width: 100%;
+}
+.lu .ds-preview .lu-count {
+  right: var(--t-space-1);
+  bottom: var(--t-space-1);
+  cursor: default;
+}
+.lu .ds-preview .lu-zoom {
+  opacity: 0;
+}
+.lu .ds-preview .lu-tile:hover .lu-zoom,
+.lu .ds-preview .lu-tile:focus-within .lu-zoom {
+  opacity: 1;
+}
+.lu .ds-preview .dxe-duplicate {
+  left: 0;
+  right: auto;
+}
+.lu .ds-preview .lu-items {
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+}
+.ds-preview-meta {
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.ds-section {
+  border-top: 1px solid var(--t-border);
+}
+.ds-section h3 {
+  margin: 0;
+}
+.lu .ds-section [data-ds-section] {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-3);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--t-space-3) var(--t-space-5);
+  color: var(--t-accent-ink, var(--t-accent));
+  font: 600 var(--t-size-md) var(--t-font);
+  text-align: start;
+}
+.ds-section [data-ds-section] small {
+  flex: 1;
+  overflow: hidden;
+  color: var(--t-fg-soft);
+  font: 400 var(--t-size-sm) var(--t-font);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ds-section [aria-expanded="true"] small {
+  visibility: hidden;
+}
+.ds-section [aria-expanded="false"] .lu-ico {
+  transform: rotate(90deg);
+}
+.ds-section [aria-expanded="true"] .lu-ico {
+  transform: rotate(-90deg);
+}
+.ds-region {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition:
+    grid-template-rows 180ms ease,
+    visibility 180ms;
+}
+.ds-region[inert] {
+  grid-template-rows: 0fr;
+  visibility: hidden;
+}
+.ds-region > div {
+  min-height: 0;
+  overflow: hidden;
+}
+.ds-section-body {
+  padding: 0 var(--t-space-5) var(--t-space-4);
+}
+.ds-section-body > p {
+  margin: 0 0 var(--t-space-2);
+}
+.ds-widgets {
+  display: grid;
+  gap: var(--t-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ds-widgets li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--t-space-3);
+}
+.ds-widgets small {
+  display: block;
+}
+.ds-setting {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--t-space-3);
+  margin-block: var(--t-space-2);
+}
+.lu .ds-setting select {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 var(--t-space-2);
+  border: 1px solid var(--t-border-strong);
+  border-radius: var(--lu-r);
+  color: var(--t-fg);
+  background: var(--t-surface);
+  font: var(--t-size-md) var(--t-font);
+}
+.ds-setting small {
+  grid-column: 2;
+}
+.ds-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--t-space-2);
+  border-top: 1px solid var(--t-border);
+  padding-bottom: max(var(--t-space-3), env(safe-area-inset-bottom));
+}
+.ds-footer > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--t-space-2);
+}
+.ds-footer > div:last-child {
+  margin-inline-start: auto;
+}
+.lu .ds-panel .ds-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--t-space-1);
+  min-height: 30px;
+  color: var(--t-fg-soft);
+  font-size: var(--t-size-sm);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.lu .ds-panel .ds-link:hover {
+  color: var(--t-fg);
+}
+.lu .ds-panel .ds-remove {
+  color: color-mix(in oklab, var(--t-danger) 76%, var(--t-fg));
+}
+
+/* The short gallery and the searchable browser share their tiles. */
+.lu .ds-panel .dxe-kids {
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-3);
+}
+.lu .ds-panel .dxe-kids-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--t-space-2);
+  font-size: var(--t-size-sm);
+}
+.lu .ds-panel .dxe-kids-head .lu-seg {
+  margin-inline-start: auto;
+}
+.lu .ds-panel .dxe-kids-head .lu-seg button {
+  min-height: 32px;
+  padding-inline: var(--t-space-2);
+  font-size: var(--t-size-sm);
+}
+.lu .ds-panel .dxe-kids-head .dxe-shared {
+  flex: 1 1 100%;
+  text-align: right;
+}
+.lu .ds-panel .dxe-grid-items.is-busy {
+  opacity: 0.55;
+}
+.lu .ds-panel .dxe-strip {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--t-space-1);
+}
+.lu .ds-panel .dxe-grid-items {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--t-space-2);
+}
+/* Every item tile is a box in the display's own shape (--dxe-arw/--dxe-arh, set
+   on .dxe-kids): tall on a portrait frame, wide on a landscape one. A picture
+   fills it the way the frame shows it: cropped to cover, or whole where the
+   widget letterboxes (.is-fit). */
+.lu .ds-panel .dxe-it {
+  display: flex;
+  position: relative;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  width: 100%;
+  min-width: 0;
+  font-size: 11.5px;
+  color: var(--t-fg-soft);
+  text-align: left;
+}
+.lu .ds-panel button.dxe-it {
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 11.5px;
+  line-height: normal;
+  cursor: pointer;
+}
+.lu .ds-panel .dxe-it-pic {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: var(--dxe-arw, 16) / var(--dxe-arh, 10);
+  border-radius: var(--lu-r-xs);
+  border: 1px solid var(--t-border-strong);
+  background: var(--lu-paper);
+  overflow: hidden;
+}
+.lu .ds-panel .dxe-it-pic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.lu .ds-panel .dxe-kids.is-fit .dxe-it-pic img {
+  object-fit: contain;
+}
+.lu .ds-panel .dxe-it.is-ghost .dxe-it-pic {
+  background: color-mix(in oklab, var(--t-fg) 7%, var(--lu-paper));
+  animation: dxe-pulse 1.2s ease-in-out infinite alternate;
+}
+@keyframes dxe-pulse {
+  to {
+    opacity: 0.55;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lu .ds-panel .dxe-it.is-ghost .dxe-it-pic {
+    animation: none;
+  }
+}
+/* A sent picture fills its box too: one of this display's own shape fits exactly;
+   one sent to a display of another shape is cropped, never a thin band. */
+.lu .ds-panel .dxe-it.is-render .dxe-it-pic img {
+  object-fit: cover;
+}
+.lu .ds-panel .dxe-it-word {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  padding: 0 8px;
+  font: 600 11.5px/1.25 var(--t-font);
+  color: var(--t-fg-soft);
+  background: var(--t-surface-sunk);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.lu .ds-panel .dxe-it.is-marked .dxe-it-pic {
+  outline: 2px solid var(--lu-acc);
+  outline-offset: 1px;
+}
+.lu .ds-panel button.dxe-it:hover .dxe-it-pic {
+  border-color: var(--t-fg);
+}
+.lu .ds-panel .dxe-it-l {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lu .ds-panel .dxe-more {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--t-space-1);
+  min-width: 0;
+  min-height: 44px;
+  padding: var(--t-space-1);
+  border: 1px dashed var(--t-border-strong);
+  border-radius: var(--lu-r);
+  font-size: var(--t-size-sm);
+  cursor: pointer;
+}
+.lu .ds-panel .dxe-more span {
+  display: flex;
+  flex-direction: column;
+}
+.lu .ds-panel .dxe-more small {
+  color: var(--t-fg-soft);
+}
+.lu .ds-panel .dxe-more:hover {
+  border-color: var(--t-fg);
+}
+.lu .ds-panel .dxe-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--t-border);
+  border-radius: var(--lu-r);
+  background: var(--t-surface-soft);
+}
+.lu .ds-panel .dxe-grid-tb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+.lu .ds-panel .dxe-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 280px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--t-border-strong);
+  border-radius: var(--lu-r);
+  background: var(--t-surface);
+}
+/* (an id: the app's own input rules are long :is() chains) */
+#dashboard-sidebar .dxe-search input {
+  min-height: 0;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--t-fg);
+  font: 14px var(--t-font);
+  box-shadow: none;
+  outline: none;
+}
+.lu .ds-panel .dxe-search:focus-within {
+  outline: 2px solid var(--lu-acc);
+  outline-offset: 1px;
+}
+.lu .ds-panel .dxe-range {
+  margin-left: auto;
+}
+.lu .ds-panel .dxe-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.lu .ds-panel .dxe-pg {
+  min-width: 30px;
+  height: 30px;
+  border-radius: var(--lu-r);
+  font: 13px var(--t-font-mono);
+  text-align: center;
+  cursor: pointer;
+}
+.lu .ds-panel .dxe-pg:hover {
+  background: color-mix(in oklab, var(--t-fg) 6%, transparent);
+}
+.lu .ds-panel .dxe-pg[aria-current="page"] {
+  box-shadow: inset 0 0 0 1.5px var(--t-fg);
+  font-weight: 600;
+}
+.lu .ds-panel .dxe-loading {
+  font-size: 13px;
+}
+
+.ds-item-number {
+  position: absolute;
+  top: 3px;
+  display: grid;
+  place-items: center;
+  min-width: 16px;
+  padding: 1px 3px;
+  font: 600 10px var(--t-font-mono);
+  border-radius: var(--lu-r-xs);
+  left: 3px;
+  color: var(--t-bg);
+  background: var(--t-fg);
+}
+.lu .ds-panel .ds-pin {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 30px;
+  margin-top: var(--t-space-1);
+  border: 1px solid var(--t-border);
+  border-radius: var(--lu-r-xs);
+  color: var(--t-fg-soft);
+  cursor: pointer;
+}
+.lu .ds-panel .ds-pin[aria-pressed="true"] {
+  color: var(--t-accent-fg);
+  background: var(--t-accent);
+}
+.lu .ds-panel [data-ds-photo] {
+  cursor: zoom-in;
+}
+@media (pointer: coarse) {
+  .lu .ds-panel .ds-pin {
+    min-height: 44px;
+  }
+}
+.lu .ds-panel .dxe-soft,
+.lu .ds-panel .dxe-mono {
+  color: var(--t-fg-soft);
+}
+.lu .ds-tile-open {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  border-radius: inherit;
+}
+.lu .lu-tile:has(.ds-tile-open[aria-expanded="true"]) {
+  outline: 2px solid var(--t-accent);
+  outline-offset: 3px;
+}
+
+@media (max-width: 700px) {
+  .has-dashboard-sidebar {
+    overflow: hidden;
+  }
+  .has-dashboard-sidebar .ds-scrim {
+    position: fixed;
+    z-index: 1899;
+    inset: 0;
+    display: block;
+    background: rgb(0 0 0 / 45%);
+  }
+  .lu .ds-panel {
+    width: 100%;
+    border: 0;
+  }
+  .lu .ds-panel .dxe-kids-head .lu-seg {
+    order: -1;
+    margin-inline-start: 0;
+  }
+  .lu .ds-panel .dxe-kids-head .lu-seg button {
+    min-height: 44px;
+  }
+  .lu .ds-panel .dxe-kids-head > .dxe-soft {
+    flex-basis: 100%;
+    text-align: start;
+  }
+  .lu .ds-panel .ds-close,
+  .lu .ds-panel .ds-gear,
+  .lu .ds-panel .ds-link,
+  .lu .ds-panel .ds-setting select {
+    min-height: 44px;
+  }
+  .ds-setting {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  }
+  .lu .ds-panel .ds-close,
+  .lu .ds-panel .ds-gear {
+    min-width: 44px;
+  }
+}
+@media (max-width: 700px), (hover: none), (pointer: coarse) {
+  .lu .ds-preview .lu-items {
+    display: flex;
+  }
+  .lu .ds-preview .lu-it {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .lu .ds-preview .lu-zoom,
+  .lu .ds-preview .lu-items {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lu .ds-panel,
+  .has-dashboard-sidebar .ds-panel,
+  .ds-region {
+    transition: none;
+  }
+}
+
+.has-dashboard-sidebar .lu.dxe .dxe-tiles-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+.has-dashboard-sidebar .lu.dxe .dxe-tiles {
+  flex-wrap: nowrap;
+  width: max-content;
+}
+.has-dashboard-sidebar .lu.dxe .dxe-hint {
+  position: sticky;
+  left: 0;
+}
+
+.has-dashboard-sidebar .lu .lu-step:has([aria-expanded="true"][aria-controls="dashboard-sidebar"]) {
+  scroll-margin-block-end: 56px;
+}

@@ -1470,3 +1470,47 @@ def test_editor_accepts_overnight_rotation_but_rejects_equal_times(
     )
     assert not _when(app, "between", "08:30", "08:30", pages="a,b")["ok"]
     assert _stored(app).advance_end_at == "03:59"
+
+
+def test_sidebar_edits_are_scoped_and_reject_stale_steps(app: Flask) -> None:
+    _deck(
+        app,
+        advance="timer",
+        advance_trigger="cycle",
+        advance_anchor="08:00",
+        advance_end_at="18:00",
+        pages=[DeckPage(page_id="a"), DeckPage(page_id="b", dwell_minutes=45)],
+    )
+    client = app.test_client()
+    url = "/decks/lu/sidebar/a?index=0"
+    details = client.get(url).get_json()
+    revision = details["revision"]
+    assert details["timing"]["cycle"] and details["edit_url"] == "/pages/a"
+    assert client.get("/decks/lu/sidebar/a?index=1").status_code == 404
+    bad = client.post(url, json={"revision": revision, "field": "updates", "value": True})
+    assert bad.status_code == 400
+    bad = client.post(url, json={"revision": revision, "field": "conditions", "value": [{}]})
+    assert bad.status_code == 400
+    updated = client.post(url, json={"revision": revision, "field": "updates", "value": 30})
+    assert updated.status_code == 200
+    assert app.config["PAGE_STORE"].get("a").refresh_minutes == 30
+    assert app.config["PAGE_STORE"].get("b").refresh_minutes == 0
+    assert updated.get_json()["revision"] == revision
+
+    removed = client.post(url, json={"revision": revision, "field": "remove"})
+    assert removed.status_code == 200
+    saved = _stored(app)
+    assert (saved.page_ids, saved.advance_trigger, saved.advance_interval_minutes) == (
+        ["b"],
+        "interval",
+        45,
+    )
+    remaining = "/decks/lu/sidebar/b?index=0"
+    assert client.post(remaining, json={"revision": revision, "field": "remove"}).status_code == 409
+    assert (
+        client.post(
+            remaining, json={"revision": removed.get_json()["revision"], "field": "remove"}
+        ).status_code
+        == 400
+    )
+    assert _stored(app) == saved

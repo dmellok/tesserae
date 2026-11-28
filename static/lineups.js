@@ -267,6 +267,414 @@
   }
 
   /* ------------------------------------------------------------ render */
+  const DS = window.TesseraeDashboardSidebar;
+  const sidebar = DS.mount(root, () => closeSidebar());
+  let dashboard = null;
+  let sidebarWrites = Promise.resolve();
+  let sidebarPending = 0;
+
+  function sidebarTile(key) {
+    return host.querySelector(`[data-ds-open="${CSS.escape(key)}"]`);
+  }
+  function closeSidebar() {
+    const current = dashboard;
+    if (!current) return;
+    flushSidebarConditions(current);
+    dashboard = null;
+    sidebar.render(null);
+    const tile = sidebarTile(current.key);
+    tile?.setAttribute("aria-expanded", "false");
+    (tile || host.querySelector(`[data-fold="${CSS.escape(current.lid)}"]`))?.focus();
+  }
+  function sidebarTarget(current) {
+    const found = lineupOf(current.lid, current.did);
+    if (!found) return null;
+    // A live refresh can reorder the strip while it is open.
+    const exact = found.l.steps[current.index];
+    const s =
+      exact?.dashboard_id === current.id
+        ? exact
+        : found.l.steps.find((step) => step.dashboard_id === current.id);
+    return s ? { ...found, s } : null;
+  }
+  function showSidebar(did, lid, index) {
+    const at = stepOf(did, lid, index);
+    if (!at) return;
+    did = at.d?.id || "";
+    const key = pickKey(did, lid, index);
+    if (dashboard?.key === key) return closeSidebar();
+    if (dashboard) {
+      flushSidebarConditions(dashboard);
+      sidebarTile(dashboard.key)?.setAttribute("aria-expanded", "false");
+    }
+    const current = { key, did, lid, index, id: at.s.dashboard_id, status: "Loading settings…" };
+    dashboard = current;
+    const tile = sidebarTile(key);
+    tile?.setAttribute("aria-expanded", "true");
+    drawSidebar();
+    tile?.closest(".lu-step")?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    sidebar.focus();
+    sidebarWrites
+      .then(() => API.sidebar(lid, current.id, did, index))
+      .then(
+        (meta) => {
+          if (dashboard !== current) return;
+          current.meta = meta;
+          current.status = "Saved";
+          current.raw = meta.step.conditions.length
+            ? JSON.stringify(meta.step.conditions, null, 2)
+            : "";
+          drawSidebar();
+          if (meta.page.items?.mode === "pick") {
+            API.dashboardItems(current.id, did, 0, DS.STRIP, "").then(
+              (data) => {
+                current.strip = { data };
+                if (dashboard === current) drawSidebar();
+              },
+              (err) => {
+                current.strip = { err: err.message };
+                if (dashboard === current) drawSidebar();
+              }
+            );
+          }
+        },
+        (err) => {
+          if (dashboard === current) setSidebarStatus(current, err.message);
+        }
+      );
+  }
+
+  function setSidebarStatus(current, status) {
+    current.status = status;
+    if (dashboard === current) {
+      const live = sidebar.panel.querySelector(".ds-saved");
+      if (live) {
+        live.replaceChildren(status);
+        if (status === "Saved") live.insertAdjacentHTML("afterbegin", R.ico("check"));
+      }
+    }
+  }
+
+  function drawSidebar() {
+    const current = dashboard;
+    if (!current) return;
+    const at = sidebarTarget(current);
+    if (!at) return closeSidebar();
+    const { l, s } = at;
+    const d = at.d || { id: "" };
+    const meta = current.meta;
+    const p = { ...meta?.page, id: s.dashboard_id, name: s.name, shared: true };
+    const choice = d.id && choiceFor(d, l, s);
+    const canPush = !!(d.id && l.actions.push_step_url && !s.missing && !s.off_display);
+    const home = meta?.can_home && meta.home === p.id;
+    const blocked = current.action ? " disabled" : "";
+    const links = meta
+      ? `<button type="button" class="ds-link ds-remove" data-ds-field="remove" data-fk="ds-remove"${l.steps.length < 2 || blocked ? " disabled" : ""}${l.steps.length < 2 ? ' title="A lineup needs at least one dashboard"' : ""}>Remove</button>` +
+        (meta.can_home && !home
+          ? `<button type="button" class="ds-link" data-ds-field="home" data-fk="ds-home"${blocked}>${R.ico("star")} Make home</button>`
+          : "")
+      : "";
+    const owner = picks.get(pickKey(d.id, l.id, s.index));
+    const busy = owner?.hist?.some((x) => x.state === "loading");
+    const draw =
+      canPush && s.draw_items
+        ? `<button type="button" class="lu-btn-ghost lu-btn-line" data-ds-draw data-fk="ds-draw"${busy ? " disabled" : ""}>${R.ico("refresh")}Draw another</button>`
+        : "";
+    const push = canPush
+      ? `<button type="button" class="lu-btn-primary" data-ds-push data-fk="ds-push"${current.pushing || (choice && choice.state !== "ready") ? " disabled" : ""}>${R.ico("send")}Push now</button>`
+      : "";
+    const picked = choice && (choice.item || s.items?.[choice.idx]);
+    sidebar.render(current.key, {
+      p,
+      d,
+      l,
+      s,
+      choice,
+      home,
+      edit: meta?.edit_url,
+      duplicate: meta?.duplicate_url
+        ? DS.duplicateControl(p.id, p.name, !!current.action, true)
+        : "",
+      status: current.status,
+      previewLabel:
+        choice?.mode === "draw"
+          ? `Draw ${choice.pos + 1} of ${choice.of}`
+          : picked
+            ? `${choice.idx + 1} of ${p.items?.count || s.item_count} · ${picked.label}`
+            : "",
+      previewNotice:
+        current.notice ||
+        (choice?.state === "loading" ? "Drawing preview…" : choice?.error || owner?.note),
+      photos:
+        meta &&
+        DS.photos(p, {
+          pinned: p.items?.pinned,
+          strip: current.strip,
+          grid: current.grid,
+          current: choice?.idx,
+          choice:
+            owner?.mode === "draw"
+              ? {
+                  ...owner,
+                  hist: owner.hist.map((e) => ({
+                    ...e,
+                    thumb: e.thumb_url,
+                    n: e.key.split(":").at(-1),
+                    note: e.error,
+                  })),
+                }
+              : null,
+          canDraw: canPush,
+          onScreen: s.on_screen,
+          shape: ` style="--dxe-arw:${Number(d.width) || 16};--dxe-arh:${Number(d.height) || 10}"`,
+        }),
+      timing: meta && !p.missing && DS.timing(meta.step, meta.timing),
+      conditions: {
+        summary: s.cond_label || "Shows whenever the lineup runs",
+        body: meta
+          ? DS.conditionBody(
+              p.id,
+              p.name,
+              current.raw,
+              current.editConditions || !!current.raw,
+              s.cond_ok
+            )
+          : "",
+      },
+      actions: { links, buttons: draw + push },
+    });
+  }
+
+  function saveSidebar(current, field, value) {
+    if (!current.meta) return Promise.resolve(false);
+    sidebarPending++;
+    setSidebarStatus(current, "Saving…");
+    const save = async () => {
+      try {
+        const { revision } = await API.sidebar(
+          current.lid,
+          current.id,
+          current.did,
+          current.index,
+          {
+            revision: current.meta.revision,
+            field,
+            value,
+          }
+        );
+        current.meta.revision = revision;
+        const step = current.meta.step;
+        const p = current.meta.page;
+        if (field === "updates") p.refresh = step.refresh = value;
+        if (field === "pin") {
+          p.items.pinned = value;
+          dropPick(current.key);
+        }
+        if (field === "home") current.meta.home = current.id;
+        if (field === "dwell" || field === "override") step[field] = value;
+        if (field === "conditions") step.conditions = value;
+        generation++;
+        setSidebarStatus(current, "Saved");
+        return true;
+      } catch (err) {
+        setSidebarStatus(current, err.message);
+        say(err.message);
+        return false;
+      } finally {
+        sidebarPending--;
+      }
+    };
+    const result = (sidebarWrites = sidebarWrites.then(save));
+    return result;
+  }
+
+  async function updateSidebar(current, field, value, item) {
+    if (await saveSidebar(current, field, value)) {
+      if (dashboard === current) {
+        const at = sidebarTarget(current);
+        if (field === "pin" && item && at?.d && !at.s.off_display)
+          stepItem(current.did, current.lid, at.s.index, 0, item);
+        else drawSidebar();
+      }
+      scheduleRefresh(0);
+    }
+  }
+
+  async function loadSidebarGrid(current) {
+    const g = current.grid;
+    const token = (g.token || 0) + 1;
+    g.token = token;
+    g.busy = true;
+    try {
+      const data = await API.dashboardItems(current.id, current.did, g.offset, DS.GRID_PAGE, g.q);
+      if (g.token === token) g.data = data;
+    } catch (err) {
+      if (g.token === token) {
+        g.data = { matched: 0, items: [] };
+        say(err.message);
+      }
+    }
+    if (g.token !== token) return;
+    g.busy = false;
+    if (dashboard === current) drawSidebar();
+  }
+
+  async function sidebarAction(current, field) {
+    if (!current.meta || current.action) return;
+    current.action = field;
+    drawSidebar();
+    let copy;
+    try {
+      if (field === "duplicate") copy = await DS.duplicatePage(current.meta.duplicate_url);
+      if (!(await saveSidebar(current, field, copy?.id))) {
+        if (copy) say(`${copy.name} was created but could not be added to the lineup.`);
+        return;
+      }
+      if (field === "remove" || field === "duplicate") {
+        const next = await API.view(params.get("day"));
+        vm = next;
+        if (dashboard === current) closeSidebar();
+        render();
+        const open = sidebarTile(
+          pickKey(
+            current.did,
+            current.lid,
+            field === "duplicate" ? current.index + 1 : current.index
+          )
+        );
+        if (field === "duplicate" && dashboard === null && open)
+          showSidebar(current.did, current.lid, current.index + 1);
+        else if (dashboard === null) open?.focus();
+      } else {
+        scheduleRefresh(0);
+      }
+    } catch (err) {
+      setSidebarStatus(current, err.message);
+      say(err.message);
+      scheduleRefresh(0);
+    } finally {
+      current.action = null;
+      if (dashboard === current) drawSidebar();
+    }
+  }
+
+  async function pushSidebar(current) {
+    const at = sidebarTarget(current);
+    if (!at?.d || current.pushing) return;
+    current.pushing = true;
+    drawSidebar();
+    try {
+      const result = await doPush(at.d, at.l, at.s, choiceFor(at.d, at.l, at.s));
+      current.notice = result.msg;
+      say(result.say);
+      scheduleRefresh(2500);
+    } catch (err) {
+      current.notice = `Could not push: ${err.message}`;
+      say(current.notice);
+    } finally {
+      current.pushing = false;
+      if (dashboard === current) drawSidebar();
+    }
+  }
+
+  sidebar.panel.addEventListener("click", (event) => {
+    const button = event.target.closest("button");
+    const current = dashboard;
+    if (!button || !current || button.disabled) return;
+    const ds = button.dataset;
+    const at = sidebarTarget(current);
+    if (!at) return;
+    if (ds.dsPush !== undefined) pushSidebar(current);
+    else if (ds.dsDraw !== undefined) drawStep(current.did, current.lid, at.s.index, 1, true);
+    else if (ds.dsField) sidebarAction(current, ds.dsField);
+    else if (ds.duplicate) sidebarAction(current, "duplicate");
+    else if (ds.addCond) {
+      current.editConditions = true;
+      drawSidebar();
+      queueMicrotask(() => sidebar.panel.querySelector("[data-condition-picker] button")?.focus());
+    } else if (ds.grid) {
+      const g = (current.grid ||= { q: "", offset: 0 });
+      g.open = !g.open;
+      drawSidebar();
+      if (g.open) {
+        sidebar.panel.querySelector("[data-grid-q]")?.focus();
+        loadSidebarGrid(current);
+      }
+    } else if (ds.gpage) {
+      current.grid.offset = (Number(ds.gpage) - 1) * DS.GRID_PAGE;
+      loadSidebarGrid(current);
+    } else if (ds.pinMode || ds.pinItem) {
+      const pinned = current.meta.page.items.pinned;
+      const preview = at.d && choiceFor(at.d, at.l, at.s);
+      const item = ds.pinItem
+        ? { key: ds.key, index: Number(ds.index), label: ds.label }
+        : preview?.item || at.s.items?.[preview?.idx] || current.strip?.data?.items[0];
+      const pin =
+        ds.mode === "walk" || (ds.pinItem && item.key === pinned)
+          ? ""
+          : ds.pinItem
+            ? item.key
+            : pinned || item?.key;
+      if (pin !== undefined && pin !== pinned)
+        updateSidebar(current, "pin", pin, pin ? item : null);
+    } else if (ds.previewItem && at.d) {
+      stepItem(current.did, current.lid, at.s.index, 0, {
+        key: ds.key,
+        index: Number(ds.index),
+        label: ds.label,
+      });
+    } else if (ds.drawPos && at.d) {
+      const owner = picks.get(pickKey(current.did, current.lid, at.s.index));
+      if (owner?.mode === "draw") {
+        owner.pos = Number(ds.pos);
+        pickChanged();
+      }
+    }
+  });
+
+  function flushSidebarConditions(current) {
+    if (current.condTimer) editSidebarConditions(current, current.raw, false);
+  }
+
+  function editSidebarConditions(current, raw, delayed) {
+    current.raw = raw;
+    clearTimeout(current.condTimer);
+    const commit = () => {
+      current.condTimer = null;
+      try {
+        const rows = DS.readConditions(raw);
+        if (JSON.stringify(rows) !== JSON.stringify(current.meta.step.conditions))
+          updateSidebar(current, "conditions", rows);
+      } catch (err) {
+        setSidebarStatus(current, err.message);
+      }
+    };
+    if (delayed) current.condTimer = setTimeout(commit, 400);
+    else commit();
+  }
+
+  sidebar.panel.addEventListener("input", (event) => {
+    const current = dashboard;
+    const { dataset, value } = event.target;
+    if (dataset.cond) editSidebarConditions(current, value, true);
+    if (dataset.gridQ !== undefined) {
+      const g = current.grid;
+      g.q = value;
+      g.offset = 0;
+      g.token = (g.token || 0) + 1;
+      clearTimeout(g.timer);
+      g.timer = setTimeout(() => loadSidebarGrid(current), 220);
+    }
+  });
+  sidebar.panel.addEventListener("change", (event) => {
+    const current = dashboard;
+    const { dataset, value } = event.target;
+    if (dataset.cond) editSidebarConditions(current, value, false);
+    for (const field of ["dwell", "updates", "override"]) {
+      if (dataset[field]) updateSidebar(current, field, value === "" ? null : Number(value));
+    }
+  });
+
   const ui = {
     get view() {
       return st.view;
@@ -283,6 +691,12 @@
     day: dayOf,
     order: (ls) => ordered(ls, null),
     itemChoice: (d, l, s) => choiceFor(d, l, s),
+    zoomBeside: true,
+    tileExtra: (s, l, d) => {
+      const key = pickKey(d.id || "", l.id, s.index);
+      const selected = dashboard?.key === key && dashboard.id === s.dashboard_id;
+      return `<button type="button" class="ds-tile-open" data-ds-open="${R.esc(key)}" aria-controls="${DS.ID}" aria-expanded="${selected}" aria-label="Dashboard details for ${R.esc(s.name)}"></button>`;
+    },
     pendingBar: (d) => {
       const f = st.flash[d.id];
       delete st.flash[d.id];
@@ -293,6 +707,7 @@
   function localFocusKey(el) {
     if (!el || !host.contains(el)) return null;
     for (const a of [
+      "data-ds-open",
       "data-fold",
       "data-collapse",
       "data-toggle-day",
@@ -614,6 +1029,7 @@
       const el = host.querySelector(fk);
       if (el) el.focus({ preventScroll: true });
     }
+    drawSidebar();
     syncZoom(); // a lightbox open over the page follows the redraw
     requestAnimationFrame(() => {
       fit();
@@ -1193,9 +1609,9 @@
           }
         : null;
     }
-    const it = s.pick_items && s.items ? s.items[p.idx] : null;
+    const it = p.item || (s.pick_items && s.items ? s.items[p.idx] : null);
     // Gone: another dashboard now, the item left the list, or what was pushed has landed.
-    if (p.dash !== s.dashboard_id || !it || it.key !== p.key || landed) {
+    if (p.dash !== s.dashboard_id || (p.key && it?.key !== p.key) || landed) {
       dropPick(k);
       return null;
     }
@@ -1268,7 +1684,7 @@
   };
   // Draw next: the next picture already drawn here, else one more drawing (one at a time).
   // Draw previous: back through what was drawn, then to the step as last sent.
-  function drawStep(did, lid, i, delta) {
+  function drawStep(did, lid, i, delta, fresh = false) {
     const at = stepOf(did, lid, i);
     if (!at || !at.s.draw_items) return;
     const k = pickKey(did, lid, i);
@@ -1292,7 +1708,7 @@
     if (delta < 0) {
       if (p.pos < 0) return;
       p.pos--;
-    } else if (p.pos < p.hist.length - 1) {
+    } else if (!fresh && p.pos < p.hist.length - 1) {
       p.pos++;
     } else {
       if (p.hist.some((e) => e.state === "loading")) return;
@@ -1316,19 +1732,24 @@
   }
   // Move the chosen item by ``delta`` (wrapping); nothing chosen yet starts at the first
   // (next) or the last (previous).
-  function stepItem(did, lid, i, delta) {
+  function stepItem(did, lid, i, delta, item) {
     const at = stepOf(did, lid, i);
     if (!at) return;
     if (at.s.draw_items) return drawStep(did, lid, i, delta);
-    if (!at.s.pick_items || !at.s.items.length) return;
-    const n = at.s.items.length;
+    if (!item && (!at.s.pick_items || !at.s.items.length)) return;
     const k = pickKey(did, lid, i);
     const cur = picks.get(k);
-    const idx = cur && cur.mode !== "draw" ? (cur.idx + delta + n) % n : delta > 0 ? 0 : n - 1;
+    const list = dashboard?.key === k && dashboard.strip?.data;
+    const n = list?.matched || cur?.count || at.s.items.length;
+    const idx =
+      item?.index ??
+      (cur && cur.mode !== "draw" ? (cur.idx + delta + n) % n : delta > 0 ? 0 : n - 1);
     if (cur) stopPick(cur);
-    const it = at.s.items[idx];
+    const it = item || at.s.items[idx];
     const p = {
-      key: it.key,
+      item,
+      count: n,
+      key: it?.key || "",
       idx,
       dash: at.s.dashboard_id,
       state: "loading",
@@ -1340,9 +1761,27 @@
       token: ++pickSeq,
       timer: null,
     };
-    p.timer = setTimeout(() => pollEntry(k, p, p, 0), ITEM_DEBOUNCE);
+    p.timer = setTimeout(async () => {
+      let chosen = it;
+      try {
+        if (!chosen) {
+          const found = await API.dashboardItems(at.s.dashboard_id, did, idx, 1, "");
+          if (picks.get(k) !== p) return;
+          chosen = found.items[0];
+          if (!chosen) throw new Error("That item is gone.");
+          p.item = chosen;
+          p.key = chosen.key;
+        }
+        say(`${at.s.name}: ${chosen.label}, ${idx + 1} of ${n}. Drawing it.`);
+        pollEntry(k, p, p, 0);
+      } catch (err) {
+        if (picks.get(k) !== p) return;
+        p.state = "error";
+        p.error = err.message;
+        pickChanged();
+      }
+    }, ITEM_DEBOUNCE);
     picks.set(k, p);
-    say(`${at.s.name}: ${it.label}, ${idx + 1} of ${n}. Drawing it.`);
     pickChanged();
   }
   function pickChanged() {
@@ -1359,6 +1798,7 @@
   /* ------------------------------------------------------------ zoom (lightbox) */
   const LB = window.TesseraeLineupsLightbox;
   let zoom = null; // {kind: "step" | "head", did, lid, i, dash, pushing, msg, last}
+  let zoomFromSidebar = false;
   let zoomFocus = null; // selector of the control to return to
   function lockPage(el) {
     const inert = [];
@@ -1418,7 +1858,7 @@
     const n = s.items ? s.items.length : 0;
     const url = p && p.state === "ready" ? p.large_url : largeUrl(s.thumb_url);
     const drawn = !!p && p.mode === "draw";
-    const it = p && !drawn ? s.items[p.idx] : null;
+    const it = p && !drawn ? p.item || s.items[p.idx] : null;
     let notice = "";
     if (p && p.state === "error") notice = `Could not draw this one: ${p.error}`;
     const own = picks.get(pickKey(d.id, l.id, s.index));
@@ -1522,6 +1962,7 @@
     } else if (kind === "head" && did !== undefined) {
       zoom = { kind: "head", did, pushing: false, msg: null, last: null };
     } else return;
+    zoomFromSidebar = sidebar.panel.contains(btn);
     zoomFocus = focusKey(btn);
     closePeek();
     closeDayPop();
@@ -1535,7 +1976,11 @@
   function closeZoom() {
     zoom = null;
     // The opener may have been redrawn while the lightbox was open: find it again.
-    const el = zoomFocus ? host.querySelector(zoomFocus) : null;
+    const el = zoomFromSidebar
+      ? sidebar.panel.querySelector("[data-zoom]")
+      : zoomFocus
+        ? host.querySelector(zoomFocus)
+        : null;
     zoomFocus = null;
     if (el) el.focus({ preventScroll: true });
   }
@@ -2306,7 +2751,16 @@
       openZoom(zb);
       return;
     }
-    const hit = e.target.closest(".lu-tile .lu-thumb, .lu-now-thumb .lu-thumb");
+    const opener = e.target.closest("[data-ds-open]");
+    const step = e.target.closest(".lu-step[data-step]");
+    if ((opener || (step && !e.target.closest("button, a"))) && !travelled(e)) {
+      const row = (opener || step).closest(".lu-row");
+      if (row) {
+        showSidebar(row.dataset.display, row.dataset.lineup, Number(step.dataset.step));
+        return;
+      }
+    }
+    const hit = e.target.closest(".lu-now-thumb .lu-thumb");
     if (hit && !e.target.closest("button, a") && !travelled(e)) {
       const z = hit.querySelector(".lu-zoom");
       if (z) {
@@ -2652,6 +3106,7 @@
       edit.active() ||
       !!sdrag ||
       moving ||
+      sidebarPending > 0 ||
       (wizard && wizard.open) ||
       // A tile's "Queued · picks up ~3:48 PM" note is read before a redraw drops it.
       !!root.querySelector(
