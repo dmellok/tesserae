@@ -6306,6 +6306,9 @@
         var palette = $("panels-palette");
         if (palette) renderPalette(palette);
         hydrateDoc(res[1]);
+        var requested = new URLSearchParams(location.search).get("widget");
+        var widget = requested && byId(requested);
+        if (widget && widget.kind === "widget") select(requested);
         initLiveSync();
         initAgentRail();
       })

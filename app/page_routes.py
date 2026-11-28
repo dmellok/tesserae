@@ -1409,9 +1409,14 @@ def edit(page_id: str) -> Response | str:
         abort(404)
     # Freeform dashboards open in the composer, not the grid editor, so any
     # /pages/<id> link (list card, deep link) reaches the right editor.
+    widget = request.args.get("widget")
     if page.layout_kind == "canvas":
-        return redirect(url_for("panels.editor", canvas_id=page.id))
-    template = "page_editor.html" if _editor_version() == "classic" else "page_editor_v2.html"
+        return redirect(url_for("panels.editor", canvas_id=page.id, widget=widget))
+    template = (
+        "page_editor.html"
+        if not widget and _editor_version() == "classic"
+        else "page_editor_v2.html"
+    )
     return render_template(template, **_editor_context(page))
 
 
@@ -1913,11 +1918,14 @@ def duplicate(page_id: str) -> Response:
     )
     _store().save(copy)
     if wants_json:
+        from app.lineup_editor import dashboard_widgets
+
         return jsonify(
             ok=True,
             page={
                 "id": new_id,
                 "name": new_name,
+                "widgets": dashboard_widgets(copy),
                 "thumb": url_for("composer.compose_preview", page_id=new_id) + "?refresh=300",
             },
         )

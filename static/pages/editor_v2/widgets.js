@@ -478,6 +478,13 @@
   // Back from a reload: reopen the row that was open.
   EV2.ready(() => {
     list.querySelectorAll("[data-ev2-cell-form]").forEach(refreshSums);
+    const requested = new URLSearchParams(location.search).get("widget");
+    if (requested && rowFor(requested)?.dataset.widget) {
+      ensureStep();
+      openRow(requested);
+      rowFor(requested).scrollIntoView({ block: "nearest" });
+      return;
+    }
     // After a keyboard swap: the moved widget keeps focus, and the result is said.
     const moved = EV2.restored.focusCell;
     if (moved && rowFor(moved)) {
