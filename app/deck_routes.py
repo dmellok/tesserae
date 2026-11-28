@@ -3520,7 +3520,7 @@ def _recent_sent(
 def _editor_page(
     page: Any, dims: tuple[int, int], token: str, device_id: str | None = None
 ) -> dict[str, Any]:
-    from app.lineup_editor import dashboard_summary, paid_widgets
+    from app.lineup_editor import dashboard_summary, dashboard_widgets, paid_widgets
 
     try:
         summary = dashboard_summary(page, device_id)
@@ -3541,6 +3541,7 @@ def _editor_page(
         "devices": list(page.device_ids),
         "subtitle": summary.get("subtitle", ""),
         "icon": summary.get("icon", ""),
+        "widgets": dashboard_widgets(page, summary.get("items")),
         "items": summary.get("items", {}),
         "recent": (
             _recent_sent(page.id, device_id=device_id)
@@ -3801,6 +3802,196 @@ def picker_previews() -> Response | tuple[Response, int]:
             if shot.thumb_url
         },
     )
+
+
+def _sidebar_display(deck: Deck, display_id: str | None) -> Any:
+    if display_id:
+        page_devices = {p.id: list(p.device_ids) for p in _pages().list()}
+        if display_id not in _deck_displays(deck, page_devices):
+            raise _EditError("This lineup is no longer on this display.", 409, deck.id)
+    registry = current_app.config.get("DEVICE_REGISTRY")
+    return registry.get(display_id) if registry and display_id else None
+
+
+@bp.get("/<deck_id>/sidebar/<page_id>")
+def sidebar_step(deck_id: str, page_id: str) -> Response:
+    """Load the settings for one displayed step, including the dashboard's own settings."""
+    from app.lineup_editor import display_caps
+
+    deck = _store().get(deck_id)
+    index = request.args.get("index", type=int)
+    if (
+        deck is None
+        or index is None
+        or not 0 <= index < len(deck.pages)
+        or deck.pages[index].page_id != page_id
+    ):
+        return _edit_error_json(_EditError("This dashboard is no longer in the lineup.", 404))
+    try:
+        device = _sidebar_display(deck, request.args.get("display_id"))
+        step = deck.pages[index]
+    except _EditError as exc:
+        return _edit_error_json(exc)
+    display_id = device.id if device is not None else None
+    caps = display_caps(device)
+    page = _pages().get(page_id)
+    meta = (
+        _editor_page(page, (0, 0), "", display_id)
+        if page is not None
+        else {"id": page_id, "refresh": 0, "missing": True, "items": {}}
+    )
+    return jsonify(
+        page=meta,
+        step={
+            "id": page_id,
+            "dwell": step.dwell_minutes,
+            "override": step.refresh_interval_minutes,
+            "refresh": meta["refresh"],
+            "conditions": [c.model_dump(mode="json", exclude_none=True) for c in step.conditions],
+        },
+        revision=_deck_revision(deck),
+        edit_url=url_for("pages.edit", page_id=page_id) if page is not None else "",
+        duplicate_url=url_for("pages.duplicate", page_id=page_id) if page is not None else "",
+        timing={
+            "cycle": deck.advance_trigger == "cycle" and len(deck.pages) > 1,
+            "interval": deck.advance_interval_minutes,
+            "update": not (
+                deck.advance_trigger == "interval" and caps["sleeps"] and not meta["refresh"]
+            ),
+            "keepReady": caps["inputs"] and deck.advance_trigger != "daily",
+            "cadence": deck.refresh_interval_minutes,
+            "readyLabel": (
+                "Ready for presses and taps"
+                if caps["buttons"] and caps["touch"]
+                else "Ready for taps"
+                if caps["touch"]
+                else "Ready for button presses"
+            ),
+        },
+        home=deck.resolved_home_page_id,
+        can_home=len(deck.pages) > 1 and (caps["inputs"] or deck.advance == "manual"),
+    )
+
+
+@bp.post("/<deck_id>/sidebar/<page_id>")
+def save_sidebar_step(deck_id: str, page_id: str) -> Response:
+    """Save one field or action. The revision guards deck changes; dashboard
+    changes use the same compare-and-swap as the lineup editor."""
+    body = _json_body()
+    field, value = body.get("field"), body.get("value")
+    step_fields = {
+        "dwell": "dwell_minutes",
+        "override": "refresh_interval_minutes",
+        "conditions": "conditions",
+    }
+    if not isinstance(field, str) or field not in (
+        *step_fields,
+        "updates",
+        "pin",
+        "remove",
+        "home",
+        "duplicate",
+    ):
+        return _edit_error_json(_EditError("Unknown dashboard setting.", 400, deck_id))
+    if field == "updates" and (
+        not isinstance(value, int) or isinstance(value, bool) or not 0 <= value <= 1440
+    ):
+        return _edit_error_json(_EditError("Updates must be 0–1440 minutes.", 400, deck_id))
+    if field == "pin" and (not isinstance(value, str) or len(value) > 4096):
+        return _edit_error_json(_EditError("Invalid item key.", 400, deck_id))
+    if field in ("dwell", "override") and value is not None and not _is_int(value):
+        return _edit_error_json(_EditError("Choose a duration in minutes.", 400, deck_id))
+    if field == "duplicate" and not isinstance(value, str):
+        return _edit_error_json(_EditError("Choose a dashboard to add.", 400, deck_id))
+    display_id = request.args.get("display_id") or None
+    step_index = request.args.get("index", type=int)
+    page_devices = {p.id: list(p.device_ids) for p in _pages().list()}
+
+    def plan(decks: dict[str, Deck]) -> tuple[list[Deck], Deck]:
+        deck = decks.get(deck_id)
+        if (
+            deck is None
+            or step_index is None
+            or not 0 <= step_index < len(deck.pages)
+            or deck.pages[step_index].page_id != page_id
+        ):
+            raise _EditError("This dashboard is no longer in the lineup.", 404, deck_id)
+        if body.get("revision") != _deck_revision(deck):
+            raise _EditError(
+                "This lineup changed. Reopen the dashboard and try again.", 409, deck_id
+            )
+        pages = list(deck.pages)
+        index = step_index
+        step = pages[index]
+        if field in ("pin", "updates"):
+            if page_id not in page_devices:
+                raise _EditError("This dashboard was deleted.", 404, deck_id)
+            return [], deck
+        home = deck.home_page_id
+        entry = deck.entry_page_id
+        if field == "remove":
+            if len(pages) == 1:
+                raise _EditError("A lineup needs at least one dashboard.", 400, deck_id)
+            pages.pop(index)
+            if not any(p.page_id == page_id for p in pages):
+                if home == page_id:
+                    home = None
+                if entry == page_id:
+                    entry = None
+                pages = [
+                    p.model_copy(
+                        update={
+                            "links": [link for link in p.links if link.target_page_id != page_id]
+                        }
+                    )
+                    for p in pages
+                ]
+        elif field == "home":
+            home = page_id
+        elif field == "duplicate":
+            if value not in page_devices or value in deck.page_ids:
+                raise _EditError("That dashboard can't be added here.", 400, deck_id)
+            if guard_change(deck.device_ids, [value], Consent()):
+                raise _EditError("The copy isn't bound to the lineup's displays.", 400, deck_id)
+            pages.insert(index + 1, step.model_copy(update={"page_id": value}))
+        else:
+            pages[index] = DeckPage.model_validate({**step.model_dump(), step_fields[field]: value})
+        saved = _merged_deck(deck, pages=pages, home_page_id=home, entry_page_id=entry)
+        if field in ("remove", "duplicate"):
+            saved = _reshape_window(saved)
+        if field in ("remove", "duplicate", "dwell"):
+            with using_time_cycle(_time_cycle()):
+                _check_batch(decks, {**decks, deck.id: saved}, [deck.id], page_devices)
+        return [saved], saved
+
+    try:
+        current = _store().get(deck_id)
+        if current:
+            _sidebar_display(current, display_id)
+        saved = _store().transaction(plan)
+    except _EditError as exc:
+        return _edit_error_json(exc)
+    except ValidationError as exc:
+        return _edit_error_json(_EditError(_first_error(exc), 400, deck_id))
+
+    if field in ("pin", "updates"):
+        form_field = "pin" if field == "pin" else "page_refresh"
+        warnings = _save_dashboard_edits(
+            {f"{form_field}[{page_id}]": str(value)}, [page_id], display_id, bind=False
+        )
+        if warnings:
+            return _edit_error_json(_EditError(warnings[0], 409, deck_id))
+        # A dashboard setting applies to all lineups and displays using it.
+        touched = [d for d in _store().all() if page_id in d.page_ids]
+    else:
+        touched = [saved]
+    for deck in touched:
+        _invalidate(deck)
+    if field in ("remove", "duplicate") and saved.advance_trigger == "cycle":
+        resync = getattr(current_app.config.get("SCHEDULER"), "resync_cycle", None)
+        if callable(resync):
+            resync(deck_id)
+    return jsonify(ok=True, revision=_deck_revision(saved))
 
 
 @bp.get("/dashboard-items")
@@ -4279,7 +4470,9 @@ def editor_save() -> Response:
     return redirect(url)
 
 
-def _save_dashboard_edits(form: Any, ordered: list[str], display: str | None) -> list[str]:
+def _save_dashboard_edits(
+    form: Any, ordered: list[str], display: str | None, *, bind: bool = True
+) -> list[str]:
     """The dashboard settings the editor shows in a step's row: its own
     Updates (``page_refresh[id]``, minutes) and its widget's pin (``pin[id]``,
     an item key or "" to unpin). An unassigned dashboard added to the lineup
@@ -4311,12 +4504,12 @@ def _save_dashboard_edits(form: Any, ordered: list[str], display: str | None) ->
                     updated = updated.model_copy(update={"refresh_minutes": minutes})
                 pin_failed = False
                 if wants_pin:
-                    data = pin_page(updated, pin_key)
+                    data = pin_page(updated, pin_key, display)
                     if data is not None:
                         updated = Page.model_validate(data)
                     else:
                         pin_failed = True
-                if display and not updated.device_ids:
+                if bind and display and not updated.device_ids:
                     updated = updated.model_copy(update={"device_ids": [display]})
                 if pin_failed:
                     warnings.append(f"Couldn't pin {name}; its list didn't load.")
